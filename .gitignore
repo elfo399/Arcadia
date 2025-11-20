@@ -1,0 +1,78 @@
+# -----------------------------------------
+# Unity
+# -----------------------------------------
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+/[Rr]enderPipelineResources/
+/[Ss]haderCache/
+
+# Lightmap & GI cache
+/[Ll]ightmapSnapshot
+/[Gg]Icache/
+
+# Crash & error logs
+sysinfo.txt
+*.stacktrace
+
+# -----------------------------------------
+# Addressables
+# -----------------------------------------
+/ServerData/
+/StreamingAssets/aa.meta
+/StreamingAssets/aa/
+
+# -----------------------------------------
+# Package Manager
+# -----------------------------------------
+/Packages/manifest_temp.json
+/Packages/packages-lock.json.alt
+
+# Scriptable Build Pipeline
+/Library/com.unity.addressables/
+.*/ShaderCache/
+.*/PackageCache/
+
+# -----------------------------------------
+# IDE / Tools
+# -----------------------------------------
+/.idea/
+/.vs/
+/*.csproj
+/*.sln
+/*.user
+/*.unityproj
+/*.pidb
+/*.suo
+/*.tmp
+/*.userprefs
+.vscode/
+
+# Rider temp
+*.DotSettings.user
+
+# -----------------------------------------
+# Auto-generated builds
+# -----------------------------------------
+/*.apk
+/*.aab
+/*.xcodeproj
+/*.xcworkspace
+/*.xcconfig
+/*.ipa
+/*.app
+/*.exe
+/*.unitypackage
+
+# -----------------------------------------
+# OS junk
+# -----------------------------------------
+Thumbs.db
+Desktop.ini
+.DS_Store
