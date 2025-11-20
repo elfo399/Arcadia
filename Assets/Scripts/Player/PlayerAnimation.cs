@@ -6,10 +6,10 @@ public class PlayerAnimation : MonoBehaviour
     [SerializeField] private PlayerController playerController;
 
     private static readonly int SpeedParam = Animator.StringToHash("Speed");
+    private static readonly int IsSprintingParam = Animator.StringToHash("IsSprinting");
 
     void Reset()
     {
-        // Prova a trovare automaticamente i riferimenti
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
 
@@ -22,10 +22,10 @@ public class PlayerAnimation : MonoBehaviour
         if (animator == null || playerController == null)
             return;
 
-        // Leggiamo quanto si sta muovendo il player (0 = fermo, 1 = max input)
+        // 0..1: intensità del movimento (Idle/Run/Sprint)
         float speed = playerController.moveAmount;
 
-        // Passiamo il valore all'Animator (parametro "Speed")
         animator.SetFloat(SpeedParam, speed);
+        animator.SetBool(IsSprintingParam, playerController.isSprinting);
     }
 }
