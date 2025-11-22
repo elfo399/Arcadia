@@ -33,8 +33,7 @@ public class PlayerController : MonoBehaviour
     public float sprintStaminaCostPerSecond = 12f;
 
     [Header("Falling")]
-    // più vicino a 0 = animazione di caduta parte prima,
-    // ma con il check sullo stato "Jump" evitiamo la fase iniziale del salto
+    // Più vicino a 0 => anim di caduta parte prima
     public float fallingSpeedThreshold = -1.0f;
 
     [HideInInspector] public bool canMove = true;
@@ -253,11 +252,13 @@ public class PlayerController : MonoBehaviour
             var state = animator.GetCurrentAnimatorStateInfo(0);
             bool isInJumpAnim = state.IsName("Jump");
 
-            // Sei in aria, non stai rollando, non sei nel pieno della Jump,
-            // e la velocità Y è sotto la soglia → inizia la caduta
+            // 🔴 QUI LA FIX:
+            // Sei in aria, non stai rollando, NON sei in Jump, NON stai attaccando
+            // e stai cadendo abbastanza veloce → falling
             if (!controller.isGrounded &&
                 !isRolling &&
                 !isInJumpAnim &&
+                !isAttacking &&
                 velocity.y < fallingSpeedThreshold)
             {
                 isFalling = true;
