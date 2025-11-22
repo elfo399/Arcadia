@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a544078287434a34b9eda1b7e6dec126, type: 3}
+  m_Name: Sword
+  m_EditorClassIdentifier: 
+  weaponName: Sword
+  modelPrefab: {fileID: 0}
+  physicalDamage: 10
+  rightHandLightAttackAnim: Right_Slash_1
+  rightHandHeavyAttackAnim: 
+  leftHandLightAttackAnim: 
+  leftHandHeavyAttackAnim: 
+  lightAttackStaminaCost: 10
+  heavyAttackStaminaCost: 20
+  hasRightSkill: 0
+  hasLeftSkill: 0

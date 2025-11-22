@@ -127,6 +127,51 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""LightAttackRight"",
+                    ""type"": ""Button"",
+                    ""id"": ""c7f8eab9-809e-4a59-997f-e4f7e30285de"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""HeavyAttackRight"",
+                    ""type"": ""Button"",
+                    ""id"": ""36ae7561-7ac1-4c0c-a99c-862b0696139e"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""LightAttackLeft"",
+                    ""type"": ""Button"",
+                    ""id"": ""e28f34e7-1863-45ff-abc0-8be1bb8bae25"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""HeavyAttackLeft"",
+                    ""type"": ""Button"",
+                    ""id"": ""5ded5106-a744-476b-abff-22440d255008"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""UseFlask"",
+                    ""type"": ""Button"",
+                    ""id"": ""7855a816-d2c8-4336-8908-8c77dd5766bf"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -272,6 +317,116 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
                     ""action"": ""SprintOrDodge"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""971085d2-388c-4289-ba2e-b55bd26b236b"",
+                    ""path"": ""<Gamepad>/rightShoulder"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""LightAttackRight"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c47f09b6-46b2-4c10-bca8-ac110dba5953"",
+                    ""path"": ""<Mouse>/leftButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""LightAttackRight"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""2495ecc9-7601-4539-bf70-25b8d64d97b2"",
+                    ""path"": ""<Gamepad>/rightTrigger"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""HeavyAttackRight"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""63bf30a7-441b-49b7-83b7-8680b14d5933"",
+                    ""path"": ""<Mouse>/rightButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""HeavyAttackRight"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""70ef11c5-440c-4840-b69e-9c2cbfef33e1"",
+                    ""path"": ""<Gamepad>/leftShoulder"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""LightAttackLeft"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""332db82a-610d-4a3f-9ff9-5655943d3935"",
+                    ""path"": ""<Keyboard>/q"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""LightAttackLeft"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""0d44e238-c2f5-4821-a0bd-38ebef27c692"",
+                    ""path"": ""<Gamepad>/leftTrigger"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""HeavyAttackLeft"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""85eb2fa3-a0f8-4728-b901-8e4473b1ee17"",
+                    ""path"": ""<Keyboard>/e"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""HeavyAttackLeft"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""8e7e3c97-59b9-4170-ab85-fd61f86e8974"",
+                    ""path"": ""<Gamepad>/buttonWest"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""UseFlask"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""f3ecb909-68a5-4aff-b985-3e86936597a2"",
+                    ""path"": ""<Keyboard>/r"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""UseFlask"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -284,6 +439,11 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
         m_Player_Move = m_Player.FindAction("Move", throwIfNotFound: true);
         m_Player_Jump = m_Player.FindAction("Jump", throwIfNotFound: true);
         m_Player_SprintOrDodge = m_Player.FindAction("SprintOrDodge", throwIfNotFound: true);
+        m_Player_LightAttackRight = m_Player.FindAction("LightAttackRight", throwIfNotFound: true);
+        m_Player_HeavyAttackRight = m_Player.FindAction("HeavyAttackRight", throwIfNotFound: true);
+        m_Player_LightAttackLeft = m_Player.FindAction("LightAttackLeft", throwIfNotFound: true);
+        m_Player_HeavyAttackLeft = m_Player.FindAction("HeavyAttackLeft", throwIfNotFound: true);
+        m_Player_UseFlask = m_Player.FindAction("UseFlask", throwIfNotFound: true);
     }
 
     ~@PlayerControls()
@@ -368,6 +528,11 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Move;
     private readonly InputAction m_Player_Jump;
     private readonly InputAction m_Player_SprintOrDodge;
+    private readonly InputAction m_Player_LightAttackRight;
+    private readonly InputAction m_Player_HeavyAttackRight;
+    private readonly InputAction m_Player_LightAttackLeft;
+    private readonly InputAction m_Player_HeavyAttackLeft;
+    private readonly InputAction m_Player_UseFlask;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -395,6 +560,26 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/SprintOrDodge".
         /// </summary>
         public InputAction @SprintOrDodge => m_Wrapper.m_Player_SprintOrDodge;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/LightAttackRight".
+        /// </summary>
+        public InputAction @LightAttackRight => m_Wrapper.m_Player_LightAttackRight;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/HeavyAttackRight".
+        /// </summary>
+        public InputAction @HeavyAttackRight => m_Wrapper.m_Player_HeavyAttackRight;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/LightAttackLeft".
+        /// </summary>
+        public InputAction @LightAttackLeft => m_Wrapper.m_Player_LightAttackLeft;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/HeavyAttackLeft".
+        /// </summary>
+        public InputAction @HeavyAttackLeft => m_Wrapper.m_Player_HeavyAttackLeft;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/UseFlask".
+        /// </summary>
+        public InputAction @UseFlask => m_Wrapper.m_Player_UseFlask;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -433,6 +618,21 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
             @SprintOrDodge.started += instance.OnSprintOrDodge;
             @SprintOrDodge.performed += instance.OnSprintOrDodge;
             @SprintOrDodge.canceled += instance.OnSprintOrDodge;
+            @LightAttackRight.started += instance.OnLightAttackRight;
+            @LightAttackRight.performed += instance.OnLightAttackRight;
+            @LightAttackRight.canceled += instance.OnLightAttackRight;
+            @HeavyAttackRight.started += instance.OnHeavyAttackRight;
+            @HeavyAttackRight.performed += instance.OnHeavyAttackRight;
+            @HeavyAttackRight.canceled += instance.OnHeavyAttackRight;
+            @LightAttackLeft.started += instance.OnLightAttackLeft;
+            @LightAttackLeft.performed += instance.OnLightAttackLeft;
+            @LightAttackLeft.canceled += instance.OnLightAttackLeft;
+            @HeavyAttackLeft.started += instance.OnHeavyAttackLeft;
+            @HeavyAttackLeft.performed += instance.OnHeavyAttackLeft;
+            @HeavyAttackLeft.canceled += instance.OnHeavyAttackLeft;
+            @UseFlask.started += instance.OnUseFlask;
+            @UseFlask.performed += instance.OnUseFlask;
+            @UseFlask.canceled += instance.OnUseFlask;
         }
 
         /// <summary>
@@ -456,6 +656,21 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
             @SprintOrDodge.started -= instance.OnSprintOrDodge;
             @SprintOrDodge.performed -= instance.OnSprintOrDodge;
             @SprintOrDodge.canceled -= instance.OnSprintOrDodge;
+            @LightAttackRight.started -= instance.OnLightAttackRight;
+            @LightAttackRight.performed -= instance.OnLightAttackRight;
+            @LightAttackRight.canceled -= instance.OnLightAttackRight;
+            @HeavyAttackRight.started -= instance.OnHeavyAttackRight;
+            @HeavyAttackRight.performed -= instance.OnHeavyAttackRight;
+            @HeavyAttackRight.canceled -= instance.OnHeavyAttackRight;
+            @LightAttackLeft.started -= instance.OnLightAttackLeft;
+            @LightAttackLeft.performed -= instance.OnLightAttackLeft;
+            @LightAttackLeft.canceled -= instance.OnLightAttackLeft;
+            @HeavyAttackLeft.started -= instance.OnHeavyAttackLeft;
+            @HeavyAttackLeft.performed -= instance.OnHeavyAttackLeft;
+            @HeavyAttackLeft.canceled -= instance.OnHeavyAttackLeft;
+            @UseFlask.started -= instance.OnUseFlask;
+            @UseFlask.performed -= instance.OnUseFlask;
+            @UseFlask.canceled -= instance.OnUseFlask;
         }
 
         /// <summary>
@@ -524,5 +739,40 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnSprintOrDodge(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "LightAttackRight" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnLightAttackRight(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "HeavyAttackRight" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnHeavyAttackRight(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "LightAttackLeft" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnLightAttackLeft(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "HeavyAttackLeft" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnHeavyAttackLeft(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "UseFlask" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnUseFlask(InputAction.CallbackContext context);
     }
 }
