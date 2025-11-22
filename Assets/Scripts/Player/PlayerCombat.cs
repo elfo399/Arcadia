@@ -16,14 +16,14 @@ public class PlayerCombat : MonoBehaviour
     public bool isAttacking = false;
 
     [Header("Permissions")]
-    public bool canAttack = true; // 👈 NEW: se false, nessun attacco parte
+    public bool canAttack = true; // se false, nessun attacco parte
 
     void Awake()
     {
-        animator    = GetComponentInChildren<Animator>();
-        inventory   = GetComponent<PlayerInventory>();
-        stats       = GetComponent<PlayerStats>();
-        controller  = GetComponent<PlayerController>();
+        animator   = GetComponentInChildren<Animator>();
+        inventory  = GetComponent<PlayerInventory>();
+        stats      = GetComponent<PlayerStats>();
+        controller = GetComponent<PlayerController>();
 
         controls = new PlayerControls();
     }
@@ -46,13 +46,19 @@ public class PlayerCombat : MonoBehaviour
 
     void HandleAttackInput()
     {
-        // NON puoi attaccare se:
-        // - sei in roll
-        // - stai già attaccando
-        // - il controller ti ha disabilitato gli attacchi
+        bool isRolling = controller != null && controller.IsRolling;
+
+        // Se stai rollando o stai premendo il tasto di roll nello stesso frame,
+        // blocchiamo subito tutti gli input di attacco.
+        if (isRolling ||
+            controls.Player.SprintOrDodge.IsPressed() ||
+            controls.Player.SprintOrDodge.WasPerformedThisFrame())
+        {
+            return;
+        }
+
         if (!canAttack) return;
         if (isAttacking) return;
-        if (controller != null && controller.isDodging) return;
 
         // R1 → attacco leggero mano destra
         if (controls.Player.LightAttackRight.WasPerformedThisFrame())
@@ -91,9 +97,8 @@ public class PlayerCombat : MonoBehaviour
     {
         // sicurezza extra
         if (!canAttack) return;
-        if (controller != null && controller.isDodging) return;
+        if (controller != null && controller.IsRolling) return;
 
-        // Prendiamo l'arma (o i pugni se la mano è vuota)
         WeaponItem weapon = inventory.GetWeaponForHand(hand);
         if (weapon == null)
         {
@@ -101,22 +106,18 @@ public class PlayerCombat : MonoBehaviour
             return;
         }
 
-        // Stamina cost in base al tipo di attacco (preso dall'arma)
         float staminaCost = (type == AttackType.Light)
             ? weapon.lightAttackStaminaCost
             : weapon.heavyAttackStaminaCost;
 
-        // Se non hai stamina sufficiente, niente attacco
         if (!stats.HasStamina(staminaCost))
         {
             Debug.Log("Stamina insufficiente per " + type + " con " + weapon.weaponName);
             return;
         }
 
-        // Consuma stamina
         stats.SpendStamina(staminaCost);
 
-        // Esegui davvero l'attacco
         PerformAttack(weapon, hand, type);
     }
 
@@ -140,7 +141,6 @@ public class PlayerCombat : MonoBehaviour
         isAttacking = true;
         animator.CrossFadeInFixedTime(animToPlay, 0.1f);
 
-        // per ora blocchiamo per mezzo secondo
         Invoke(nameof(ResetAttackFlag), 0.5f);
     }
 
@@ -151,7 +151,6 @@ public class PlayerCombat : MonoBehaviour
 
     string GetAttackAnimation(WeaponAnimationProfile profile, Hand hand, AttackType type, bool isAirAttack)
     {
-        // AIR ATTACK (solo light)
         if (isAirAttack && type == AttackType.Light)
         {
             if (hand == Hand.Right && !string.IsNullOrEmpty(profile.rightHandAirAttackAnim))
@@ -161,7 +160,6 @@ public class PlayerCombat : MonoBehaviour
                 return profile.leftHandAirAttackAnim;
         }
 
-        // Normale
         if (hand == Hand.Right)
         {
             if (type == AttackType.Light)

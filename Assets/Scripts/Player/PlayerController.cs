@@ -32,6 +32,11 @@ public class PlayerController : MonoBehaviour
     public float jumpStaminaCost = 15f;
     public float sprintStaminaCostPerSecond = 12f;
 
+    [Header("Falling")]
+    // più vicino a 0 = animazione di caduta parte prima,
+    // ma con il check sullo stato "Jump" evitiamo la fase iniziale del salto
+    public float fallingSpeedThreshold = -1.0f;
+
     [HideInInspector] public bool canMove = true;
     [HideInInspector] public float moveAmount;
     [HideInInspector] public bool isSprinting = false;
@@ -42,9 +47,11 @@ public class PlayerController : MonoBehaviour
     private Vector3 velocity;
     private Transform cam;
     private PlayerControls controls;
-    private PlayerCombat combat;          // rif. al combat per sapere se stai attaccando
+    private PlayerCombat combat;
 
     [HideInInspector] public bool isDodging = false;
+    [HideInInspector] public bool isFalling = false;
+
     public bool IsGrounded => controller != null && controller.isGrounded;
     private float lastDodgeTime = -999f;
 
@@ -58,6 +65,27 @@ public class PlayerController : MonoBehaviour
 
     // riferimento alle stats
     private PlayerStats playerStats;
+
+    /// <summary>
+    /// Vero se il player sta facendo il roll:
+    /// - durante il coroutine (isDodging)
+    /// - oppure finché l'animazione "Roll" non ha passato l'80% circa.
+    /// </summary>
+    public bool IsRolling
+    {
+        get
+        {
+            if (animator == null)
+                return isDodging;
+
+            var state = animator.GetCurrentAnimatorStateInfo(0);
+            bool inMainRollAnim = state.IsName("Roll") && state.normalizedTime < 0.8f;
+
+            return isDodging || inMainRollAnim;
+        }
+    }
+
+    public bool IsFalling => isFalling;
 
     void Awake()
     {
@@ -76,13 +104,10 @@ public class PlayerController : MonoBehaviour
     void OnEnable() => controls.Player.Enable();
     void OnDisable() => controls.Player.Disable();
 
-
     void Update()
     {
-        //--------------------------------------------------
-        // STATO ATTACCO
-        //--------------------------------------------------
         bool isAttacking = combat != null && combat.isAttacking;
+        bool isRolling   = IsRolling;
 
         //--------------------------------------------------
         // GROUND CHECK + COYOTE TIME
@@ -93,12 +118,15 @@ public class PlayerController : MonoBehaviour
 
             if (velocity.y < 0f)
                 velocity.y = -2f;
+
+            // appena tocchi terra, non sei più in falling
+            isFalling = false;
         }
 
         //--------------------------------------------------
-        // INPUT MOVIMENTO
+        // INPUT MOVIMENTO (PUOI MUOVERTI ANCHE IN CADUTA)
         //--------------------------------------------------
-        Vector2 moveInput = canMove && !isDodging && !isAttacking
+        Vector2 moveInput = canMove && !isRolling && !isAttacking
             ? controls.Player.Move.ReadValue<Vector2>()
             : Vector2.zero;
 
@@ -107,7 +135,7 @@ public class PlayerController : MonoBehaviour
         //--------------------------------------------------
         // INPUT SprintOrDodge
         //--------------------------------------------------
-        bool pressed = controls.Player.SprintOrDodge.WasPerformedThisFrame();
+        bool pressed  = controls.Player.SprintOrDodge.WasPerformedThisFrame();
         bool released = controls.Player.SprintOrDodge.WasReleasedThisFrame();
 
         if (pressed)
@@ -116,14 +144,13 @@ public class PlayerController : MonoBehaviour
             actionButtonHeld = true;
         }
 
-        // SPRINT solo se: a terra o coyote + ti muovi + tieni premuto + NON stai attaccando
+        // SPRINT: solo terra/coyote + movimento + hold + no attacco/roll/falling
         bool canSprint = (Time.time - lastGroundedTime) <= coyoteTime;
 
-        if (actionButtonHeld && !isSprinting && canSprint && moveAmount > 0.01f && !isAttacking)
+        if (actionButtonHeld && !isSprinting && canSprint && moveAmount > 0.01f && !isAttacking && !isRolling && !isFalling)
         {
             if (Time.time - actionButtonDownTime >= sprintThreshold)
             {
-                // controlla che ci sia almeno un minimo di stamina
                 if (playerStats == null || playerStats.HasStamina(1f))
                 {
                     isSprinting = true;
@@ -131,15 +158,14 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // RILASCIO tasto
         if (released)
         {
             float holdTime = Time.time - actionButtonDownTime;
 
             if (holdTime < sprintThreshold)
             {
-                // TAP → roll (ma non rollare se stai attaccando)
-                if (!isAttacking)
+                // TAP → roll (ma non rollare se stai attaccando, rollando o cadendo)
+                if (!isAttacking && !isRolling && !isFalling)
                     TryDodge(moveInput);
             }
 
@@ -150,15 +176,12 @@ public class PlayerController : MonoBehaviour
         //--------------------------------------------------
         // CONSUMO STAMINA PER SPRINT
         //--------------------------------------------------
-        if (isSprinting && moveAmount > 0.01f && playerStats != null)
+        if (isSprinting && moveAmount > 0.01f && playerStats != null && !isRolling && !isFalling)
         {
             playerStats.SpendStaminaPerSecond(sprintStaminaCostPerSecond);
 
-            // se finisce la stamina, stop sprint
             if (!playerStats.HasStamina(1f))
-            {
                 isSprinting = false;
-            }
         }
 
         //--------------------------------------------------
@@ -168,11 +191,11 @@ public class PlayerController : MonoBehaviour
             isSprinting = false;
 
         //--------------------------------------------------
-        // MOVIMENTO + ROTAZIONE
+        // MOVIMENTO + ROTAZIONE (DISABILITATI SOLO SE ROLL O ATTACCO)
         //--------------------------------------------------
         float currentSpeed = moveSpeed * (isSprinting ? sprintMultiplier : 1f);
 
-        if (moveAmount > 0.01f && !isDodging && !isAttacking)
+        if (moveAmount > 0.01f && !isRolling && !isAttacking)
         {
             Vector3 camForward = cam.forward;
             camForward.y = 0f;
@@ -196,27 +219,23 @@ public class PlayerController : MonoBehaviour
         }
 
         //--------------------------------------------------
-        // JUMP (con coyote time + costo stamina)
-        // NIENTE JUMP SE ATTACCHI
+        // JUMP (bloccato se roll, attacco o falling)
         //--------------------------------------------------
         bool jumpPressed = controls.Player.Jump.WasPerformedThisFrame();
 
-        if (jumpPressed && !isDodging && !isAttacking)
+        if (jumpPressed && !isRolling && !isAttacking && !isFalling)
         {
             if (Time.time - lastGroundedTime <= coyoteTime)
             {
-                // richiede stamina per saltare
                 if (playerStats == null || playerStats.HasStamina(jumpStaminaCost))
                 {
                     if (playerStats != null)
                         playerStats.SpendStamina(jumpStaminaCost);
 
-                    // ANIMAZIONE
                     animator.CrossFadeInFixedTime("Jump", 0.05f, 0, 0.2f);
 
                     velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
                 }
-                // se non ha stamina, non salta
             }
         }
 
@@ -225,23 +244,44 @@ public class PlayerController : MonoBehaviour
         //--------------------------------------------------
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
-    }
 
+        //--------------------------------------------------
+        // FALLING DETECTION (DOPO LA GRAVITY)
+        //--------------------------------------------------
+        if (animator != null)
+        {
+            var state = animator.GetCurrentAnimatorStateInfo(0);
+            bool isInJumpAnim = state.IsName("Jump");
+
+            // Sei in aria, non stai rollando, non sei nel pieno della Jump,
+            // e la velocità Y è sotto la soglia → inizia la caduta
+            if (!controller.isGrounded &&
+                !isRolling &&
+                !isInJumpAnim &&
+                velocity.y < fallingSpeedThreshold)
+            {
+                isFalling = true;
+            }
+
+            //--------------------------------------------------
+            // PARAMETRI ANIMATOR
+            //--------------------------------------------------
+            animator.SetBool("IsFalling", isFalling);
+        }
+    }
 
     //--------------------------------------------------
     // ROLL / DODGE
     //--------------------------------------------------
     private void TryDodge(Vector2 moveInput)
-    {  
+    {
         if (isDodging) return;
-        if (combat != null && combat.isAttacking) return; // niente roll durante attacco
+        if (combat != null && combat.isAttacking) return;
         if (Time.time < lastDodgeTime + dodgeCooldown) return;
 
-        // Roll SOLO a terra (o coyote)
         bool canRoll = (Time.time - lastGroundedTime) <= coyoteTime;
         if (!canRoll) return;
 
-        // serve stamina per rollare
         if (playerStats != null && !playerStats.HasStamina(rollStaminaCost))
             return;
 
@@ -251,22 +291,21 @@ public class PlayerController : MonoBehaviour
         StartCoroutine(DodgeCoroutine(moveInput));
     }
 
-
     private IEnumerator DodgeCoroutine(Vector2 moveInput)
     {
         isDodging = true;
         canMove = false;
         lastDodgeTime = Time.time;
-    
-        // 👇 DISABILITA ATTACCHI DURANTE TUTTO IL ROLL
+
+        // blocca attacchi durante il roll
         if (combat != null)
             combat.canAttack = false;
-    
+
         //--------------------------------------------------
         // DIREZIONE ROLL
         //--------------------------------------------------
         Vector3 dodgeDir;
-    
+
         if (moveInput.sqrMagnitude > 0.01f)
         {
             Vector3 camForward = cam.forward; camForward.y = 0f; camForward.Normalize();
@@ -277,43 +316,42 @@ public class PlayerController : MonoBehaviour
         {
             dodgeDir = transform.forward;
         }
-    
+
         dodgeDir.y = 0f;
         dodgeDir.Normalize();
-    
+
         //--------------------------------------------------
-        // ANIMAZIONE ROLL (istantanea)
+        // ANIMAZIONE ROLL
         //--------------------------------------------------
         animator.CrossFadeInFixedTime("Roll", 0.05f, 0, 0.2f);
-    
+
         //--------------------------------------------------
         // ASPETTA micro delay per sincronizzare col tuffo
         //--------------------------------------------------
         yield return new WaitForSeconds(rollStartDelay);
-    
+
         //--------------------------------------------------
         // MOVIMENTO ROLL (con curva)
         //--------------------------------------------------
         float elapsed = 0f;
-    
+
         while (elapsed < dodgeDuration)
         {
             float t = elapsed / dodgeDuration;
             float curveValue = dodgeSpeedCurve.Evaluate(t);
             float currentSpeed = (dodgeDistance / dodgeDuration) * curveValue;
-    
+
             controller.Move(dodgeDir * currentSpeed * Time.deltaTime);
-    
+
             elapsed += Time.deltaTime;
             yield return null;
         }
-    
+
         isDodging = false;
         canMove = true;
-    
-        // 👇 RIABILITA GLI ATTACCHI A ROLL FINITO
+
+        // riabilita gli attacchi solo a roll finito
         if (combat != null)
             combat.canAttack = true;
     }
-
 }
