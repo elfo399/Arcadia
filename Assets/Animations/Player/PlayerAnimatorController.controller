@@ -319,7 +319,7 @@ AnimatorStateMachine:
     m_Position: {x: 110, y: 0, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 2239814267185230435}
-    m_Position: {x: 530, y: 0, z: 0}
+    m_Position: {x: -230, y: -210, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -4240158174751671217}
     m_Position: {x: 10, y: -100, z: 0}
@@ -332,11 +332,12 @@ AnimatorStateMachine:
   m_ChildStateMachines: []
   m_AnyStateTransitions:
   - {fileID: 2460225024884540579}
+  - {fileID: 6568547733043275703}
   m_EntryTransitions: []
   m_StateMachineTransitions: {}
   m_StateMachineBehaviours: []
   m_AnyStatePosition: {x: -280, y: -60, z: 0}
-  m_EntryPosition: {x: -100, y: 100, z: 0}
+  m_EntryPosition: {x: -90, y: -30, z: 0}
   m_ExitPosition: {x: 800, y: 120, z: 0}
   m_ParentStateMachinePosition: {x: 800, y: 20, z: 0}
   m_DefaultState: {fileID: -5260084119487245358}
@@ -710,6 +711,31 @@ AnimatorStateTransition:
   m_InterruptionSource: 0
   m_OrderedInterruption: 1
   m_CanTransitionToSelf: 1
+--- !u!1101 &6568547733043275703
+AnimatorStateTransition:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_Conditions:
+  - m_ConditionMode: 1
+    m_ConditionEvent: DrinkPotion
+    m_EventTreshold: 0
+  m_DstStateMachine: {fileID: 0}
+  m_DstState: {fileID: 2239814267185230435}
+  m_Solo: 0
+  m_Mute: 0
+  m_IsExit: 0
+  serializedVersion: 3
+  m_TransitionDuration: 0.1
+  m_TransitionOffset: 0
+  m_ExitTime: 0.75
+  m_HasExitTime: 0
+  m_HasFixedDuration: 1
+  m_InterruptionSource: 0
+  m_OrderedInterruption: 1
+  m_CanTransitionToSelf: 1
 --- !u!1101 &6611516191195881130
 AnimatorStateTransition:
   m_ObjectHideFlags: 1
@@ -829,7 +855,7 @@ AnimatorStateTransition:
   m_Conditions:
   - m_ConditionMode: 3
     m_ConditionEvent: Speed
-    m_EventTreshold: 0.1
+    m_EventTreshold: 0.01
   m_DstStateMachine: {fileID: 0}
   m_DstState: {fileID: -6830891853741984096}
   m_Solo: 0

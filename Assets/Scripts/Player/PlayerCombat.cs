@@ -41,15 +41,16 @@ public class PlayerCombat : MonoBehaviour
     void Update()
     {
         HandleAttackInput();
-        HandleFlaskInput();
+        HandleFlaskInput();   // usa la flask solo se sei libero
     }
+
+    //──────────────── INPUT ATTACCO ────────────────
 
     void HandleAttackInput()
     {
         bool isRolling = controller != null && controller.IsRolling;
 
-        // Se stai rollando o stai premendo il tasto di roll nello stesso frame,
-        // blocchiamo subito tutti gli input di attacco.
+        // se stai rollando o premi il tasto roll → niente attacchi
         if (isRolling ||
             controls.Player.SprintOrDodge.IsPressed() ||
             controls.Player.SprintOrDodge.WasPerformedThisFrame())
@@ -60,42 +61,51 @@ public class PlayerCombat : MonoBehaviour
         if (!canAttack) return;
         if (isAttacking) return;
 
-        // R1 → attacco leggero mano destra
         if (controls.Player.LightAttackRight.WasPerformedThisFrame())
         {
             TryAttack(Hand.Right, AttackType.Light);
         }
 
-        // L1 → attacco leggero mano sinistra
         if (controls.Player.LightAttackLeft.WasPerformedThisFrame())
         {
             TryAttack(Hand.Left, AttackType.Light);
         }
 
-        // R2 → attacco pesante mano destra
         if (controls.Player.HeavyAttackRight.WasPerformedThisFrame())
         {
             TryAttack(Hand.Right, AttackType.Heavy);
         }
 
-        // L2 → attacco pesante mano sinistra
         if (controls.Player.HeavyAttackLeft.WasPerformedThisFrame())
         {
             TryAttack(Hand.Left, AttackType.Heavy);
         }
     }
 
+    //──────────────── INPUT FLASK (Quadrato) ────────────────
+    // IGNORA se stai saltando / rollando / attaccando.
+
     void HandleFlaskInput()
     {
-        if (controls.Player.UseFlask.WasPerformedThisFrame())
-        {
-            stats.UseFlask();
-        }
+        if (!controls.Player.UseFlask.WasPerformedThisFrame())
+            return;
+
+        bool isRolling  = controller != null && controller.IsRolling;
+        bool isGrounded = controller == null || controller.IsGrounded;
+
+        // se sei occupato → ignora
+        if (isRolling) return;
+        if (isAttacking) return;
+        if (!isGrounded) return;   // in aria (salto / caduta) → ignora
+
+        // qui sei: a terra, non roll, non attacco → puoi curarti
+        stats.UseFlask();
     }
+
+    //──────────────── LOGICA ATTACCO ────────────────
 
     void TryAttack(Hand hand, AttackType type)
     {
-        // sicurezza extra
         if (!canAttack) return;
         if (controller != null && controller.IsRolling) return;
 
@@ -117,7 +127,6 @@ public class PlayerCombat : MonoBehaviour
         }
 
         stats.SpendStamina(staminaCost);
-
         PerformAttack(weapon, hand, type);
     }
 
