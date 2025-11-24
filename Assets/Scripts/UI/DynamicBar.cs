@@ -4,30 +4,35 @@ using UnityEngine.UI;
 public class DynamicBar : MonoBehaviour
 {
     [Header("References")]
-    public RectTransform frameRect;   // il frame da allargare (bordo)
-    public Image fillImage;           // la barra interna (Filled)
+    // Frame that resizes based on maximum value
+    public RectTransform frameRect;
+    // Fill image representing the current amount
+    public Image fillImage;
 
     [Header("Settings")]
-    public float baseWidth = 120f;      // larghezza minima del frame
-    public float widthPerPoint = 1f;    // quanti pixel per ogni punto di max
-    public float horizontalPadding = 10f; // margine sinistra/destra del fill
+    // Minimum width of the bar frame
+    public float baseWidth = 120f;
+    // Additional width per maximum point
+    public float widthPerPoint = 1f;
+    // Padding applied horizontally to the fill
+    public float horizontalPadding = 10f;
 
+    // Maximum value represented by the bar
     private float maxValue  = 1f;
+    // Current value represented by the fill
     private float currentValue = 1f;
 
-    // MAX = cambia la dimensione del frame in base al valore massimo
+    // Resize the frame and fill according to the new maximum
     public void SetMax(float max)
     {
-        maxValue = Mathf.Max(1f, max);   // evita 0
+        maxValue = Mathf.Max(1f, max);
 
         if (frameRect == null)
             frameRect = GetComponent<RectTransform>();
 
-        // 1) Calcola larghezza del FRAME
         float newWidth = baseWidth + maxValue * widthPerPoint;
         frameRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, newWidth);
 
-        // 2) Adatta il FILL alla nuova larghezza del frame
         if (fillImage != null)
         {
             RectTransform fillRect = fillImage.rectTransform;
@@ -35,17 +40,14 @@ public class DynamicBar : MonoBehaviour
             float fillWidth = newWidth - horizontalPadding * 2f;
             if (fillWidth < 0f) fillWidth = 0f;
 
-            // larghezza del fill
             fillRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, fillWidth);
-            // posizione del fill (spostato del padding da sinistra)
             fillRect.anchoredPosition = new Vector2(horizontalPadding, fillRect.anchoredPosition.y);
         }
 
-        // 3) aggiorna il riempimento con il nuovo max
         SetCurrent(currentValue);
     }
 
-    // CURRENT = aggiorna solo il fill (quanto è piena la barra)
+    // Update the fill amount according to the current value
     public void SetCurrent(float current)
     {
         currentValue = Mathf.Clamp(current, 0f, maxValue);

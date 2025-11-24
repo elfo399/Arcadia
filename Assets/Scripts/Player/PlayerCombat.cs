@@ -6,51 +6,60 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(PlayerController))]
 public class PlayerCombat : MonoBehaviour
 {
+    // Animator used to play attack and flask animations
     private Animator animator;
+    // Inventory providing equipped weapons
     private PlayerInventory inventory;
+    // Stats reference for stamina and flasks
     private PlayerStats stats;
+    // Input actions for combat
     private PlayerControls controls;
+    // Controller reference for movement state checks
     private PlayerController controller;
 
     [Header("Combat Flags")]
+    // True while an attack animation is playing
     public bool isAttacking = false;
 
     [Header("Permissions")]
-    public bool canAttack = true; // se false, nessun attacco parte
+    // Gate to disable attacks when false
+    public bool canAttack = true;
 
+    // Cache component references and initialize input
     void Awake()
     {
-        animator   = GetComponentInChildren<Animator>();
-        inventory  = GetComponent<PlayerInventory>();
-        stats      = GetComponent<PlayerStats>();
+        animator = GetComponentInChildren<Animator>();
+        inventory = GetComponent<PlayerInventory>();
+        stats = GetComponent<PlayerStats>();
         controller = GetComponent<PlayerController>();
 
         controls = new PlayerControls();
     }
 
+    // Enable player combat input
     void OnEnable()
     {
         controls.Player.Enable();
     }
 
+    // Disable player combat input
     void OnDisable()
     {
         controls.Player.Disable();
     }
 
+    // Poll input for attacks and flask usage
     void Update()
     {
         HandleAttackInput();
-        HandleFlaskInput();   // usa la flask solo se sei libero
+        HandleFlaskInput();
     }
 
-    //──────────────── INPUT ATTACCO ────────────────
-
+    // Process attack input if the player is allowed to attack
     void HandleAttackInput()
     {
         bool isRolling = controller != null && controller.IsRolling;
 
-        // se stai rollando o premi il tasto roll → niente attacchi
         if (isRolling ||
             controls.Player.SprintOrDodge.IsPressed() ||
             controls.Player.SprintOrDodge.WasPerformedThisFrame())
@@ -82,28 +91,23 @@ public class PlayerCombat : MonoBehaviour
         }
     }
 
-    //──────────────── INPUT FLASK (Quadrato) ────────────────
-    // IGNORA se stai saltando / rollando / attaccando.
-
+    // Consume a flask if the player is free and grounded
     void HandleFlaskInput()
     {
         if (!controls.Player.UseFlask.WasPerformedThisFrame())
             return;
 
-        bool isRolling  = controller != null && controller.IsRolling;
+        bool isRolling = controller != null && controller.IsRolling;
         bool isGrounded = controller == null || controller.IsGrounded;
 
-        // se sei occupato → ignora
         if (isRolling) return;
         if (isAttacking) return;
-        if (!isGrounded) return;   // in aria (salto / caduta) → ignora
+        if (!isGrounded) return;
 
-        // qui sei: a terra, non roll, non attacco → puoi curarti
         stats.UseFlask();
     }
 
-    //──────────────── LOGICA ATTACCO ────────────────
-
+    // Try to perform an attack with the specified hand and type
     void TryAttack(Hand hand, AttackType type)
     {
         if (!canAttack) return;
@@ -130,6 +134,7 @@ public class PlayerCombat : MonoBehaviour
         PerformAttack(weapon, hand, type);
     }
 
+    // Execute attack animation and flag handling
     void PerformAttack(WeaponItem weapon, Hand hand, AttackType type)
     {
         if (weapon.animationProfile == null)
@@ -153,11 +158,13 @@ public class PlayerCombat : MonoBehaviour
         Invoke(nameof(ResetAttackFlag), 0.5f);
     }
 
+    // Reset attack flag after animation window
     void ResetAttackFlag()
     {
         isAttacking = false;
     }
 
+    // Determine which animation name to use for the given attack
     string GetAttackAnimation(WeaponAnimationProfile profile, Hand hand, AttackType type, bool isAirAttack)
     {
         if (isAirAttack && type == AttackType.Light)
@@ -176,7 +183,7 @@ public class PlayerCombat : MonoBehaviour
 
             return profile.rightHandHeavyAttackAnim;
         }
-        else // Left
+        else
         {
             if (type == AttackType.Light)
                 return profile.leftHandLightAttackAnim;

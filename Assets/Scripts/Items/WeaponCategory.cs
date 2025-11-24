@@ -1,10 +1,17 @@
 public enum WeaponCategory
-    {
-        Unarmed,
-        StraightSword,
-        Greatsword,
-        Dagger,
-        Axe,
-        Spear,
-        Special // per armi uniche / boss
-    }
+{
+    // Default unarmed state
+    Unarmed,
+    // Standard one-handed sword
+    StraightSword,
+    // Heavy two-handed sword
+    Greatsword,
+    // Lightweight dagger
+    Dagger,
+    // Axe weapons
+    Axe,
+    // Spear or polearm weapons
+    Spear,
+    // Unique or boss weapons
+    Special
+}
