@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: d193a764e528253418a9c8161269688c
+guid: b613763f1d5b22442a8a27b87669f37c
 ModelImporter:
   serializedVersion: 22200
   internalIDToNameTable:
@@ -8,7 +8,7 @@ ModelImporter:
     second: tpose
   - first:
       74: 5327579647636344352
-    second: PunchLeft
+    second: MyPunchLeft
   externalObjects: {}
   materials:
     materialImportMode: 1
@@ -63,7 +63,7 @@ ModelImporter:
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
       events:
-      - time: 0.8308824
+      - time: 0.95441175
         functionName: CallEndAttack
         data: 
         objectReferenceParameter: {instanceID: 0}
@@ -73,9 +73,9 @@ ModelImporter:
       transformMask: []
       maskType: 3
       maskSource: {instanceID: 0}
-      additiveReferencePoseFrame: 0
+      additiveReferencePoseFrame: 2
     - serializedVersion: 16
-      name: PunchLeft
+      name: MyPunchLeft
       takeName: human_male_punch_01
       internalID: 0
       firstFrame: 2
@@ -98,11 +98,18 @@ ModelImporter:
       mirror: 0
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
-      events: []
+      events:
+      - time: 0.9189815
+        functionName: CallEndAttack
+        data: 
+        objectReferenceParameter: {instanceID: 0}
+        floatParameter: 0
+        intParameter: 0
+        messageOptions: 0
       transformMask: []
       maskType: 3
       maskSource: {instanceID: 0}
-      additiveReferencePoseFrame: 0
+      additiveReferencePoseFrame: 2
     isReadable: 0
   meshes:
     lODScreenPercentages: []
