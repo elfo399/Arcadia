@@ -41,6 +41,7 @@ public class SimpleDungeonGenerator : MonoBehaviour
     private readonly Vector2Int West = Vector2Int.left;
 
     void Start() { Generate(); }
+    
     void Update() { 
         if (MinimapManager.instance && playerTransform) 
             MinimapManager.instance.UpdatePlayerPosition(playerTransform.position, xOffset); 
@@ -48,12 +49,13 @@ public class SimpleDungeonGenerator : MonoBehaviour
 
     void Generate()
     {
+        // 1. INIT SEED
         if (useRandomSeed) gameSeed = GenerateRandomId();
         gameSeed = gameSeed.ToUpper();
         Random.InitState(gameSeed.GetHashCode());
         Debug.Log($"<color=cyan>SEED: {gameSeed}</color>");
 
-        // PULIZIA
+        // 2. PULIZIA
         foreach (var r in activeRooms) if (r != null) Destroy(r.gameObject);
         activeRooms.Clear();
         gridMap.Clear();
@@ -107,7 +109,7 @@ public class SimpleDungeonGenerator : MonoBehaviour
         return true;
     }
 
-    // Abbiamo rimosso il parametro 'string type' perché è ridondante!
+    // Qui c'era l'errore: abbiamo rimosso il parametro 'string type'
     void SpawnRoom(Vector2Int anchorPos, Room prefab)
     {
         Vector3 worldPos = new Vector3(anchorPos.x * xOffset, 0, anchorPos.y * zOffset);
@@ -133,7 +135,8 @@ public class SimpleDungeonGenerator : MonoBehaviour
             if (pos != Vector2Int.zero && gridMap.ContainsKey(pos))
             {
                 Room current = gridMap[pos];
-                // Controlliamo che non sia già una stanza speciale usando i BOOLeani
+                
+                // --- FIX QUI SOTTO: Usiamo i dati dentro RoomData invece di internalRoomType ---
                 if (current.roomData.isStartRoom || current.roomData.isBossRoom) continue;
 
                 Room bossPrefab = GetBossPrefab(current.roomData.size);
@@ -153,7 +156,7 @@ public class SimpleDungeonGenerator : MonoBehaviour
             {
                 Room r = gridMap[rndPos];
                 
-                // Usiamo i flag di RoomData per assicurarci di sostituire solo stanze normali
+                // --- FIX QUI SOTTO ---
                 if (!r.roomData.isStartRoom && !r.roomData.isBossRoom && r.roomData.size == new Vector2Int(1,1))
                 {
                     ReplaceRoom(r, treasure1x1);
@@ -227,7 +230,7 @@ public class SimpleDungeonGenerator : MonoBehaviour
             int ax = Mathf.RoundToInt(r.transform.position.x / xOffset);
             int ay = Mathf.RoundToInt(r.transform.position.z / zOffset);
             
-            // Passiamo direttamente RoomData, che contiene tutte le info (Size e Tipo)
+            // --- FIX QUI SOTTO: Passiamo RoomData ---
             MinimapManager.instance.RegisterRoom(new Vector2Int(ax, ay), r.roomData);
         }
     }
