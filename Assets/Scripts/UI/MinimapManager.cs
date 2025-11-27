@@ -14,6 +14,7 @@ public class MinimapManager : MonoBehaviour
     public Sprite skullIcon;   // Boss
     public Sprite crownIcon;   // Treasure
     public Sprite startIcon;   // Start
+    public Sprite shopIcon;   // Start
 
     [Header("Colori")]
     public Color currentRoomColor = Color.white;
@@ -92,6 +93,12 @@ public class MinimapManager : MonoBehaviour
             {
                 fillImage.color = specialRoomColor; 
                 overlayImg.sprite = startIcon;
+                overlayImg.gameObject.SetActive(true);
+            }
+            else if (data.isShopRoom && shopIcon != null)
+            {
+                fillImage.color = specialRoomColor;
+                overlayImg.sprite = shopIcon;
                 overlayImg.gameObject.SetActive(true);
             }
         }

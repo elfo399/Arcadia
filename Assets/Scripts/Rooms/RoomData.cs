@@ -14,4 +14,5 @@ public class RoomData : ScriptableObject
     public bool isBossRoom;
     public bool isTreasureRoom;
     public bool isStartRoom;
+    public bool isShopRoom;
 }
