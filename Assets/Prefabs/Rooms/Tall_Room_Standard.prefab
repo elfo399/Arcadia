@@ -1477,6 +1477,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2465098802145948511}
   - component: {fileID: 9073747019927318074}
+  - component: {fileID: 7322722828731293067}
   m_Layer: 0
   m_Name: Tall_Room_Standard
   m_TagString: Untagged
@@ -1526,37 +1527,67 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   roomData: {fileID: 11400000, guid: 703bab4fcbd926d4693df762c70a8d81, type: 2}
+  internalRoomType: Normal
   doors:
   - label: North DX
     gridOffset: {x: 0, y: 1}
     direction: {x: 0, y: 1}
     doorObject: {fileID: 4468019011060315025}
     wallObject: {fileID: 4907858621689939227}
+    isConnected: 0
   - label: South DX
     gridOffset: {x: 0, y: 0}
     direction: {x: 0, y: -1}
     doorObject: {fileID: 992268561662703808}
     wallObject: {fileID: 3060343329876996752}
+    isConnected: 0
   - label: West_SX
     gridOffset: {x: 0, y: 0}
     direction: {x: -1, y: 0}
     doorObject: {fileID: 5692850843076534909}
     wallObject: {fileID: 4384561209117864248}
+    isConnected: 0
   - label: West_DX
     gridOffset: {x: 0, y: 1}
     direction: {x: -1, y: 0}
     doorObject: {fileID: 6607862612952269542}
     wallObject: {fileID: 3458865883069993561}
+    isConnected: 0
   - label: East_SX
     gridOffset: {x: 0, y: 0}
     direction: {x: 1, y: 0}
     doorObject: {fileID: 5254987993790537219}
     wallObject: {fileID: 3596602838662624233}
+    isConnected: 0
   - label: East_DX
     gridOffset: {x: 0, y: 1}
     direction: {x: 1, y: 0}
     doorObject: {fileID: 1953106945190598228}
     wallObject: {fileID: 7517478782434005477}
+    isConnected: 0
+  roomCleared: 0
+  activeEnemies: []
+--- !u!65 &7322722828731293067
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4485767998833019594}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 45, y: 1, z: 95}
+  m_Center: {x: 0, y: 1, z: 25}
 --- !u!1 &4523402569780469222
 GameObject:
   m_ObjectHideFlags: 0

@@ -1057,6 +1057,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4632564547433871007}
   - component: {fileID: 2275314461642173434}
+  - component: {fileID: -5785350862033272322}
   m_Layer: 0
   m_Name: Room_Shop
   m_TagString: Untagged
@@ -1078,7 +1079,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 382720306513167504}
-  - {fileID: 5469367549916586497}
   - {fileID: 4071497228326024138}
   - {fileID: 3080162491272494820}
   - {fileID: 2033433490515560989}
@@ -1102,27 +1102,55 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   roomData: {fileID: 11400000, guid: 7531a94d89179294484fc139acf7ff84, type: 2}
+  internalRoomType: Normal
   doors:
   - label: North
     gridOffset: {x: 0, y: 0}
     direction: {x: 0, y: 1}
     doorObject: {fileID: 75610467913206445}
     wallObject: {fileID: 6690670704869111997}
+    isConnected: 0
   - label: South
     gridOffset: {x: 0, y: 0}
     direction: {x: 0, y: -1}
     doorObject: {fileID: 8050985167038856448}
     wallObject: {fileID: 5190223399547746128}
+    isConnected: 0
   - label: West
     gridOffset: {x: 0, y: 0}
     direction: {x: -1, y: 0}
     doorObject: {fileID: 3278329207975274429}
     wallObject: {fileID: 6820404311904105720}
+    isConnected: 0
   - label: East
     gridOffset: {x: 0, y: 0}
     direction: {x: 1, y: 0}
     doorObject: {fileID: 3067673834399767491}
     wallObject: {fileID: 6023095682210919977}
+    isConnected: 0
+  roomCleared: 0
+  activeEnemies: []
+--- !u!65 &-5785350862033272322
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6647102630654545674}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 45, y: 1, z: 45}
+  m_Center: {x: 0, y: 1, z: 0}
 --- !u!1 &6690670704869111997
 GameObject:
   m_ObjectHideFlags: 0
@@ -1788,54 +1816,6 @@ Transform:
   - {fileID: 1744658715453764804}
   m_Father: {fileID: 4632564547433871007}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &8685582469919413733
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 5469367549916586497}
-  - component: {fileID: 6063949671715852216}
-  m_Layer: 0
-  m_Name: Enemy_Spawn_Point
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &5469367549916586497
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8685582469919413733}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.1, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 4632564547433871007}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &6063949671715852216
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8685582469919413733}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8638a9de1ed220e4d841548bed5e5af5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  props:
-  - {fileID: 8858051749441068820, guid: 4c67ed6c086451b4db54ac4d24b626bb, type: 3}
-  spawnChance: 100
-  randomRotation: 1
 --- !u!1 &8833441535581490759
 GameObject:
   m_ObjectHideFlags: 0

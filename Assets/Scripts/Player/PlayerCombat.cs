@@ -6,21 +6,19 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(PlayerController))]
 public class PlayerCombat : MonoBehaviour
 {
+    // Componenti
     private Animator animator;
     private PlayerInventory inventory;
     private PlayerStats stats;
     private PlayerControls controls;
     private PlayerController controller;
 
-    [Header("Combat Flags")]
+    [Header("Stato Combattimento")]
     public bool isAttacking = false;
-
-    [Header("Permissions")]
     public bool canAttack = true;
 
     void Awake()
     {
-        // Spesso l'Animator è sul figlio (il modello), usiamo GetComponentInChildren
         animator = GetComponentInChildren<Animator>();
         inventory = GetComponent<PlayerInventory>();
         stats = GetComponent<PlayerStats>();
@@ -39,16 +37,23 @@ public class PlayerCombat : MonoBehaviour
 
     void HandleAttackInput()
     {
-        // Se stiamo rollando o usando tasti speciali, niente attacco
-        bool isRolling = controller != null && controller.IsRolling;
-        if (isRolling) return;
-
+        // Se stiamo rollando, niente attacchi
+        if (controller != null && controller.IsRolling) return;
+        
+        // Se stiamo già attaccando o siamo bloccati, esci
         if (!canAttack || isAttacking) return;
 
-        if (controls.Player.LightAttackRight.WasPerformedThisFrame()) TryAttack(Hand.Right, AttackType.Light);
-        if (controls.Player.LightAttackLeft.WasPerformedThisFrame()) TryAttack(Hand.Left, AttackType.Light);
-        if (controls.Player.HeavyAttackRight.WasPerformedThisFrame()) TryAttack(Hand.Right, AttackType.Heavy);
-        if (controls.Player.HeavyAttackLeft.WasPerformedThisFrame()) TryAttack(Hand.Left, AttackType.Heavy);
+        if (controls.Player.LightAttackRight.WasPerformedThisFrame())
+            TryAttack(Hand.Right, AttackType.Light);
+
+        if (controls.Player.LightAttackLeft.WasPerformedThisFrame())
+            TryAttack(Hand.Left, AttackType.Light);
+
+        if (controls.Player.HeavyAttackRight.WasPerformedThisFrame())
+            TryAttack(Hand.Right, AttackType.Heavy);
+
+        if (controls.Player.HeavyAttackLeft.WasPerformedThisFrame())
+            TryAttack(Hand.Left, AttackType.Heavy);
     }
 
     void HandleFlaskInput()
@@ -65,45 +70,61 @@ public class PlayerCombat : MonoBehaviour
 
     void TryAttack(Hand hand, AttackType type)
     {
-        if (!canAttack) return;
-        if (controller != null && controller.IsRolling) return;
-
+        // 1. Recupera l'arma (o i Pugni se slot vuoto)
         WeaponItem weapon = inventory.GetWeaponForHand(hand);
-        if (weapon == null) return;
 
+        // DEBUG SICUREZZA 1: Arma mancante
+        if (weapon == null)
+        {
+            Debug.LogError($"[PlayerCombat] ERRORE GRAVE: Nessuna arma trovata per la mano {hand}! " +
+                           "Controlla PlayerInventory: gli slot 'Unarmed Right/Left' DEVONO avere il file 'Unarmed_Item'.");
+            return;
+        }
+
+        // 2. Calcola costo Stamina
         float staminaCost = (type == AttackType.Light) ? weapon.lightAttackStaminaCost : weapon.heavyAttackStaminaCost;
 
-        if (!stats.HasStamina(staminaCost)) return;
+        // DEBUG SICUREZZA 2: Stamina
+        if (!stats.HasStamina(staminaCost))
+        {
+            // Debug.Log("Stamina insufficiente per attaccare!");
+            return;
+        }
 
+        // 3. Esegui
         stats.SpendStamina(staminaCost);
         PerformAttack(weapon, hand, type);
     }
 
     void PerformAttack(WeaponItem weapon, Hand hand, AttackType type)
     {
-        if (weapon.animationProfile == null) return;
+        // DEBUG SICUREZZA 3: Profilo Animazioni
+        if (weapon.animationProfile == null)
+        {
+            Debug.LogError($"[PlayerCombat] L'arma '{weapon.weaponName}' non ha un Animation Profile assegnato! Assegnalo nell'Inspector.");
+            return;
+        }
 
         bool isAirAttack = controller != null && !controller.IsGrounded;
         string animToPlay = GetAttackAnimation(weapon.animationProfile, hand, type, isAirAttack);
 
-        if (string.IsNullOrEmpty(animToPlay)) return;
-
-        // --- MODIFICA CHIAVE: Blocca il movimento PRIMA di attaccare ---
-        if (controller != null)
+        if (string.IsNullOrEmpty(animToPlay))
         {
-            controller.StopMovementImmediate();
+            Debug.LogWarning($"[PlayerCombat] Nessuna animazione trovata nel profilo per {hand} - {type}");
+            return;
         }
 
-        isAttacking = true;
-        
-        // CrossFade basso (0.1f) per rendere l'attacco reattivo
-        animator.CrossFadeInFixedTime(animToPlay, 0.1f);
+        // 1. Ferma il movimento (Feeling Souls-like)
+        if (controller != null) controller.StopMovementImmediate();
 
-        // NOTA: Abbiamo RIMOSSO l'Invoke. 
-        // Ora devi usare un Animation Event nell'animazione che chiama EndAttack()
+        // 2. Setta flag
+        isAttacking = true;
+
+        // 3. Lancia animazione (CrossFade basso per reattività istantanea)
+        animator.CrossFadeInFixedTime(animToPlay, 0.1f);
     }
 
-    // --- NUOVA FUNZIONE: Da chiamare tramite Animation Event ---
+    // Chiamata dall'Animation Event (tramite PlayerAnimationEvents.cs)
     public void EndAttack()
     {
         isAttacking = false;
@@ -111,12 +132,16 @@ public class PlayerCombat : MonoBehaviour
 
     string GetAttackAnimation(WeaponAnimationProfile profile, Hand hand, AttackType type, bool isAirAttack)
     {
+        // Attacchi Aerei
         if (isAirAttack && type == AttackType.Light)
         {
-            if (hand == Hand.Right && !string.IsNullOrEmpty(profile.rightHandAirAttackAnim)) return profile.rightHandAirAttackAnim;
-            if (hand == Hand.Left && !string.IsNullOrEmpty(profile.leftHandAirAttackAnim)) return profile.leftHandAirAttackAnim;
+            if (hand == Hand.Right && !string.IsNullOrEmpty(profile.rightHandAirAttackAnim)) 
+                return profile.rightHandAirAttackAnim;
+            if (hand == Hand.Left && !string.IsNullOrEmpty(profile.leftHandAirAttackAnim)) 
+                return profile.leftHandAirAttackAnim;
         }
 
+        // Attacchi Terra
         if (hand == Hand.Right)
         {
             return (type == AttackType.Light) ? profile.rightHandLightAttackAnim : profile.rightHandHeavyAttackAnim;

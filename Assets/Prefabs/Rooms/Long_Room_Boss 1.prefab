@@ -1058,6 +1058,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3823231744370535695}
   - component: {fileID: 7698762379488882794}
+  - component: {fileID: -5692971914959772820}
   m_Layer: 0
   m_Name: Long_Room_Boss 1
   m_TagString: Untagged
@@ -1107,37 +1108,67 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   roomData: {fileID: 11400000, guid: ddfaeeda9568be746bd6877cb3dbd90e, type: 2}
+  internalRoomType: Normal
   doors:
   - label: North SX
     gridOffset: {x: 0, y: 0}
     direction: {x: 0, y: 1}
     doorObject: {fileID: 8379064459467575613}
     wallObject: {fileID: 2999111908457128749}
+    isConnected: 0
   - label: North DX
     gridOffset: {x: 1, y: 0}
     direction: {x: 0, y: 1}
     doorObject: {fileID: 2970832937737825729}
     wallObject: {fileID: 5991797579141045067}
+    isConnected: 0
   - label: South SX
     gridOffset: {x: 0, y: 0}
     direction: {x: 0, y: -1}
     doorObject: {fileID: 2423190088959290834}
     wallObject: {fileID: 7331752897928507626}
+    isConnected: 0
   - label: South DX
     gridOffset: {x: 1, y: 0}
     direction: {x: 0, y: -1}
     doorObject: {fileID: 1945042326307268240}
     wallObject: {fileID: 4414536180840295616}
+    isConnected: 0
   - label: West
     gridOffset: {x: 0, y: 0}
     direction: {x: -1, y: 0}
     doorObject: {fileID: 6357396989978197037}
     wallObject: {fileID: 3162094833258524520}
+    isConnected: 0
   - label: East
     gridOffset: {x: 1, y: 0}
     direction: {x: 1, y: 0}
     doorObject: {fileID: 6905818077146267731}
     wallObject: {fileID: 2797474750500187577}
+    isConnected: 0
+  roomCleared: 0
+  activeEnemies: []
+--- !u!65 &-5692971914959772820
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2989182293221069978}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 95, y: 1, z: 45}
+  m_Center: {x: 25, y: 1, z: 0}
 --- !u!1 &2999111908457128749
 GameObject:
   m_ObjectHideFlags: 0
