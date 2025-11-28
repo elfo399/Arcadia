@@ -11,12 +11,11 @@ public class Room : MonoBehaviour
     public struct DoorEntry 
     {
         public string label;          
-        public Vector2Int gridOffset; // (0,0) o (1,0) ecc.
-        public Vector2Int direction;  // (0,1) Nord, (0,-1) Sud, ecc.
-        public GameObject doorObject; // Il varco (Cornice)
-        public GameObject wallObject; // Il muro solido
+        public Vector2Int gridOffset; 
+        public Vector2Int direction;  
+        public GameObject doorObject; 
+        public GameObject wallObject; 
         
-        // Memoria: Questa porta era aperta prima del combattimento?
         [HideInInspector] public bool isConnected; 
     }
 
@@ -24,50 +23,44 @@ public class Room : MonoBehaviour
     public List<DoorEntry> doors = new List<DoorEntry>();
 
     [Header("Stato Battaglia")]
-    public bool roomCleared = false; // Già completata?
-    public List<GameObject> activeEnemies = new List<GameObject>(); // Lista nemici vivi
+    public bool roomCleared = false; 
+    public List<GameObject> activeEnemies = new List<GameObject>(); 
 
     [Header("Rewards")]
-    public GameObject coinPrefab; // Trascina qui il prefab della Moneta
+    public GameObject coinPrefab; 
     public int minCoins = 2;
     public int maxCoins = 5;
 
     private bool playerEntered = false;
 
-    // --- SETUP PORTE (Chiamata dal Generatore) ---
+    // --- SETUP PORTE ---
     public void OpenDoor(Vector2Int relativePos, Vector2Int direction)
     {
         for(int i = 0; i < doors.Count; i++)
         {
             if (doors[i].gridOffset == relativePos && doors[i].direction == direction)
             {
-                // 1. Apri visivamente subito
                 if(doors[i].wallObject != null) doors[i].wallObject.SetActive(false);
                 if(doors[i].doorObject != null) doors[i].doorObject.SetActive(true);
                 
-                // 2. Ricordatelo per dopo! (IMPORTANTE per riaprire dopo il lock)
                 var entry = doors[i];
                 entry.isConnected = true; 
-                doors[i] = entry; // Salviamo la modifica nella struct
+                doors[i] = entry; 
                 return;
             }
         }
     }
 
     // --- GESTIONE NEMICI ---
-    
-    // Chiamata dallo spawner (RandomProp) quando crea uno zombie
     public void RegisterEnemy(GameObject enemy)
     {
         if (!activeEnemies.Contains(enemy))
         {
             activeEnemies.Add(enemy);
-            // Opzionale: Disattiva i nemici finché non entri (Optimization)
             enemy.SetActive(false); 
         }
     }
 
-    // Chiamata dal nemico quando muore
     public void EnemyDied(GameObject enemy)
     {
         if (activeEnemies.Contains(enemy))
@@ -75,7 +68,6 @@ public class Room : MonoBehaviour
             activeEnemies.Remove(enemy);
         }
 
-        // Se la lista è vuota e il player è dentro -> VITTORIA
         if (activeEnemies.Count == 0 && playerEntered && !roomCleared)
         {
             UnlockRoom();
@@ -83,20 +75,18 @@ public class Room : MonoBehaviour
     }
 
     // --- LOGICA COMBATTIMENTO ---
-
     void OnTriggerEnter(Collider other)
     {
-        // Se entra il Player, la stanza non è pulita e ci sono nemici
         if (other.CompareTag("Player") && !playerEntered && !roomCleared)
         {
             if (activeEnemies.Count > 0)
             {
-                LockRoom(); // CHIUDI TUTTO!
-                WakeUpEnemies(); // SVEGLIA ZOMBIE!
+                LockRoom(); 
+                WakeUpEnemies(); 
             }
             else
             {
-                roomCleared = true; // Stanza vuota, segnala come fatta
+                roomCleared = true; 
             }
             playerEntered = true;
         }
@@ -104,7 +94,6 @@ public class Room : MonoBehaviour
 
     void LockRoom()
     {
-        // Riattiva i muri solidi su TUTTE le porte (anche quelle connesse)
         foreach (var d in doors)
         {
             if (d.wallObject != null) d.wallObject.SetActive(true);
@@ -116,7 +105,6 @@ public class Room : MonoBehaviour
     {
         roomCleared = true;
         
-        // Riapri SOLO le porte che erano connesse (usando il bool isConnected salvato prima)
         foreach (var d in doors)
         {
             if (d.isConnected)
@@ -125,7 +113,6 @@ public class Room : MonoBehaviour
             }
         }
         
-        // SPAWN MONETE
         if (coinPrefab != null)
         {
             SpawnReward();
@@ -148,11 +135,12 @@ public class Room : MonoBehaviour
         
         for (int i = 0; i < amount; i++)
         {
-            // Spawna al centro della stanza con un piccolo offset casuale
-            Vector3 randomOffset = new Vector3(Random.Range(-2f, 2f), 1f, Random.Range(-2f, 2f));
+            Vector3 randomOffset = new Vector3(Random.Range(-2f, 2f), 0.01f, Random.Range(-2f, 2f));
             Vector3 spawnPos = transform.position + randomOffset;
             
-            Instantiate(coinPrefab, spawnPos, Quaternion.identity);
+            // --- MODIFICA QUI ---
+            // Aggiunto 'transform' alla fine per rendere le monete figlie della stanza
+            Instantiate(coinPrefab, spawnPos, Quaternion.identity, transform);
         }
     }
 }
