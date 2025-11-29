@@ -1,6 +1,7 @@
 using UnityEngine;
 using Cinemachine;
 using UnityEngine.InputSystem;
+using System.Collections.Generic;
 
 public class TargetLockSystem : MonoBehaviour
 {
@@ -14,6 +15,13 @@ public class TargetLockSystem : MonoBehaviour
     public LayerMask enemyLayer;      
     public float maxLockDistance = 25f; 
 
+    [Header("Switching (NUOVO)")]
+    public float switchCooldown = 0.2f;
+    public float switchThreshold = 0.5f;
+
+    [Header("Parametri Movimento")]
+    public float rotationSpeed = 20f; 
+
     [Header("UI")]
     public RectTransform targetIcon;  
 
@@ -23,13 +31,12 @@ public class TargetLockSystem : MonoBehaviour
 
     private PlayerControls controls;
     private Camera mainCam;
-    private PlayerController controller; // Riferimento al controller
+    private float lastSwitchTime;
 
     void Awake()
     {
         controls = new PlayerControls();
         mainCam = Camera.main;
-        controller = GetComponent<PlayerController>(); // Prendiamo il controller
     }
 
     void OnEnable()
@@ -69,8 +76,72 @@ public class TargetLockSystem : MonoBehaviour
 
             HandleRotation();
             UpdateTargetUI();
+
+            // --- NUOVO: CAMBIO BERSAGLIO ---
+            HandleTargetSwitching();
         }
     }
+
+    // --- LOGICA SWITCHING ---
+    void HandleTargetSwitching()
+    {
+        if (Time.time < lastSwitchTime + switchCooldown) return;
+
+        // Legge l'input della camera (Mouse Delta o Right Stick)
+        Vector2 lookInput = controls.Player.Look.ReadValue<Vector2>();
+
+        // Se muovo forte a destra o sinistra
+        if (Mathf.Abs(lookInput.x) > switchThreshold)
+        {
+            SwitchTarget(Mathf.Sign(lookInput.x)); // +1 Destra, -1 Sinistra
+            lastSwitchTime = Time.time;
+        }
+    }
+
+    void SwitchTarget(float direction)
+    {
+        Collider[] colliders = Physics.OverlapSphere(transform.position, scanRadius, enemyLayer);
+        Transform bestCandidate = null;
+        float bestScore = Mathf.Infinity;
+
+        // Posizione schermo attuale
+        Vector3 currentScreenPos = mainCam.WorldToViewportPoint(currentTarget.position);
+
+        foreach (Collider col in colliders)
+        {
+            EnemyHealth health = col.GetComponentInParent<EnemyHealth>();
+            if (health == null) continue;
+            Transform candidate = health.transform;
+
+            if (candidate == currentTarget) continue;
+
+            Vector3 candidateScreenPos = mainCam.WorldToViewportPoint(candidate.position);
+            
+            // Differenza X e Y
+            float diffX = candidateScreenPos.x - currentScreenPos.x;
+            float diffY = Mathf.Abs(candidateScreenPos.y - currentScreenPos.y);
+
+            // Se cerco a Destra (dir > 0) voglio diffX positiva
+            // Se cerco a Sinistra (dir < 0) voglio diffX negativa
+            if ((direction > 0 && diffX > 0) || (direction < 0 && diffX < 0))
+            {
+                // Score: Più è vicino in orizzontale meglio è. Penalizziamo la distanza verticale.
+                float score = Mathf.Abs(diffX) + (diffY * 2);
+                
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    bestCandidate = candidate;
+                }
+            }
+        }
+
+        if (bestCandidate != null)
+        {
+            StartLockOn(bestCandidate);
+        }
+    }
+    // ------------------------
 
     void HandleLockOnInput()
     {
@@ -122,6 +193,7 @@ public class TargetLockSystem : MonoBehaviour
         isLockedOn = false;
         currentTarget = null;
 
+        // FIX CAMERA SNAP (Mantenuto dalla tua versione)
         if (mainCam != null && freeLookCamera != null)
         {
             freeLookCamera.m_XAxis.Value = mainCam.transform.eulerAngles.y;
@@ -132,28 +204,19 @@ public class TargetLockSystem : MonoBehaviour
         lockOnCamera.LookAt = null;
         if (targetIcon != null) targetIcon.gameObject.SetActive(false);
         
-        // Reset rotazione grafica per sicurezza
+        // FIX ROTAZIONE (Mantenuto)
         if (playerModel != null) playerModel.localRotation = Quaternion.identity;
     }
 
     void HandleRotation()
     {
-        // --- FIX FONDAMENTALE ---
-        // Se stiamo rollando, NON forzare la rotazione verso il nemico.
-        // Lascia che il PlayerController gestisca la direzione (così può girarsi e scappare).
-        if (controller != null && controller.isDodging) return;
-        // ------------------------
-
         Vector3 dir = currentTarget.position - transform.position;
         dir.y = 0; 
         if (dir == Vector3.zero) return;
         
         Quaternion targetRot = Quaternion.LookRotation(dir);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * rotationSpeed);
         
-        // Ruotiamo il PADRE
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 15f);
-        
-        // Teniamo il FIGLIO dritto
         if (playerModel != null) playerModel.localRotation = Quaternion.identity;
     }
 
@@ -163,6 +226,7 @@ public class TargetLockSystem : MonoBehaviour
         {
             Vector3 worldPos = currentTarget.position + Vector3.up * 1.4f;
             Vector3 screenPos = mainCam.WorldToScreenPoint(worldPos);
+            
             if (screenPos.z > 0)
             {
                 targetIcon.gameObject.SetActive(true);

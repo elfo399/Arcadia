@@ -881,7 +881,7 @@ MonoBehaviour:
   maxStamina: 120
   currentStamina: 120
   staminaRegenRate: 25
-  staminaRegenDelay: 0.8
+  staminaRegenDelay: 1.2
   maxMana: 60
   currentMana: 60
   maxFlasks: 3
@@ -930,6 +930,9 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   maxLockDistance: 25
+  switchCooldown: 0.3
+  switchThreshold: 0.5
+  rotationSpeed: 20
   targetIcon: {fileID: 1687575231}
   isLockedOn: 0
   currentTarget: {fileID: 0}

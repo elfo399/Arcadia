@@ -3,49 +3,45 @@ using UnityEngine.UI;
 
 public class EnemyHealthBar : MonoBehaviour
 {
-    [Header("Riferimenti UI")]
-    public Slider healthSlider; // Il componente Slider di Unity
-    public Image fillImage;     // L'immagine che si colora (per cambiarla se serve)
-
-    [Header("Settings")]
-    public Gradient healthGradient; // Opzionale: Verde -> Giallo -> Rosso
-
-    private Camera mainCamera;
+    // Questa variabile DEVE chiamarsi "slider" (minuscolo) e essere pubblica
+    // perché lo script EnemySetup la cerca per nome.
+    public Slider slider; 
+    
+    private Camera cam;
 
     void Start()
     {
-        mainCamera = Camera.main;
-        
-        // Nascondi la barra se il nemico è al massimo della vita (opzionale)
-        // gameObject.SetActive(false); 
+        cam = Camera.main;
     }
 
     public void SetMaxHealth(int maxHealth)
     {
-        healthSlider.maxValue = maxHealth;
-        healthSlider.value = maxHealth;
-        
-        if(healthGradient != null)
-            fillImage.color = healthGradient.Evaluate(1f);
+        if (slider != null)
+        {
+            slider.maxValue = maxHealth;
+            slider.value = maxHealth;
+        }
+        // Opzionale: Nascondi la barra se è piena per pulizia
+        // gameObject.SetActive(false);
     }
 
-    public void SetHealth(int currentHealth)
+    public void SetHealth(int health)
     {
-        // Mostra la barra appena prende danno
-        if (!gameObject.activeSelf) gameObject.SetActive(true);
-
-        healthSlider.value = currentHealth;
-
-        if (healthGradient != null)
-            fillImage.color = healthGradient.Evaluate(healthSlider.normalizedValue);
+        // Mostra la barra appena il nemico viene colpito
+        gameObject.SetActive(true); 
+        
+        if (slider != null)
+        {
+            slider.value = health;
+        }
     }
 
     void LateUpdate()
     {
-        // BILLBOARD: Fai in modo che la barra guardi sempre la telecamera
-        if (mainCamera != null)
+        // Rotazione Billboard: guarda sempre la telecamera
+        if (cam != null)
         {
-            transform.LookAt(transform.position + mainCamera.transform.forward);
+            transform.LookAt(transform.position + cam.transform.forward);
         }
     }
 }

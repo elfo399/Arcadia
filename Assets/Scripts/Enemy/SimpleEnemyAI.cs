@@ -1,6 +1,11 @@
 using UnityEngine;
 using UnityEngine.AI;
 
+// Automazione: Aggiunge i componenti fisici se mancano!
+[RequireComponent(typeof(NavMeshAgent))]
+[RequireComponent(typeof(CapsuleCollider))]
+[RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(EnemyHealth))]
 public class SimpleEnemyAI : MonoBehaviour
 {
     [Header("Setup")]
@@ -8,8 +13,8 @@ public class SimpleEnemyAI : MonoBehaviour
     public Transform playerTarget;
 
     [Header("Parametri AI")]
-    public float sightRange = 15f;  // Distanza a cui ti vede
-    public float attackRange = 2f;  // Distanza a cui attacca
+    public float sightRange = 15f;
+    public float attackRange = 2f;
 
     // Stati interni
     private bool playerInSight;
@@ -18,58 +23,56 @@ public class SimpleEnemyAI : MonoBehaviour
     void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
+        
+        // Configura la fisica per evitare bug col NavMesh
+        Rigidbody rb = GetComponent<Rigidbody>();
+        rb.isKinematic = true; 
+        rb.useGravity = false;
+
+        // Configura il collider se necessario
+        CapsuleCollider col = GetComponent<CapsuleCollider>();
+        col.isTrigger = false; // Deve essere solido per essere colpito
     }
 
     void Start()
     {
-        // 1. Disattiva subito l'agent per evitare errori se nasce a mezz'aria
+        // Disattiva agent all'inizio per evitare errori di spawn
         if (agent != null) agent.enabled = false;
 
-        // 2. Trova il giocatore
         GameObject p = GameObject.FindGameObjectWithTag("Player");
         if (p != null) playerTarget = p.transform;
 
-        // 3. Aspetta un attimo che il NavMesh sia generato, poi "Snap to Ground"
+        // Snap to ground dopo che il dungeon è generato
         Invoke(nameof(ActivateAgent), 0.5f);
     }
 
-    // Questa funzione risolve il problema dello zombie volante
     void ActivateAgent()
     {
         if (agent == null) return;
 
-        // Cerca un punto valido sul NavMesh entro 5 metri dalla posizione di spawn
         NavMeshHit hit;
+        // Cerca il pavimento entro 5 metri
         if (NavMesh.SamplePosition(transform.position, out hit, 5.0f, NavMesh.AllAreas))
         {
-            // Trovato! Sposta fisicamente lo zombie sul pavimento
             transform.position = hit.position; 
-            
-            // Warp è fondamentale: dice all'Agent "Tu ora sei qui, ricalcola tutto"
             agent.Warp(hit.position); 
-            
             agent.enabled = true;
         }
         else
         {
-            // Fallback se non trova il pavimento (magari è spawnato dentro un muro)
-            Debug.LogWarning($"{gameObject.name}: NavMesh non trovato vicino allo spawn!");
-            agent.enabled = true; // Proviamo ad attivarlo comunque
+            // Se fallisce, prova ad attivarlo dov'è
+            agent.enabled = true;
         }
     }
 
     void Update()
     {
-        // Se il player è morto o l'agent non è ancora attivo, non fare nulla
         if (playerTarget == null || !agent.enabled || !agent.isOnNavMesh) return;
 
-        // Calcola distanze
         float distance = Vector3.Distance(transform.position, playerTarget.position);
-
         playerInSight = distance <= sightRange;
         playerInAttackRange = distance <= attackRange;
 
-        // Macchina a stati semplice
         if (playerInSight && !playerInAttackRange)
         {
             ChasePlayer();
@@ -80,7 +83,6 @@ public class SimpleEnemyAI : MonoBehaviour
         }
         else
         {
-            // Se il player è lontano, sta fermo
             agent.isStopped = true;
         }
     }
@@ -93,18 +95,13 @@ public class SimpleEnemyAI : MonoBehaviour
 
     void AttackPlayer()
     {
-        // Ferma il movimento per attaccare
         agent.isStopped = true;
-
+        
         // Guarda il player (solo rotazione Y)
-        Vector3 targetPostition = new Vector3(playerTarget.position.x, transform.position.y, playerTarget.position.z);
-        transform.LookAt(targetPostition);
-
-        // TODO: Qui aggiungeremo l'animazione attack e il danno
-        // Debug.Log("Zombie sta attaccando!");
+        Vector3 targetPos = new Vector3(playerTarget.position.x, transform.position.y, playerTarget.position.z);
+        transform.LookAt(targetPos);
     }
 
-    // Disegna i raggi di visione nell'editor
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;

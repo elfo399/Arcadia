@@ -1,7 +1,8 @@
 using UnityEngine;
-using TMPro; // NECESSARIO PER LA UI
+using TMPro; 
 
-public class PlayerStats : MonoBehaviour
+// Aggiungiamo IDamageable così i nemici possono colpirti
+public class PlayerStats : MonoBehaviour, IDamageable 
 {
     [Header("Health")]
     public float maxHealth = 100f;
@@ -24,11 +25,15 @@ public class PlayerStats : MonoBehaviour
     public float flaskUseCooldown = 1f;
 
     [Header("Economia (NUOVO)")]
-    public int currentCoins = 0;      // I soldi attuali
-    public TextMeshProUGUI coinText;  // Trascina qui il testo della UI
+    public int currentCoins = 0;
+    public TextMeshProUGUI coinText; 
 
-    [Header("UI Bars")]
-    public DynamicBar healthBar;
+    [Header("Chiavi (NUOVO)")]
+    public int currentKeys = 0;
+    public TextMeshProUGUI keyText;
+
+    [Header("UI Bars (Il tuo sistema DynamicBar)")]
+    public DynamicBar healthBar;   // Trascina qui l'oggetto con lo script DynamicBar
     public DynamicBar staminaBar;
     public DynamicBar manaBar;
 
@@ -48,9 +53,11 @@ public class PlayerStats : MonoBehaviour
         currentMana = maxMana;
         currentFlasks = maxFlasks;
 
+        // Inizializza tutto
         UpdateAllBars();
         UpdateFlaskUI();
-        UpdateCoinUI(); // Aggiorna la scritta a 0 all'inizio
+        UpdateCoinUI();
+        UpdateKeyUI();
     }
 
     void Update()
@@ -61,124 +68,7 @@ public class PlayerStats : MonoBehaviour
             flaskTimer -= Time.deltaTime;
     }
 
-    // --- NUOVE FUNZIONI PER I SOLDI ---
-    public void AddCoins(int amount)
-    {
-        currentCoins += amount;
-        UpdateCoinUI();
-    }
-
-    void UpdateCoinUI()
-    {
-        if (coinText != null)
-        {
-            coinText.text = currentCoins.ToString();
-        }
-    }
-    // ----------------------------------
-
-    void HandleStaminaRegen()
-    {
-        if (Time.time < lastStaminaUseTime + staminaRegenDelay)
-            return;
-
-        if (currentStamina < maxStamina)
-        {
-            currentStamina += staminaRegenRate * Time.deltaTime;
-            currentStamina = Mathf.Min(currentStamina, maxStamina);
-            UpdateStaminaBar();
-        }
-    }
-
-    public bool HasStamina(float amount)
-    {
-        return currentStamina >= amount;
-    }
-
-    public void SpendStamina(float amount)
-    {
-        if (amount <= 0f) return;
-
-        currentStamina -= amount;
-        if (currentStamina < 0f) currentStamina = 0f;
-
-        lastStaminaUseTime = Time.time;
-        UpdateStaminaBar();
-    }
-
-    public void SpendStaminaPerSecond(float amountPerSecond)
-    {
-        float amount = amountPerSecond * Time.deltaTime;
-        SpendStamina(amount);
-    }
-
-    public void UseFlask()
-    {
-        if (currentFlasks <= 0) return;
-        if (flaskTimer > 0f) return;
-
-        currentFlasks--;
-        flaskTimer = flaskUseCooldown;
-
-        currentHealth += flaskHealAmount;
-        currentHealth = Mathf.Min(currentHealth, maxHealth);
-
-        UpdateHealthBar();
-        UpdateFlaskUI();
-
-        if (animator != null) animator.SetTrigger("DrinkPotion");
-    }
-
-    void UpdateFlaskUI()
-    {
-        if (flaskCounterText != null) flaskCounterText.text = currentFlasks.ToString();
-    }
-
-    public void TakeDamage(float amount)
-    {
-        if (amount <= 0f) return;
-
-        currentHealth -= amount;
-        currentHealth = Mathf.Max(0f, currentHealth);
-
-        UpdateHealthBar();
-        
-        if (currentHealth <= 0) Die();
-    }
-
-    void Die()
-    {
-        Debug.Log("GAME OVER");
-        // Qui puoi mettere il reload della scena o il menu di morte
-    }
-
-    public void RestoreHealth(float amount)
-    {
-        if (amount <= 0f) return;
-        currentHealth += amount;
-        currentHealth = Mathf.Min(currentHealth, maxHealth);
-        UpdateHealthBar();
-    }
-
-    public bool UseMana(float amount)
-    {
-        if (amount <= 0f) return true;
-        if (currentMana < amount) return false;
-
-        currentMana -= amount;
-        currentMana = Mathf.Max(0f, currentMana);
-        UpdateManaBar();
-        return true;
-    }
-
-    public void RestoreMana(float amount)
-    {
-        if (amount <= 0f) return;
-        currentMana += amount;
-        currentMana = Mathf.Min(currentMana, maxMana);
-        UpdateManaBar();
-    }
-
+    // --- GESTIONE BARRE (DynamicBar) ---
     void UpdateAllBars()
     {
         UpdateHealthBar();
@@ -211,5 +101,137 @@ public class PlayerStats : MonoBehaviour
             manaBar.SetMax(maxMana);
             manaBar.SetCurrent(currentMana);
         }
+    }
+
+    // --- GESTIONE MONETE ---
+    public void AddCoins(int amount)
+    {
+        currentCoins += amount;
+        UpdateCoinUI();
+    }
+
+    void UpdateCoinUI()
+    {
+        if (coinText != null) coinText.text = currentCoins.ToString();
+    }
+
+    // --- GESTIONE CHIAVI ---
+    public void AddKeys(int amount)
+    {
+        currentKeys += amount;
+        UpdateKeyUI();
+    }
+
+    public bool UseKey()
+    {
+        if (currentKeys > 0)
+        {
+            currentKeys--;
+            UpdateKeyUI();
+            return true;
+        }
+        return false;
+    }
+
+    void UpdateKeyUI()
+    {
+        if (keyText != null) keyText.text = "x" + currentKeys.ToString();
+    }
+
+    // --- DANNO (Interfaccia IDamageable) ---
+    // Questa versione accetta int (dai nemici)
+    public void TakeDamage(int amount)
+    {
+        TakeDamage((float)amount);
+    }
+
+    public void TakeDamage(float amount)
+    {
+        if (amount <= 0f) return;
+
+        currentHealth -= amount;
+        if (currentHealth < 0) currentHealth = 0;
+
+        UpdateHealthBar();
+        
+        if (currentHealth <= 0) Die();
+    }
+
+    // --- GESTIONE RISORSE ---
+
+    public void UseFlask()
+    {
+        if (currentFlasks <= 0 || flaskTimer > 0f) return;
+
+        currentFlasks--;
+        flaskTimer = flaskUseCooldown;
+
+        currentHealth += flaskHealAmount;
+        if (currentHealth > maxHealth) currentHealth = maxHealth;
+
+        UpdateHealthBar();
+        UpdateFlaskUI();
+
+        if (animator != null) animator.SetTrigger("DrinkPotion");
+    }
+
+    public void SpendStamina(float amount)
+    {
+        if (amount <= 0f) return;
+
+        currentStamina -= amount;
+        if (currentStamina < 0) currentStamina = 0;
+
+        lastStaminaUseTime = Time.time;
+        UpdateStaminaBar();
+    }
+
+    public bool HasStamina(float amount)
+    {
+        return currentStamina >= amount;
+    }
+
+    public void SpendStaminaPerSecond(float amountPerSecond)
+    {
+        SpendStamina(amountPerSecond * Time.deltaTime);
+    }
+
+    void HandleStaminaRegen()
+    {
+        if (Time.time < lastStaminaUseTime + staminaRegenDelay) return;
+
+        if (currentStamina < maxStamina)
+        {
+            currentStamina += staminaRegenRate * Time.deltaTime;
+            if (currentStamina > maxStamina) currentStamina = maxStamina;
+            UpdateStaminaBar();
+        }
+    }
+
+    public bool UseMana(float amount)
+    {
+        if (currentMana < amount) return false;
+        currentMana -= amount;
+        UpdateManaBar();
+        return true;
+    }
+    
+    public void RestoreMana(float amount)
+    {
+        if (amount <= 0f) return;
+        currentMana += amount;
+        currentMana = Mathf.Min(currentMana, maxMana);
+        UpdateManaBar();
+    }
+
+    void UpdateFlaskUI()
+    {
+        if (flaskCounterText != null) flaskCounterText.text = currentFlasks.ToString();
+    }
+
+    void Die()
+    {
+        Debug.Log("GAME OVER");
+        // Qui ricaricheremo la scena
     }
 }

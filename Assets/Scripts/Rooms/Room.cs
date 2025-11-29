@@ -13,8 +13,9 @@ public class Room : MonoBehaviour
         public string label;          
         public Vector2Int gridOffset; 
         public Vector2Int direction;  
-        public GameObject doorObject; 
-        public GameObject wallObject; 
+        public GameObject doorObject; // Cornice aperta
+        public GameObject wallObject; // Muro chiuso
+        public GameObject lockObject; // <--- LUCC HETTO / CANCELLO
         
         [HideInInspector] public bool isConnected; 
     }
@@ -22,7 +23,8 @@ public class Room : MonoBehaviour
     [Header("Configurazione Porte")]
     public List<DoorEntry> doors = new List<DoorEntry>();
 
-    [Header("Stato Battaglia")]
+    [Header("Stato Stanza")]
+    public bool isLocked = false; // Serve la chiave?
     public bool roomCleared = false; 
     public List<GameObject> activeEnemies = new List<GameObject>(); 
 
@@ -33,20 +35,56 @@ public class Room : MonoBehaviour
 
     private bool playerEntered = false;
 
-    // --- SETUP PORTE ---
+    void Start()
+    {
+        // Se è Shop o Treasure (e non è Start), blocca la stanza
+        if (roomData != null)
+        {
+            if ((roomData.isShopRoom || roomData.isTreasureRoom) && !roomData.isStartRoom)
+            {
+                isLocked = true;
+            }
+        }
+    }
+
+    // --- SETUP PORTE (Chiamata dal Generatore) ---
     public void OpenDoor(Vector2Int relativePos, Vector2Int direction)
     {
         for(int i = 0; i < doors.Count; i++)
         {
             if (doors[i].gridOffset == relativePos && doors[i].direction == direction)
             {
+                // 1. Togli il muro pieno
                 if(doors[i].wallObject != null) doors[i].wallObject.SetActive(false);
+                
+                // 2. Attiva la cornice della porta
                 if(doors[i].doorObject != null) doors[i].doorObject.SetActive(true);
+
+                // 3. Se la stanza è bloccata a chiave, attiva il cancello
+                if (isLocked && doors[i].lockObject != null)
+                {
+                    doors[i].lockObject.SetActive(true);
+                }
                 
                 var entry = doors[i];
                 entry.isConnected = true; 
                 doors[i] = entry; 
                 return;
+            }
+        }
+    }
+
+    // --- SBLOCCO CON CHIAVE ---
+    public void UnlockSpecialRoom()
+    {
+        isLocked = false; // Ora è aperta per sempre
+
+        // Rimuovi TUTTI i cancelli da TUTTE le porte connesse
+        foreach (var d in doors)
+        {
+            if (d.isConnected && d.lockObject != null)
+            {
+                d.lockObject.SetActive(false);
             }
         }
     }
@@ -63,25 +101,23 @@ public class Room : MonoBehaviour
 
     public void EnemyDied(GameObject enemy)
     {
-        if (activeEnemies.Contains(enemy))
-        {
-            activeEnemies.Remove(enemy);
-        }
+        if (activeEnemies.Contains(enemy)) activeEnemies.Remove(enemy);
 
         if (activeEnemies.Count == 0 && playerEntered && !roomCleared)
         {
-            UnlockRoom();
+            UnlockRoomBattle();
         }
     }
 
     // --- LOGICA COMBATTIMENTO ---
     void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Player") && !playerEntered && !roomCleared)
+        // Entra solo se non è bloccata a chiave (devi prima aprire il cancello)
+        if (other.CompareTag("Player") && !playerEntered && !roomCleared && !isLocked)
         {
             if (activeEnemies.Count > 0)
             {
-                LockRoom(); 
+                LockRoomBattle(); 
                 WakeUpEnemies(); 
             }
             else
@@ -92,7 +128,7 @@ public class Room : MonoBehaviour
         }
     }
 
-    void LockRoom()
+    void LockRoomBattle()
     {
         foreach (var d in doors)
         {
@@ -101,16 +137,13 @@ public class Room : MonoBehaviour
         Debug.Log("STANZA BLOCCATA! Uccidi i nemici.");
     }
 
-    void UnlockRoom()
+    void UnlockRoomBattle()
     {
         roomCleared = true;
         
         foreach (var d in doors)
         {
-            if (d.isConnected)
-            {
-                if(d.wallObject != null) d.wallObject.SetActive(false);
-            }
+            if (d.isConnected && d.wallObject != null) d.wallObject.SetActive(false);
         }
         
         if (coinPrefab != null)
@@ -135,11 +168,11 @@ public class Room : MonoBehaviour
         
         for (int i = 0; i < amount; i++)
         {
-            Vector3 randomOffset = new Vector3(Random.Range(-2f, 2f), 0.01f, Random.Range(-2f, 2f));
+            // Offset casuale
+            Vector3 randomOffset = new Vector3(Random.Range(-2f, 2f), 0.2f, Random.Range(-2f, 2f));
             Vector3 spawnPos = transform.position + randomOffset;
             
-            // --- MODIFICA QUI ---
-            // Aggiunto 'transform' alla fine per rendere le monete figlie della stanza
+            // Spawn come figlio della stanza (pulizia hierarchy)
             Instantiate(coinPrefab, spawnPos, Quaternion.identity, transform);
         }
     }
