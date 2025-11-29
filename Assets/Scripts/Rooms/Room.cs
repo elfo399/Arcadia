@@ -28,11 +28,6 @@ public class Room : MonoBehaviour
     public bool roomCleared = false; 
     public List<GameObject> activeEnemies = new List<GameObject>(); 
 
-    [Header("Rewards")]
-    public GameObject coinPrefab; 
-    public int minCoins = 2;
-    public int maxCoins = 5;
-
     private bool playerEntered = false;
 
     void Start()
@@ -146,9 +141,10 @@ public class Room : MonoBehaviour
             if (d.isConnected && d.wallObject != null) d.wallObject.SetActive(false);
         }
         
-        if (coinPrefab != null)
+        // Spawn delle ricompense basato sulla nuova lista
+        if (roomData != null && roomData.rewards.Count > 0)
         {
-            SpawnReward();
+            SpawnRewards();
         }
         
         Debug.Log("STANZA PULITA! Porte aperte.");
@@ -162,18 +158,54 @@ public class Room : MonoBehaviour
         }
     }
 
-    void SpawnReward()
+    void SpawnRewards()
     {
-        int amount = Random.Range(minCoins, maxCoins + 1);
-        
-        for (int i = 0; i < amount; i++)
+        // Fase 1: Itera su ogni TIPO di ricompensa (es. Monete, Pozioni)
+        foreach (var lootItem in roomData.rewards)
         {
-            // Offset casuale
-            Vector3 randomOffset = new Vector3(Random.Range(-2f, 2f), 0.2f, Random.Range(-2f, 2f));
-            Vector3 spawnPos = transform.position + randomOffset;
-            
-            // Spawn come figlio della stanza (pulizia hierarchy)
-            Instantiate(coinPrefab, spawnPos, Quaternion.identity, transform);
+            if (lootItem.itemPrefab == null || lootItem.quantityWeights.Count == 0) continue;
+
+            // Tira il dado per vedere se questo TIPO di oggetto spawna
+            float dropRoll = Random.Range(0f, 100f);
+            if (dropRoll <= lootItem.dropChance)
+            {
+                // Fase 2: L'oggetto spawna. Ora, quale quantità scegliamo?
+                // Calcoliamo il peso totale della sotto-lista delle quantità
+                float totalWeight = 0;
+                foreach (var quantity in lootItem.quantityWeights)
+                {
+                    totalWeight += quantity.chance;
+                }
+
+                // Scegliamo un punto casuale all'interno del peso totale
+                float quantityRoll = Random.Range(0f, totalWeight);
+                int chosenAmount = 0;
+
+                // Troviamo a quale fascia di quantità corrisponde il punto scelto
+                foreach (var quantity in lootItem.quantityWeights)
+                {
+                    if (quantityRoll <= quantity.chance)
+                    {
+                        chosenAmount = quantity.amount;
+                        break; // Trovato! Usciamo dal ciclo.
+                    }
+                    else
+                    {
+                        quantityRoll -= quantity.chance;
+                    }
+                }
+                
+                // Se per qualche motivo non viene scelta una quantità (es. pesi a 0), non spawniamo nulla
+                if(chosenAmount <= 0) continue;
+
+                // Spawniamo la quantità scelta
+                for (int i = 0; i < chosenAmount; i++)
+                {
+                    Vector3 randomOffset = new Vector3(Random.Range(-2f, 2f), 0.2f, Random.Range(-2f, 2f));
+                    Vector3 spawnPos = transform.position + randomOffset;
+                    Instantiate(lootItem.itemPrefab, spawnPos, Quaternion.identity, transform);
+                }
+            }
         }
     }
 }

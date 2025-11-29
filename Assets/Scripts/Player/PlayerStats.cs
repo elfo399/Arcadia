@@ -1,7 +1,7 @@
 using UnityEngine;
 using TMPro; 
+using UnityEngine.SceneManagement; 
 
-// Aggiungiamo IDamageable così i nemici possono colpirti
 public class PlayerStats : MonoBehaviour, IDamageable 
 {
     [Header("Health")]
@@ -24,16 +24,16 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public float flaskHealAmount = 40f;
     public float flaskUseCooldown = 1f;
 
-    [Header("Economia (NUOVO)")]
+    [Header("Economia")]
     public int currentCoins = 0;
     public TextMeshProUGUI coinText; 
 
-    [Header("Chiavi (NUOVO)")]
+    [Header("Chiavi")]
     public int currentKeys = 0;
     public TextMeshProUGUI keyText;
 
-    [Header("UI Bars (Il tuo sistema DynamicBar)")]
-    public DynamicBar healthBar;   // Trascina qui l'oggetto con lo script DynamicBar
+    [Header("UI Bars (Sistema DynamicBar)")]
+    public DynamicBar healthBar;   
     public DynamicBar staminaBar;
     public DynamicBar manaBar;
 
@@ -66,41 +66,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         if (flaskTimer > 0f)
             flaskTimer -= Time.deltaTime;
-    }
-
-    // --- GESTIONE BARRE (DynamicBar) ---
-    void UpdateAllBars()
-    {
-        UpdateHealthBar();
-        UpdateStaminaBar();
-        UpdateManaBar();
-    }
-
-    void UpdateHealthBar()
-    {
-        if (healthBar != null)
-        {
-            healthBar.SetMax(maxHealth);
-            healthBar.SetCurrent(currentHealth);
-        }
-    }
-
-    void UpdateStaminaBar()
-    {
-        if (staminaBar != null)
-        {
-            staminaBar.SetMax(maxStamina);
-            staminaBar.SetCurrent(currentStamina);
-        }
-    }
-
-    void UpdateManaBar()
-    {
-        if (manaBar != null)
-        {
-            manaBar.SetMax(maxMana);
-            manaBar.SetCurrent(currentMana);
-        }
     }
 
     // --- GESTIONE MONETE ---
@@ -138,8 +103,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (keyText != null) keyText.text = "x" + currentKeys.ToString();
     }
 
-    // --- DANNO (Interfaccia IDamageable) ---
-    // Questa versione accetta int (dai nemici)
+    // --- DANNO & VITA (IDamageable) ---
     public void TakeDamage(int amount)
     {
         TakeDamage((float)amount);
@@ -157,7 +121,15 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (currentHealth <= 0) Die();
     }
 
-    // --- GESTIONE RISORSE ---
+    public void RestoreHealth(float amount)
+    {
+        if (amount <= 0f) return;
+        currentHealth += amount;
+        currentHealth = Mathf.Min(currentHealth, maxHealth);
+        UpdateHealthBar();
+    }
+
+    // --- FLASKS & STAMINA & MANA ---
 
     public void UseFlask()
     {
@@ -177,6 +149,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public void SpendStamina(float amount)
     {
+        // Se siamo nell'Hub, non consumare stamina (Opzionale)
+        if (SceneManager.GetActiveScene().name == "HubScene") return;
+
         if (amount <= 0f) return;
 
         currentStamina -= amount;
@@ -224,6 +199,42 @@ public class PlayerStats : MonoBehaviour, IDamageable
         UpdateManaBar();
     }
 
+    // --- AGGIORNAMENTO GRAFICO ---
+
+    void UpdateAllBars()
+    {
+        UpdateHealthBar();
+        UpdateStaminaBar();
+        UpdateManaBar();
+    }
+
+    void UpdateHealthBar()
+    {
+        if (healthBar != null)
+        {
+            healthBar.SetMax(maxHealth);
+            healthBar.SetCurrent(currentHealth);
+        }
+    }
+
+    void UpdateStaminaBar()
+    {
+        if (staminaBar != null)
+        {
+            staminaBar.SetMax(maxStamina);
+            staminaBar.SetCurrent(currentStamina);
+        }
+    }
+
+    void UpdateManaBar()
+    {
+        if (manaBar != null)
+        {
+            manaBar.SetMax(maxMana);
+            manaBar.SetCurrent(currentMana);
+        }
+    }
+
     void UpdateFlaskUI()
     {
         if (flaskCounterText != null) flaskCounterText.text = currentFlasks.ToString();
@@ -231,7 +242,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     void Die()
     {
-        Debug.Log("GAME OVER");
-        // Qui ricaricheremo la scena
+        Debug.Log("SEI MORTO! Ritorno all'Hub...");
+        SceneManager.LoadScene("HubScene");
     }
 }

@@ -32,11 +32,14 @@ public class TargetLockSystem : MonoBehaviour
     private PlayerControls controls;
     private Camera mainCam;
     private float lastSwitchTime;
+    private PlayerController playerController;
 
     void Awake()
     {
         controls = new PlayerControls();
         mainCam = Camera.main;
+        // Cerca il PlayerController nel genitore (o dove si trova)
+        playerController = GetComponentInParent<PlayerController>();
     }
 
     void OnEnable()
@@ -210,6 +213,12 @@ public class TargetLockSystem : MonoBehaviour
 
     void HandleRotation()
     {
+        // Se il giocatore sta schivando, non forzare la rotazione verso il nemico.
+        if (playerController != null && playerController.isDodging)
+        {
+            return;
+        }
+
         Vector3 dir = currentTarget.position - transform.position;
         dir.y = 0; 
         if (dir == Vector3.zero) return;

@@ -17,3 +17,26 @@ MonoBehaviour:
   size: {x: 1, y: 1}
   isBossRoom: 0
   isTreasureRoom: 0
+  isStartRoom: 0
+  isShopRoom: 0
+  rewards:
+  - itemPrefab: {fileID: 8995147148237869290, guid: 1d2576cf8ee2bd344a2d1a5e3f558e62, type: 3}
+    dropChance: 80
+    quantityWeights:
+    - amount: 1
+      chance: 50
+    - amount: 2
+      chance: 20
+    - amount: 3
+      chance: 15
+    - amount: 4
+      chance: 10
+    - amount: 5
+      chance: 5
+  - itemPrefab: {fileID: 5469647403989664328, guid: 7365aa4f4f5c7ba4fb21856c2d5bbdae, type: 3}
+    dropChance: 20
+    quantityWeights:
+    - amount: 1
+      chance: 80
+    - amount: 2
+      chance: 20

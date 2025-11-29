@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement; // <--- NECESSARIO
 
 public class MinimapManager : MonoBehaviour
 {
@@ -11,10 +12,10 @@ public class MinimapManager : MonoBehaviour
     public GameObject roomIconPrefab;
 
     [Header("Icone Speciali")]
-    public Sprite skullIcon;   // Boss
-    public Sprite crownIcon;   // Treasure
-    public Sprite startIcon;   // Start
-    public Sprite shopIcon;   // Start
+    public Sprite skullIcon;   
+    public Sprite crownIcon;   
+    public Sprite startIcon;   
+    public Sprite shopIcon;    
 
     [Header("Colori")]
     public Color currentRoomColor = Color.white;
@@ -31,13 +32,27 @@ public class MinimapManager : MonoBehaviour
 
     void Awake() { if (instance == null) instance = this; }
 
+    // --- MODIFICA HUB: NASCONDI MAPPA ---
+    void Start()
+    {
+        // Se siamo nell'Hub, spegniamo la mappa
+        if (SceneManager.GetActiveScene().name == "HubScene")
+        {
+            if (mapContainer != null) 
+                mapContainer.gameObject.SetActive(false);
+                
+            // Se hai anche una cornice esterna (Mask), potresti voler spegnere anche quella
+            // transform.Find("MinimapMask")?.gameObject.SetActive(false);
+        }
+    }
+    // ------------------------------------
+
     public void ClearMap()
     {
         foreach (Transform child in mapContainer) Destroy(child.gameObject);
         gridIcons.Clear();
     }
 
-    // --- ORA ACCETTA ROOMDATA ---
     public void RegisterRoom(Vector2Int gridPos, RoomData data)
     {
         if (data == null) return;
@@ -45,17 +60,14 @@ public class MinimapManager : MonoBehaviour
         GameObject newIconObj = Instantiate(roomIconPrefab, mapContainer);
         RectTransform rt = newIconObj.GetComponent<RectTransform>();
 
-        // Ancore e Pivot
         rt.pivot = new Vector2(0, 0);
         rt.anchorMin = new Vector2(0.5f, 0.5f);
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.localScale = Vector3.one;
 
-        // Posizione
         Vector2 uiPos = new Vector2(gridPos.x * FullStep, gridPos.y * FullStep);
         rt.anchoredPosition = uiPos;
 
-        // Calcolo Dimensioni basato su data.size
         float width = (data.size.x * iconBaseSize) + ((data.size.x - 1) * iconSpacing);
         float height = (data.size.y * iconBaseSize) + ((data.size.y - 1) * iconSpacing);
         rt.sizeDelta = new Vector2(width, height);
@@ -66,44 +78,38 @@ public class MinimapManager : MonoBehaviour
         Transform fillTrans = newIconObj.transform.Find("RoomFill");
         
         if (fillTrans != null) fillImage = fillTrans.GetComponent<Image>();
-        else fillImage = baseImage; // Fallback
+        else fillImage = baseImage;
 
         fillImage.color = normalRoomColor;
 
-        // --- GESTIONE ICONE BASATA SUI TUOI BOOL ---
         Transform overlayTrans = newIconObj.transform.Find("IconOverlay");
         if (overlayTrans != null)
         {
             Image overlayImg = overlayTrans.GetComponent<Image>();
             overlayImg.gameObject.SetActive(false); 
 
-            if (data.isBossRoom && skullIcon != null)
-            {
+            if (data.isBossRoom && skullIcon != null) {
                 fillImage.color = specialRoomColor;
                 overlayImg.sprite = skullIcon;
                 overlayImg.gameObject.SetActive(true);
             }
-            else if (data.isTreasureRoom && crownIcon != null)
-            {
+            else if (data.isTreasureRoom && crownIcon != null) {
                 fillImage.color = specialRoomColor;
                 overlayImg.sprite = crownIcon;
                 overlayImg.gameObject.SetActive(true);
             }
-            else if (data.isStartRoom && startIcon != null)
-            {
+            else if (data.isStartRoom && startIcon != null) {
                 fillImage.color = specialRoomColor; 
                 overlayImg.sprite = startIcon;
                 overlayImg.gameObject.SetActive(true);
             }
-            else if (data.isShopRoom && shopIcon != null)
-            {
+            else if (data.isShopRoom && shopIcon != null) {
                 fillImage.color = specialRoomColor;
                 overlayImg.sprite = shopIcon;
                 overlayImg.gameObject.SetActive(true);
             }
         }
 
-        // Registrazione nel dizionario per l'illuminazione
         for (int x = 0; x < data.size.x; x++) {
             for (int y = 0; y < data.size.y; y++) {
                 Vector2Int cell = gridPos + new Vector2Int(x, y);
