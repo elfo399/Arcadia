@@ -3,15 +3,20 @@ using UnityEngine;
 using Unity.AI.Navigation;
 using System.Linq; 
 
-public class SimpleDungeonGenerator : MonoBehaviour
+public class CoreGenerator : MonoBehaviour
 {
+    public static CoreGenerator Instance; // Singleton per accesso facile
+
     [Header("Riferimenti")]
     public Transform playerTransform;
     public NavMeshSurface navMeshSurface; 
 
     [Header("Configurazione Seed")]
-    public string gameSeed = "";       
+    public string gameSeedString = ""; // La stringa (es. "PIPPO")
     public bool useRandomSeed = true;  
+    
+    // Questo è il numero magico che guiderà tutto il gioco
+    [HideInInspector] public int currentMasterSeed; 
 
     [Header("Generazione")]
     public int totalRooms = 15;
@@ -26,68 +31,74 @@ public class SimpleDungeonGenerator : MonoBehaviour
 
     [Header("Prefabs Stanze Normali")]
     public Room startRoomPrefab; 
-    // Array per varianti
     public Room[] normal1x1Variants;    
     public Room[] normal2x1Variants; 
     public Room[] normal1x2Variants; 
     public Room[] normal2x2Variants; 
     
-    [Header("Prefabs Boss")]
+    [Header("Prefabs Stanze Speciali")]
     public Room[] boss1x1Variants;     
     public Room[] boss2x1Variants; 
     public Room[] boss1x2Variants; 
     public Room[] boss2x2Variants; 
-
-    [Header("Prefabs Tesoro (NUOVO)")]
     public Room[] treasure1x1Variants; 
-    public Room[] treasure2x1Variants; 
-    public Room[] treasure1x2Variants; 
-    public Room[] treasure2x2Variants; 
-
-    [Header("Prefabs Shop (NUOVO)")]
     public Room[] shop1x1Variants; 
-    public Room[] shop2x1Variants; 
-    public Room[] shop1x2Variants; 
-    public Room[] shop2x2Variants; 
+    // Aggiungi varianti shop/treasure 2x1 ecc se vuoi
 
-    // Database
+    // Database interno
     private List<Room> activeRooms = new List<Room>(); 
     private Dictionary<Vector2Int, Room> gridMap = new Dictionary<Vector2Int, Room>();
     private List<Vector2Int> anchors = new List<Vector2Int>(); 
+
+    // Usiamo System.Random per stabilità totale della mappa
+    private System.Random prng; 
 
     private readonly Vector2Int North = Vector2Int.up;
     private readonly Vector2Int South = Vector2Int.down;
     private readonly Vector2Int East = Vector2Int.right;
     private readonly Vector2Int West = Vector2Int.left;
 
+    void Awake()
+    {
+        Instance = this;
+    }
+
     void Start() { Generate(); }
+    
     void Update() { 
         if (MinimapManager.instance && playerTransform) 
             MinimapManager.instance.UpdatePlayerPosition(playerTransform.position, xOffset); 
     }
 
-    void Generate()
+    public void Generate()
     {
-        if (useRandomSeed) gameSeed = GenerateRandomId();
-        gameSeed = gameSeed.ToUpper();
-        Random.InitState(gameSeed.GetHashCode());
-        Debug.Log($"<color=cyan>SEED: {gameSeed}</color>");
+        // 1. CALCOLO SEED
+        if (useRandomSeed) gameSeedString = GenerateRandomString();
+        
+        // Convertiamo la stringa in un numero intero stabile
+        currentMasterSeed = gameSeedString.GetHashCode();
+        
+        // Inizializziamo il generatore casuale PRINCIPALE
+        prng = new System.Random(currentMasterSeed);
+        
+        Debug.Log($"<color=cyan>GENERATING DUNGEON - SEED: {gameSeedString} ({currentMasterSeed})</color>");
 
+        // 2. PULIZIA
         foreach (var r in activeRooms) if (r != null) Destroy(r.gameObject);
         activeRooms.Clear();
         gridMap.Clear();
         anchors.Clear();
         if (MinimapManager.instance) MinimapManager.instance.ClearMap();
 
-        // START
+        // 3. START ROOM
         SpawnRoom(Vector2Int.zero, (startRoomPrefab != null ? startRoomPrefab : GetRandomRoom(normal1x1Variants)));
 
-        // WALKER
+        // 4. RANDOM WALKER
         int safety = 0;
-        while (anchors.Count < totalRooms && safety < 1000)
+        while (anchors.Count < totalRooms && safety < 2000)
         {
             safety++;
-            Vector2Int startPoint = anchors[Random.Range(0, anchors.Count)];
+            Vector2Int startPoint = anchors[prng.Next(0, anchors.Count)];
             Vector2Int targetPos = startPoint + GetRandomDirection();
 
             if (gridMap.ContainsKey(targetPos)) continue; 
@@ -99,23 +110,27 @@ public class SimpleDungeonGenerator : MonoBehaviour
             if (!spawned) TrySpawn(targetPos, GetRandomRoom(normal1x1Variants), 100);
         }
 
+        // 5. STANZE SPECIALI
         HandleSpecialRooms();
+
+        // 6. FINISH
         ConnectAllDoors();
         if (navMeshSurface != null) navMeshSurface.BuildNavMesh();
         DrawMinimapFinal();
     }
 
-    // --- HELPER ---
+    // --- LOGICA HELPER ---
+
     Room GetRandomRoom(Room[] variants)
     {
         if (variants == null || variants.Length == 0) return null;
-        return variants[Random.Range(0, variants.Length)];
+        return variants[prng.Next(0, variants.Length)];
     }
 
     bool TrySpawn(Vector2Int pos, Room prefab, int chance)
     {
         if (prefab == null) return false;
-        if (Random.Range(0, 100) > chance) return false;
+        if (prng.Next(0, 100) > chance) return false;
         if (!CanFitRoom(pos, prefab.roomData.size)) return false;
         SpawnRoom(pos, prefab);
         return true;
@@ -145,40 +160,29 @@ public class SimpleDungeonGenerator : MonoBehaviour
         activeRooms.Add(newRoom);
     }
 
-    // --- LOGICA SPECIALE AGGIORNATA ---
     void HandleSpecialRooms()
     {
-        List<Room> allCandidates = new List<Room>();
-        foreach (var r in activeRooms) if (!r.roomData.isStartRoom) allCandidates.Add(r);
+        List<Room> candidates = activeRooms.Where(r => !r.roomData.isStartRoom).ToList();
+        List<Room> deadEnds = candidates.FindAll(r => GetRoomConnectionsCount(r) == 1);
 
-        // Troviamo i Vicoli Ciechi
-        List<Room> deadEnds = allCandidates.FindAll(r => GetRoomConnectionsCount(r) == 1);
+        // BOSS
+        PlaceSpecialRoomType(deadEnds, candidates, minBossDistance, "Boss");
+        RefreshLists(ref deadEnds, ref candidates);
 
-        // ================= BOSS =================
-        // Cerchiamo tra i vicoli ciechi, poi fallback su tutto
-        PlaceSpecialRoomType(deadEnds, allCandidates, minBossDistance, "Boss");
+        // TREASURE
+        PlaceSpecialRoomType(deadEnds, candidates, minTreasureDistance, "Treasure");
+        RefreshLists(ref deadEnds, ref candidates);
 
-        // Aggiorna liste (rimuovi stanze trasformate)
-        RefreshLists(ref deadEnds, ref allCandidates);
-
-        // ================= TREASURE =================
-        PlaceSpecialRoomType(deadEnds, allCandidates, minTreasureDistance, "Treasure");
-
-        RefreshLists(ref deadEnds, ref allCandidates);
-
-        // ================= SHOP =================
-        PlaceSpecialRoomType(deadEnds, allCandidates, minShopDistance, "Shop");
+        // SHOP
+        PlaceSpecialRoomType(deadEnds, candidates, minShopDistance, "Shop");
     }
 
-    // Funzione generica per piazzare qualsiasi tipo speciale
     void PlaceSpecialRoomType(List<Room> primaryPool, List<Room> fallbackPool, int minDistance, string type)
     {
-        // 1. Filtra per distanza
         var validPrimary = primaryPool.FindAll(r => GetDistanceFromStart(r) >= minDistance);
         var validFallback = fallbackPool.FindAll(r => GetDistanceFromStart(r) >= minDistance);
 
-        // 2. Filtra per "Esiste un prefab di questa taglia?"
-        // Se la stanza candidata è 2x1, ma non abbiamo creato il prefab Shop 2x1, non possiamo usarla.
+        // Filtra se abbiamo prefab per quella taglia
         validPrimary = validPrimary.FindAll(r => HasPrefabForTypeAndSize(type, r.roomData.size));
         validFallback = validFallback.FindAll(r => HasPrefabForTypeAndSize(type, r.roomData.size));
 
@@ -186,28 +190,20 @@ public class SimpleDungeonGenerator : MonoBehaviour
 
         if (validPrimary.Count > 0)
         {
-            if (type == "Boss") // Il Boss preferisce la più lontana
+            if (type == "Boss") // Boss: Più lontano
             {
                 validPrimary.Sort((a, b) => GetDistanceFromStart(b).CompareTo(GetDistanceFromStart(a)));
                 target = validPrimary[0];
             }
-            else // Shop e Treasure random
+            else // Altri: Random
             {
-                target = validPrimary[Random.Range(0, validPrimary.Count)];
+                target = validPrimary[prng.Next(0, validPrimary.Count)];
             }
         }
         else if (validFallback.Count > 0)
         {
-            // Fallback
-            if (type == "Boss")
-            {
-                validFallback.Sort((a, b) => GetDistanceFromStart(b).CompareTo(GetDistanceFromStart(a)));
-                target = validFallback[0];
-            }
-            else
-            {
-                target = validFallback[Random.Range(0, validFallback.Count)];
-            }
+            if (type == "Boss") { validFallback.Sort((a, b) => GetDistanceFromStart(b).CompareTo(GetDistanceFromStart(a))); target = validFallback[0]; }
+            else target = validFallback[prng.Next(0, validFallback.Count)];
         }
 
         if (target != null)
@@ -215,58 +211,24 @@ public class SimpleDungeonGenerator : MonoBehaviour
             Room prefab = GetPrefabForTypeAndSize(type, target.roomData.size);
             if (prefab != null) ReplaceRoom(target, prefab);
         }
-        else
-        {
-            Debug.LogWarning($"Impossibile piazzare {type}: nessuna stanza valida o nessun prefab della taglia giusta.");
-        }
     }
 
     void RefreshLists(ref List<Room> deadEnds, ref List<Room> all)
     {
-        // Rimuoviamo dalle liste le stanze che sono state distrutte (null)
-        deadEnds.RemoveAll(r => r == null);
-        all.RemoveAll(r => r == null);
-        
-        // Rimuoviamo anche quelle che sono diventate speciali (es. non sovrascrivere boss con shop)
-        deadEnds.RemoveAll(r => r.roomData.isBossRoom || r.roomData.isTreasureRoom || r.roomData.isShopRoom);
-        all.RemoveAll(r => r.roomData.isBossRoom || r.roomData.isTreasureRoom || r.roomData.isShopRoom);
+        deadEnds.RemoveAll(r => r == null || r.roomData.isBossRoom || r.roomData.isTreasureRoom || r.roomData.isShopRoom);
+        all.RemoveAll(r => r == null || r.roomData.isBossRoom || r.roomData.isTreasureRoom || r.roomData.isShopRoom);
     }
 
-    bool HasPrefabForTypeAndSize(string type, Vector2Int size)
-    {
-        return GetPrefabForTypeAndSize(type, size) != null;
-    }
+    bool HasPrefabForTypeAndSize(string type, Vector2Int size) => GetPrefabForTypeAndSize(type, size) != null;
 
     Room GetPrefabForTypeAndSize(string type, Vector2Int size)
     {
         Room[] variants = null;
-
-        if (type == "Boss")
-        {
-            if (size == new Vector2Int(2, 2)) variants = boss2x2Variants;
-            else if (size == new Vector2Int(2, 1)) variants = boss2x1Variants;
-            else if (size == new Vector2Int(1, 2)) variants = boss1x2Variants;
-            else variants = boss1x1Variants;
-        }
-        else if (type == "Treasure")
-        {
-            if (size == new Vector2Int(2, 2)) variants = treasure2x2Variants;
-            else if (size == new Vector2Int(2, 1)) variants = treasure2x1Variants;
-            else if (size == new Vector2Int(1, 2)) variants = treasure1x2Variants;
-            else variants = treasure1x1Variants;
-        }
-        else if (type == "Shop")
-        {
-            if (size == new Vector2Int(2, 2)) variants = shop2x2Variants;
-            else if (size == new Vector2Int(2, 1)) variants = shop2x1Variants;
-            else if (size == new Vector2Int(1, 2)) variants = shop1x2Variants;
-            else variants = shop1x1Variants;
-        }
-
+        if (type == "Boss") variants = (size == new Vector2Int(2,2)) ? boss2x2Variants : (size == new Vector2Int(2,1)) ? boss2x1Variants : (size == new Vector2Int(1,2)) ? boss1x2Variants : boss1x1Variants;
+        else if (type == "Treasure") variants = (size == new Vector2Int(2,2)) ? treasure2x2Variants : (size == new Vector2Int(2,1)) ? treasure2x1Variants : (size == new Vector2Int(1,2)) ? treasure1x2Variants : treasure1x1Variants;
+        else if (type == "Shop") variants = (size == new Vector2Int(2,2)) ? shop2x2Variants : (size == new Vector2Int(2,1)) ? shop2x1Variants : (size == new Vector2Int(1,2)) ? shop1x2Variants : shop1x1Variants;
         return GetRandomRoom(variants);
     }
-
-    // --- ALTRE FUNZIONI STANDARD ---
 
     int GetRoomConnectionsCount(Room room)
     {
@@ -276,23 +238,17 @@ public class SimpleDungeonGenerator : MonoBehaviour
         int ay = Mathf.RoundToInt(wPos.z / zOffset);
         Vector2Int anchor = new Vector2Int(ax, ay);
         Vector2Int size = room.roomData.size;
-
-        for (int x = 0; x < size.x; x++) {
-            for (int y = 0; y < size.y; y++) {
-                Vector2Int cell = anchor + new Vector2Int(x, y);
-                CheckNeighborForCount(cell + North, room, neighbors);
-                CheckNeighborForCount(cell + South, room, neighbors);
-                CheckNeighborForCount(cell + East, room, neighbors);
-                CheckNeighborForCount(cell + West, room, neighbors);
-            }
+        for (int x = 0; x < size.x; x++) for (int y = 0; y < size.y; y++) {
+            Vector2Int cell = anchor + new Vector2Int(x, y);
+            CheckNeighborForCount(cell + North, room, neighbors); CheckNeighborForCount(cell + South, room, neighbors);
+            CheckNeighborForCount(cell + East, room, neighbors); CheckNeighborForCount(cell + West, room, neighbors);
         }
         return neighbors.Count;
     }
 
     void CheckNeighborForCount(Vector2Int targetPos, Room myRoom, HashSet<Room> list)
     {
-        if (gridMap.ContainsKey(targetPos))
-        {
+        if (gridMap.ContainsKey(targetPos)) {
             Room neighbor = gridMap[targetPos];
             if (neighbor != myRoom) list.Add(neighbor);
         }
@@ -301,75 +257,56 @@ public class SimpleDungeonGenerator : MonoBehaviour
     int GetDistanceFromStart(Room r)
     {
         Vector3 pos = r.transform.position;
-        int x = Mathf.RoundToInt(pos.x / xOffset);
-        int y = Mathf.RoundToInt(pos.z / zOffset);
+        int x = Mathf.RoundToInt(pos.x / xOffset); int y = Mathf.RoundToInt(pos.z / zOffset);
         return Mathf.Abs(x) + Mathf.Abs(y);
     }
 
     void ReplaceRoom(Room oldRoom, Room newPrefab)
     {
         Vector3 oldPos = oldRoom.transform.position;
-        int ax = Mathf.RoundToInt(oldPos.x / xOffset);
-        int ay = Mathf.RoundToInt(oldPos.z / zOffset);
+        int ax = Mathf.RoundToInt(oldPos.x / xOffset); int ay = Mathf.RoundToInt(oldPos.z / zOffset);
         Vector2Int anchor = new Vector2Int(ax, ay);
-
         Vector2Int size = oldRoom.roomData.size;
-        for (int x = 0; x < size.x; x++)
-            for (int y = 0; y < size.y; y++)
-                gridMap.Remove(anchor + new Vector2Int(x, y));
-
+        for (int x = 0; x < size.x; x++) for (int y = 0; y < size.y; y++) gridMap.Remove(anchor + new Vector2Int(x, y));
         activeRooms.Remove(oldRoom);
         Destroy(oldRoom.gameObject);
-
         SpawnRoom(anchor, newPrefab);
     }
 
     void ConnectAllDoors()
     {
-        foreach (Room r in activeRooms)
-        {
-            if (r == null) continue;
-            int ax = Mathf.RoundToInt(r.transform.position.x / xOffset);
-            int ay = Mathf.RoundToInt(r.transform.position.z / zOffset);
+        foreach (Room r in activeRooms) {
+            if(r==null) continue;
+            int ax = Mathf.RoundToInt(r.transform.position.x/xOffset); int ay = Mathf.RoundToInt(r.transform.position.z/zOffset);
             Vector2Int anchor = new Vector2Int(ax, ay);
             Vector2Int size = r.roomData.size;
-
-            for (int x = 0; x < size.x; x++) {
-                for (int y = 0; y < size.y; y++) {
-                    Vector2Int currentCell = anchor + new Vector2Int(x, y);
-                    Vector2Int relPos = new Vector2Int(x, y);
-                    SafeCheckNeighbor(r, currentCell, relPos, North);
-                    SafeCheckNeighbor(r, currentCell, relPos, South);
-                    SafeCheckNeighbor(r, currentCell, relPos, East);
-                    SafeCheckNeighbor(r, currentCell, relPos, West);
-                }
+            for (int x=0; x<size.x; x++) for (int y=0; y<size.y; y++) {
+                Vector2Int cell = anchor + new Vector2Int(x,y); Vector2Int rel = new Vector2Int(x,y);
+                SafeCheckNeighbor(r, cell, rel, North); SafeCheckNeighbor(r, cell, rel, South);
+                SafeCheckNeighbor(r, cell, rel, East); SafeCheckNeighbor(r, cell, rel, West);
             }
         }
     }
 
     void SafeCheckNeighbor(Room myRoom, Vector2Int myCell, Vector2Int relPos, Vector2Int dir)
     {
-        Vector2Int neighborCell = myCell + dir;
-        if (gridMap.ContainsKey(neighborCell))
-        {
-            Room neighborRoom = gridMap[neighborCell];
-            if (neighborRoom != null && neighborRoom != myRoom) myRoom.OpenDoor(relPos, dir);
+        if (gridMap.ContainsKey(myCell + dir)) {
+            Room neighbor = gridMap[myCell + dir];
+            if (neighbor != null && neighbor != myRoom) myRoom.OpenDoor(relPos, dir);
         }
     }
 
     void DrawMinimapFinal()
     {
         if (MinimapManager.instance == null) return;
-        foreach (Room r in activeRooms)
-        {
-            if (r == null) continue;
-            int ax = Mathf.RoundToInt(r.transform.position.x / xOffset);
-            int ay = Mathf.RoundToInt(r.transform.position.z / zOffset);
+        foreach (Room r in activeRooms) {
+            if(r==null) continue;
+            int ax = Mathf.RoundToInt(r.transform.position.x/xOffset); int ay = Mathf.RoundToInt(r.transform.position.z/zOffset);
             MinimapManager.instance.RegisterRoom(new Vector2Int(ax, ay), r.roomData);
         }
     }
 
-    string GenerateRandomId()
+    string GenerateRandomString()
     {
         string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         System.Random rng = new System.Random((int)System.DateTime.Now.Ticks);
@@ -378,5 +315,5 @@ public class SimpleDungeonGenerator : MonoBehaviour
         return new string(s);
     }
 
-    Vector2Int GetRandomDirection() { int r = Random.Range(0, 4); return r == 0 ? North : r == 1 ? South : r == 2 ? West : East; }
+    Vector2Int GetRandomDirection() { int r = prng.Next(0, 4); return r == 0 ? North : r == 1 ? South : r == 2 ? West : East; }
 }

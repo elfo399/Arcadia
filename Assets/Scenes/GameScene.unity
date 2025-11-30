@@ -2794,16 +2794,31 @@ MonoBehaviour:
   minTreasureDistance: 1
   minShopDistance: 1
   startRoomPrefab: {fileID: 2275314461642173434, guid: 1cfcec606dc09e94ca79a3f66d98f7b7, type: 3}
-  normal1x1: {fileID: 2275314461642173434, guid: 1be0c2646728d694f908888d18639618, type: 3}
-  normal2x1: {fileID: 9073747019927318074, guid: 2e830d4482d7f3b40a179b8d7b0aedb9, type: 3}
-  normal1x2: {fileID: 9073747019927318074, guid: ee22ea4f4cca3f54eabea76b2863ab67, type: 3}
-  normal2x2: {fileID: 9073747019927318074, guid: 4cc49084223755745822f668fb0e59c4, type: 3}
-  boss1x1: {fileID: 2275314461642173434, guid: 5c7c8544a8eaa634b93ca8fddcbe3c76, type: 3}
-  boss2x1: {fileID: 7698762379488882794, guid: bce41936b1ac381488289d4883b6ff12, type: 3}
-  boss1x2: {fileID: 9073747019927318074, guid: c1c332ecb6989584787311dc08df3f78, type: 3}
-  boss2x2: {fileID: 9073747019927318074, guid: 5b136c5068824194b94b3f65cc1c4a6f, type: 3}
-  treasure1x1: {fileID: 2275314461642173434, guid: 58f50ff50f0205542b815b7f8a9953eb, type: 3}
-  shop1x1: {fileID: 2275314461642173434, guid: e774d33a5155f974b82a8e86e375d7cd, type: 3}
+  normal1x1Variants:
+  - {fileID: 2275314461642173434, guid: 1be0c2646728d694f908888d18639618, type: 3}
+  - {fileID: 2275314461642173434, guid: 283bae4cbc5632040abe3360f78448f5, type: 3}
+  normal2x1Variants:
+  - {fileID: 9073747019927318074, guid: 2e830d4482d7f3b40a179b8d7b0aedb9, type: 3}
+  normal1x2Variants:
+  - {fileID: 9073747019927318074, guid: ee22ea4f4cca3f54eabea76b2863ab67, type: 3}
+  normal2x2Variants:
+  - {fileID: 9073747019927318074, guid: 4cc49084223755745822f668fb0e59c4, type: 3}
+  boss1x1Variants:
+  - {fileID: 2275314461642173434, guid: 5c7c8544a8eaa634b93ca8fddcbe3c76, type: 3}
+  boss2x1Variants:
+  - {fileID: 9073747019927318074, guid: c1c332ecb6989584787311dc08df3f78, type: 3}
+  boss1x2Variants:
+  - {fileID: 7698762379488882794, guid: bce41936b1ac381488289d4883b6ff12, type: 3}
+  boss2x2Variants:
+  - {fileID: 9073747019927318074, guid: 5b136c5068824194b94b3f65cc1c4a6f, type: 3}
+  treasure1x1Variants: []
+  treasure2x1Variants: []
+  treasure1x2Variants: []
+  treasure2x2Variants: []
+  shop1x1Variants: []
+  shop2x1Variants: []
+  shop1x2Variants: []
+  shop2x2Variants: []
 --- !u!114 &1038740302
 MonoBehaviour:
   m_ObjectHideFlags: 0
