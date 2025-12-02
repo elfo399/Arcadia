@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Unity.AI.Navigation;
@@ -118,8 +119,8 @@ public class CoreGenerator : MonoBehaviour
 
     public void Generate()
     {
-        if (useRandomSeed) gameSeedString = System.Guid.NewGuid().ToString().Substring(0, 8);
-        currentMasterSeed = gameSeedString.GetHashCode();
+        if (useRandomSeed) gameSeedString = GenerateSeedString();
+        currentMasterSeed = ComputeSeedHash(gameSeedString);
 
         CleanupScene();
 
@@ -454,6 +455,34 @@ public class CoreGenerator : MonoBehaviour
 
     int GetManhattanDist(Vector2Int a, Vector2Int b) => Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
     Vector2Int GetGridPos(Vector3 pos) => new Vector2Int(Mathf.RoundToInt(pos.x / xOffset), Mathf.RoundToInt(pos.z / zOffset));
+
+    // Seed helper: genera un ID nel formato XXXX-XXXX
+    string GenerateSeedString()
+    {
+        const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        System.Random rng = new System.Random(Environment.TickCount);
+        char[] s = new char[9];
+        for (int i = 0; i < s.Length; i++)
+        {
+            if (i == 4) s[i] = '-';
+            else s[i] = chars[rng.Next(chars.Length)];
+        }
+        return new string(s);
+    }
+
+    // Hash deterministico (più stabile di string.GetHashCode)
+    int ComputeSeedHash(string seed)
+    {
+        unchecked
+        {
+            int hash = 17;
+            foreach (char c in seed)
+            {
+                hash = hash * 31 + c;
+            }
+            return hash;
+        }
+    }
 
     #endregion
 }
