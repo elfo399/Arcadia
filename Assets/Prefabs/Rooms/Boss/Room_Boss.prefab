@@ -1080,6 +1080,7 @@ Transform:
   m_Children:
   - {fileID: 382720306513167504}
   - {fileID: 4071497228326024138}
+  - {fileID: 8317037053734233}
   - {fileID: 3080162491272494820}
   - {fileID: 2033433490515560989}
   - {fileID: 7330122838609333708}
@@ -1109,27 +1110,35 @@ MonoBehaviour:
     direction: {x: 0, y: 1}
     doorObject: {fileID: 75610467913206445}
     wallObject: {fileID: 6690670704869111997}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: South
     gridOffset: {x: 0, y: 0}
     direction: {x: 0, y: -1}
     doorObject: {fileID: 8050985167038856448}
     wallObject: {fileID: 5190223399547746128}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: West
     gridOffset: {x: 0, y: 0}
     direction: {x: -1, y: 0}
     doorObject: {fileID: 3278329207975274429}
     wallObject: {fileID: 6820404311904105720}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: East
     gridOffset: {x: 0, y: 0}
     direction: {x: 1, y: 0}
     doorObject: {fileID: 3067673834399767491}
     wallObject: {fileID: 6023095682210919977}
+    lockObject: {fileID: 0}
     isConnected: 0
+  isLocked: 0
   roomCleared: 0
   activeEnemies: []
+  coinPrefab: {fileID: 0}
+  minCoins: 2
+  maxCoins: 5
 --- !u!65 &-175505389014454851
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1361,6 +1370,52 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &6972102609248398245
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8317037053734233}
+  - component: {fileID: 8653331523000360328}
+  m_Layer: 0
+  m_Name: Enemy_Spawn_Point
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8317037053734233
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6972102609248398245}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.1, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4632564547433871007}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8653331523000360328
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6972102609248398245}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 071e65189bf67a8459d4da1e6433f5f8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spawnTable: {fileID: 11400000, guid: 77375612f1def3c4a8ca7052ea05907f, type: 2}
+  spawnChance: 98
 --- !u!1 &7188624370631327717
 GameObject:
   m_ObjectHideFlags: 0

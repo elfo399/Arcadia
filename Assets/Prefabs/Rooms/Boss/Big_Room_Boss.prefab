@@ -1749,6 +1749,52 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &3730916923150329779
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6588876545705216119}
+  - component: {fileID: 1396894541701765647}
+  m_Layer: 0
+  m_Name: Enemy_Spawn_Point
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6588876545705216119
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3730916923150329779}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 25, y: 0.1, z: 25}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2465098802145948511}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1396894541701765647
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3730916923150329779}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 071e65189bf67a8459d4da1e6433f5f8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spawnTable: {fileID: 11400000, guid: 77375612f1def3c4a8ca7052ea05907f, type: 2}
+  spawnChance: 100
 --- !u!1 &3736947059603686416
 GameObject:
   m_ObjectHideFlags: 0
@@ -2062,6 +2108,7 @@ Transform:
   - {fileID: 983091271920789923}
   - {fileID: 6319964465076036225}
   - {fileID: 3383320974987499393}
+  - {fileID: 6588876545705216119}
   - {fileID: 6557025062751794698}
   - {fileID: 5242482242948447012}
   - {fileID: 6284314018212098282}
@@ -2100,51 +2147,63 @@ MonoBehaviour:
     direction: {x: 0, y: 1}
     doorObject: {fileID: 7166205522964631405}
     wallObject: {fileID: 4514277170246237565}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: North DX
     gridOffset: {x: 1, y: 1}
     direction: {x: 0, y: 1}
     doorObject: {fileID: 4468019011060315025}
     wallObject: {fileID: 4907858621689939227}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: South SX
     gridOffset: {x: 0, y: 0}
     direction: {x: 0, y: -1}
     doorObject: {fileID: 3935008918324900738}
     wallObject: {fileID: 8251875609231077050}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: South DX
     gridOffset: {x: 1, y: 0}
     direction: {x: 0, y: -1}
     doorObject: {fileID: 992268561662703808}
     wallObject: {fileID: 3060343329876996752}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: West_SX
     gridOffset: {x: 0, y: 0}
     direction: {x: -1, y: 0}
     doorObject: {fileID: 5692850843076534909}
     wallObject: {fileID: 4384561209117864248}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: West_DX
     gridOffset: {x: 0, y: 1}
     direction: {x: -1, y: 0}
     doorObject: {fileID: 3458865883069993561}
     wallObject: {fileID: 6607862612952269542}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: East_SX
     gridOffset: {x: 1, y: 0}
     direction: {x: 1, y: 0}
     doorObject: {fileID: 5254987993790537219}
     wallObject: {fileID: 3596602838662624233}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: East_DX
     gridOffset: {x: 1, y: 1}
     direction: {x: 1, y: 0}
     doorObject: {fileID: 1953106945190598228}
     wallObject: {fileID: 7517478782434005477}
+    lockObject: {fileID: 0}
     isConnected: 0
+  isLocked: 0
   roomCleared: 0
   activeEnemies: []
+  coinPrefab: {fileID: 0}
+  minCoins: 2
+  maxCoins: 5
 --- !u!65 &1075246272291012284
 BoxCollider:
   m_ObjectHideFlags: 0

@@ -1082,6 +1082,7 @@ Transform:
   - {fileID: 8073625913103032064}
   - {fileID: 1918453188650186739}
   - {fileID: 5603648654200203354}
+  - {fileID: 1552237894529206623}
   - {fileID: 6915869443137054068}
   - {fileID: 4615429868130119354}
   - {fileID: 7141062288768927916}
@@ -1115,39 +1116,49 @@ MonoBehaviour:
     direction: {x: 0, y: 1}
     doorObject: {fileID: 8379064459467575613}
     wallObject: {fileID: 2999111908457128749}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: North DX
     gridOffset: {x: 1, y: 0}
     direction: {x: 0, y: 1}
     doorObject: {fileID: 2970832937737825729}
     wallObject: {fileID: 5991797579141045067}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: South SX
     gridOffset: {x: 0, y: 0}
     direction: {x: 0, y: -1}
     doorObject: {fileID: 2423190088959290834}
     wallObject: {fileID: 7331752897928507626}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: South DX
     gridOffset: {x: 1, y: 0}
     direction: {x: 0, y: -1}
     doorObject: {fileID: 1945042326307268240}
     wallObject: {fileID: 4414536180840295616}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: West
     gridOffset: {x: 0, y: 0}
     direction: {x: -1, y: 0}
     doorObject: {fileID: 6357396989978197037}
     wallObject: {fileID: 3162094833258524520}
+    lockObject: {fileID: 0}
     isConnected: 0
   - label: East
     gridOffset: {x: 1, y: 0}
     direction: {x: 1, y: 0}
     doorObject: {fileID: 6905818077146267731}
     wallObject: {fileID: 2797474750500187577}
+    lockObject: {fileID: 0}
     isConnected: 0
+  isLocked: 0
   roomCleared: 0
   activeEnemies: []
+  coinPrefab: {fileID: 0}
+  minCoins: 2
+  maxCoins: 5
 --- !u!65 &-5692971914959772820
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -2708,6 +2719,52 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &8162011429659543897
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1552237894529206623}
+  - component: {fileID: 5593230808119328482}
+  m_Layer: 0
+  m_Name: Enemy_Spawn_Point
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1552237894529206623
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8162011429659543897}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 25, y: 0.1, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3823231744370535695}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5593230808119328482
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8162011429659543897}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 071e65189bf67a8459d4da1e6433f5f8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spawnTable: {fileID: 11400000, guid: 77375612f1def3c4a8ca7052ea05907f, type: 2}
+  spawnChance: 100
 --- !u!1 &8379064459467575613
 GameObject:
   m_ObjectHideFlags: 0
