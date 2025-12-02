@@ -13,9 +13,9 @@ public class Room : MonoBehaviour
         public string label;          
         public Vector2Int gridOffset; 
         public Vector2Int direction;  
-        public GameObject doorObject; // Cornice aperta
-        public GameObject wallObject; // Muro chiuso
-        public GameObject lockObject; // <--- LUCC HETTO / CANCELLO
+        public GameObject doorObject; // Cornice
+        public GameObject wallObject; // Muro Pieno
+        public GameObject lockObject; // Cancello
         
         [HideInInspector] public bool isConnected; 
     }
@@ -23,16 +23,22 @@ public class Room : MonoBehaviour
     [Header("Configurazione Porte")]
     public List<DoorEntry> doors = new List<DoorEntry>();
 
-    [Header("Stato Stanza")]
-    public bool isLocked = false; // Serve la chiave?
+    [Header("Stato")]
+    public bool isLocked = false; // Chiave
     public bool roomCleared = false; 
     public List<GameObject> activeEnemies = new List<GameObject>(); 
+
+    [Header("Rewards")]
+    // (Non usare coinPrefab se usi il sistema RoomData.rewards)
+    public GameObject coinPrefab; // Fallback vecchio
+    public int minCoins = 2;
+    public int maxCoins = 5;
 
     private bool playerEntered = false;
 
     void Start()
     {
-        // Se è Shop o Treasure (e non è Start), blocca la stanza
+        // Lock iniziale per Shop/Treasure
         if (roomData != null)
         {
             if ((roomData.isShopRoom || roomData.isTreasureRoom) && !roomData.isStartRoom)
@@ -69,22 +75,17 @@ public class Room : MonoBehaviour
         }
     }
 
-    // --- SBLOCCO CON CHIAVE ---
+    // --- SBLOCCO CHIAVE ---
     public void UnlockSpecialRoom()
     {
-        isLocked = false; // Ora è aperta per sempre
-
-        // Rimuovi TUTTI i cancelli da TUTTE le porte connesse
+        isLocked = false; 
         foreach (var d in doors)
         {
-            if (d.isConnected && d.lockObject != null)
-            {
-                d.lockObject.SetActive(false);
-            }
+            if (d.isConnected && d.lockObject != null) d.lockObject.SetActive(false);
         }
     }
 
-    // --- GESTIONE NEMICI ---
+    // --- NEMICI ---
     public void RegisterEnemy(GameObject enemy)
     {
         if (!activeEnemies.Contains(enemy))
@@ -104,10 +105,9 @@ public class Room : MonoBehaviour
         }
     }
 
-    // --- LOGICA COMBATTIMENTO ---
+    // --- BATTLE LOGIC ---
     void OnTriggerEnter(Collider other)
     {
-        // Entra solo se non è bloccata a chiave (devi prima aprire il cancello)
         if (other.CompareTag("Player") && !playerEntered && !roomCleared && !isLocked)
         {
             if (activeEnemies.Count > 0)
@@ -127,9 +127,21 @@ public class Room : MonoBehaviour
     {
         foreach (var d in doors)
         {
-            if (d.wallObject != null) d.wallObject.SetActive(true);
+            // Chiudi solo le porte che erano aperte
+            if (d.isConnected)
+            {
+                // PRIORITÀ 1: Sbarre
+                if (d.lockObject != null) d.lockObject.SetActive(true);
+                // PRIORITÀ 2: Muro (se non ci sono sbarre)
+                else if (d.wallObject != null) 
+                {
+                    d.wallObject.SetActive(true);
+                    // Se rimetti il muro, spegni la cornice per pulizia
+                    if(d.doorObject != null) d.doorObject.SetActive(false);
+                }
+            }
         }
-        Debug.Log("STANZA BLOCCATA! Uccidi i nemici.");
+        Debug.Log("STANZA BLOCCATA!");
     }
 
     void UnlockRoomBattle()
@@ -138,72 +150,87 @@ public class Room : MonoBehaviour
         
         foreach (var d in doors)
         {
-            if (d.isConnected && d.wallObject != null) d.wallObject.SetActive(false);
+            if (d.isConnected)
+            {
+                // Sblocca Sbarre
+                if (d.lockObject != null) d.lockObject.SetActive(false);
+                
+                // Sblocca Muro (se usato come fallback)
+                if (d.wallObject != null) d.wallObject.SetActive(false);
+                
+                // Riaccendi Cornice
+                if (d.doorObject != null) d.doorObject.SetActive(true);
+            }
         }
         
-        // Spawn delle ricompense basato sulla nuova lista
+        // LOOT SYSTEM
         if (roomData != null && roomData.rewards.Count > 0)
         {
             SpawnRewards();
         }
+        else if (coinPrefab != null) // Fallback vecchio
+        {
+            // SpawnLegacyCoin();
+        }
         
-        Debug.Log("STANZA PULITA! Porte aperte.");
+        Debug.Log("STANZA PULITA!");
     }
 
     void WakeUpEnemies()
     {
-        foreach (var enemy in activeEnemies)
-        {
-            if(enemy != null) enemy.SetActive(true);
-        }
+        foreach (var enemy in activeEnemies) if(enemy!=null) enemy.SetActive(true);
     }
 
+    // --- LOOT SYSTEM DETERMINISTICO ---
     void SpawnRewards()
     {
-        // Fase 1: Itera su ogni TIPO di ricompensa (es. Monete, Pozioni)
-        foreach (var lootItem in roomData.rewards)
+        // 1. Calcolo Seed Locale (basato su MasterSeed e Posizione Stanza)
+        int masterSeed = (CoreGenerator.Instance != null) ? CoreGenerator.Instance.currentMasterSeed : 0;
+        int localSeed = masterSeed + (int)(transform.position.x * 100) + (int)(transform.position.z * 100);
+        
+        System.Random prng = new System.Random(localSeed);
+
+        // 2. Itero su tutti i possibili premi
+        foreach (var loot in roomData.rewards)
         {
-            if (lootItem.itemPrefab == null || lootItem.quantityWeights.Count == 0) continue;
+            if (loot.itemPrefab == null) continue;
 
-            // Tira il dado per vedere se questo TIPO di oggetto spawna
-            float dropRoll = Random.Range(0f, 100f);
-            if (dropRoll <= lootItem.dropChance)
+            // A. Roll drop chance
+            int dropRoll = prng.Next(0, 101);
+            
+            if (dropRoll <= loot.dropChance)
             {
-                // Fase 2: L'oggetto spawna. Ora, quale quantità scegliamo?
-                // Calcoliamo il peso totale della sotto-lista delle quantità
-                float totalWeight = 0;
-                foreach (var quantity in lootItem.quantityWeights)
-                {
-                    totalWeight += quantity.chance;
-                }
-
-                // Scegliamo un punto casuale all'interno del peso totale
-                float quantityRoll = Random.Range(0f, totalWeight);
-                int chosenAmount = 0;
-
-                // Troviamo a quale fascia di quantità corrisponde il punto scelto
-                foreach (var quantity in lootItem.quantityWeights)
-                {
-                    if (quantityRoll <= quantity.chance)
-                    {
-                        chosenAmount = quantity.amount;
-                        break; // Trovato! Usciamo dal ciclo.
-                    }
-                    else
-                    {
-                        quantityRoll -= quantity.chance;
-                    }
-                }
+                // B. Calcolo Quantità Ponderata
+                int amountToSpawn = 0;
                 
-                // Se per qualche motivo non viene scelta una quantità (es. pesi a 0), non spawniamo nulla
-                if(chosenAmount <= 0) continue;
-
-                // Spawniamo la quantità scelta
-                for (int i = 0; i < chosenAmount; i++)
+                if (loot.quantityWeights.Count > 0)
                 {
-                    Vector3 randomOffset = new Vector3(Random.Range(-2f, 2f), 0.2f, Random.Range(-2f, 2f));
-                    Vector3 spawnPos = transform.position + randomOffset;
-                    Instantiate(lootItem.itemPrefab, spawnPos, Quaternion.identity, transform);
+                    float totalWeight = 0;
+                    foreach(var qw in loot.quantityWeights) totalWeight += qw.chance;
+
+                    double weightRoll = prng.NextDouble() * totalWeight;
+                    float currentWeight = 0;
+
+                    foreach(var qw in loot.quantityWeights)
+                    {
+                        currentWeight += qw.chance;
+                        if (weightRoll <= currentWeight)
+                        {
+                            amountToSpawn = qw.amount;
+                            break;
+                        }
+                    }
+                }
+                else amountToSpawn = 1; // Default
+
+                // C. Spawn fisico
+                for (int i = 0; i < amountToSpawn; i++)
+                {
+                    float rx = (float)(prng.NextDouble() * 4 - 2);
+                    float rz = (float)(prng.NextDouble() * 4 - 2);
+                    Vector3 spawnPos = transform.position + new Vector3(rx, 0.2f, rz); // Altezza terra
+                    
+                    Instantiate(loot.itemPrefab, spawnPos, Quaternion.identity, transform);
                 }
             }
         }

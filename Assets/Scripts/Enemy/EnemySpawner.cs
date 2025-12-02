@@ -4,21 +4,30 @@ using UnityEngine.AI;
 public class EnemySpawner : MonoBehaviour
 {
     [Header("Configurazione")]
-    public SpawnTable spawnTable; // La lista dei mostri del livello
-    [Range(0, 100)] public int spawnChance = 50; // Probabilità
+    public SpawnTable spawnTable; 
+    [Range(0, 100)] public int spawnChance = 50; 
 
     void Start()
     {
-        // 1. Lancia il dado
-        if (Random.Range(0, 100) > spawnChance)
+        // 1. Recupera Seed Globale
+        int masterSeed = (CoreGenerator.Instance != null) ? CoreGenerator.Instance.currentMasterSeed : 0;
+        
+        // 2. Calcola Seed Locale
+        int localSeed = masterSeed + (int)(transform.position.x * 1000) + (int)(transform.position.z * 1000);
+        System.Random prng = new System.Random(localSeed);
+
+        // 3. Lancia dado
+        if (prng.Next(0, 101) > spawnChance)
         {
             Destroy(gameObject);
             return;
         }
 
-        // 2. Pesca il mostro
+        // 4. Pesca mostro
         if (spawnTable == null) return;
-        EnemyData data = spawnTable.GetRandomEnemy();
+        
+        // ORA FUNZIONA: SpawnTable ha il metodo che accetta prng
+        EnemyData data = spawnTable.GetRandomEnemy(prng);
 
         if (data != null && data.prefab != null)
         {
@@ -28,38 +37,26 @@ public class EnemySpawner : MonoBehaviour
 
     void SpawnEnemy(EnemyData data)
     {
-        // Crea il mostro
         GameObject enemy = Instantiate(data.prefab, transform.position, transform.rotation, transform);
         enemy.name = data.enemyName;
 
-        // --- INIEZIONE DATI (Sovrascrivi le stats del prefab con quelle del Data) ---
-        
-        // Vita
+        // Iniezione Dati
         EnemyHealth health = enemy.GetComponent<EnemyHealth>();
         if (health != null) 
         {
             health.maxHealth = data.maxHealth;
-            // Reset vita corrente (importante!)
-            // Nota: Assicurati che EnemyHealth abbia un metodo o proprietà per resettare, 
-            // oppure fallo via reflection/public field se currentHealth è pubblico.
-            // Se currentHealth è privato e inizializzato in Start(), cambiare maxHealth qui funziona perché Start() parte dopo.
+            health.currentHealth = data.maxHealth; // ORA FUNZIONA: currentHealth è public
         }
 
-        // Velocità
         NavMeshAgent agent = enemy.GetComponent<NavMeshAgent>();
-        if (agent != null) 
-        {
-            agent.speed = data.moveSpeed;
-        }
+        if (agent != null) agent.speed = data.moveSpeed;
 
-        // --- REGISTRAZIONE STANZA (Fondamentale per le porte!) ---
+        // La registrazione è gestita automaticamente da EnemyHealth.Start() ora,
+        // ma lasciamo questo controllo per sicurezza se lo script parte prima
         if (enemy.CompareTag("Enemy"))
         {
             Room room = GetComponentInParent<Room>();
-            if (room != null) 
-            {
-                room.RegisterEnemy(enemy);
-            }
+            if (room != null) room.RegisterEnemy(enemy);
         }
     }
 }

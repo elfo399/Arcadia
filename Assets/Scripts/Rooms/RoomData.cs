@@ -4,17 +4,18 @@ using UnityEngine;
 [System.Serializable]
 public class QuantityWeight
 {
-    public int amount = 1;
+    public int amount = 1;      // Quanti ne cadono? (es. 3 monete)
     [Range(0f, 100f)]
-    public float chance = 1;
+    public float chance = 10;   // Peso probabilistico (più è alto, più è probabile)
 }
 
 [System.Serializable]
 public class LootItem
 {
+    public string name;         // Solo per ordine nell'Inspector
     public GameObject itemPrefab;
     [Range(0f, 100f)]
-    public float dropChance;
+    public float dropChance;    // Probabilità globale che questo tipo di oggetto appaia (es. 50%)
     public List<QuantityWeight> quantityWeights = new List<QuantityWeight>();
 }
 
@@ -23,10 +24,10 @@ public class RoomData : ScriptableObject
 {
     [Header("Identità")]
     public string roomName;
-    public GameObject roomPrefab; // Il modello 3D della stanza
+    public GameObject roomPrefab; 
 
     [Header("Dimensioni Griglia")]
-    public Vector2Int size = new Vector2Int(1, 1); // 1x1, 2x1, 2x2, ecc.
+    public Vector2Int size = new Vector2Int(1, 1); 
 
     [Header("Tipo")]
     public bool isBossRoom;
@@ -34,6 +35,6 @@ public class RoomData : ScriptableObject
     public bool isStartRoom;
     public bool isShopRoom;
     
-    [Header("Rewards")]
+    [Header("Rewards / Loot Table")]
     public List<LootItem> rewards = new List<LootItem>();
 }
