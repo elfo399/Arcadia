@@ -28,13 +28,21 @@ public class Room : MonoBehaviour
     public bool roomCleared = false; 
     public List<GameObject> activeEnemies = new List<GameObject>(); 
 
-    [Header("Rewards")]
-    // (Non usare coinPrefab se usi il sistema RoomData.rewards)
-    public GameObject coinPrefab; // Fallback vecchio
-    public int minCoins = 2;
-    public int maxCoins = 5;
+    [Header("Progressione Piano / Portale Boss")]
+    [Tooltip("Prefab del portale per scendere al piano successivo (es. un cubo viola).")]
+    public GameObject floorPortalPrefab;
+    [Tooltip("Portale già presente nel prefab della stanza (lascialo disattivo finché il boss non muore).")]
+    public GameObject preplacedFloorPortal;
+    public Vector3 portalSpawnOffset = Vector3.zero;
+    [Tooltip("Distanza dal centro stanza verso il muro opposto all'ingresso boss.")]
+    public float portalDistanceFromCenter = 10f;
+
+    [Header("Spawn Player")]
+    [Tooltip("Punto di spawn consigliato per il player all'inizio del piano.")]
+    public Transform playerSpawnPoint;
 
     private bool playerEntered = false;
+    private GameObject spawnedPortal;
 
     void Start()
     {
@@ -102,6 +110,7 @@ public class Room : MonoBehaviour
         if (activeEnemies.Count == 0 && playerEntered && !roomCleared)
         {
             UnlockRoomBattle();
+            TrySpawnFloorPortal();
         }
     }
 
@@ -168,10 +177,6 @@ public class Room : MonoBehaviour
         {
             SpawnRewards();
         }
-        else if (coinPrefab != null) // Fallback vecchio
-        {
-            // SpawnLegacyCoin();
-        }
         
         Debug.Log("STANZA PULITA!");
     }
@@ -234,5 +239,68 @@ public class Room : MonoBehaviour
                 }
             }
         }
+    }
+
+    void TrySpawnFloorPortal()
+    {
+        if (spawnedPortal != null) return;
+        if (roomData == null || !roomData.isBossRoom) return;
+
+        Vector3 targetPos = GetPortalTargetPosition();
+
+        // Se esiste un portale già presente nel prefab, attivalo
+        if (preplacedFloorPortal != null)
+        {
+            spawnedPortal = preplacedFloorPortal;
+            spawnedPortal.transform.position = targetPos;
+            spawnedPortal.SetActive(true);
+            EnsurePortalComponent(spawnedPortal);
+            return;
+        }
+
+        // Altrimenti istanzia il prefab
+        if (floorPortalPrefab == null) return;
+
+        spawnedPortal = Instantiate(floorPortalPrefab, targetPos, Quaternion.identity, transform);
+        EnsurePortalComponent(spawnedPortal);
+    }
+
+    void EnsurePortalComponent(GameObject portal)
+    {
+        if (portal == null) return;
+        if (portal.GetComponent<FloorPortal>() == null)
+        {
+            portal.AddComponent<FloorPortal>();
+        }
+        // Assicura un collider trigger per il portale
+        Collider col = portal.GetComponent<Collider>();
+        if (col == null)
+        {
+            col = portal.AddComponent<BoxCollider>();
+            ((BoxCollider)col).size = new Vector3(1f, 2f, 1f);
+        }
+        col.isTrigger = true;
+    }
+
+    Vector3 GetPortalTargetPosition()
+    {
+        // Trova la direzione della porta di ingresso (prima porta connessa)
+        Vector2Int entranceDir = Vector2Int.zero;
+        foreach (var d in doors)
+        {
+            if (d.isConnected)
+            {
+                entranceDir = d.direction;
+                break;
+            }
+        }
+
+        // Opposto rispetto all'ingresso
+        Vector3 offsetDir = (entranceDir == Vector2Int.zero)
+            ? Vector3.forward
+            : new Vector3(-entranceDir.x, 0f, -entranceDir.y).normalized;
+
+        Vector3 offset = offsetDir * portalDistanceFromCenter + portalSpawnOffset;
+        return transform.position + offset;
     }
 }

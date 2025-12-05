@@ -19,6 +19,11 @@ public class CoreGenerator : MonoBehaviour
     public bool useRandomSeed = true;
     [HideInInspector] public int currentMasterSeed;
 
+    [Header("Progressione Piani")]
+    public int currentFloor = 1;
+    public int maxFloors = 4;
+    public Vector3 playerSpawnOffset = Vector3.zero;
+
     [Header("Generazione")]
     public int totalNormalRooms = 15;
     public int xOffset = 50;
@@ -91,6 +96,7 @@ public class CoreGenerator : MonoBehaviour
     }
 
     private List<Room> activeRoomObjects = new List<Room>();
+    private Room startRoomInstance;
     private System.Random prng;
 
     private readonly Vector2Int[] directions = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
@@ -119,10 +125,17 @@ public class CoreGenerator : MonoBehaviour
 
     public void Generate()
     {
+        if (startRoomPrefab == null || startRoomPrefab.roomData == null)
+        {
+            Debug.LogError("[CoreGenerator] StartRoomPrefab o RoomData mancante. Configura il prefab di start.");
+            return;
+        }
+
         if (useRandomSeed) gameSeedString = GenerateSeedString();
         currentMasterSeed = ComputeSeedHash(gameSeedString);
 
         CleanupScene();
+        startRoomInstance = null;
 
         List<VirtualRoom> finalLayout = null;
         int attempts = 0;
@@ -148,11 +161,18 @@ public class CoreGenerator : MonoBehaviour
             ConnectDoors();
             if (navMeshSurface != null) navMeshSurface.BuildNavMesh();
             InitializeMinimap();
+            RespawnPlayerAtStart();
         }
         else
         {
             Debug.LogError("CRITICO: Impossibile generare dungeon. Regole troppo strette (Distanza Boss + Dead End).");
         }
+    }
+
+    public void NextFloor()
+    {
+        currentFloor = Mathf.Clamp(currentFloor + 1, 1, maxFloors);
+        Generate();
     }
 
     private List<VirtualRoom> TryBuildVirtualLayout()
@@ -396,10 +416,7 @@ public class CoreGenerator : MonoBehaviour
             instance.name = $"{vr.type}_{vr.anchorPos}";
 
             instance.roomData.size = vr.size;
-            instance.roomData.isStartRoom = (vr.type == "Start");
-            instance.roomData.isBossRoom = (vr.type == "Boss");
-            instance.roomData.isShopRoom = (vr.type == "Shop");
-            instance.roomData.isTreasureRoom = (vr.type == "Treasure");
+            if (vr.type == "Start") startRoomInstance = instance;
 
             activeRoomObjects.Add(instance);
         }
@@ -455,6 +472,48 @@ public class CoreGenerator : MonoBehaviour
 
     int GetManhattanDist(Vector2Int a, Vector2Int b) => Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
     Vector2Int GetGridPos(Vector3 pos) => new Vector2Int(Mathf.RoundToInt(pos.x / xOffset), Mathf.RoundToInt(pos.z / zOffset));
+
+    void RespawnPlayerAtStart()
+    {
+        if (playerTransform == null) return;
+
+        // Trova la stanza start; se assente, fallback alla prima stanza
+        Room startRoom = activeRoomObjects.FirstOrDefault(r => r != null && r.roomData != null && r.roomData.isStartRoom);
+        if (startRoom == null) startRoom = startRoomInstance;
+        if (startRoom == null) startRoom = activeRoomObjects.FirstOrDefault(r => r != null);
+        if (startRoom == null)
+        {
+            Debug.LogError("[CoreGenerator] Nessuna stanza trovata per lo spawn. Teletrasporto all'origine.");
+            playerTransform.position = playerSpawnOffset;
+            playerTransform.rotation = Quaternion.identity;
+            return;
+        }
+
+        Vector3 basePos = startRoom.transform.position + Vector3.up; // leggero offset verticale
+        Quaternion baseRot = startRoom.transform.rotation;
+
+        if (startRoom.playerSpawnPoint != null)
+        {
+            basePos = startRoom.playerSpawnPoint.position;
+            baseRot = startRoom.playerSpawnPoint.rotation;
+        }
+
+        Vector3 targetPos = basePos + playerSpawnOffset;
+
+        // Snap al suolo (NavMesh o Raycast) per evitare spawn nel vuoto
+        UnityEngine.AI.NavMeshHit hit;
+        if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
+        {
+            targetPos = hit.position;
+        }
+        else if (Physics.Raycast(targetPos + Vector3.up * 5f, Vector3.down, out RaycastHit rayHit, 20f, Physics.AllLayers, QueryTriggerInteraction.Ignore))
+        {
+            targetPos = rayHit.point;
+        }
+
+        playerTransform.position = targetPos;
+        playerTransform.rotation = baseRot;
+    }
 
     // Seed helper: genera un ID nel formato XXXX-XXXX
     string GenerateSeedString()

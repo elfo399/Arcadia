@@ -11,7 +11,12 @@ public class RandomProp : MonoBehaviour
 
     void Start()
     {
-        if (Random.Range(0, 100) > spawnChance)
+        // Seed deterministico basato su master seed e posizione stanza
+        int masterSeed = (CoreGenerator.Instance != null) ? CoreGenerator.Instance.currentMasterSeed : 0;
+        int localSeed = masterSeed + (int)(transform.position.x * 1000) + (int)(transform.position.z * 1000);
+        System.Random prng = new System.Random(localSeed);
+
+        if (prng.Next(0, 101) > spawnChance)
         {
             Destroy(gameObject); 
             return;
@@ -19,9 +24,13 @@ public class RandomProp : MonoBehaviour
 
         if (props.Length == 0) return;
 
-        GameObject prefabToSpawn = props[Random.Range(0, props.Length)];
+        GameObject prefabToSpawn = props[prng.Next(0, props.Length)];
         Quaternion rotation = transform.rotation;
-        if (randomRotation) rotation = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+        if (randomRotation)
+        {
+            float angle = (float)(prng.NextDouble() * 360f);
+            rotation = Quaternion.Euler(0, angle, 0);
+        }
 
         GameObject spawnedProp = Instantiate(prefabToSpawn, transform.position, rotation, transform);
 

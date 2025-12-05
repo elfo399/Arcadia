@@ -2818,11 +2818,14 @@ MonoBehaviour:
   gameSeedString: 
   useRandomSeed: 1
   currentMasterSeed: 0
-  totalNormalRooms: 5
+  currentFloor: 1
+  maxFloors: 4
+  playerSpawnOffset: {x: 0, y: 0, z: 0}
+  totalNormalRooms: 1
   xOffset: 50
   zOffset: 50
   normalBigRoomChance: 100
-  bossBigRoomChance: 100
+  bossBigRoomChance: 0
   shopBigRoomChance: 10
   treasureBigRoomChance: 5
   minBossDistance: 3
