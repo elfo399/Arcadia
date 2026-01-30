@@ -484,8 +484,7 @@ public class CoreGenerator : MonoBehaviour
         if (startRoom == null)
         {
             Debug.LogError("[CoreGenerator] Nessuna stanza trovata per lo spawn. Teletrasporto all'origine.");
-            playerTransform.position = playerSpawnOffset;
-            playerTransform.rotation = Quaternion.identity;
+            TeleportPlayer(playerSpawnOffset, Quaternion.identity);
             return;
         }
 
@@ -511,8 +510,24 @@ public class CoreGenerator : MonoBehaviour
             targetPos = rayHit.point;
         }
 
-        playerTransform.position = targetPos;
-        playerTransform.rotation = baseRot;
+        TeleportPlayer(targetPos, baseRot);
+    }
+
+    void TeleportPlayer(Vector3 targetPosition, Quaternion targetRotation)
+    {
+        if (playerTransform == null) return;
+
+        CharacterController controller = playerTransform.GetComponent<CharacterController>();
+        if (controller != null && controller.enabled)
+        {
+            controller.enabled = false;
+            playerTransform.SetPositionAndRotation(targetPosition, targetRotation);
+            controller.enabled = true;
+        }
+        else
+        {
+            playerTransform.SetPositionAndRotation(targetPosition, targetRotation);
+        }
     }
 
     // Seed helper: genera un ID nel formato XXXX-XXXX
