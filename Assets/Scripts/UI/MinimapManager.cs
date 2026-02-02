@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement; // <--- NECESSARIO
+using UnityEngine.SceneManagement;
+using System.Linq;
 
 public class MinimapManager : MonoBehaviour
 {
@@ -21,132 +22,193 @@ public class MinimapManager : MonoBehaviour
 
     [Header("Colori")]
     public Color currentRoomColor = Color.white;
-    public Color normalRoomColor = new Color(0.3f, 0.3f, 0.3f, 1f); 
-    public Color specialRoomColor = new Color(0.3f, 0.3f, 0.3f, 1f);
+    public Color visitedRoomColor = new Color(0.3f, 0.3f, 0.3f, 1f);
+    public Color adjacentRoomColor = new Color(0.2f, 0.2f, 0.2f, 1f);
 
     [Header("Settings")]
     public float iconBaseSize = 20f; 
     public float iconSpacing = 0f;   
 
-    private Dictionary<Vector2Int, Image> gridIcons = new Dictionary<Vector2Int, Image>();
-    private Vector2Int lastGridPos = new Vector2Int(-999, -999);
+    // --- STRUTTURE DATI PER FOG OF WAR ---
+    private Dictionary<Vector2Int, GameObject> _roomIconObjects = new Dictionary<Vector2Int, GameObject>();
+    private Dictionary<Vector2Int, RoomData> _roomData = new Dictionary<Vector2Int, RoomData>();
+    private HashSet<Vector2Int> _visitedRoomAnchors = new HashSet<Vector2Int>();
+    private HashSet<Vector2Int> _revealedRoomAnchors = new HashSet<Vector2Int>(); // Stanze da mostrare permanentemente
+    private Vector2Int _lastPlayerRoomAnchor = new Vector2Int(-999, -999);
+    
     private float FullStep => iconBaseSize + iconSpacing;
 
-    void Awake() { if (instance == null) instance = this; }
+    void Awake() 
+    { 
+        if (instance == null) instance = this; 
+    }
 
-    // --- MODIFICA HUB: NASCONDI MAPPA ---
     void Start()
     {
-        // Se siamo nell'Hub, spegniamo la mappa
-        if (SceneManager.GetActiveScene().name == "HubScene")
+        if (SceneManager.GetActiveScene().name == "HubScene" && mapContainer != null)
         {
-            if (mapContainer != null) 
-                mapContainer.gameObject.SetActive(false);
-                
-            // Se hai anche una cornice esterna (Mask), potresti voler spegnere anche quella
-            // transform.Find("MinimapMask")?.gameObject.SetActive(false);
+            mapContainer.gameObject.SetActive(false);
         }
     }
-    // ------------------------------------
 
     public void ClearMap()
     {
         foreach (Transform child in mapContainer) Destroy(child.gameObject);
-        gridIcons.Clear();
+        _roomIconObjects.Clear();
+        _visitedRoomAnchors.Clear();
+        _revealedRoomAnchors.Clear();
+        _roomData.Clear();
+        _lastPlayerRoomAnchor = new Vector2Int(-999,-999);
     }
 
     public void RegisterRoom(Vector2Int gridPos, RoomData data)
     {
-        if (data == null) return;
+        if (data == null || _roomData.ContainsKey(gridPos)) return;
 
         GameObject newIconObj = Instantiate(roomIconPrefab, mapContainer);
-        RectTransform rt = newIconObj.GetComponent<RectTransform>();
+        _roomData.Add(gridPos, data);
+        _roomIconObjects.Add(gridPos, newIconObj);
+        
+        SetupIconVisuals(newIconObj, gridPos, data);
+        
+        newIconObj.SetActive(false);
+    }
 
+    private void SetupIconVisuals(GameObject iconObj, Vector2Int gridPos, RoomData data)
+    {
+        RectTransform rt = iconObj.GetComponent<RectTransform>();
         rt.pivot = new Vector2(0, 0);
         rt.anchorMin = new Vector2(0.5f, 0.5f);
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.localScale = Vector3.one;
 
-        Vector2 uiPos = new Vector2(gridPos.x * FullStep, gridPos.y * FullStep);
-        rt.anchoredPosition = uiPos;
+        rt.anchoredPosition = new Vector2(gridPos.x * FullStep, gridPos.y * FullStep);
+        rt.sizeDelta = new Vector2(
+            (data.size.x * iconBaseSize) + ((data.size.x - 1) * iconSpacing),
+            (data.size.y * iconBaseSize) + ((data.size.y - 1) * iconSpacing)
+        );
 
-        float width = (data.size.x * iconBaseSize) + ((data.size.x - 1) * iconSpacing);
-        float height = (data.size.y * iconBaseSize) + ((data.size.y - 1) * iconSpacing);
-        rt.sizeDelta = new Vector2(width, height);
+        Image fillImage = iconObj.transform.Find("RoomFill")?.GetComponent<Image>() ?? iconObj.GetComponent<Image>();
+        fillImage.color = visitedRoomColor;
 
-        // Grafica
-        Image baseImage = newIconObj.GetComponent<Image>();
-        Image fillImage = null;
-        Transform fillTrans = newIconObj.transform.Find("RoomFill");
-        
-        if (fillTrans != null) fillImage = fillTrans.GetComponent<Image>();
-        else fillImage = baseImage;
-
-        fillImage.color = normalRoomColor;
-
-        Transform overlayTrans = newIconObj.transform.Find("IconOverlay");
-        if (overlayTrans != null)
+        Image overlayImg = iconObj.transform.Find("IconOverlay")?.GetComponent<Image>();
+        if (overlayImg != null)
         {
-            Image overlayImg = overlayTrans.GetComponent<Image>();
-            overlayImg.gameObject.SetActive(false); 
-
-            if (data.isBossRoom && skullIcon != null) {
-                fillImage.color = specialRoomColor;
-                overlayImg.sprite = skullIcon;
-                overlayImg.gameObject.SetActive(true);
-            }
-            else if (data.isTreasureRoom && crownIcon != null) {
-                fillImage.color = specialRoomColor;
-                overlayImg.sprite = crownIcon;
-                overlayImg.gameObject.SetActive(true);
-            }
-            else if (data.isStartRoom && startIcon != null) {
-                fillImage.color = specialRoomColor; 
-                overlayImg.sprite = startIcon;
-                overlayImg.gameObject.SetActive(true);
-            }
-            else if (data.isShopRoom && shopIcon != null) {
-                fillImage.color = specialRoomColor;
-                overlayImg.sprite = shopIcon;
-                overlayImg.gameObject.SetActive(true);
-            }
-            else if (data.isBlessedRoom && blessedIcon != null) {
-                fillImage.color = specialRoomColor;
-                overlayImg.sprite = blessedIcon;
-                overlayImg.gameObject.SetActive(true);
-            }
-            else if (data.isEvilRoom && evilIcon != null) {
-                fillImage.color = specialRoomColor;
-                overlayImg.sprite = evilIcon;
-                overlayImg.gameObject.SetActive(true);
-            }
+            overlayImg.gameObject.SetActive(false);
+            if      (data.isBossRoom && skullIcon != null)   { overlayImg.sprite = skullIcon;   overlayImg.gameObject.SetActive(true); }
+            else if (data.isTreasureRoom && crownIcon != null) { overlayImg.sprite = crownIcon;   overlayImg.gameObject.SetActive(true); }
+            else if (data.isStartRoom && startIcon != null)  { overlayImg.sprite = startIcon;   overlayImg.gameObject.SetActive(true); }
+            else if (data.isShopRoom && shopIcon != null)    { overlayImg.sprite = shopIcon;    overlayImg.gameObject.SetActive(true); }
+            else if (data.isBlessedRoom && blessedIcon != null){ overlayImg.sprite = blessedIcon; overlayImg.gameObject.SetActive(true); }
+            else if (data.isEvilRoom && evilIcon != null)    { overlayImg.sprite = evilIcon;    overlayImg.gameObject.SetActive(true); }
         }
-
-        for (int x = 0; x < data.size.x; x++) {
-            for (int y = 0; y < data.size.y; y++) {
-                Vector2Int cell = gridPos + new Vector2Int(x, y);
-                if (!gridIcons.ContainsKey(cell)) gridIcons.Add(cell, fillImage);
-            }
-        }
+    }
+    
+    public void RevealStartingArea(Vector2Int startPosAnchor)
+    {
+        _lastPlayerRoomAnchor = startPosAnchor;
+        UpdateMapVisibility(startPosAnchor);
     }
 
     public void UpdatePlayerPosition(Vector3 worldPos, float roomSize)
     {
         int gridX = Mathf.RoundToInt(worldPos.x / roomSize);
         int gridY = Mathf.RoundToInt(worldPos.z / roomSize);
-        Vector2Int currentGridPos = new Vector2Int(gridX, gridY);
+        Vector2Int currentGridCell = new Vector2Int(gridX, gridY);
 
-        Vector2 targetPos = -1 * new Vector2(gridX * FullStep, gridY * FullStep);
+        Vector2 targetPos = -1 * new Vector2(currentGridCell.x * FullStep, currentGridCell.y * FullStep);
         mapContainer.anchoredPosition = Vector2.Lerp(mapContainer.anchoredPosition, targetPos, Time.deltaTime * 5f);
+        
+        if(GetAnchorForCell(currentGridCell, out Vector2Int currentRoomAnchor))
+        {
+            if (currentRoomAnchor == _lastPlayerRoomAnchor) return;
+            
+            _lastPlayerRoomAnchor = currentRoomAnchor;
+            UpdateMapVisibility(currentRoomAnchor);
+        }
+    }
 
-        if (currentGridPos == lastGridPos) return;
+    private void UpdateMapVisibility(Vector2Int currentRoomAnchor)
+    {
+        // 1. Aggiungi la stanza corrente a quelle visitate e rivelate
+        _visitedRoomAnchors.Add(currentRoomAnchor);
+        _revealedRoomAnchors.Add(currentRoomAnchor);
+        
+        // 2. Aggiungi le stanze adiacenti a quelle rivelate
+        foreach (var room in _roomData)
+        {
+            if (AreRoomsAdjacent(currentRoomAnchor, room.Key))
+            {
+                _revealedRoomAnchors.Add(room.Key);
+            }
+        }
 
-        if (gridIcons.ContainsKey(lastGridPos) && gridIcons[lastGridPos] != null) 
-            gridIcons[lastGridPos].color = normalRoomColor;
+        // 3. Itera su tutte le stanze e aggiorna la visibilità e il colore in base allo stato
+        foreach (var entry in _roomData)
+        {
+            Vector2Int roomAnchor = entry.Key;
+            GameObject iconObj = _roomIconObjects[roomAnchor];
 
-        if (gridIcons.ContainsKey(currentGridPos) && gridIcons[currentGridPos] != null) 
-            gridIcons[currentGridPos].color = currentRoomColor;
+            if (_revealedRoomAnchors.Contains(roomAnchor))
+            {
+                iconObj.SetActive(true);
+                Image fillImage = iconObj.transform.Find("RoomFill")?.GetComponent<Image>() ?? iconObj.GetComponent<Image>();
 
-        lastGridPos = currentGridPos;
+                if (roomAnchor == currentRoomAnchor)
+                {
+                    fillImage.color = currentRoomColor;
+                }
+                else if (_visitedRoomAnchors.Contains(roomAnchor))
+                {
+                    fillImage.color = visitedRoomColor;
+                }
+                else // Rivelata ma non visitata (quindi adiacente a una visitata)
+                {
+                    fillImage.color = adjacentRoomColor;
+                }
+            }
+            else
+            {
+                iconObj.SetActive(false);
+            }
+        }
+    }
+    
+    private bool GetAnchorForCell(Vector2Int cell, out Vector2Int foundAnchor)
+    {
+        foreach(var entry in _roomData)
+        {
+            Vector2Int anchor = entry.Key;
+            Vector2Int size = entry.Value.size;
+            if (cell.x >= anchor.x && cell.x < anchor.x + size.x &&
+                cell.y >= anchor.y && cell.y < anchor.y + size.y)
+            {
+                foundAnchor = anchor;
+                return true;
+            }
+        }
+        foundAnchor = new Vector2Int(-999, -999);
+        return false;
+    }
+
+    // Controlla se due stanze, dati i loro anchor, sono adiacenti CARDINALMENTE.
+    private bool AreRoomsAdjacent(Vector2Int anchor1, Vector2Int anchor2)
+    {
+        if (anchor1 == anchor2 || !_roomData.ContainsKey(anchor1) || !_roomData.ContainsKey(anchor2)) return false;
+
+        RectInt rect1 = new RectInt(anchor1, _roomData[anchor1].size);
+        RectInt rect2 = new RectInt(anchor2, _roomData[anchor2].size);
+
+        // Intervalli Y si sovrappongono E intervalli X si toccano? (Adiacenza Orizzontale)
+        bool horizontalOverlap = rect1.yMax > rect2.yMin && rect2.yMax > rect1.yMin;
+        bool horizontalTouch = rect1.xMax == rect2.xMin || rect2.xMax == rect1.xMin;
+        if (horizontalOverlap && horizontalTouch) return true;
+
+        // Intervalli X si sovrappongono E intervalli Y si toccano? (Adiacenza Verticale)
+        bool verticalOverlap = rect1.xMax > rect2.xMin && rect2.xMax > rect1.xMin;
+        bool verticalTouch = rect1.yMax == rect2.yMin || rect2.yMax == rect1.yMin;
+        if (verticalOverlap && verticalTouch) return true;
+
+        return false;
     }
 }

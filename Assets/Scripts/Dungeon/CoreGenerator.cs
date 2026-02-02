@@ -116,6 +116,9 @@ public class CoreGenerator : MonoBehaviour
     private Room startRoomInstance;
     private System.Random prng;
     private PlayerStats playerStats;
+    
+    // OTTIMIZZAZIONE: Dizionario per accesso rapido ai prefab, inizializzato una sola volta.
+    private Dictionary<string, Dictionary<Vector2Int, Room[]>> _prefabLookup;
 
     private readonly Vector2Int[] directions = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
     
@@ -134,8 +137,12 @@ public class CoreGenerator : MonoBehaviour
         Instance = this;
         playerStats = FindObjectOfType<PlayerStats>();
         if (playerStats == null) Debug.LogWarning("[CoreGenerator] PlayerStats non trovato! La generazione di stanze speciali (Curch/EvilCurch) non funzionerà.");
+        
+        InitializePrefabLookup();
     }
+    
     void Start() { Generate(); }
+    
     void Update() 
     { 
         if (MinimapManager.instance && playerTransform) 
@@ -171,7 +178,6 @@ public class CoreGenerator : MonoBehaviour
         int attempts = 0;
         bool success = false;
 
-        // Aumentiamo i tentativi perché le regole sono molto strette
         while (!success && attempts < 300)
         {
             prng = new System.Random(currentMasterSeed + attempts);
@@ -195,7 +201,7 @@ public class CoreGenerator : MonoBehaviour
         }
         else
         {
-            Debug.LogError("CRITICO: Impossibile generare dungeon. Regole troppo strette (Distanza Boss + Dead End).");
+            Debug.LogError("CRITICO: Impossibile generare dungeon. Le regole di piazzamento sono troppo strette.");
         }
     }
 
@@ -223,7 +229,6 @@ public class CoreGenerator : MonoBehaviour
         // 2. CORPO CENTRALE
         List<VirtualRoom> expandableRooms = new List<VirtualRoom> { layout[0] };
         int normalCount = 0;
-
         while (normalCount < totalNormalRooms && expandableRooms.Count > 0)
         {
             VirtualRoom origin = expandableRooms[prng.Next(expandableRooms.Count)];
@@ -234,7 +239,6 @@ public class CoreGenerator : MonoBehaviour
 
             foreach (var size in sizesToTry)
             {
-                // Passiamo FALSE come "strictOneDoor" per le stanze normali
                 if (CanFit(potentialAnchor, size, occupiedCells, false))
                 {
                     Room prefab = GetRandomPrefab("Normal", size);
@@ -249,75 +253,185 @@ public class CoreGenerator : MonoBehaviour
             }
         }
 
-        // 3. SOCKETS
-        List<Vector2Int> freeSockets = new List<Vector2Int>();
-        foreach (var cell in occupiedCells)
-        {
-            foreach (var dir in directions)
-            {
-                Vector2Int neighbor = cell + dir;
-                if (!occupiedCells.Contains(neighbor) && !freeSockets.Contains(neighbor))
-                    freeSockets.Add(neighbor);
-            }
-        }
-        freeSockets = freeSockets.OrderBy(x => prng.Next()).ToList();
+        // --- FASE DI PIAZZAMENTO STANZE SPECIALI ---
 
-        // 4. SPECIALI
-        if (!TryPlaceSpecialRoom(layout, occupiedCells, freeSockets, "Shop", -1, shopBigRoomChance)) return null;
-        if (!TryPlaceSpecialRoom(layout, occupiedCells, freeSockets, "Treasure", -1, treasureBigRoomChance)) return null;
+        // 3. OTTIMIZZAZIONE: Crea una mappa spaziale una sola volta per velocizzare i controlli di adiacenza.
+        var cellToRoomMap = BuildCellToRoomMap(layout);
         
-        // Per il Boss attiviamo il flag "bossMustBeDeadEnd" se richiesto
-        if (!TryPlaceSpecialRoom(layout, occupiedCells, freeSockets, "Boss", minBossDistance, bossBigRoomChance)) return null;
+        // 4. Trova candidati per la sostituzione (vicoli ciechi) e per l'aggiunta (spazi esterni).
+        List<VirtualRoom> deadEndNormalRooms = FindDeadEndNormalRooms(layout, cellToRoomMap);
+        deadEndNormalRooms = deadEndNormalRooms.OrderBy(x => prng.Next()).ToList();
 
+        List<Vector2Int> freeSockets = FindFreeSockets(occupiedCells);
+        freeSockets = freeSockets.OrderBy(x => prng.Next()).ToList();
+        
+        // 5. Tenta di piazzare le stanze speciali, passando la mappa spaziale per ottimizzare i controlli.
+        if (!PlaceSpecialRoom("Shop", layout, occupiedCells, deadEndNormalRooms, freeSockets, -1, shopBigRoomChance, cellToRoomMap)) return null;
+        if (!PlaceSpecialRoom("Treasure", layout, occupiedCells, deadEndNormalRooms, freeSockets, -1, treasureBigRoomChance, cellToRoomMap)) return null;
+        if (!PlaceSpecialRoom("Boss", layout, occupiedCells, deadEndNormalRooms, freeSockets, minBossDistance, bossBigRoomChance, cellToRoomMap)) return null;
 
-        // 4. CURCH / EVIL CURCH (NON possono esistere assieme)
-        if (playerStats != null)
+        // 5.1 CURCH / EVIL CURCH (opzionale)
+        if (playerStats != null && prng.Next(0, 100) < curchsRoomsChance)
         {
-            if (prng.Next(0, 100) < curchsRoomsChance) // 50% di chance base di provare a spawnare una delle due
-            {
-                if (playerStats.benedetto > playerStats.malefico)
-                {
-                    TryPlaceSpecialRoom(layout, occupiedCells, freeSockets, "Curch", 0, curchBigRoomChance);
-                }
-                else if (playerStats.malefico > playerStats.benedetto)
-                {
-                    TryPlaceSpecialRoom(layout, occupiedCells, freeSockets, "EvilCurch", 0, evilCurchBigRoomChance);
-                }
-            }
+            string curchType = playerStats.benedetto > playerStats.malefico ? "Curch" : "EvilCurch";
+            int curchChance = playerStats.benedetto > playerStats.malefico ? curchBigRoomChance : evilCurchBigRoomChance;
+            if(playerStats.benedetto != playerStats.malefico)
+                PlaceSpecialRoom(curchType, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, curchChance, cellToRoomMap);
         }
 
         return layout;
     }
+    
+    #endregion
 
-    bool TryPlaceSpecialRoom(List<VirtualRoom> layout, HashSet<Vector2Int> occupied, List<Vector2Int> sockets, string type, int minDistance, int chance)
+    #region --- Logica di Piazzamento e Helpers ---
+    
+    private Dictionary<Vector2Int, VirtualRoom> BuildCellToRoomMap(List<VirtualRoom> layout)
     {
-        List<Vector2Int> sizesAttemptOrder = GetSizesToTry(chance, type);
-        
-        // Flag specifico: se è Boss e vogliamo una sola porta, attiviamo la modalità "strict"
-        bool isStrictDeadEnd = (type == "Boss" && bossMustBeDeadEnd);
-
-        for (int i = 0; i < sockets.Count; i++)
+        var map = new Dictionary<Vector2Int, VirtualRoom>();
+        foreach (var r in layout)
         {
-            Vector2Int spot = sockets[i];
+            for (int x = 0; x < r.size.x; x++)
+                for (int y = 0; y < r.size.y; y++)
+                    map[r.anchorPos + new Vector2Int(x, y)] = r;
+        }
+        return map;
+    }
 
+    private List<VirtualRoom> FindDeadEndNormalRooms(List<VirtualRoom> layout, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    {
+        var candidates = new List<VirtualRoom>();
+        var normalRooms = layout.Where(r => r.type == "Normal").ToList();
+        
+        if (normalRooms.Count == 0) return candidates;
+
+        foreach (var room in normalRooms)
+        {
+            var neighbors = new HashSet<VirtualRoom>();
+            for (int x = 0; x < room.size.x; x++)
+            {
+                for (int y = 0; y < room.size.y; y++)
+                {
+                    var cell = room.anchorPos + new Vector2Int(x, y);
+                    foreach (var dir in directions)
+                    {
+                        if (cellToRoomMap.TryGetValue(cell + dir, out var neighborRoom) && neighborRoom != room)
+                            neighbors.Add(neighborRoom);
+                    }
+                }
+            }
+
+            if (neighbors.Count == 1)
+            {
+                candidates.Add(room);
+            }
+        }
+        return candidates;
+    }
+    
+    private List<Vector2Int> FindFreeSockets(HashSet<Vector2Int> occupiedCells)
+    {
+        var sockets = new List<Vector2Int>();
+        foreach (var cell in occupiedCells)
+        {
+            foreach (var dir in directions)
+            {
+                var neighbor = cell + dir;
+                if (!occupiedCells.Contains(neighbor) && !sockets.Contains(neighbor))
+                    sockets.Add(neighbor);
+            }
+        }
+        return sockets;
+    }
+    
+    private void TemporarilyRemoveRoom(VirtualRoom room, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    {
+        layout.Remove(room);
+        for (int x = 0; x < room.size.x; x++)
+        {
+            for (int y = 0; y < room.size.y; y++)
+            {
+                Vector2Int cell = room.anchorPos + new Vector2Int(x, y);
+                occupied.Remove(cell);
+                cellToRoomMap.Remove(cell);
+            }
+        }
+    }
+
+    private void RestoreRoom(VirtualRoom room, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    {
+        layout.Add(room);
+        for (int x = 0; x < room.size.x; x++)
+        {
+            for (int y = 0; y < room.size.y; y++)
+            {
+                Vector2Int cell = room.anchorPos + new Vector2Int(x, y);
+                occupied.Add(cell);
+                cellToRoomMap[cell] = room;
+            }
+        }
+    }
+    
+    bool PlaceSpecialRoom(string type, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, List<VirtualRoom> replacementCandidates, List<Vector2Int> freeSockets, int minDistance, int bigRoomChance, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    {
+        var sizesToTry = GetSizesToTry(bigRoomChance, type);
+
+        // --- Strategia 1: Sostituzione di una stanza interna (vicolo cieco) ---
+        foreach (var roomToReplace in replacementCandidates.ToList()) 
+        {
+            if (minDistance > 0 && GetManhattanDist(Vector2Int.zero, roomToReplace.anchorPos) < minDistance) continue;
+            if (avoidBossTouchingSpecials && type == "Boss" && IsTouchingRestrictedRoom(roomToReplace.anchorPos, roomToReplace.size, cellToRoomMap, roomToReplace)) continue;
+            if (IsTouchingAnySpecialRoom(roomToReplace.anchorPos, roomToReplace.size, cellToRoomMap, roomToReplace)) continue;
+            
+            Room prefab = GetRandomPrefab(type, roomToReplace.size);
+            if (prefab != null)
+            {
+                TemporarilyRemoveRoom(roomToReplace, layout, occupied, cellToRoomMap);
+                AddRoomToLayout(layout, occupied, roomToReplace.anchorPos, roomToReplace.size, type, prefab, cellToRoomMap);
+                replacementCandidates.Remove(roomToReplace);
+                return true; 
+            }
+        }
+
+        // --- Strategia 2: Aggiunta su un bordo esterno (fallback) ---
+        bool isStrictDeadEnd = (type == "Boss" && bossMustBeDeadEnd);
+        foreach (var spot in freeSockets.ToList())
+        {
             if (minDistance > 0 && GetManhattanDist(Vector2Int.zero, spot) < minDistance) continue;
 
-            foreach (var size in sizesAttemptOrder)
+            foreach (var size in sizesToTry)
             {
-                // Qui passiamo il flag strictOneDoor
                 if (CanFit(spot, size, occupied, isStrictDeadEnd))
                 {
-                    // Controllo adiacenza speciale per il Boss (Shop/Treasure)
-                    if (avoidBossTouchingSpecials && type == "Boss")
-                    {
-                        if (IsTouchingRestrictedRoom(spot, size, layout)) continue; 
-                    }
+                    if (avoidBossTouchingSpecials && type == "Boss" && IsTouchingRestrictedRoom(spot, size, cellToRoomMap, null)) continue;
+                    if (IsTouchingAnySpecialRoom(spot, size, cellToRoomMap, null)) continue;
 
                     Room prefab = GetRandomPrefab(type, size);
                     if (prefab != null)
                     {
-                        AddRoomToLayout(layout, occupied, spot, size, type, prefab);
-                        sockets.RemoveAt(i);
+                        AddRoomToLayout(layout, occupied, spot, size, type, prefab, cellToRoomMap);
+                        freeSockets.Remove(spot);
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return type == "Curch" || type == "EvilCurch";
+    }
+
+    bool IsTouchingAnySpecialRoom(Vector2Int anchor, Vector2Int size, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap, VirtualRoom roomToIgnore)
+    {
+        var specialRoomTypes = new HashSet<string> { "Boss", "Shop", "Treasure", "Curch", "EvilCurch" };
+        for (int x = 0; x < size.x; x++)
+        {
+            for (int y = 0; y < size.y; y++)
+            {
+                Vector2Int cell = anchor + new Vector2Int(x, y);
+                foreach (var dir in directions)
+                {
+                    if (cellToRoomMap.TryGetValue(cell + dir, out var neighborRoom) && neighborRoom != roomToIgnore && specialRoomTypes.Contains(neighborRoom.type))
+                    {
                         return true;
                     }
                 }
@@ -326,48 +440,55 @@ public class CoreGenerator : MonoBehaviour
         return false;
     }
 
-    // --- Helper Logic ---
-
-    List<Vector2Int> GetSizesToTry(int chancePercent, string roomType)
+    bool IsTouchingRestrictedRoom(Vector2Int anchor, Vector2Int size, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap, VirtualRoom roomToIgnore)
     {
-        List<Vector2Int> sizes = new List<Vector2Int>();
-        int roll = prng.Next(0, 100);
-        bool tryBig = roll < chancePercent;
-
-        if (showRngLogs)
-        {
-            string color = tryBig ? "green" : "grey";
-            string resultText = tryBig ? "BIG" : "Small";
-            Debug.Log($"[RNG] <b>{roomType}</b>: Roll <color=yellow>{roll}</color> (Chance < {chancePercent}%) -> <color={color}>{resultText}</color>");
-        }
-
-        if (tryBig)
-        {
-            sizes.AddRange(bigSizes.OrderBy(x => prng.Next()));
-            sizes.Add(new Vector2Int(1, 1));
-        }
-        else
-        {
-            sizes.Add(new Vector2Int(1, 1));
-        }
-        return sizes;
-    }
-
-    // --- NUOVA LOGICA CANFIT: Supporta "Solo 1 Entrata" ---
-    bool CanFit(Vector2Int anchor, Vector2Int size, HashSet<Vector2Int> occupied, bool strictOneDoor)
-    {
-        int connectionsCount = 0;
-
         for (int x = 0; x < size.x; x++)
         {
             for (int y = 0; y < size.y; y++)
             {
                 Vector2Int cell = anchor + new Vector2Int(x, y);
+                foreach (var dir in directions)
+                {
+                    if (cellToRoomMap.TryGetValue(cell + dir, out var neighborRoom) && neighborRoom != roomToIgnore && (neighborRoom.type == "Shop" || neighborRoom.type == "Treasure"))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    
+    List<Vector2Int> GetSizesToTry(int chancePercent, string roomType)
+    {
+        var sizes = new List<Vector2Int>();
+        bool tryBig = prng.Next(0, 100) < chancePercent;
 
-                // 1. Controllo Collisione: La cella deve essere libera
+        if (showRngLogs)
+        {
+            string color = tryBig ? "green" : "grey";
+            string resultText = tryBig ? "GRANDE" : "Piccola";
+            Debug.Log($"[RNG] Stanza <b>{roomType}</b>: Roll < {chancePercent}% -> <color={color}>{resultText}</color>");
+        }
+
+        if (tryBig)
+        {
+            sizes.AddRange(bigSizes.OrderBy(x => prng.Next()));
+        }
+        sizes.Add(new Vector2Int(1, 1)); // Aggiunge sempre 1x1 come fallback
+        return sizes;
+    }
+    
+    bool CanFit(Vector2Int anchor, Vector2Int size, HashSet<Vector2Int> occupied, bool strictOneDoor)
+    {
+        int connectionsCount = 0;
+        for (int x = 0; x < size.x; x++)
+        {
+            for (int y = 0; y < size.y; y++)
+            {
+                Vector2Int cell = anchor + new Vector2Int(x, y);
                 if (occupied.Contains(cell)) return false;
 
-                // 2. Conta le connessioni (solo se stiamo controllando per strictOneDoor)
                 if (strictOneDoor)
                 {
                     foreach (var dir in directions)
@@ -380,97 +501,76 @@ public class CoreGenerator : MonoBehaviour
                 }
             }
         }
-
-        // 3. Regola Boss: Deve avere ESATTAMENTE 1 connessione in totale (Vicolo Cieco)
-        // Se ha 0 connessioni è isolata (impossibile con questo algo, ma ok).
-        // Se ha > 1 connessioni, vuol dire che tocca il dungeon in due punti -> Bocciata.
-        if (strictOneDoor && connectionsCount != 1) return false;
-
-        return true;
+        return !strictOneDoor || connectionsCount == 1;
     }
 
-    bool IsTouchingRestrictedRoom(Vector2Int anchor, Vector2Int size, List<VirtualRoom> currentLayout)
+    VirtualRoom AddRoomToLayout(List<VirtualRoom> layout, HashSet<Vector2Int> occupied, Vector2Int anchor, Vector2Int size, string type, Room prefab, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap = null)
     {
+        var vr = new VirtualRoom { anchorPos = anchor, size = size, type = type, prefabReference = prefab };
+        layout.Add(vr);
         for (int x = 0; x < size.x; x++)
         {
             for (int y = 0; y < size.y; y++)
             {
                 Vector2Int cell = anchor + new Vector2Int(x, y);
-                foreach (var dir in directions)
-                {
-                    Vector2Int neighborCheck = cell + dir;
-                    foreach (var existingRoom in currentLayout)
-                    {
-                        if (existingRoom.Contains(neighborCheck))
-                        {
-                            if (existingRoom.type == "Shop" || existingRoom.type == "Treasure") return true; 
-                        }
-                    }
-                }
+                occupied.Add(cell);
+                cellToRoomMap?.Add(cell, vr);
             }
         }
-        return false;
-    }
-
-    VirtualRoom AddRoomToLayout(List<VirtualRoom> layout, HashSet<Vector2Int> occupied, Vector2Int anchor, Vector2Int size, string type, Room prefab)
-    {
-        VirtualRoom vr = new VirtualRoom { anchorPos = anchor, size = size, type = type, prefabReference = prefab };
-        layout.Add(vr);
-        for (int x = 0; x < size.x; x++)
-            for (int y = 0; y < size.y; y++)
-                occupied.Add(anchor + new Vector2Int(x, y));
         return vr;
     }
-
+    
+    // OTTIMIZZAZIONE: Usa un dizionario pre-calcolato per un accesso istantaneo ai prefab.
     Room GetRandomPrefab(string type, Vector2Int size)
     {
-        Room[] source = null;
-        if (type == "Normal")
+        if (_prefabLookup.TryGetValue(type, out var sizeMap) && sizeMap.TryGetValue(size, out var variants))
         {
-            if (size == new Vector2Int(1, 1)) source = normal1x1Variants;
-            else if (size == new Vector2Int(2, 1)) source = normal2x1Variants;
-            else if (size == new Vector2Int(1, 2)) source = normal1x2Variants;
-            else if (size == new Vector2Int(2, 2)) source = normal2x2Variants;
+            if (variants != null && variants.Length > 0)
+            {
+                return variants[prng.Next(variants.Length)];
+            }
         }
-        else if (type == "Boss")
-        {
-            if (size == new Vector2Int(1, 1)) source = boss1x1Variants;
-            else if (size == new Vector2Int(2, 1)) source = boss2x1Variants;
-            else if (size == new Vector2Int(1, 2)) source = boss1x2Variants;
-            else if (size == new Vector2Int(2, 2)) source = boss2x2Variants;
-        }
-        else if (type == "Shop")
-        {
-            if (size == new Vector2Int(1, 1)) source = shop1x1Variants;
-            else if (size == new Vector2Int(2, 1)) source = shop2x1Variants;
-            else if (size == new Vector2Int(1, 2)) source = shop1x2Variants;
-            else if (size == new Vector2Int(2, 2)) source = shop2x2Variants;
-        }
-        else if (type == "Treasure")
-        {
-            if (size == new Vector2Int(1, 1)) source = treasure1x1Variants;
-            else if (size == new Vector2Int(2, 1)) source = treasure2x1Variants;
-            else if (size == new Vector2Int(1, 2)) source = treasure1x2Variants;
-            else if (size == new Vector2Int(2, 2)) source = treasure2x2Variants;
-        }
-        else if (type == "Curch")
-        {
-            if (size == new Vector2Int(1, 1)) source = curch1x1Variants;
-            else if (size == new Vector2Int(2, 2)) source = curch2x2Variants;
-            // No 1x2 or 2x2 variants provided by user
-        }
-        else if (type == "EvilCurch")
-        {
-            if (size == new Vector2Int(1, 1)) source = evilCurch1x1Variants;
-            else if (size == new Vector2Int(2, 2)) source = evilCurch2x2Variants;
-            // No 1x2 or 2x2 variants provided by user
-        }
-        return (source != null && source.Length > 0) ? source[prng.Next(source.Length)] : null;
+        return null;
     }
 
     #endregion
 
-    #region --- Costruzione Fisica ---
+    #region --- Costruzione Fisica e Inizializzazione ---
+
+    private void InitializePrefabLookup()
+    {
+        _prefabLookup = new Dictionary<string, Dictionary<Vector2Int, Room[]>>
+        {
+            ["Normal"] = new Dictionary<Vector2Int, Room[]>
+            {
+                [new Vector2Int(1, 1)] = normal1x1Variants, [new Vector2Int(2, 1)] = normal2x1Variants,
+                [new Vector2Int(1, 2)] = normal1x2Variants, [new Vector2Int(2, 2)] = normal2x2Variants
+            },
+            ["Boss"] = new Dictionary<Vector2Int, Room[]>
+            {
+                [new Vector2Int(1, 1)] = boss1x1Variants, [new Vector2Int(2, 1)] = boss2x1Variants,
+                [new Vector2Int(1, 2)] = boss1x2Variants, [new Vector2Int(2, 2)] = boss2x2Variants
+            },
+            ["Shop"] = new Dictionary<Vector2Int, Room[]>
+            {
+                [new Vector2Int(1, 1)] = shop1x1Variants, [new Vector2Int(2, 1)] = shop2x1Variants,
+                [new Vector2Int(1, 2)] = shop1x2Variants, [new Vector2Int(2, 2)] = shop2x2Variants
+            },
+            ["Treasure"] = new Dictionary<Vector2Int, Room[]>
+            {
+                [new Vector2Int(1, 1)] = treasure1x1Variants, [new Vector2Int(2, 1)] = treasure2x1Variants,
+                [new Vector2Int(1, 2)] = treasure1x2Variants, [new Vector2Int(2, 2)] = treasure2x2Variants
+            },
+            ["Curch"] = new Dictionary<Vector2Int, Room[]>
+            {
+                [new Vector2Int(1, 1)] = curch1x1Variants, [new Vector2Int(2, 2)] = curch2x2Variants
+            },
+            ["EvilCurch"] = new Dictionary<Vector2Int, Room[]>
+            {
+                [new Vector2Int(1, 1)] = evilCurch1x1Variants, [new Vector2Int(2, 2)] = evilCurch2x2Variants
+            }
+        };
+    }
 
     void SpawnDungeon(List<VirtualRoom> layout)
     {
@@ -490,7 +590,7 @@ public class CoreGenerator : MonoBehaviour
 
     void ConnectDoors()
     {
-        Dictionary<Vector2Int, Room> gridLookup = new Dictionary<Vector2Int, Room>();
+        var gridLookup = new Dictionary<Vector2Int, Room>();
         foreach (Room r in activeRoomObjects)
         {
             Vector2Int anchor = GetGridPos(r.transform.position);
@@ -542,11 +642,10 @@ public class CoreGenerator : MonoBehaviour
     void RespawnPlayerAtStart()
     {
         if (playerTransform == null) return;
-
-        // Trova la stanza start; se assente, fallback alla prima stanza
-        Room startRoom = activeRoomObjects.FirstOrDefault(r => r != null && r.roomData != null && r.roomData.isStartRoom);
-        if (startRoom == null) startRoom = startRoomInstance;
+        
+        Room startRoom = startRoomInstance ?? activeRoomObjects.FirstOrDefault(r => r != null && r.roomData != null && r.roomData.isStartRoom);
         if (startRoom == null) startRoom = activeRoomObjects.FirstOrDefault(r => r != null);
+        
         if (startRoom == null)
         {
             Debug.LogError("[CoreGenerator] Nessuna stanza trovata per lo spawn. Teletrasporto all'origine.");
@@ -554,29 +653,27 @@ public class CoreGenerator : MonoBehaviour
             return;
         }
 
-        Vector3 basePos = startRoom.transform.position + Vector3.up; // leggero offset verticale
-        Quaternion baseRot = startRoom.transform.rotation;
-
-        if (startRoom.playerSpawnPoint != null)
-        {
-            basePos = startRoom.playerSpawnPoint.position;
-            baseRot = startRoom.playerSpawnPoint.rotation;
-        }
-
+        Vector3 basePos = startRoom.playerSpawnPoint != null ? startRoom.playerSpawnPoint.position : startRoom.transform.position + Vector3.up;
+        Quaternion baseRot = startRoom.playerSpawnPoint != null ? startRoom.playerSpawnPoint.rotation : startRoom.transform.rotation;
         Vector3 targetPos = basePos + playerSpawnOffset;
-
-        // Snap al suolo (NavMesh o Raycast) per evitare spawn nel vuoto
-        UnityEngine.AI.NavMeshHit hit;
-        if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
+        
+        if (UnityEngine.AI.NavMesh.SamplePosition(targetPos, out var hit, 5f, UnityEngine.AI.NavMesh.AllAreas))
         {
             targetPos = hit.position;
         }
-        else if (Physics.Raycast(targetPos + Vector3.up * 5f, Vector3.down, out RaycastHit rayHit, 20f, Physics.AllLayers, QueryTriggerInteraction.Ignore))
+        else if (Physics.Raycast(targetPos + Vector3.up * 5f, Vector3.down, out var rayHit, 20f, Physics.AllLayers, QueryTriggerInteraction.Ignore))
         {
             targetPos = rayHit.point;
         }
 
         TeleportPlayer(targetPos, baseRot);
+
+        // --- FOG OF WAR: Rivela l'area di partenza sulla minimappa ---
+        if (MinimapManager.instance != null)
+        {
+            Vector2Int startGridPos = GetGridPos(startRoom.transform.position);
+            MinimapManager.instance.RevealStartingArea(startGridPos);
+        }
     }
 
     void TeleportPlayer(Vector3 targetPosition, Quaternion targetRotation)
@@ -596,12 +693,11 @@ public class CoreGenerator : MonoBehaviour
         }
     }
 
-    // Seed helper: genera un ID nel formato XXXX-XXXX
     string GenerateSeedString()
     {
         const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        System.Random rng = new System.Random(Environment.TickCount);
-        char[] s = new char[9];
+        var rng = new System.Random(Environment.TickCount);
+        var s = new char[9];
         for (int i = 0; i < s.Length; i++)
         {
             if (i == 4) s[i] = '-';
@@ -610,7 +706,6 @@ public class CoreGenerator : MonoBehaviour
         return new string(s);
     }
 
-    // Hash deterministico (più stabile di string.GetHashCode)
     int ComputeSeedHash(string seed)
     {
         unchecked
