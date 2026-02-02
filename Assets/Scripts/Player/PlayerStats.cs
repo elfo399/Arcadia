@@ -32,6 +32,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public int currentKeys = 0;
     public TextMeshProUGUI keyText;
 
+    [Header("Statistiche Persistenti")]
+    public int karma = 0;
+    public int benedetto = 0;
+    public int malefico = 0;
+
     [Header("UI Bars (Sistema DynamicBar)")]
     public DynamicBar healthBar;   
     public DynamicBar staminaBar;
@@ -58,6 +63,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
         UpdateFlaskUI();
         UpdateCoinUI();
         UpdateKeyUI();
+
+        LoadStats();
     }
 
     void Update()
@@ -240,8 +247,55 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (flaskCounterText != null) flaskCounterText.text = currentFlasks.ToString();
     }
 
+    // --- SALVATAGGIO E CARICAMENTO STATS ---
+    public void SaveStats()
+    {
+        PlayerPrefs.SetInt("Player_Karma", karma);
+        PlayerPrefs.SetInt("Player_Benedetto", benedetto);
+        PlayerPrefs.SetInt("Player_Malefico", malefico);
+        PlayerPrefs.Save();
+        Debug.Log("Statistiche persistenti salvate!");
+    }
+
+    public void LoadStats()
+    {
+        karma = PlayerPrefs.GetInt("Player_Karma", 0);
+        benedetto = PlayerPrefs.GetInt("Player_Benedetto", 0);
+        malefico = PlayerPrefs.GetInt("Player_Malefico", 0);
+        Debug.Log("Statistiche persistenti caricate!");
+    }
+
+    public void AddPersistentStat(string statName, int amount)
+    {
+        switch (statName)
+        {
+            case "karma":
+                karma += amount;
+                Debug.Log($"Karma modificato di {amount}. Nuovo valore: {karma}");
+                break;
+            case "benedetto":
+                benedetto += amount;
+                Debug.Log($"Benedetto modificato di {amount}. Nuovo valore: {benedetto}");
+                break;
+            case "malefico":
+                malefico += amount;
+                Debug.Log($"Malefico modificato di {amount}. Nuovo valore: {malefico}");
+                break;
+            default:
+                Debug.LogWarning($"Statistica persistente '{statName}' non trovata.");
+                return;
+        }
+        SaveStats();
+    }
+
+    void OnApplicationQuit()
+    {
+        SaveStats();
+    }
+
     void Die()
     {
+        SaveStats();
         Debug.Log("SEI MORTO! Ritorno all'Hub...");
         SceneManager.LoadScene("HubScene");
     }

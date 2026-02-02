@@ -34,6 +34,8 @@ public class RoomData : ScriptableObject
     public bool isTreasureRoom;
     public bool isStartRoom;
     public bool isShopRoom;
+    public bool isBlessedRoom;
+    public bool isEvilRoom;
     
     [Header("Rewards / Loot Table")]
     public List<LootItem> rewards = new List<LootItem>();

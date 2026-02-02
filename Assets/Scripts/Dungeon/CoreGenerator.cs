@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.AI.Navigation;
 using System.Linq;
+using UnityEngine.SceneManagement;
 
 public class CoreGenerator : MonoBehaviour
 {
@@ -13,6 +14,9 @@ public class CoreGenerator : MonoBehaviour
     [Header("Riferimenti")]
     public Transform playerTransform;
     public NavMeshSurface navMeshSurface;
+
+    [Header("Scene Management")]
+    public string hubSceneName = "HubScene";
 
     [Header("Configurazione Seed")]
     public string gameSeedString = "";
@@ -29,6 +33,9 @@ public class CoreGenerator : MonoBehaviour
     public int xOffset = 50;
     public int zOffset = 50;
 
+    [Header("Probabilità special room")]
+    [Range(0, 100)] public int curchsRoomsChance = 20;
+
     [Header("Probabilità Big Room (Normali)")]
     [Range(0, 100)] public int normalBigRoomChance = 30;
 
@@ -36,6 +43,8 @@ public class CoreGenerator : MonoBehaviour
     [Range(0, 100)] public int bossBigRoomChance = 100;
     [Range(0, 100)] public int shopBigRoomChance = 50;
     [Range(0, 100)] public int treasureBigRoomChance = 50;
+    [Range(0, 100)] public int curchBigRoomChance = 50;
+    [Range(0, 100)] public int evilCurchBigRoomChance = 50;
 
     [Header("Regole Distanza & Adiacenza")]
     [Tooltip("Distanza minima (celle) dallo Start per il Boss.")]
@@ -77,6 +86,14 @@ public class CoreGenerator : MonoBehaviour
     public Room[] shop1x2Variants;
     public Room[] shop2x2Variants;
 
+    [Header("Prefabs Curch")]
+    public Room[] curch1x1Variants;
+    public Room[] curch2x2Variants;
+
+    [Header("Prefabs Evil Curch")]
+    public Room[] evilCurch1x1Variants;
+    public Room[] evilCurch2x2Variants;
+
     #endregion
 
     #region --- Strutture Dati Interne ---
@@ -98,6 +115,7 @@ public class CoreGenerator : MonoBehaviour
     private List<Room> activeRoomObjects = new List<Room>();
     private Room startRoomInstance;
     private System.Random prng;
+    private PlayerStats playerStats;
 
     private readonly Vector2Int[] directions = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
     
@@ -111,7 +129,12 @@ public class CoreGenerator : MonoBehaviour
 
     #region --- Unity Lifecycle ---
 
-    void Awake() { Instance = this; }
+    void Awake() 
+    { 
+        Instance = this;
+        playerStats = FindObjectOfType<PlayerStats>();
+        if (playerStats == null) Debug.LogWarning("[CoreGenerator] PlayerStats non trovato! La generazione di stanze speciali (Curch/EvilCurch) non funzionerà.");
+    }
     void Start() { Generate(); }
     void Update() 
     { 
@@ -131,8 +154,15 @@ public class CoreGenerator : MonoBehaviour
             return;
         }
 
-        if (useRandomSeed) gameSeedString = GenerateSeedString();
-        currentMasterSeed = ComputeSeedHash(gameSeedString);
+        if (useRandomSeed)
+        {
+            gameSeedString = GenerateSeedString();
+            useRandomSeed = false;
+        }
+        
+        string floorSeedString = $"{gameSeedString}-{currentFloor}";
+        currentMasterSeed = ComputeSeedHash(floorSeedString);
+        if (showRngLogs) Debug.Log($"[CoreGenerator] Seed per piano {currentFloor}: '{floorSeedString}' -> Hash: {currentMasterSeed}");
 
         CleanupScene();
         startRoomInstance = null;
@@ -146,7 +176,7 @@ public class CoreGenerator : MonoBehaviour
         {
             prng = new System.Random(currentMasterSeed + attempts);
             
-            if(showRngLogs && attempts == 0) Debug.Log("--- INIZIO GENERAZIONE ---");
+            if(showRngLogs && attempts == 0) Debug.Log($"--- INIZIO GENERAZIONE PIANO {currentFloor} (Seed: {floorSeedString}) ---");
 
             finalLayout = TryBuildVirtualLayout();
 
@@ -171,8 +201,15 @@ public class CoreGenerator : MonoBehaviour
 
     public void NextFloor()
     {
-        currentFloor = Mathf.Clamp(currentFloor + 1, 1, maxFloors);
-        Generate();
+        if (currentFloor >= maxFloors)
+        {
+            SceneManager.LoadScene(hubSceneName);
+        }
+        else
+        {
+            currentFloor++;
+            Generate();
+        }
     }
 
     private List<VirtualRoom> TryBuildVirtualLayout()
@@ -231,6 +268,23 @@ public class CoreGenerator : MonoBehaviour
         
         // Per il Boss attiviamo il flag "bossMustBeDeadEnd" se richiesto
         if (!TryPlaceSpecialRoom(layout, occupiedCells, freeSockets, "Boss", minBossDistance, bossBigRoomChance)) return null;
+
+
+        // 4. CURCH / EVIL CURCH (NON possono esistere assieme)
+        if (playerStats != null)
+        {
+            if (prng.Next(0, 100) < curchsRoomsChance) // 50% di chance base di provare a spawnare una delle due
+            {
+                if (playerStats.benedetto > playerStats.malefico)
+                {
+                    TryPlaceSpecialRoom(layout, occupiedCells, freeSockets, "Curch", 0, curchBigRoomChance);
+                }
+                else if (playerStats.malefico > playerStats.benedetto)
+                {
+                    TryPlaceSpecialRoom(layout, occupiedCells, freeSockets, "EvilCurch", 0, evilCurchBigRoomChance);
+                }
+            }
+        }
 
         return layout;
     }
@@ -398,6 +452,18 @@ public class CoreGenerator : MonoBehaviour
             else if (size == new Vector2Int(2, 1)) source = treasure2x1Variants;
             else if (size == new Vector2Int(1, 2)) source = treasure1x2Variants;
             else if (size == new Vector2Int(2, 2)) source = treasure2x2Variants;
+        }
+        else if (type == "Curch")
+        {
+            if (size == new Vector2Int(1, 1)) source = curch1x1Variants;
+            else if (size == new Vector2Int(2, 2)) source = curch2x2Variants;
+            // No 1x2 or 2x2 variants provided by user
+        }
+        else if (type == "EvilCurch")
+        {
+            if (size == new Vector2Int(1, 1)) source = evilCurch1x1Variants;
+            else if (size == new Vector2Int(2, 2)) source = evilCurch2x2Variants;
+            // No 1x2 or 2x2 variants provided by user
         }
         return (source != null && source.Length > 0) ? source[prng.Next(source.Length)] : null;
     }

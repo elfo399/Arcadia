@@ -893,6 +893,9 @@ MonoBehaviour:
   coinText: {fileID: 1845315899}
   currentKeys: 2
   keyText: {fileID: 1421805105}
+  karma: 0
+  benedetto: 100
+  malefico: 0
   healthBar: {fileID: 935423593}
   staminaBar: {fileID: 425995996}
   manaBar: {fileID: 628399916}
@@ -2815,19 +2818,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 220392745}
   navMeshSurface: {fileID: 1038740302}
+  hubSceneName: HubScene
   gameSeedString: 
   useRandomSeed: 1
   currentMasterSeed: 0
   currentFloor: 1
-  maxFloors: 4
+  maxFloors: 2
   playerSpawnOffset: {x: 0, y: 0, z: 0}
   totalNormalRooms: 1
   xOffset: 50
   zOffset: 50
-  normalBigRoomChance: 100
+  normalBigRoomChance: 40
   bossBigRoomChance: 0
   shopBigRoomChance: 10
   treasureBigRoomChance: 5
+  curchBigRoomChance: 48
+  evilCurchBigRoomChance: 48
   minBossDistance: 3
   avoidBossTouchingSpecials: 1
   bossMustBeDeadEnd: 1
@@ -2865,6 +2871,14 @@ MonoBehaviour:
   - {fileID: 9073747019927318074, guid: a18b0ee7569d59c4aad0b2e2f8ab985d, type: 3}
   shop2x2Variants:
   - {fileID: 9073747019927318074, guid: 620c6b11e9024ce4ab30346a3a269a6d, type: 3}
+  curch1x1Variants:
+  - {fileID: 2275314461642173434, guid: 60e55eca9e8fdf147b38756514601e03, type: 3}
+  curch2x2Variants:
+  - {fileID: 9073747019927318074, guid: ed440eed9a7a5cb41b9c7d8992f0bad7, type: 3}
+  evilCurch1x1Variants:
+  - {fileID: 2275314461642173434, guid: dc73bfc787fc9894aa79d66758d6c2df, type: 3}
+  evilCurch2x2Variants:
+  - {fileID: 9073747019927318074, guid: 1a6be751729964540abd995d13f7a5c7, type: 3}
 --- !u!1001 &1067541857
 PrefabInstance:
   m_ObjectHideFlags: 0
