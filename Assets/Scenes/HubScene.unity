@@ -412,7 +412,7 @@ GameObject:
   - component: {fileID: 177780906}
   m_Layer: 0
   m_Name: HealthBar
-  m_TagString: Untagged
+  m_TagString: HealthBar
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -467,7 +467,7 @@ GameObject:
   - component: {fileID: 246700042}
   m_Layer: 0
   m_Name: Text (TMP)
-  m_TagString: Untagged
+  m_TagString: FlaskCounterText
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -600,7 +600,7 @@ GameObject:
   - component: {fileID: 277291278}
   m_Layer: 0
   m_Name: StaminaBar
-  m_TagString: Untagged
+  m_TagString: StaminaBar
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -1822,7 +1822,7 @@ GameObject:
   - component: {fileID: 812289460}
   m_Layer: 0
   m_Name: KeyCount
-  m_TagString: Untagged
+  m_TagString: KeyText
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -2632,7 +2632,7 @@ GameObject:
   - component: {fileID: 1638112283}
   m_Layer: 0
   m_Name: CoinCount
-  m_TagString: Untagged
+  m_TagString: CoinText
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -3265,6 +3265,9 @@ MonoBehaviour:
   coinText: {fileID: 1638112283}
   currentKeys: 2
   keyText: {fileID: 812289460}
+  karma: 0
+  benedetto: 0
+  malefico: 0
   healthBar: {fileID: 177780906}
   staminaBar: {fileID: 277291278}
   manaBar: {fileID: 2134503930}
@@ -3673,7 +3676,7 @@ GameObject:
   - component: {fileID: 2134503930}
   m_Layer: 0
   m_Name: ManaBar
-  m_TagString: Untagged
+  m_TagString: ManaBar
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0

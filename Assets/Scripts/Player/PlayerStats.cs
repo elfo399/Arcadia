@@ -1,9 +1,11 @@
 using UnityEngine;
-using TMPro; 
-using UnityEngine.SceneManagement; 
+using TMPro;
+using UnityEngine.SceneManagement;
 
-public class PlayerStats : MonoBehaviour, IDamageable 
+public class PlayerStats : MonoBehaviour, IDamageable
 {
+    public static PlayerStats instance;
+
     [Header("Health")]
     public float maxHealth = 100f;
     public float currentHealth = 100f;
@@ -26,7 +28,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     [Header("Economia")]
     public int currentCoins = 0;
-    public TextMeshProUGUI coinText; 
+    public TextMeshProUGUI coinText;
 
     [Header("Chiavi")]
     public int currentKeys = 0;
@@ -38,7 +40,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public int malefico = 0;
 
     [Header("UI Bars (Sistema DynamicBar)")]
-    public DynamicBar healthBar;   
+    public DynamicBar healthBar;
     public DynamicBar staminaBar;
     public DynamicBar manaBar;
 
@@ -51,6 +53,17 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     void Awake()
     {
+        if (instance == null)
+        {
+            instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else if (instance != this)
+        {
+            Destroy(gameObject);
+            return; 
+        }
+
         animator = GetComponentInChildren<Animator>();
 
         currentHealth = maxHealth;
@@ -58,14 +71,49 @@ public class PlayerStats : MonoBehaviour, IDamageable
         currentMana = maxMana;
         currentFlasks = maxFlasks;
 
-        // Inizializza tutto
-        UpdateAllBars();
-        UpdateFlaskUI();
-        UpdateCoinUI();
-        UpdateKeyUI();
-
         LoadStats();
+        AssignUIElements();
+        UpdateAllUI();
     }
+
+    void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        AssignUIElements();
+        UpdateAllUI();
+    }
+
+    void AssignUIElements()
+    {
+        // Trova le barre UI tramite il loro tag o un componente specifico
+        // È consigliabile dare un tag univoco ai GameObject delle barre nel prefab della UI
+        var uiBars = FindObjectsOfType<DynamicBar>();
+        foreach (var bar in uiBars)
+        {
+            if (bar.CompareTag("HealthBar")) healthBar = bar;
+            else if (bar.CompareTag("StaminaBar")) staminaBar = bar;
+            else if (bar.CompareTag("ManaBar")) manaBar = bar;
+        }
+
+        // Trova i testi tramite tag
+        var textElements = FindObjectsOfType<TextMeshProUGUI>();
+        foreach (var text in textElements)
+        {
+            if (text.CompareTag("CoinText")) coinText = text;
+            else if (text.CompareTag("KeyText")) keyText = text;
+            else if (text.CompareTag("FlaskCounterText")) flaskCounterText = text;
+        }
+    }
+
 
     void Update()
     {
@@ -124,7 +172,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (currentHealth < 0) currentHealth = 0;
 
         UpdateHealthBar();
-        
+
         if (currentHealth <= 0) Die();
     }
 
@@ -197,7 +245,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         UpdateManaBar();
         return true;
     }
-    
+
     public void RestoreMana(float amount)
     {
         if (amount <= 0f) return;
@@ -208,6 +256,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     // --- AGGIORNAMENTO GRAFICO ---
 
+    void UpdateAllUI()
+    {
+        UpdateAllBars();
+        UpdateFlaskUI();
+        UpdateCoinUI();
+        UpdateKeyUI();
+    }
+    
     void UpdateAllBars()
     {
         UpdateHealthBar();
@@ -250,20 +306,35 @@ public class PlayerStats : MonoBehaviour, IDamageable
     // --- SALVATAGGIO E CARICAMENTO STATS ---
     public void SaveStats()
     {
-        PlayerPrefs.SetInt("Player_Karma", karma);
-        PlayerPrefs.SetInt("Player_Benedetto", benedetto);
-        PlayerPrefs.SetInt("Player_Malefico", malefico);
-        PlayerPrefs.Save();
-        Debug.Log("Statistiche persistenti salvate!");
+        GameData data = new GameData
+        {
+            karma = this.karma,
+            benedetto = this.benedetto,
+            malefico = this.malefico
+        };
+        // Aggiungi qui altre statistiche che vuoi salvare
+
+        SaveSystem.SaveData(data);
     }
 
     public void LoadStats()
     {
-        karma = PlayerPrefs.GetInt("Player_Karma", 0);
-        benedetto = PlayerPrefs.GetInt("Player_Benedetto", 0);
-        malefico = PlayerPrefs.GetInt("Player_Malefico", 0);
-        Debug.Log("Statistiche persistenti caricate!");
+        GameData data = SaveSystem.LoadData();
+        if (data != null)
+        {
+            this.karma = data.karma;
+            this.benedetto = data.benedetto;
+            this.malefico = data.malefico;
+            // Aggiungi qui altre statistiche che vuoi caricare
+
+            Debug.Log("Dati persistenti caricati da file!");
+        }
+        else
+        {
+            Debug.Log("Nessun file di salvataggio trovato. Verranno usati i valori correnti (da Inspector alla prima esecuzione).");
+        }
     }
+
 
     public void AddPersistentStat(string statName, int amount)
     {
