@@ -199,6 +199,24 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""TabNext"",
+                    ""type"": ""Button"",
+                    ""id"": ""6c5c2b7a-5f0c-4e2b-9c32-fb2f6f6d5d21"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""TabPrev"",
+                    ""type"": ""Button"",
+                    ""id"": ""9c6a2d3c-2b6a-4f4d-9f12-1a6a6d1f4e1a"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -520,6 +538,28 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
                     ""action"": ""Inventory"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c87dc36f-b5f0-4e42-9f6c-7e5d9f8b6bfa"",
+                    ""path"": ""<Gamepad>/rightShoulder"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""TabNext"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""f3c9e4f1-2c7b-4c4f-8d12-1a2b3c4d5e6f"",
+                    ""path"": ""<Gamepad>/leftShoulder"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""TabPrev"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -540,6 +580,8 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
         m_Player_LockOn = m_Player.FindAction("LockOn", throwIfNotFound: true);
         m_Player_Interact = m_Player.FindAction("Interact", throwIfNotFound: true);
         m_Player_Inventory = m_Player.FindAction("Inventory", throwIfNotFound: true);
+        m_Player_TabNext = m_Player.FindAction("TabNext", throwIfNotFound: true);
+        m_Player_TabPrev = m_Player.FindAction("TabPrev", throwIfNotFound: true);
     }
 
     ~@PlayerControls()
@@ -632,6 +674,8 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_LockOn;
     private readonly InputAction m_Player_Interact;
     private readonly InputAction m_Player_Inventory;
+    private readonly InputAction m_Player_TabNext;
+    private readonly InputAction m_Player_TabPrev;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -691,6 +735,14 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/Inventory".
         /// </summary>
         public InputAction @Inventory => m_Wrapper.m_Player_Inventory;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/TabNext".
+        /// </summary>
+        public InputAction @TabNext => m_Wrapper.m_Player_TabNext;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/TabPrev".
+        /// </summary>
+        public InputAction @TabPrev => m_Wrapper.m_Player_TabPrev;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -753,6 +805,12 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
             @Inventory.started += instance.OnInventory;
             @Inventory.performed += instance.OnInventory;
             @Inventory.canceled += instance.OnInventory;
+            @TabNext.started += instance.OnTabNext;
+            @TabNext.performed += instance.OnTabNext;
+            @TabNext.canceled += instance.OnTabNext;
+            @TabPrev.started += instance.OnTabPrev;
+            @TabPrev.performed += instance.OnTabPrev;
+            @TabPrev.canceled += instance.OnTabPrev;
         }
 
         /// <summary>
@@ -800,6 +858,12 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
             @Inventory.started -= instance.OnInventory;
             @Inventory.performed -= instance.OnInventory;
             @Inventory.canceled -= instance.OnInventory;
+            @TabNext.started -= instance.OnTabNext;
+            @TabNext.performed -= instance.OnTabNext;
+            @TabNext.canceled -= instance.OnTabNext;
+            @TabPrev.started -= instance.OnTabPrev;
+            @TabPrev.performed -= instance.OnTabPrev;
+            @TabPrev.canceled -= instance.OnTabPrev;
         }
 
         /// <summary>
@@ -924,5 +988,19 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnInventory(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "TabNext" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnTabNext(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "TabPrev" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnTabPrev(InputAction.CallbackContext context);
     }
 }

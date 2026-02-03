@@ -33,6 +33,7 @@ public class PlayerController : MonoBehaviour
     [Header("UI")]
     public GameObject inventoryPanel;
     public GameObject playerHudPanel;
+    public InventoryUI inventoryUI;
 
     // Flags
     [HideInInspector] public bool canMove = true;
@@ -85,6 +86,7 @@ public class PlayerController : MonoBehaviour
 
         // Ensure inventory is closed on start
         if(inventoryPanel != null) inventoryPanel.SetActive(false);
+        if (inventoryUI == null && inventoryPanel != null) inventoryUI = inventoryPanel.GetComponentInChildren<InventoryUI>(true);
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
@@ -142,6 +144,15 @@ public class PlayerController : MonoBehaviour
             isSprinting = false;
             animator.SetFloat("Speed", 0f);
             animator.SetBool("IsSprinting", false);
+
+            // Navigazione tab con L1/R1 (gamepad)
+            if (inventoryUI != null)
+            {
+                if (Controls.Player.TabNext.WasPerformedThisFrame())
+                    inventoryUI.NextTab();
+                if (Controls.Player.TabPrev.WasPerformedThisFrame())
+                    inventoryUI.PreviousTab();
+            }
         }
 
         velocity.y += gravity * Time.deltaTime;
@@ -322,6 +333,10 @@ public class PlayerController : MonoBehaviour
         if (inventoryPanel != null)
         {
             inventoryPanel.SetActive(isInventoryOpen);
+            if (isInventoryOpen && inventoryUI != null)
+            {
+                inventoryUI.SetActiveTab("Inventory");
+            }
         }
         else
         {
