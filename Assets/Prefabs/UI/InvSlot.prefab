@@ -220,6 +220,7 @@ GameObject:
   - component: {fileID: 8428656605780339554}
   - component: {fileID: 1698618946436997657}
   - component: {fileID: 3403797527966567215}
+  - component: {fileID: 3146139372920839725}
   m_Layer: 0
   m_Name: InvSlot
   m_TagString: Untagged
@@ -286,3 +287,17 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &3146139372920839725
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8437915609006335547}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e87185add014a45459979c34e59c1647, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  iconImage: {fileID: 2966376228102518626}
+  quantityText: {fileID: 9208822717969760337}

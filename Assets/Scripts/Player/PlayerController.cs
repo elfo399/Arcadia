@@ -30,16 +30,23 @@ public class PlayerController : MonoBehaviour
     [Header("Falling")]
     public float fallingSpeedThreshold = -2.0f;
 
+    [Header("UI")]
+    public GameObject inventoryPanel;
+    public GameObject playerHudPanel;
+
     // Flags
     [HideInInspector] public bool canMove = true;
     [HideInInspector] public float moveAmount;
     [HideInInspector] public bool isSprinting = false;
     [HideInInspector] public bool isDodging = false; // Letto dal LockSystem
     [HideInInspector] public bool isFalling = false;
+    
+    private bool isInventoryOpen = false;
+    public bool IsInventoryOpen => isInventoryOpen;
 
     [SerializeField] private Animator animator;
     private CharacterController controller;
-    private PlayerControls controls;
+    public PlayerControls Controls { get; private set; }
     private PlayerCombat combat;
     private PlayerStats playerStats;
     private Transform cam;
@@ -68,21 +75,30 @@ public class PlayerController : MonoBehaviour
     {
         controller = GetComponent<CharacterController>();
         cam = Camera.main.transform;
-        controls = new PlayerControls();
+        Controls = new PlayerControls();
 
         if (animator == null) animator = GetComponentInChildren<Animator>();
         playerStats = GetComponent<PlayerStats>();
         combat = GetComponent<PlayerCombat>();
+        
+        Controls.Player.Inventory.performed += OnInventoryPerformed;
+
+        // Ensure inventory is closed on start
+        if(inventoryPanel != null) inventoryPanel.SetActive(false);
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 
-    void OnEnable() => controls.Player.Enable();
-    void OnDisable() => controls.Player.Disable();
+    void OnEnable() => Controls.Player.Enable();
+    void OnDisable() => Controls.Player.Disable();
+
+    private void OnDestroy()
+    {
+        Controls.Player.Inventory.performed -= OnInventoryPerformed;
+    }
 
     void Update()
     {
-        bool isAttacking = combat != null && combat.isAttacking;
-        bool isRolling = IsRolling;
-
         if (controller.isGrounded)
         {
             lastGroundedTime = Time.time;
@@ -90,29 +106,43 @@ public class PlayerController : MonoBehaviour
             isFalling = false;
         }
 
-        Vector2 moveInput = Vector2.zero;
-        if (canMove && !isRolling && !isAttacking)
+        if (!isInventoryOpen)
         {
-            moveInput = controls.Player.Move.ReadValue<Vector2>();
-        }
-        moveAmount = moveInput.magnitude;
+            bool isAttacking = combat != null && combat.isAttacking;
+            bool isRolling = IsRolling;
+            
+            Vector2 moveInput = Vector2.zero;
+            if (canMove && !isRolling && !isAttacking)
+            {
+                moveInput = Controls.Player.Move.ReadValue<Vector2>();
+            }
+            moveAmount = moveInput.magnitude;
 
-        HandleSprintAndDodgeInput(moveInput);
+            HandleSprintAndDodgeInput(moveInput);
 
-        if (moveAmount > 0.01f && !isRolling && !isAttacking)
-        {
-            HandleMovement(moveInput);
+            if (moveAmount > 0.01f && !isRolling && !isAttacking)
+            {
+                HandleMovement(moveInput);
+            }
+            else
+            {
+                if (!isRolling && !isAttacking)
+                {
+                    animator.SetFloat("Speed", 0f);
+                    animator.SetBool("IsSprinting", false);
+                }
+            }
+
+            HandleJump();
         }
         else
         {
-            if (!isRolling && !isAttacking)
-            {
-                animator.SetFloat("Speed", 0f);
-                animator.SetBool("IsSprinting", false);
-            }
+            // Se l'inventario è aperto, azzera l'input di movimento
+            moveAmount = 0;
+            isSprinting = false;
+            animator.SetFloat("Speed", 0f);
+            animator.SetBool("IsSprinting", false);
         }
-
-        HandleJump();
 
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
@@ -144,8 +174,8 @@ public class PlayerController : MonoBehaviour
 
     void HandleSprintAndDodgeInput(Vector2 moveInput)
     {
-        bool pressed = controls.Player.SprintOrDodge.WasPerformedThisFrame();
-        bool released = controls.Player.SprintOrDodge.WasReleasedThisFrame();
+        bool pressed = Controls.Player.SprintOrDodge.WasPerformedThisFrame();
+        bool released = Controls.Player.SprintOrDodge.WasReleasedThisFrame();
         bool isAttacking = combat != null && combat.isAttacking;
 
         if (pressed)
@@ -182,7 +212,7 @@ public class PlayerController : MonoBehaviour
 
     void HandleJump()
     {
-        if (controls.Player.Jump.WasPerformedThisFrame() && !IsRolling && combat != null && !combat.isAttacking)
+        if (Controls.Player.Jump.WasPerformedThisFrame() && !IsRolling && combat != null && !combat.isAttacking)
         {
             if ((Time.time - lastGroundedTime) <= coyoteTime)
             {
@@ -277,6 +307,48 @@ public class PlayerController : MonoBehaviour
         {
             animator.SetFloat("Speed", 0f);
             animator.SetBool("IsSprinting", false);
+        }
+    }
+
+    private void OnInventoryPerformed(InputAction.CallbackContext ctx)
+    {
+        ToggleInventory();
+    }
+
+    private void ToggleInventory()
+    {
+        isInventoryOpen = !isInventoryOpen;
+
+        if (inventoryPanel != null)
+        {
+            inventoryPanel.SetActive(isInventoryOpen);
+        }
+        else
+        {
+            Debug.LogWarning("[PlayerController] Inventory panel non assegnato.");
+        }
+        if (playerHudPanel != null) playerHudPanel.SetActive(!isInventoryOpen);
+
+        canMove = !isInventoryOpen;
+        if (!canMove)
+        {
+            StopMovementImmediate();
+        }
+
+        // Sledgehammer approach: Find ALL FreeLook cameras in the scene and disable their input.
+        CameraInputBlocker.SetAllCinemachineInput(!isInventoryOpen);
+
+        if (isInventoryOpen)
+        {
+            Controls.Player.Look.Disable();
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+        else
+        {
+            Controls.Player.Look.Enable();
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
     }
 }

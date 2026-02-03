@@ -20,34 +20,17 @@ public class ThirdPersonCamera : MonoBehaviour
 
     // Current yaw rotation
     private float yaw;
-    // Current pitch rotation
     private float pitch;
 
-    // Input controls for camera movement
-    private PlayerControls controls;
-
-    // Initialize input bindings
-    void Awake()
-    {
-        controls = new PlayerControls();
-    }
-
-    // Enable camera input
-    void OnEnable()
-    {
-        controls.Player.Enable();
-    }
-
-    // Disable camera input
-    void OnDisable()
-    {
-        controls.Player.Disable();
-    }
+    private PlayerController playerController;
+    private bool warnedMissingController = false;
 
     // Initialize orientation based on the current transform
     void Start()
     {
         if (target == null) return;
+
+        playerController = target.GetComponent<PlayerController>();
 
         Vector3 angles = transform.eulerAngles;
         yaw = angles.y;
@@ -58,8 +41,29 @@ public class ThirdPersonCamera : MonoBehaviour
     void LateUpdate()
     {
         if (target == null) return;
+        if (playerController != null && playerController.IsInventoryOpen) return;
 
-        Vector2 lookInput = controls.Player.Look.ReadValue<Vector2>();
+        Vector2 lookInput = Vector2.zero;
+        if (playerController != null && playerController.Controls != null)
+        {
+            lookInput = playerController.Controls.Player.Look.ReadValue<Vector2>();
+        }
+        else
+        {
+            // Fallback: use mouse delta if no PlayerController/controls are available (e.g., cutscenes)
+            var mouse = Mouse.current;
+            if (mouse != null)
+            {
+                lookInput = mouse.delta.ReadValue();
+            }
+            else if (!warnedMissingController)
+            {
+                Debug.LogWarning("[ThirdPersonCamera] Nessun PlayerController con controlli trovato e nessun mouse disponibile per il look input.");
+                warnedMissingController = true;
+            }
+        }
+
+        if (lookInput == Vector2.zero) return;
 
         float inputX = lookInput.x;
         float inputY = lookInput.y;

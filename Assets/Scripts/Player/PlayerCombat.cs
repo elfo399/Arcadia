@@ -10,7 +10,6 @@ public class PlayerCombat : MonoBehaviour
     private Animator animator;
     private PlayerInventory inventory;
     private PlayerStats stats;
-    private PlayerControls controls;
     private PlayerController controller;
 
     [Header("Stato Combattimento")]
@@ -23,11 +22,7 @@ public class PlayerCombat : MonoBehaviour
         inventory = GetComponent<PlayerInventory>();
         stats = GetComponent<PlayerStats>();
         controller = GetComponent<PlayerController>();
-        controls = new PlayerControls();
     }
-
-    void OnEnable() => controls.Player.Enable();
-    void OnDisable() => controls.Player.Disable();
 
     void Update()
     {
@@ -37,31 +32,38 @@ public class PlayerCombat : MonoBehaviour
 
     void HandleAttackInput()
     {
+        if (controller == null || controller.Controls == null) return;
+
+        // Se l'inventario è aperto, non fare nulla
+        if (controller != null && controller.IsInventoryOpen) return;
+
         // Se stiamo rollando, niente attacchi
         if (controller != null && controller.IsRolling) return;
         
         // Se stiamo già attaccando o siamo bloccati, esci
         if (!canAttack || isAttacking) return;
 
-        if (controls.Player.LightAttackRight.WasPerformedThisFrame())
+        if (controller.Controls.Player.LightAttackRight.WasPerformedThisFrame())
             TryAttack(Hand.Right, AttackType.Light);
 
-        if (controls.Player.LightAttackLeft.WasPerformedThisFrame())
+        if (controller.Controls.Player.LightAttackLeft.WasPerformedThisFrame())
             TryAttack(Hand.Left, AttackType.Light);
 
-        if (controls.Player.HeavyAttackRight.WasPerformedThisFrame())
+        if (controller.Controls.Player.HeavyAttackRight.WasPerformedThisFrame())
             TryAttack(Hand.Right, AttackType.Heavy);
 
-        if (controls.Player.HeavyAttackLeft.WasPerformedThisFrame())
+        if (controller.Controls.Player.HeavyAttackLeft.WasPerformedThisFrame())
             TryAttack(Hand.Left, AttackType.Heavy);
     }
 
     void HandleFlaskInput()
     {
-        if (!controls.Player.UseFlask.WasPerformedThisFrame()) return;
+        if (controller == null || controller.Controls == null) return;
+        if (controller.IsInventoryOpen) return;
+        if (!controller.Controls.Player.UseFlask.WasPerformedThisFrame()) return;
 
-        bool isRolling = controller != null && controller.IsRolling;
-        bool isGrounded = controller == null || controller.IsGrounded;
+        bool isRolling = controller.IsRolling;
+        bool isGrounded = controller.IsGrounded;
 
         if (isRolling || isAttacking || !isGrounded) return;
 

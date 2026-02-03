@@ -29,40 +29,41 @@ public class TargetLockSystem : MonoBehaviour
     public bool isLockedOn = false;
     public Transform currentTarget;
 
-    private PlayerControls controls;
     private Camera mainCam;
     private float lastSwitchTime;
     private PlayerController playerController;
 
     void Awake()
     {
-        controls = new PlayerControls();
         mainCam = Camera.main;
         // Cerca il PlayerController nel genitore (o dove si trova)
         playerController = GetComponentInParent<PlayerController>();
     }
 
-    void OnEnable()
-    {
-        controls.Player.Enable();
-        controls.Player.LockOn.performed += _ => HandleLockOnInput();
-    }
-
-    void OnDisable()
-    {
-        controls.Player.LockOn.performed -= _ => HandleLockOnInput();
-        controls.Player.Disable();
-    }
-
     void Start()
     {
+        if(playerController != null && playerController.Controls != null)
+        {
+            playerController.Controls.Player.LockOn.performed += HandleLockOnInput;
+        }
+
         freeLookCamera.Priority = 10;
         lockOnCamera.Priority = 0;
         if (targetIcon != null) targetIcon.gameObject.SetActive(false);
     }
 
+    void OnDestroy()
+    {
+        if (playerController != null && playerController.Controls != null)
+        {
+            playerController.Controls.Player.LockOn.performed -= HandleLockOnInput;
+        }
+    }
+
     void Update()
     {
+        if (playerController != null && playerController.IsInventoryOpen) return;
+
         if (isLockedOn)
         {
             if (currentTarget == null || !currentTarget.gameObject.activeInHierarchy)
@@ -89,9 +90,10 @@ public class TargetLockSystem : MonoBehaviour
     void HandleTargetSwitching()
     {
         if (Time.time < lastSwitchTime + switchCooldown) return;
+        if (playerController == null || playerController.Controls == null) return;
 
         // Legge l'input della camera (Mouse Delta o Right Stick)
-        Vector2 lookInput = controls.Player.Look.ReadValue<Vector2>();
+        Vector2 lookInput = playerController.Controls.Player.Look.ReadValue<Vector2>();
 
         // Se muovo forte a destra o sinistra
         if (Mathf.Abs(lookInput.x) > switchThreshold)
@@ -146,7 +148,7 @@ public class TargetLockSystem : MonoBehaviour
     }
     // ------------------------
 
-    void HandleLockOnInput()
+    void HandleLockOnInput(InputAction.CallbackContext context)
     {
         if (isLockedOn) StopLockOn();
         else FindAndLockTarget();
@@ -255,5 +257,21 @@ public class TargetLockSystem : MonoBehaviour
     {
         Gizmos.color = Color.cyan;
         Gizmos.DrawWireSphere(transform.position, scanRadius);
+    }
+
+    public void SetCameraInputActive(bool active)
+    {
+        if (freeLookCamera == null) return;
+
+        if (active)
+        {
+            freeLookCamera.m_XAxis.m_InputAxisName = "Mouse X";
+            freeLookCamera.m_YAxis.m_InputAxisName = "Mouse Y";
+        }
+        else
+        {
+            freeLookCamera.m_XAxis.m_InputAxisName = "";
+            freeLookCamera.m_YAxis.m_InputAxisName = "";
+        }
     }
 }
