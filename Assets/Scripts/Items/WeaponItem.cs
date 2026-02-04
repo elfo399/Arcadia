@@ -12,6 +12,11 @@ public class WeaponItem : ScriptableObject
     // Prefab for the weapon model
     public GameObject modelPrefab;
 
+    [TextArea]
+    [Header("Description")]
+    // Descrizione testuale per il pannello dettagli
+    public string description;
+
     [Header("Category")]
     // Weapon category classification
     public WeaponCategory category;
@@ -19,6 +24,18 @@ public class WeaponItem : ScriptableObject
     [Header("Danni")]
     // Physical damage dealt by the weapon
     public int physicalDamage = 10;
+    // Moltiplicatore o chance di colpo critico (interpretazione libera)
+    public float criticalHit = 1.1f;
+    // Peso usato per il bilanciamento (UI / equip load)
+    public float weight = 3f;
+
+    [Header("Scaling")]
+    // Nota di scaling (es. STR C / DEX B). Stringa libera per l'UI.
+    public string scaling = "STR C / DEX D";
+
+    [Header("Requisiti")]
+    // Requisiti minimi per impugnare (testo libero per semplicità)
+    public string requirements = "STR 10 / DEX 8";
 
     [Header("Animation Profile")]
     // Animation mappings used for attacks

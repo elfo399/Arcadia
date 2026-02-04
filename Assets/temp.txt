@@ -13,7 +13,6 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private int initialSlotCount = 0; // facoltativo: crea slot all'avvio
     private readonly List<InventorySlot> slots = new();
     private List<InventoryItem> currentItems = new();
-    public List<InventoryItem> GetCurrentItemsSnapshot() => new List<InventoryItem>(currentItems);
 
     [Header("Tabs")]
     [SerializeField] private TabEntry[] tabs;
@@ -124,14 +123,14 @@ public class InventoryUI : MonoBehaviour
             InventoryItem item = i < currentItems.Count ? currentItems[i] : null;
             if (item != null)
             {
-                slots[i].Setup(GetItemIcon(item), item.amount);
+                slots[i].Setup(item.icon, item.amount);
+                slots[i].gameObject.SetActive(true);
             }
             else
             {
                 slots[i].Clear();
+                slots[i].gameObject.SetActive(false);
             }
-            // mantieni attivo lo slot anche se vuoto, cosï¿½ si vede la griglia di placeholder
-            slots[i].gameObject.SetActive(true);
         }
 
         selectedPadIndex = -1;
@@ -297,24 +296,7 @@ public class InventoryUI : MonoBehaviour
         if (slotPrefab == null)
         {
             if (slots.Count < required)
-            {
-                // Se manca il prefab, prova a clonare il primo slot esistente come template
-                if (slots.Count > 0)
-                {
-                    var template = slots[0];
-                    while (slots.Count < required)
-                    {
-                        var clone = Instantiate(template, slotParent);
-                        clone.Init(slots.Count, this);
-                        clone.gameObject.SetActive(true);
-                        slots.Add(clone);
-                    }
-                }
-                else
-                {
-                    Debug.LogWarning($"InventoryUI: servono {required} slot ma slotPrefab non Ã¨ assegnato e non ci sono slot da clonare.");
-                }
-            }
+                Debug.LogWarning($"InventoryUI: servono {required} slot ma slotPrefab non è assegnato; usa gli slot già presenti ({slots.Count}).");
             return;
         }
 
@@ -337,21 +319,13 @@ public class InventoryUI : MonoBehaviour
 
     // --------- DRAG & DROP / SWAP LOGIC ----------
 
-    private bool IsValidIndex(int index) => index >= 0 && index < slots.Count;
+    private bool IsValidIndex(int index) => index >= 0 && index < currentItems.Count;
 
-    private bool HasItem(int index) => index >= 0 && index < currentItems.Count && currentItems[index] != null;
+    private bool HasItem(int index) => IsValidIndex(index) && currentItems[index] != null;
 
     private void SwapItems(int a, int b)
     {
         if (!IsValidIndex(a) || !IsValidIndex(b) || a == b) return;
-
-        // Estende currentItems se si droppa su slot oltre la lista corrente
-        int maxIndex = Mathf.Max(a, b);
-        while (currentItems.Count <= maxIndex)
-        {
-            currentItems.Add(null);
-        }
-
         var temp = currentItems[a];
         currentItems[a] = currentItems[b];
         currentItems[b] = temp;
@@ -366,14 +340,14 @@ public class InventoryUI : MonoBehaviour
         var item = currentItems[index];
         if (item != null)
         {
-            slots[index].Setup(GetItemIcon(item), item.amount);
+            slots[index].Setup(item.icon, item.amount);
+            slots[index].gameObject.SetActive(true);
         }
         else
         {
             slots[index].Clear();
+            slots[index].gameObject.SetActive(false);
         }
-        // Mantieni lo slot attivo anche se vuoto, cos\u00ec la griglia non collassa
-        slots[index].gameObject.SetActive(true);
     }
 
     // ------- DETAIL PANEL --------
@@ -431,7 +405,7 @@ public class InventoryUI : MonoBehaviour
         if (detailRoot != null) detailRoot.SetActive(true);
 
         // Preferisce i dati dell'arma se presenti, altrimenti quelli degli usabili o degli item generici
-        Sprite icon = GetItemIcon(item);
+        Sprite icon = item.icon;
         string title = item.title;
         string description = item.description;
 
@@ -477,16 +451,6 @@ public class InventoryUI : MonoBehaviour
             if (weaponScalingText != null) weaponScalingText.text = weapon.scaling ?? string.Empty;
             if (weaponRequirementsText != null) weaponRequirementsText.text = weapon.requirements ?? string.Empty;
         }
-    }
-
-    private Sprite GetItemIcon(InventoryItem item)
-    {
-        if (item == null) return null;
-        if (item.icon != null) return item.icon;
-        if (item.weaponData != null && item.weaponData.icon != null) return item.weaponData.icon;
-        if (item.usableData != null && item.usableData.icon != null) return item.usableData.icon;
-        if (item.itemData != null && item.itemData.icon != null) return item.itemData.icon;
-        return null;
     }
 
     // Mouse: select origin on pointer down, start drag to move preview

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -49,6 +50,7 @@ public class PlayerController : MonoBehaviour
     private CharacterController controller;
     public PlayerControls Controls { get; private set; }
     private PlayerCombat combat;
+    private PlayerInventory playerInventory;
     private PlayerStats playerStats;
     private Transform cam;
 
@@ -80,6 +82,7 @@ public class PlayerController : MonoBehaviour
 
         if (animator == null) animator = GetComponentInChildren<Animator>();
         playerStats = GetComponent<PlayerStats>();
+        playerInventory = GetComponent<PlayerInventory>();
         combat = GetComponent<PlayerCombat>();
         
         Controls.Player.Inventory.performed += OnInventoryPerformed;
@@ -328,7 +331,15 @@ public class PlayerController : MonoBehaviour
 
     private void ToggleInventory()
     {
-        isInventoryOpen = !isInventoryOpen;
+        bool opening = !isInventoryOpen;
+
+        // Se stiamo chiudendo, salviamo l'ordine corrente degli item
+        if (!opening && isInventoryOpen && inventoryUI != null && playerInventory != null)
+        {
+            playerInventory.ReplaceAllItems(inventoryUI.GetCurrentItemsSnapshot());
+        }
+
+        isInventoryOpen = opening;
 
         if (inventoryPanel != null)
         {
@@ -336,6 +347,14 @@ public class PlayerController : MonoBehaviour
             if (isInventoryOpen && inventoryUI != null)
             {
                 inventoryUI.SetActiveTab("Inventory");
+                // Popola la UI con gli item attuali del giocatore
+                if (playerInventory != null)
+                {
+                    var list = new List<InventoryItem>(playerInventory.Items);
+                    inventoryUI.UpdateUI(list);
+                    // Workaround: una refresh al frame successivo evita che le icone restino vuote alla prima apertura
+                    StartCoroutine(RefreshInventoryNextFrame(list));
+                }
             }
         }
         else
@@ -364,6 +383,15 @@ public class PlayerController : MonoBehaviour
             Controls.Player.Look.Enable();
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
+        }
+    }
+
+    private IEnumerator RefreshInventoryNextFrame(List<InventoryItem> snapshot)
+    {
+        yield return null; // aspetta un frame
+        if (inventoryUI != null)
+        {
+            inventoryUI.UpdateUI(snapshot);
         }
     }
 }

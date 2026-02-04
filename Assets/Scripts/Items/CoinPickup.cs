@@ -3,7 +3,7 @@ using UnityEngine;
 public class CoinPickup : MonoBehaviour
 {
     [Header("Settings")]
-    public int coinValue = 1;
+    public int coinValue = 1; // espresso in rame
     public float rotateSpeed = 80f; // Rotazione lenta ed elegante
 
     void Update()

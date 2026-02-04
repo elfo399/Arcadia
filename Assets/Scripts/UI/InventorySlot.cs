@@ -1,24 +1,38 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.EventSystems;
 
-public class InventorySlot : MonoBehaviour
+/// <summary>
+/// UI cell that supports mouse drag&drop and gamepad selection.
+/// Delegates logic to InventoryUI via callbacks.
+/// </summary>
+public class InventorySlot : MonoBehaviour,
+    IPointerDownHandler,
+    IBeginDragHandler,
+    IDragHandler,
+    IEndDragHandler,
+    IDropHandler,
+    ISelectHandler,
+    ISubmitHandler
 {
     [SerializeField] private Image iconImage;
     [SerializeField] private TextMeshProUGUI quantityText;
+    [SerializeField] private bool logMissingReferences = false;
+
+    private int slotIndex = -1;
+    private InventoryUI owner;
 
     void Awake()
     {
-        // Ensure components are assigned, disable them by default
-        if (iconImage == null)
-        {
-            iconImage = GetComponentInChildren<Image>();
-        }
-        if (quantityText == null)
-        {
-            quantityText = GetComponentInChildren<TextMeshProUGUI>();
-        }
+        ResolveReferences();
         Clear();
+    }
+
+    public void Init(int index, InventoryUI inventory)
+    {
+        slotIndex = index;
+        owner = inventory;
     }
 
     /// <summary>
@@ -28,6 +42,14 @@ public class InventorySlot : MonoBehaviour
     /// <param name="quantity">The number of items in the stack.</param>
     public void Setup(Sprite itemIcon, int quantity)
     {
+        ResolveReferences();
+
+        if (iconImage == null)
+        {
+            if (logMissingReferences) Debug.LogWarning($"InventorySlot '{name}' non ha un iconImage assegnato.");
+            return;
+        }
+
         if (itemIcon != null)
         {
             iconImage.enabled = true;
@@ -55,6 +77,8 @@ public class InventorySlot : MonoBehaviour
     /// </summary>
     public void Clear()
     {
+        ResolveReferences();
+
         if (iconImage != null)
         {
             iconImage.enabled = false;
@@ -64,6 +88,80 @@ public class InventorySlot : MonoBehaviour
         {
             quantityText.enabled = false;
             quantityText.text = "";
+        }
+    }
+
+    // --- EventSystem handlers ---
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        owner?.HandleSlotPointerDown(slotIndex);
+    }
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        owner?.HandleSlotBeginDrag(slotIndex, eventData);
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        owner?.HandleSlotDrag(eventData);
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        owner?.HandleSlotEndDrag();
+    }
+
+    public void OnDrop(PointerEventData eventData)
+    {
+        owner?.HandleSlotDrop(slotIndex);
+    }
+
+    // Gamepad/keyboard selection + submit for swap
+    public void OnSelect(BaseEventData eventData)
+    {
+        owner?.HandleSlotSelected(slotIndex);
+    }
+
+    public void OnSubmit(BaseEventData eventData)
+    {
+        owner?.HandleSlotSubmit(slotIndex);
+    }
+
+    // ------- Helpers --------
+    private void ResolveReferences()
+    {
+        if (iconImage == null)
+        {
+            // 1) Cerca child chiamato "Icon"
+            var iconTransform = transform.Find("Icon");
+            if (iconTransform != null)
+                iconImage = iconTransform.GetComponent<Image>();
+
+            // 2) Prima Image figlia diversa dal background
+            if (iconImage == null)
+            {
+                var images = GetComponentsInChildren<Image>(true);
+                foreach (var img in images)
+                {
+                    if (img == null) continue;
+                    if (img == GetComponent<Image>()) continue; // salta eventuale bg sullo stesso GO
+                    iconImage = img;
+                    break;
+                }
+            }
+        }
+
+        if (quantityText == null)
+        {
+            // Cerca child chiamato "QuantityText" oppure il primo TMP figlio
+            var qtTransform = transform.Find("QuantityText");
+            if (qtTransform != null)
+                quantityText = qtTransform.GetComponent<TextMeshProUGUI>();
+            if (quantityText == null)
+            {
+                quantityText = GetComponentInChildren<TextMeshProUGUI>(true);
+            }
         }
     }
 }

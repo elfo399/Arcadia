@@ -1,6 +1,7 @@
 using UnityEngine;
 using TMPro;
 using UnityEngine.SceneManagement;
+using System;
 
 public class PlayerStats : MonoBehaviour, IDamageable
 {
@@ -26,9 +27,17 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public float flaskHealAmount = 40f;
     public float flaskUseCooldown = 1f;
 
-    [Header("Economia")]
-    public int currentCoins = 0;
-    public TextMeshProUGUI coinText;
+    [Header("Economia (Run Corrente)")]
+    public int runGold = 0;
+    public int runSilver = 0;
+    public int runCopper = 0;
+    public event Action<int, int, int> OnRunWalletChanged;
+
+    [Header("Banca (Persistente)")]
+    public int bankGold = 0;
+    public int bankSilver = 0;
+    public int bankCopper = 0;
+    public event Action<int, int, int> OnBankChanged;
 
     [Header("Chiavi")]
     public int currentKeys = 0;
@@ -74,6 +83,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
         LoadStats();
         AssignUIElements();
         UpdateAllUI();
+        NotifyBankChanged();
+        NotifyRunWalletChanged();
     }
 
     void OnEnable()
@@ -90,6 +101,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         AssignUIElements();
         UpdateAllUI();
+
+        // Ogni run parte senza monete portatili
+        if (scene.name == "GameScene")
+        {
+            ResetRunWallet();
+        }
     }
 
     void AssignUIElements()
@@ -108,10 +125,15 @@ public class PlayerStats : MonoBehaviour, IDamageable
         var textElements = FindObjectsOfType<TextMeshProUGUI>();
         foreach (var text in textElements)
         {
-            if (text.CompareTag("CoinText")) coinText = text;
-            else if (text.CompareTag("KeyText")) keyText = text;
+            if (text.CompareTag("KeyText")) keyText = text;
             else if (text.CompareTag("FlaskCounterText")) flaskCounterText = text;
         }
+    }
+
+    private void ResetRunWallet()
+    {
+        runGold = runSilver = runCopper = 0;
+        NotifyRunWalletChanged();
     }
 
 
@@ -124,15 +146,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
     }
 
     // --- GESTIONE MONETE ---
-    public void AddCoins(int amount)
+    public void AddCoins(int copperAmount)
     {
-        currentCoins += amount;
-        UpdateCoinUI();
-    }
-
-    void UpdateCoinUI()
-    {
-        if (coinText != null) coinText.text = currentCoins.ToString();
+        // Tutte le monete raccolte sono espresse in rame, converti
+        runCopper += Mathf.Max(0, copperAmount);
+        NormalizeRunWallet();
+        NotifyRunWalletChanged();
     }
 
     // --- GESTIONE CHIAVI ---
@@ -260,7 +279,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         UpdateAllBars();
         UpdateFlaskUI();
-        UpdateCoinUI();
         UpdateKeyUI();
     }
     
@@ -311,6 +329,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
             karma = this.karma,
             benedetto = this.benedetto,
             malefico = this.malefico
+            ,
+            bankGold = this.bankGold,
+            bankSilver = this.bankSilver,
+            bankCopper = this.bankCopper
         };
         // Aggiungi qui altre statistiche che vuoi salvare
 
@@ -325,6 +347,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
             this.karma = data.karma;
             this.benedetto = data.benedetto;
             this.malefico = data.malefico;
+            this.bankGold = data.bankGold;
+            this.bankSilver = data.bankSilver;
+            this.bankCopper = data.bankCopper;
             // Aggiungi qui altre statistiche che vuoi caricare
 
             Debug.Log("Dati persistenti caricati da file!");
@@ -359,6 +384,77 @@ public class PlayerStats : MonoBehaviour, IDamageable
         SaveStats();
     }
 
+    // --- BANCA PERSISTENTE ---
+    public void Deposit(int gold, int silver, int copper)
+    {
+        // Preleva dal wallet di run e deposita in banca
+        gold = Mathf.Max(0, gold);
+        silver = Mathf.Max(0, silver);
+        copper = Mathf.Max(0, copper);
+
+        if (!SpendRunFunds(gold, silver, copper)) return;
+
+        bankGold += gold;
+        bankSilver += silver;
+        bankCopper += copper;
+        NormalizeBank();
+        SaveStats();
+        NotifyBankChanged();
+        NotifyRunWalletChanged();
+    }
+
+    public bool Withdraw(int gold, int silver, int copper)
+    {
+        NormalizeBank();
+        if (!HasBankFunds(gold, silver, copper)) return false;
+
+        bankGold -= gold;
+        bankSilver -= silver;
+        bankCopper -= copper;
+        NormalizeBank();
+        // Aggiunge al wallet di run
+        runGold += gold;
+        runSilver += silver;
+        runCopper += copper;
+        NormalizeRunWallet();
+        SaveStats();
+        NotifyBankChanged();
+        NotifyRunWalletChanged();
+        return true;
+    }
+
+    public bool HasBankFunds(int gold, int silver, int copper)
+    {
+        NormalizeBank();
+        // Semplificazione: confronta per valuta separata
+        return bankGold >= gold && bankSilver >= silver && bankCopper >= copper;
+    }
+
+    private void NormalizeBank()
+    {
+        // Converte overflow di rame/argento in tagli superiori (100:1 di default)
+        const int rate = 100;
+        if (bankCopper >= rate)
+        {
+            bankSilver += bankCopper / rate;
+            bankCopper = bankCopper % rate;
+        }
+        if (bankSilver >= rate)
+        {
+            bankGold += bankSilver / rate;
+            bankSilver = bankSilver % rate;
+        }
+        // Nessun prestito: clamp a zero min
+        bankGold = Mathf.Max(0, bankGold);
+        bankSilver = Mathf.Max(0, bankSilver);
+        bankCopper = Mathf.Max(0, bankCopper);
+    }
+
+    private void NotifyBankChanged()
+    {
+        OnBankChanged?.Invoke(bankGold, bankSilver, bankCopper);
+    }
+
     void OnApplicationQuit()
     {
         SaveStats();
@@ -369,5 +465,48 @@ public class PlayerStats : MonoBehaviour, IDamageable
         SaveStats();
         Debug.Log("SEI MORTO! Ritorno all'Hub...");
         SceneManager.LoadScene("HubScene");
+    }
+
+    // --- WALLET DI RUN ---
+    public bool HasRunFunds(int gold, int silver, int copper)
+    {
+        NormalizeRunWallet();
+        return runGold >= gold && runSilver >= silver && runCopper >= copper;
+    }
+
+    public bool SpendRunFunds(int gold, int silver, int copper)
+    {
+        if (!HasRunFunds(gold, silver, copper)) return false;
+        runGold -= gold;
+        runSilver -= silver;
+        runCopper -= copper;
+        NormalizeRunWallet();
+        NotifyRunWalletChanged();
+        return true;
+    }
+
+    private void NormalizeRunWallet()
+    {
+        const int rate = 100; // 100 rame = 1 argento, 100 argento = 1 oro
+
+        if (runCopper >= rate)
+        {
+            runSilver += runCopper / rate;
+            runCopper = runCopper % rate;
+        }
+        if (runSilver >= rate)
+        {
+            runGold += runSilver / rate;
+            runSilver = runSilver % rate;
+        }
+
+        runGold = Mathf.Max(0, runGold);
+        runSilver = Mathf.Max(0, runSilver);
+        runCopper = Mathf.Max(0, runCopper);
+    }
+
+    private void NotifyRunWalletChanged()
+    {
+        OnRunWalletChanged?.Invoke(runGold, runSilver, runCopper);
     }
 }
