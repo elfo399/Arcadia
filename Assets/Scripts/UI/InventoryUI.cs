@@ -1,11 +1,15 @@
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using UnityEngine.Events;
 
 public class InventoryUI : MonoBehaviour
 {
     [Header("UI References")]
-    [SerializeField] private InventorySlot[] slots;
+    [SerializeField] private InventorySlot slotPrefab;
+    [SerializeField] private Transform slotParent;
+    [SerializeField] private int initialSlotCount = 0; // facoltativo: crea slot all'avvio
+    private readonly List<InventorySlot> slots = new();
 
     [Header("Tabs")]
     [SerializeField] private TabEntry[] tabs;
@@ -14,12 +18,24 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private string defaultTabKey = "Inventory";
     private int currentTabIndex = -1;
 
+    [Header("Events")]
+    public UnityEvent<string> onTabChanged;
+
     void Start()
     {
-        // Se non assegnato in Inspector, popola automaticamente dai figli
-        if (slots == null || slots.Length == 0)
+        // fallback: se non assegnato, usa il proprio transform come parent
+        if (slotParent == null) slotParent = transform;
+
+        // se non usiamo prefab, conserva eventuali slot già presenti come figli
+        if (slotPrefab == null && slotParent != null)
         {
-            slots = GetComponentsInChildren<InventorySlot>();
+            slots.AddRange(slotParent.GetComponentsInChildren<InventorySlot>(true));
+        }
+
+        // genera slot iniziali se richiesto
+        if (slotPrefab != null && initialSlotCount > 0 && slots.Count == 0)
+        {
+            EnsureSlots(initialSlotCount);
         }
 
         ClearAllSlots();
@@ -36,17 +52,28 @@ public class InventoryUI : MonoBehaviour
     /// </summary>
     public void UpdateUI(List<InventoryItem> inventoryData)
     {
+        if (inventoryData == null)
+        {
+            ClearAllSlots();
+            return;
+        }
+
+        EnsureSlots(inventoryData.Count);
+
         ClearAllSlots();
 
-        for (int i = 0; i < slots.Length; i++)
+        for (int i = 0; i < slots.Count; i++)
         {
             if (i < inventoryData.Count && inventoryData[i] != null)
             {
                 slots[i].Setup(inventoryData[i].icon, inventoryData[i].amount);
+                slots[i].gameObject.SetActive(true);
             }
             else
             {
                 slots[i].Clear();
+                // nasconde eventuali slot in eccesso
+                slots[i].gameObject.SetActive(false);
             }
         }
     }
@@ -57,6 +84,8 @@ public class InventoryUI : MonoBehaviour
     public void SetActiveTab(string tabKey)
     {
         if (tabs == null || tabs.Length == 0) return;
+
+        bool tabFound = false;
 
         foreach (var tab in tabs)
         {
@@ -74,12 +103,21 @@ public class InventoryUI : MonoBehaviour
             {
                 // salva l'indice corrente
                 currentTabIndex = System.Array.IndexOf(tabs, tab);
+                tabFound = true;
             }
         }
         // se non trovata, punta alla prima tab valida
         if (currentTabIndex < 0 && tabs.Length > 0)
         {
             currentTabIndex = 0;
+            if (tabs[0].background != null) tabs[0].background.SetActive(true);
+            if (tabs[0].label != null) tabs[0].label.color = activeColor;
+            tabFound = true;
+        }
+
+        if (tabFound && onTabChanged != null)
+        {
+            onTabChanged.Invoke(tabKey);
         }
     }
 
@@ -106,6 +144,31 @@ public class InventoryUI : MonoBehaviour
     }
 
     /// <summary>
+    /// Costruisce da zero un numero esatto di slot usando il prefab.
+    /// Utile quando conosci già la capacità massima dell'inventario.
+    /// </summary>
+    public void BuildSlots(int count)
+    {
+        if (slotParent == null) slotParent = transform;
+
+        if (slotPrefab == null || slotParent == null)
+        {
+            Debug.LogWarning("InventoryUI: slotPrefab o slotParent non assegnato.");
+            return;
+        }
+
+        // elimina i vecchi slot presenti come figli
+        for (int i = slotParent.childCount - 1; i >= 0; i--)
+        {
+            Destroy(slotParent.GetChild(i).gameObject);
+        }
+        slots.Clear();
+
+        EnsureSlots(count);
+        ClearAllSlots();
+    }
+
+    /// <summary>
     /// Pulisce tutti gli slot inventario.
     /// </summary>
     private void ClearAllSlots()
@@ -117,6 +180,23 @@ public class InventoryUI : MonoBehaviour
             {
                 slot.Clear();
             }
+        }
+    }
+
+    /// <summary>
+    /// Garantisce che esistano almeno 'required' slot, istanziando i prefab mancanti.
+    /// </summary>
+    private void EnsureSlots(int required)
+    {
+        if (slotParent == null) slotParent = transform;
+
+        if (slotPrefab == null || slotParent == null) return;
+
+        while (slots.Count < required)
+        {
+            var slot = Instantiate(slotPrefab, slotParent);
+            slot.gameObject.SetActive(true);
+            slots.Add(slot);
         }
     }
 
