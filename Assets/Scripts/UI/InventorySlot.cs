@@ -128,6 +128,20 @@ public class InventorySlot : MonoBehaviour,
         owner?.HandleSlotSubmit(slotIndex);
     }
 
+    /// <summary>
+    /// Returns the current icon rect size so the drag preview can mirror grid visuals.
+    /// </summary>
+    public Vector2 GetIconSize()
+    {
+        ResolveReferences();
+        if (iconImage != null && iconImage.rectTransform != null)
+        {
+            var rect = iconImage.rectTransform.rect;
+            return new Vector2(rect.width, rect.height);
+        }
+        return Vector2.zero;
+    }
+
     // ------- Helpers --------
     private void ResolveReferences()
     {

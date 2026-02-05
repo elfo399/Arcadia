@@ -539,7 +539,12 @@ public class InventoryUI : MonoBehaviour
     {
         if (!HasItem(index)) return;
         dragOriginIndex = index;
-        CreateDragPreview(currentItems[index]?.icon, eventData);
+        var iconSize = Vector2.zero;
+        if (IsValidIndex(index) && index < slots.Count && slots[index] != null)
+        {
+            iconSize = slots[index].GetIconSize();
+        }
+        CreateDragPreview(currentItems[index]?.icon, eventData, iconSize);
     }
 
     public void HandleSlotDrag(PointerEventData eventData)
@@ -599,7 +604,7 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
-    private void CreateDragPreview(Sprite icon, PointerEventData eventData)
+    private void CreateDragPreview(Sprite icon, PointerEventData eventData, Vector2 iconSize)
     {
         if (icon == null) return;
 
@@ -621,7 +626,17 @@ public class InventoryUI : MonoBehaviour
         }
 
         activeDragPreview.sprite = icon;
-        activeDragPreview.rectTransform.sizeDelta = new Vector2(48, 48);
+
+        // Keep preview the same size as the grid icon; fall back to template or a sane default.
+        if (iconSize == Vector2.zero)
+        {
+            iconSize = activeDragPreview.rectTransform.sizeDelta;
+            if (iconSize == Vector2.zero)
+            {
+                iconSize = new Vector2(48f, 48f);
+            }
+        }
+        activeDragPreview.rectTransform.sizeDelta = iconSize;
         activeDragPreview.rectTransform.position = eventData.position;
         activeDragPreview.gameObject.SetActive(true);
     }
