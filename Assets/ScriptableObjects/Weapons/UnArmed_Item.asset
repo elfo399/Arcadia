@@ -15,8 +15,13 @@ MonoBehaviour:
   weaponName: Punch
   icon: {fileID: 21300000, guid: 693022d52112aca4e963ea06258c4add, type: 3}
   modelPrefab: {fileID: 0}
+  description: Pugni a mani nude
   category: 0
   physicalDamage: 50
+  criticalHit: 1.1
+  weight: 3
+  scaling: STR C / DEX D
+  requirements: STR 10 / DEX 8
   animationProfile: {fileID: 11400000, guid: 83aa8dbcfcce8614f95a879fa83d9545, type: 2}
   lightAttackStaminaCost: 10
   heavyAttackStaminaCost: 20

@@ -54,6 +54,18 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI weaponScalingText;
     [SerializeField] private TextMeshProUGUI weaponRequirementsText;
 
+    [Header("Detail Panel - Weapon")]
+    [SerializeField] private GameObject weaponDetailRoot;   // DescWeapon
+    [SerializeField] private Image weaponImage;             // DescWeapon/Image
+    [SerializeField] private TextMeshProUGUI weaponTitle;   // DescWeapon/Title
+    [SerializeField] private TextMeshProUGUI weaponDesc;    // DescWeapon/Desc
+
+    [Header("Detail Panel - Item")]
+    [SerializeField] private GameObject itemDetailRoot;     // DescItem
+    [SerializeField] private Image itemImage;               // DescItem/Image
+    [SerializeField] private TextMeshProUGUI itemTitle;     // DescItem/Title
+    [SerializeField] private TextMeshProUGUI itemDesc;      // DescItem/Desc
+
     [Header("Events")]
     public UnityEvent<string> onTabChanged;
 
@@ -381,6 +393,9 @@ public class InventoryUI : MonoBehaviour
     {
         currentSelectedIndex = -1;
 
+        if (weaponDetailRoot != null) weaponDetailRoot.SetActive(false);
+        if (itemDetailRoot != null) itemDetailRoot.SetActive(false);
+
         if (detailIcon != null)
         {
             detailIcon.enabled = false;
@@ -430,6 +445,10 @@ public class InventoryUI : MonoBehaviour
 
         if (detailRoot != null) detailRoot.SetActive(true);
 
+        // disattiva entrambi i pannelli specifici, poi attiva quello corretto
+        if (weaponDetailRoot != null) weaponDetailRoot.SetActive(false);
+        if (itemDetailRoot != null) itemDetailRoot.SetActive(false);
+
         // Preferisce i dati dell'arma se presenti, altrimenti quelli degli usabili o degli item generici
         Sprite icon = GetItemIcon(item);
         string title = item.title;
@@ -438,15 +457,35 @@ public class InventoryUI : MonoBehaviour
         var weapon = item.weaponData;
         var usable = item.usableData;
         var itemData = item.itemData;
-        bool isWeapon = weapon != null;
 
         if (weapon != null)
         {
             if (weapon.icon != null) icon = weapon.icon;
             if (!string.IsNullOrEmpty(weapon.weaponName)) title = weapon.weaponName;
             if (!string.IsNullOrEmpty(weapon.description)) description = weapon.description;
+
+            if (weaponDetailRoot != null) weaponDetailRoot.SetActive(true);
+            if (weaponImage != null) weaponImage.sprite = icon;
+            if (weaponTitle != null) weaponTitle.text = title ?? string.Empty;
+            if (weaponDesc != null) weaponDesc.text = description ?? string.Empty;
+            if (weaponDamageText != null) weaponDamageText.text = weapon.physicalDamage.ToString();
+            if (weaponCriticalText != null) weaponCriticalText.text = weapon.criticalHit.ToString("0.##");
+            if (weaponWeightText != null) weaponWeightText.text = weapon.weight.ToString("0.##");
+            if (weaponScalingText != null) weaponScalingText.text = weapon.scaling ?? string.Empty;
+            if (weaponRequirementsText != null) weaponRequirementsText.text = weapon.requirements ?? string.Empty;
+
+            // weaponStatsRoot è la sezione stat arma: lasciala attiva
+            if (weaponStatsRoot != null) weaponStatsRoot.SetActive(true);
+
+            // Aggiorna anche il blocco comune (fallback per sicurezza)
+            if (detailIcon != null) { detailIcon.enabled = icon != null; detailIcon.sprite = icon; }
+            if (detailTitle != null) detailTitle.text = title ?? string.Empty;
+            if (detailDescription != null) detailDescription.text = description ?? string.Empty;
+            return;
         }
-        else if (usable != null)
+
+        // Item o Usable
+        if (usable != null)
         {
             if (usable.icon != null) icon = usable.icon;
             if (!string.IsNullOrEmpty(usable.itemName)) title = usable.itemName;
@@ -459,24 +498,18 @@ public class InventoryUI : MonoBehaviour
             if (!string.IsNullOrEmpty(itemData.description)) description = itemData.description;
         }
 
-        if (detailIcon != null)
-        {
-            detailIcon.enabled = icon != null;
-            detailIcon.sprite = icon;
-        }
+        if (itemDetailRoot != null) itemDetailRoot.SetActive(true);
+        if (itemImage != null) itemImage.sprite = icon;
+        if (itemTitle != null) itemTitle.text = title ?? string.Empty;
+        if (itemDesc != null) itemDesc.text = description ?? string.Empty;
+
+        // pannello item: nascondi la sezione stat arma
+        if (weaponStatsRoot != null) weaponStatsRoot.SetActive(false);
+
+        // Aggiorna anche il blocco comune (se presente) per garantire visibilità
+        if (detailIcon != null) { detailIcon.enabled = icon != null; detailIcon.sprite = icon; }
         if (detailTitle != null) detailTitle.text = title ?? string.Empty;
         if (detailDescription != null) detailDescription.text = description ?? string.Empty;
-
-        if (weaponStatsRoot != null) weaponStatsRoot.SetActive(isWeapon);
-
-        if (isWeapon && weapon != null)
-        {
-            if (weaponDamageText != null) weaponDamageText.text = weapon.physicalDamage.ToString();
-            if (weaponCriticalText != null) weaponCriticalText.text = weapon.criticalHit.ToString("0.##");
-            if (weaponWeightText != null) weaponWeightText.text = weapon.weight.ToString("0.##");
-            if (weaponScalingText != null) weaponScalingText.text = weapon.scaling ?? string.Empty;
-            if (weaponRequirementsText != null) weaponRequirementsText.text = weapon.requirements ?? string.Empty;
-        }
     }
 
     private Sprite GetItemIcon(InventoryItem item)
@@ -488,6 +521,7 @@ public class InventoryUI : MonoBehaviour
         if (item.itemData != null && item.itemData.icon != null) return item.itemData.icon;
         return null;
     }
+
 
     // Mouse: select origin on pointer down, start drag to move preview
     public void HandleSlotPointerDown(int index)
