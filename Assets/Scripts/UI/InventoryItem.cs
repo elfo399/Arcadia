@@ -8,6 +8,7 @@ using UnityEngine;
 [System.Serializable]
 public class InventoryItem
 {
+    public string instanceId;
     public Sprite icon;
     public int amount;
     public string title;
@@ -35,11 +36,13 @@ public class InventoryItem
     {
         weaponData = weapon;
         icon = weapon != null ? weapon.icon : null;
-        amount = quantity;
+        // le armi non sono stackabili visivamente: amount viene usato solo per duplicare in griglia
+        amount = Mathf.Max(1, quantity);
         title = overrideTitle ?? (weapon != null ? weapon.weaponName : string.Empty);
         description = overrideDescription ?? (weapon != null ? weapon.description : string.Empty);
         itemData = null;
         usableData = null;
+        instanceId = System.Guid.NewGuid().ToString();
     }
 
     public InventoryItem(ItemData item, int quantity = 1, string overrideTitle = null, string overrideDescription = null)
@@ -51,6 +54,7 @@ public class InventoryItem
         description = overrideDescription ?? (item != null ? item.description : string.Empty);
         weaponData = null;
         usableData = null;
+        instanceId = System.Guid.NewGuid().ToString();
     }
 
     public InventoryItem(UsableItemData usable, int quantity = 1, string overrideTitle = null, string overrideDescription = null)
@@ -62,5 +66,6 @@ public class InventoryItem
         description = overrideDescription ?? (usable != null ? usable.description : string.Empty);
         weaponData = null;
         itemData = null;
+        instanceId = System.Guid.NewGuid().ToString();
     }
 }

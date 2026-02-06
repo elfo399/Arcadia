@@ -19,6 +19,7 @@ public class InventorySlot : MonoBehaviour,
     [SerializeField] private Image iconImage;
     [SerializeField] private TextMeshProUGUI quantityText;
     [SerializeField] private bool logMissingReferences = false;
+    [SerializeField] private bool displayOnly = false; // se true mostra solo l'icona, nessuna interazione
 
     private int slotIndex = -1;
     private InventoryUI owner;
@@ -33,6 +34,11 @@ public class InventorySlot : MonoBehaviour,
     {
         slotIndex = index;
         owner = inventory;
+    }
+
+    public void SetDisplayOnly(bool value)
+    {
+        displayOnly = value;
     }
 
     /// <summary>
@@ -94,11 +100,13 @@ public class InventorySlot : MonoBehaviour,
     // --- EventSystem handlers ---
     public void OnPointerDown(PointerEventData eventData)
     {
+        if (displayOnly) return;
         owner?.HandleSlotPointerDown(slotIndex);
     }
 
     public void OnBeginDrag(PointerEventData eventData)
     {
+        if (displayOnly) return;
         owner?.HandleSlotBeginDrag(slotIndex, eventData);
     }
 
@@ -109,22 +117,26 @@ public class InventorySlot : MonoBehaviour,
 
     public void OnEndDrag(PointerEventData eventData)
     {
+        if (displayOnly) return;
         owner?.HandleSlotEndDrag();
     }
 
     public void OnDrop(PointerEventData eventData)
     {
+        if (displayOnly) return;
         owner?.HandleSlotDrop(slotIndex);
     }
 
     // Gamepad/keyboard selection + submit for swap
     public void OnSelect(BaseEventData eventData)
     {
+        if (displayOnly) return;
         owner?.HandleSlotSelected(slotIndex);
     }
 
     public void OnSubmit(BaseEventData eventData)
     {
+        if (displayOnly) return;
         owner?.HandleSlotSubmit(slotIndex);
     }
 

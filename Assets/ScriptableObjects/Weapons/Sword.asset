@@ -13,13 +13,18 @@ MonoBehaviour:
   m_Name: Sword
   m_EditorClassIdentifier: 
   weaponName: Sword
+  icon: {fileID: 21300000, guid: 3e6d06a378fbe094dba40f61731113e6, type: 3}
   modelPrefab: {fileID: 0}
-  physicalDamage: 10
-  rightHandLightAttackAnim: Right_Slash_1
-  rightHandHeavyAttackAnim: 
-  leftHandLightAttackAnim: 
-  leftHandHeavyAttackAnim: 
+  description: 
+  category: 0
+  physicalDamage: 100
+  criticalHit: 1.1
+  weight: 3
+  scaling: STR C / DEX D
+  requirements: STR 10 / DEX 8
+  animationProfile: {fileID: 11400000, guid: 83aa8dbcfcce8614f95a879fa83d9545, type: 2}
   lightAttackStaminaCost: 10
   heavyAttackStaminaCost: 20
   hasRightSkill: 0
   hasLeftSkill: 0
+  isSpecialWeapon: 0

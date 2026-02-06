@@ -75,15 +75,27 @@ public class InventoryUI : MonoBehaviour
     private Filter currentFilter = Filter.All;
     private Filter lastFilter = Filter.All;
 
-    [Header("Equipment Cross Icons")]
-    [SerializeField] private Image crossTop;
-    [SerializeField] private Image crossRight;
-    [SerializeField] private Image crossBottom;
-    [SerializeField] private Image crossLeft;
+    [Header("HUD Cross Icons (solo overlay esterno)")]
     [SerializeField] private Image hudCrossTop;
     [SerializeField] private Image hudCrossRight;
     [SerializeField] private Image hudCrossBottom;
     [SerializeField] private Image hudCrossLeft;
+    [Header("HUD Cross Containers (instanzia invSlot prefab)")]
+    [SerializeField] private Transform hudRightContainer;
+    [SerializeField] private Transform hudLeftContainer;
+    [SerializeField] private Transform hudBottomContainer;
+    [SerializeField] private Transform hudTopContainer;
+    [Header("Equipment Slot Containers (instanzia invSlot prefab)")]
+    [SerializeField] private Transform rightEquipContainer;
+    [SerializeField] private Transform rightEquipContainer2;
+    [SerializeField] private Transform rightEquipContainer3;
+    [SerializeField] private Transform leftEquipContainer;
+    [SerializeField] private Transform leftEquipContainer2;
+    [SerializeField] private Transform leftEquipContainer3;
+    [SerializeField] private Transform bottomEquipContainer;
+    [SerializeField] private Transform bottomEquipContainer2;
+    [SerializeField] private Transform bottomEquipContainer3;
+    [SerializeField] private Transform topEquipContainer;
     [SerializeField] private GameObject equipmentBackground;
     [SerializeField] private GameObject inventoryBackground;
     [SerializeField] private Button equipWeaponButton;
@@ -92,6 +104,25 @@ public class InventoryUI : MonoBehaviour
     private PlayerInventory playerInventory;
     private enum EquipTarget { None, Right, Left, Bottom, Top }
     private EquipTarget currentEquipTarget = EquipTarget.None;
+    private int currentEquipSlot = 0; // 0-2
+    private InventorySlot[] rightEquipSlots = new InventorySlot[3];
+    private InventorySlot[] leftEquipSlots = new InventorySlot[3];
+    private InventorySlot[] bottomEquipSlots = new InventorySlot[3];
+    private InventorySlot topEquipSlot;
+    private InventorySlot hudRightSlot;
+    private InventorySlot hudLeftSlot;
+    private InventorySlot hudBottomSlot;
+    private InventorySlot hudTopSlot;
+    private bool equipSlotsBuilt = false;
+    private bool hudSlotsBuilt = false;
+
+    void Awake()
+    {
+        // costruisci subito le croci HUD/equip anche se il menu è disattivato all'avvio
+        BuildEquipSlotsIfNeeded();
+        BuildHudSlotsIfNeeded();
+        RefreshEquipmentCross();
+    }
 
     void Start()
     {
@@ -128,6 +159,19 @@ public class InventoryUI : MonoBehaviour
         if (autoRefreshWallet) RefreshWalletUI();
 
         ResetEquipTarget();
+
+        // istanzia i visual dei quattro slot equip usando lo stesso prefab della griglia
+        BuildEquipSlotsIfNeeded();
+        BuildHudSlotsIfNeeded();
+
+        // mostra subito gli equip correnti
+        RefreshEquipmentCross();
+    }
+
+    void OnEnable()
+    {
+        // quando il pannello viene riaperto, riallinea subito le icone HUD/equip
+        RefreshEquipmentCross();
     }
 
     void OnDestroy()
@@ -173,29 +217,35 @@ public class InventoryUI : MonoBehaviour
     }
 
     // ---- Equipment cross button handlers ----
-    public void OnEquipRight()
+    public void OnEquipRight(int slot = 0)
     {
         EnsurePlayerInventory();
         ShowEquipmentInventory(true);
         currentEquipTarget = EquipTarget.Right;
+        currentEquipSlot = Mathf.Clamp(slot, 0, 2);
+        playerInventory.currentRightIndex = currentEquipSlot;
         SetSourceItemsFromPlayer();
         ShowWeaponsFilter();
         UpdateEquipButtonState();
     }
-    public void OnEquipLeft()
+    public void OnEquipLeft(int slot = 0)
     {
         EnsurePlayerInventory();
         ShowEquipmentInventory(true);
         currentEquipTarget = EquipTarget.Left;
+        currentEquipSlot = Mathf.Clamp(slot, 0, 2);
+        playerInventory.currentLeftIndex = currentEquipSlot;
         SetSourceItemsFromPlayer();
         ShowWeaponsFilter();
         UpdateEquipButtonState();
     }
-    public void OnEquipBottom()
+    public void OnEquipBottom(int slot = 0)
     {
         EnsurePlayerInventory();
         ShowEquipmentInventory(true);
         currentEquipTarget = EquipTarget.Bottom;
+        currentEquipSlot = Mathf.Clamp(slot, 0, 2);
+        playerInventory.currentUsableIndex = currentEquipSlot;
         SetSourceItemsFromPlayer();
         ShowUsablesFilter();
         UpdateEquipButtonState();
@@ -294,30 +344,16 @@ public class InventoryUI : MonoBehaviour
                 result.Add(null);
                 continue;
             }
-
-            if (it.weaponData != null)
-            {
-                int count = Mathf.Max(1, it.amount);
-                for (int i = 0; i < count; i++)
-                {
-                    var copy = new InventoryItem(it.weaponData, 1, it.title, it.description);
-                    copy.icon = it.icon;
-                    copy.itemData = it.itemData;
-                    copy.usableData = it.usableData;
-                    result.Add(copy);
-                }
-            }
-            else
-            {
-                result.Add(it);
-            }
+            // le armi sono già istanze uniche (amount=1) con instanceId: non duplicare
+            result.Add(it);
         }
         return result;
     }
 
     private void ShowEquipmentInventory(bool showInventoryPanel)
     {
-        if (equipmentBackground != null) equipmentBackground.SetActive(true);
+        // quando apri la griglia inventario per scegliere un equip, nascondi lo sfondo degli slot equip
+        if (equipmentBackground != null) equipmentBackground.SetActive(!showInventoryPanel);
         if (inventoryBackground != null) inventoryBackground.SetActive(showInventoryPanel);
         // opzionale: potresti spegnere altri background (magic/skill/quest etc) se sono presenti
     }
@@ -512,6 +548,62 @@ public class InventoryUI : MonoBehaviour
             slot.gameObject.SetActive(true);
             slots.Add(slot);
         }
+    }
+
+    // --------- EQUIP SLOT VISUALS (usa invSlot prefab) ---------
+    private void BuildEquipSlotsIfNeeded()
+    {
+        if (equipSlotsBuilt) return;
+        // Right side (3)
+        rightEquipSlots[0] = CreateEquipSlot(rightEquipContainer);
+        rightEquipSlots[1] = CreateEquipSlot(rightEquipContainer2);
+        rightEquipSlots[2] = CreateEquipSlot(rightEquipContainer3);
+
+        // Left side (3)
+        leftEquipSlots[0] = CreateEquipSlot(leftEquipContainer);
+        leftEquipSlots[1] = CreateEquipSlot(leftEquipContainer2);
+        leftEquipSlots[2] = CreateEquipSlot(leftEquipContainer3);
+
+        // Bottom (3 usables)
+        bottomEquipSlots[0] = CreateEquipSlot(bottomEquipContainer);
+        bottomEquipSlots[1] = CreateEquipSlot(bottomEquipContainer2);
+        bottomEquipSlots[2] = CreateEquipSlot(bottomEquipContainer3);
+
+        // Top (per future magie, singolo)
+        topEquipSlot = CreateEquipSlot(topEquipContainer);
+        equipSlotsBuilt = true;
+    }
+
+    private void BuildHudSlotsIfNeeded()
+    {
+        if (hudSlotsBuilt) return;
+        hudRightSlot = CreateEquipSlot(hudRightContainer);
+        hudLeftSlot = CreateEquipSlot(hudLeftContainer);
+        hudBottomSlot = CreateEquipSlot(hudBottomContainer);
+        hudTopSlot = CreateEquipSlot(hudTopContainer);
+        // lasciali attivi anche se vuoti, così si vede lo sfondo
+        if (hudRightSlot) hudRightSlot.gameObject.SetActive(true);
+        if (hudLeftSlot) hudLeftSlot.gameObject.SetActive(true);
+        if (hudBottomSlot) hudBottomSlot.gameObject.SetActive(true);
+        if (hudTopSlot) hudTopSlot.gameObject.SetActive(true);
+        hudSlotsBuilt = true;
+    }
+
+    private InventorySlot CreateEquipSlot(Transform parent)
+    {
+        if (slotPrefab == null || parent == null) return null;
+        // evita doppioni se già presente
+        var existing = parent.GetComponentInChildren<InventorySlot>();
+        if (existing != null) return existing;
+
+        var slot = Instantiate(slotPrefab, parent);
+        slot.Init(-1, this);
+        slot.SetDisplayOnly(true);
+        slot.gameObject.SetActive(true);
+        // disattiva raycast sul background per evitare selezioni
+        var img = slot.GetComponent<Image>();
+        if (img != null) img.raycastTarget = false;
+        return slot;
     }
 
     [System.Serializable]
@@ -711,6 +803,9 @@ public class InventoryUI : MonoBehaviour
     // ------ EQUIPMENT CROSS SYNC ------
     public void RefreshEquipmentCross()
     {
+        BuildEquipSlotsIfNeeded();
+        BuildHudSlotsIfNeeded();
+
         if (playerInventory == null)
             playerInventory = FindObjectOfType<PlayerInventory>();
 
@@ -721,42 +816,82 @@ public class InventoryUI : MonoBehaviour
             var left = playerInventory.leftHandWeapon ?? playerInventory.unarmedLeft;
             var rightIcon = right != null ? right.icon : null;
             var leftIcon = left != null ? left.icon : null;
-            SetCrossIcon(crossRight, rightIcon);
-            SetCrossIcon(crossLeft, leftIcon);
             SetCrossIcon(hudCrossRight, rightIcon);
             SetCrossIcon(hudCrossLeft, leftIcon);
+
+            UpdateEquipVisuals(rightEquipSlots, playerInventory.rightLoadout);
+            UpdateEquipVisuals(leftEquipSlots, playerInventory.leftLoadout);
+
+            UpdateEquipVisual(hudRightSlot, rightIcon, 1);
+            UpdateEquipVisual(hudLeftSlot, leftIcon, 1);
         }
 
-        // bottom: primo usable disponibile nella lista sorgente
+        // bottom: mostra solo l'usabile equipaggiato, niente fallback da inventario
         Sprite usableIcon = null;
-        if (playerInventory != null && playerInventory.equippedUsable != null)
+        if (playerInventory != null && playerInventory.GetCurrentUsable() != null)
         {
-            usableIcon = playerInventory.equippedUsable.icon;
+            usableIcon = playerInventory.GetCurrentUsable().icon;
         }
-        else
-        {
-            foreach (var it in sourceItems)
-            {
-                if (it != null && it.usableData != null)
-                {
-                    usableIcon = it.usableData.icon ?? it.icon;
-                    break;
-                }
-            }
-        }
-        SetCrossIcon(crossBottom, usableIcon);
         SetCrossIcon(hudCrossBottom, usableIcon);
+        UpdateEquipVisuals(bottomEquipSlots, playerInventory.usableLoadout);
+        UpdateHudVisual(hudBottomSlot, usableIcon);
 
         // top: placeholder per future magie (per ora vuoto)
-        SetCrossIcon(crossTop, null);
         SetCrossIcon(hudCrossTop, null);
+        UpdateEquipVisual(topEquipSlot, null, 0);
+        UpdateHudVisual(hudTopSlot, null);
     }
 
     private void SetCrossIcon(Image target, Sprite sprite)
     {
         if (target == null) return;
-        target.enabled = sprite != null;
         target.sprite = sprite;
+        target.enabled = sprite != null;
+    }
+
+    private void UpdateEquipVisual(InventorySlot slot, Sprite icon, int amount)
+    {
+        if (slot == null) return;
+        if (icon != null)
+            slot.Setup(icon, amount);
+        else
+            slot.Clear();
+    }
+
+    private void UpdateHudVisual(InventorySlot slot, Sprite icon)
+    {
+        if (slot == null) return;
+        slot.gameObject.SetActive(true); // mostra il fondo anche se vuoto
+        if (icon != null)
+        {
+            slot.Setup(icon, 1);
+        }
+        else
+        {
+            slot.Clear();
+        }
+    }
+
+    private void UpdateEquipVisuals(InventorySlot[] slots, WeaponItem[] loadout)
+    {
+        if (slots == null || loadout == null) return;
+        int len = Mathf.Min(slots.Length, loadout.Length);
+        for (int i = 0; i < len; i++)
+        {
+            var icon = loadout[i] != null ? loadout[i].icon : null;
+            UpdateEquipVisual(slots[i], icon, 1);
+        }
+    }
+
+    private void UpdateEquipVisuals(InventorySlot[] slots, UsableItemData[] loadout)
+    {
+        if (slots == null || loadout == null) return;
+        int len = Mathf.Min(slots.Length, loadout.Length);
+        for (int i = 0; i < len; i++)
+        {
+            var icon = loadout[i] != null ? loadout[i].icon : null;
+            UpdateEquipVisual(slots[i], icon, 1);
+        }
     }
 
     private void UpdateEquipButtonState()
@@ -797,18 +932,6 @@ public class InventoryUI : MonoBehaviour
     {
         while (sourceItems.Count <= index) sourceItems.Add(null);
         sourceItems[index] = item;
-    }
-
-    private InventoryItem CreateInventoryItemFromWeapon(WeaponItem weapon)
-    {
-        if (weapon == null) return null;
-        return new InventoryItem(weapon, 1, weapon.weaponName, weapon.description);
-    }
-
-    private InventoryItem CreateInventoryItemFromUsable(UsableItemData usable)
-    {
-        if (usable == null) return null;
-        return new InventoryItem(usable, 1, usable.itemName, usable.description);
     }
 
     private Sprite GetItemIcon(InventoryItem item)
@@ -953,6 +1076,16 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
+    private void CloseEquipGrid()
+    {
+        // Nascondi la griglia inventario quando abbiamo equipaggiato
+        ShowEquipmentInventory(false);
+        ResetFilterToAll();
+        ClearDetailPanel();
+        currentSelectedIndex = -1;
+        selectedPadIndex = -1;
+    }
+
     // Equip selected item into the slot that opened the grid (weapon button)
     public void OnEquipWeaponButtonClick()
     {
@@ -965,17 +1098,14 @@ public class InventoryUI : MonoBehaviour
 
         // arma nuova e arma precedente
         WeaponItem newWeapon = item.weaponData;
-        WeaponItem oldWeapon = null;
 
         if (currentEquipTarget == EquipTarget.Right)
         {
-            oldWeapon = playerInventory.rightHandWeapon;
-            playerInventory.rightHandWeapon = newWeapon;
+            playerInventory.SetRightAtSlot(currentEquipSlot, newWeapon, item.instanceId);
         }
         else if (currentEquipTarget == EquipTarget.Left)
         {
-            oldWeapon = playerInventory.leftHandWeapon;
-            playerInventory.leftHandWeapon = newWeapon;
+            playerInventory.SetLeftAtSlot(currentEquipSlot, newWeapon, item.instanceId);
         }
         else
         {
@@ -983,22 +1113,14 @@ public class InventoryUI : MonoBehaviour
         }
 
         // Rimetti l'arma precedente nello slot inventario (se esiste e non è unarmed)
-        if (oldWeapon != null && oldWeapon != playerInventory.unarmedRight && oldWeapon != playerInventory.unarmedLeft)
-        {
-            var back = CreateInventoryItemFromWeapon(oldWeapon);
-            currentItems[currentSelectedIndex] = back;
-            SetSourceItemAt(currentSelectedIndex, back);
-        }
-        else
-        {
-            currentItems[currentSelectedIndex] = null;
-            SetSourceItemAt(currentSelectedIndex, null);
-        }
+        currentItems[currentSelectedIndex] = null;
+        SetSourceItemAt(currentSelectedIndex, null);
 
         RefreshSlot(currentSelectedIndex);
         RefreshDetailSelection();
         RefreshEquipmentCross();
         ResetEquipTarget();
+        CloseEquipGrid();
     }
 
     // Equip usable into bottom slot
@@ -1013,28 +1135,18 @@ public class InventoryUI : MonoBehaviour
 
         if (currentEquipTarget == EquipTarget.Bottom)
         {
-            var old = playerInventory.equippedUsable;
-            playerInventory.equippedUsable = item.usableData;
-
-            // Rimetti l'usabile precedente nello slot (se esiste)
-            if (old != null)
-            {
-                var back = CreateInventoryItemFromUsable(old);
-                currentItems[currentSelectedIndex] = back;
-                SetSourceItemAt(currentSelectedIndex, back);
-            }
-            else
-            {
-                currentItems[currentSelectedIndex] = null;
-                SetSourceItemAt(currentSelectedIndex, null);
-            }
+            playerInventory.SetUsableAtSlot(currentEquipSlot, item.usableData, item.instanceId);
         }
         else
             return;
+
+        currentItems[currentSelectedIndex] = null;
+        SetSourceItemAt(currentSelectedIndex, null);
 
         RefreshSlot(currentSelectedIndex);
         RefreshDetailSelection();
         RefreshEquipmentCross();
         ResetEquipTarget();
+        CloseEquipGrid();
     }
 }
