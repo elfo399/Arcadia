@@ -13,7 +13,9 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private int initialSlotCount = 0; // facoltativo: crea slot all'avvio
     private readonly List<InventorySlot> slots = new();
     private List<InventoryItem> currentItems = new();
+    private List<InventoryItem> sourceItems = new(); // lista completa, non filtrata
     public List<InventoryItem> GetCurrentItemsSnapshot() => new List<InventoryItem>(currentItems);
+    public List<InventoryItem> GetSourceItemsSnapshot() => new List<InventoryItem>(sourceItems);
 
     [Header("Tabs")]
     [SerializeField] private TabEntry[] tabs;
@@ -69,10 +71,33 @@ public class InventoryUI : MonoBehaviour
     [Header("Events")]
     public UnityEvent<string> onTabChanged;
 
+    private enum Filter { All, Weapons, Usables, Magic }
+    private Filter currentFilter = Filter.All;
+    private Filter lastFilter = Filter.All;
+
+    [Header("Equipment Cross Icons")]
+    [SerializeField] private Image crossTop;
+    [SerializeField] private Image crossRight;
+    [SerializeField] private Image crossBottom;
+    [SerializeField] private Image crossLeft;
+    [SerializeField] private Image hudCrossTop;
+    [SerializeField] private Image hudCrossRight;
+    [SerializeField] private Image hudCrossBottom;
+    [SerializeField] private Image hudCrossLeft;
+    [SerializeField] private GameObject equipmentBackground;
+    [SerializeField] private GameObject inventoryBackground;
+    [SerializeField] private Button equipWeaponButton;
+    [SerializeField] private Button equipUsableButton;
+
+    private PlayerInventory playerInventory;
+    private enum EquipTarget { None, Right, Left, Bottom, Top }
+    private EquipTarget currentEquipTarget = EquipTarget.None;
+
     void Start()
     {
         // fallback: se non assegnato, usa il proprio transform come parent
         if (slotParent == null) slotParent = transform;
+        playerInventory = FindObjectOfType<PlayerInventory>();
 
         // se non usiamo prefab, conserva eventuali slot già presenti come figli
         if (slotPrefab == null && slotParent != null)
@@ -101,6 +126,8 @@ public class InventoryUI : MonoBehaviour
 
         CachePlayerStats();
         if (autoRefreshWallet) RefreshWalletUI();
+
+        ResetEquipTarget();
     }
 
     void OnDestroy()
@@ -117,13 +144,86 @@ public class InventoryUI : MonoBehaviour
     /// </summary>
     public void UpdateUI(List<InventoryItem> inventoryData)
     {
-        if (inventoryData == null)
-        {
-            ClearAllSlots();
-            return;
-        }
+        // se viene chiamato direttamente, consideriamo questi dati come fonte e attiviamo filtro corrente
+        sourceItems = NormalizeSourceItems(inventoryData);
+        ApplyFilterInternal(currentFilter);
+    }
 
-        currentItems = new List<InventoryItem>(inventoryData);
+    /// <summary>
+    /// Imposta la lista sorgente (completa) e applica il filtro corrente.
+    /// </summary>
+    public void SetSourceItems(List<InventoryItem> inventoryData)
+    {
+        sourceItems = NormalizeSourceItems(inventoryData);
+        ApplyFilterInternal(currentFilter);
+    }
+
+    public void ShowWeaponsFilter() { lastFilter = Filter.Weapons; ApplyFilterInternal(Filter.Weapons); }
+    public void ShowUsablesFilter() { lastFilter = Filter.Usables; ApplyFilterInternal(Filter.Usables); }
+    public void ShowMagicFilter()   { lastFilter = Filter.Magic; ApplyFilterInternal(Filter.Magic); }
+    public void ShowAllFilter()     { lastFilter = Filter.All; ApplyFilterInternal(Filter.All); }
+
+    public void ApplyLastFilter() => ApplyFilterInternal(lastFilter);
+
+    public void ResetFilterToAll()
+    {
+        lastFilter = Filter.All;
+        ApplyFilterInternal(Filter.All);
+        ResetEquipTarget();
+    }
+
+    // ---- Equipment cross button handlers ----
+    public void OnEquipRight()
+    {
+        EnsurePlayerInventory();
+        ShowEquipmentInventory(true);
+        currentEquipTarget = EquipTarget.Right;
+        SetSourceItemsFromPlayer();
+        ShowWeaponsFilter();
+        UpdateEquipButtonState();
+    }
+    public void OnEquipLeft()
+    {
+        EnsurePlayerInventory();
+        ShowEquipmentInventory(true);
+        currentEquipTarget = EquipTarget.Left;
+        SetSourceItemsFromPlayer();
+        ShowWeaponsFilter();
+        UpdateEquipButtonState();
+    }
+    public void OnEquipBottom()
+    {
+        EnsurePlayerInventory();
+        ShowEquipmentInventory(true);
+        currentEquipTarget = EquipTarget.Bottom;
+        SetSourceItemsFromPlayer();
+        ShowUsablesFilter();
+        UpdateEquipButtonState();
+    }
+    public void OnEquipTop()
+    {
+        EnsurePlayerInventory();
+        ShowEquipmentInventory(true);
+        currentEquipTarget = EquipTarget.Top;
+        SetSourceItemsFromPlayer();
+        ShowMagicFilter(); // placeholder
+        UpdateEquipButtonState();
+    }
+
+    private void ApplyFilterInternal(Filter filter)
+    {
+        currentFilter = filter;
+
+        // crea lista filtrata mantenendo la lunghezza per non rompere gli indici degli slot
+        currentItems = new List<InventoryItem>(sourceItems.Count);
+        for (int i = 0; i < sourceItems.Count; i++)
+        {
+            var item = sourceItems[i];
+            if (MatchesFilter(item, filter))
+                currentItems.Add(item);
+            else
+                currentItems.Add(null);
+        }
 
         // Garantisce almeno gli slot richiesti dagli item o dal valore iniziale configurato
         int neededSlots = Mathf.Max(currentItems.Count, initialSlotCount);
@@ -149,6 +249,77 @@ public class InventoryUI : MonoBehaviour
         selectedPadIndex = -1;
         currentSelectedIndex = -1;
         ClearDetailPanel();
+        RefreshEquipmentCross();
+        UpdateEquipButtonState();
+    }
+
+    private bool MatchesFilter(InventoryItem item, Filter filter)
+    {
+        if (filter == Filter.All || item == null) return true;
+        switch (filter)
+        {
+            case Filter.Weapons: return item.weaponData != null;
+            case Filter.Usables: return item.usableData != null;
+            case Filter.Magic:   return false; // placeholder per future magie
+            default: return true;
+        }
+    }
+
+    private void EnsurePlayerInventory()
+    {
+        if (playerInventory == null)
+            playerInventory = FindObjectOfType<PlayerInventory>();
+    }
+
+    private void SetSourceItemsFromPlayer()
+    {
+        EnsurePlayerInventory();
+        if (playerInventory == null) return;
+        var list = new List<InventoryItem>(playerInventory.Items);
+        SetSourceItems(list);
+    }
+
+    /// <summary>
+    /// Per le armi non stackabili: se amount > 1 vengono splittate in item separati.
+    /// </summary>
+    private List<InventoryItem> NormalizeSourceItems(List<InventoryItem> data)
+    {
+        var result = new List<InventoryItem>();
+        if (data == null) return result;
+
+        foreach (var it in data)
+        {
+            if (it == null)
+            {
+                result.Add(null);
+                continue;
+            }
+
+            if (it.weaponData != null)
+            {
+                int count = Mathf.Max(1, it.amount);
+                for (int i = 0; i < count; i++)
+                {
+                    var copy = new InventoryItem(it.weaponData, 1, it.title, it.description);
+                    copy.icon = it.icon;
+                    copy.itemData = it.itemData;
+                    copy.usableData = it.usableData;
+                    result.Add(copy);
+                }
+            }
+            else
+            {
+                result.Add(it);
+            }
+        }
+        return result;
+    }
+
+    private void ShowEquipmentInventory(bool showInventoryPanel)
+    {
+        if (equipmentBackground != null) equipmentBackground.SetActive(true);
+        if (inventoryBackground != null) inventoryBackground.SetActive(showInventoryPanel);
+        // opzionale: potresti spegnere altri background (magic/skill/quest etc) se sono presenti
     }
 
     /// <summary>
@@ -159,6 +330,7 @@ public class InventoryUI : MonoBehaviour
         if (tabs == null || tabs.Length == 0) return;
 
         bool tabFound = false;
+        bool isInventoryTab = string.Equals(tabKey, "Inventory", System.StringComparison.OrdinalIgnoreCase);
 
         foreach (var tab in tabs)
         {
@@ -192,6 +364,9 @@ public class InventoryUI : MonoBehaviour
         {
             onTabChanged.Invoke(tabKey);
         }
+
+        // Se la tab è Inventory, forza il filtro a "tutti"
+        if (isInventoryTab) ResetFilterToAll();
     }
 
     /// <summary>
@@ -367,9 +542,22 @@ public class InventoryUI : MonoBehaviour
         var temp = currentItems[a];
         currentItems[a] = currentItems[b];
         currentItems[b] = temp;
+
+        // Mantieni sincronizzata anche la lista sorgente
+        if (sourceItems.Count <= a) ExtendSourceToIndex(a);
+        if (sourceItems.Count <= b) ExtendSourceToIndex(b);
+        var tempSrc = sourceItems[a];
+        sourceItems[a] = sourceItems[b];
+        sourceItems[b] = tempSrc;
+
         RefreshSlot(a);
         RefreshSlot(b);
         RefreshDetailSelection();
+    }
+
+    private void ExtendSourceToIndex(int index)
+    {
+        while (sourceItems.Count <= index) sourceItems.Add(null);
     }
 
     private void RefreshSlot(int index)
@@ -386,6 +574,7 @@ public class InventoryUI : MonoBehaviour
         }
         // Mantieni lo slot attivo anche se vuoto, cos\u00ec la griglia non collassa
         slots[index].gameObject.SetActive(true);
+        UpdateEquipButtonState();
     }
 
     // ------- DETAIL PANEL --------
@@ -510,6 +699,116 @@ public class InventoryUI : MonoBehaviour
         if (detailIcon != null) { detailIcon.enabled = icon != null; detailIcon.sprite = icon; }
         if (detailTitle != null) detailTitle.text = title ?? string.Empty;
         if (detailDescription != null) detailDescription.text = description ?? string.Empty;
+
+        // Aggiorna la croce se l'Equipment è visibile
+        RefreshEquipmentCross();
+
+        // Aggiorna lo stato del pulsante equip
+        UpdateEquipButtonState();
+    }
+
+
+    // ------ EQUIPMENT CROSS SYNC ------
+    public void RefreshEquipmentCross()
+    {
+        if (playerInventory == null)
+            playerInventory = FindObjectOfType<PlayerInventory>();
+
+        // right/left hands
+        if (playerInventory != null)
+        {
+            var right = playerInventory.rightHandWeapon ?? playerInventory.unarmedRight;
+            var left = playerInventory.leftHandWeapon ?? playerInventory.unarmedLeft;
+            var rightIcon = right != null ? right.icon : null;
+            var leftIcon = left != null ? left.icon : null;
+            SetCrossIcon(crossRight, rightIcon);
+            SetCrossIcon(crossLeft, leftIcon);
+            SetCrossIcon(hudCrossRight, rightIcon);
+            SetCrossIcon(hudCrossLeft, leftIcon);
+        }
+
+        // bottom: primo usable disponibile nella lista sorgente
+        Sprite usableIcon = null;
+        if (playerInventory != null && playerInventory.equippedUsable != null)
+        {
+            usableIcon = playerInventory.equippedUsable.icon;
+        }
+        else
+        {
+            foreach (var it in sourceItems)
+            {
+                if (it != null && it.usableData != null)
+                {
+                    usableIcon = it.usableData.icon ?? it.icon;
+                    break;
+                }
+            }
+        }
+        SetCrossIcon(crossBottom, usableIcon);
+        SetCrossIcon(hudCrossBottom, usableIcon);
+
+        // top: placeholder per future magie (per ora vuoto)
+        SetCrossIcon(crossTop, null);
+        SetCrossIcon(hudCrossTop, null);
+    }
+
+    private void SetCrossIcon(Image target, Sprite sprite)
+    {
+        if (target == null) return;
+        target.enabled = sprite != null;
+        target.sprite = sprite;
+    }
+
+    private void UpdateEquipButtonState()
+    {
+        bool hasSelection = currentSelectedIndex >= 0 && HasItem(currentSelectedIndex);
+
+        if (equipWeaponButton != null)
+        {
+            bool showW = (currentEquipTarget == EquipTarget.Right || currentEquipTarget == EquipTarget.Left) && currentFilter == Filter.Weapons;
+            equipWeaponButton.gameObject.SetActive(showW);
+            equipWeaponButton.interactable = showW && hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.weaponData != null;
+        }
+
+        if (equipUsableButton != null)
+        {
+            bool showU = (currentEquipTarget == EquipTarget.Bottom) && currentFilter == Filter.Usables;
+            equipUsableButton.gameObject.SetActive(showU);
+            equipUsableButton.interactable = showU && hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.usableData != null;
+        }
+    }
+
+    private void ResetEquipTarget()
+    {
+        currentEquipTarget = EquipTarget.None;
+        if (equipWeaponButton != null)
+        {
+            equipWeaponButton.gameObject.SetActive(false);
+            equipWeaponButton.interactable = false;
+        }
+        if (equipUsableButton != null)
+        {
+            equipUsableButton.gameObject.SetActive(false);
+            equipUsableButton.interactable = false;
+        }
+    }
+
+    private void SetSourceItemAt(int index, InventoryItem item)
+    {
+        while (sourceItems.Count <= index) sourceItems.Add(null);
+        sourceItems[index] = item;
+    }
+
+    private InventoryItem CreateInventoryItemFromWeapon(WeaponItem weapon)
+    {
+        if (weapon == null) return null;
+        return new InventoryItem(weapon, 1, weapon.weaponName, weapon.description);
+    }
+
+    private InventoryItem CreateInventoryItemFromUsable(UsableItemData usable)
+    {
+        if (usable == null) return null;
+        return new InventoryItem(usable, 1, usable.itemName, usable.description);
     }
 
     private Sprite GetItemIcon(InventoryItem item)
@@ -529,10 +828,12 @@ public class InventoryUI : MonoBehaviour
         if (!HasItem(index))
         {
             ClearDetailPanel();
+            UpdateEquipButtonState();
             return;
         }
         selectedPadIndex = index;
         ShowItemDetailsByIndex(index);
+        UpdateEquipButtonState();
     }
 
     public void HandleSlotBeginDrag(int index, PointerEventData eventData)
@@ -579,10 +880,12 @@ public class InventoryUI : MonoBehaviour
         if (HasItem(index))
         {
             ShowItemDetailsByIndex(index);
+            UpdateEquipButtonState();
         }
         else
         {
             ClearDetailPanel();
+            UpdateEquipButtonState();
         }
     }
 
@@ -648,5 +951,90 @@ public class InventoryUI : MonoBehaviour
             Destroy(activeDragPreview.gameObject);
             activeDragPreview = null;
         }
+    }
+
+    // Equip selected item into the slot that opened the grid (weapon button)
+    public void OnEquipWeaponButtonClick()
+    {
+        if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex)) return;
+        EnsurePlayerInventory();
+        if (playerInventory == null) return;
+
+        var item = currentItems[currentSelectedIndex];
+        if (item.weaponData == null) return;
+
+        // arma nuova e arma precedente
+        WeaponItem newWeapon = item.weaponData;
+        WeaponItem oldWeapon = null;
+
+        if (currentEquipTarget == EquipTarget.Right)
+        {
+            oldWeapon = playerInventory.rightHandWeapon;
+            playerInventory.rightHandWeapon = newWeapon;
+        }
+        else if (currentEquipTarget == EquipTarget.Left)
+        {
+            oldWeapon = playerInventory.leftHandWeapon;
+            playerInventory.leftHandWeapon = newWeapon;
+        }
+        else
+        {
+            return; // not a weapon target
+        }
+
+        // Rimetti l'arma precedente nello slot inventario (se esiste e non è unarmed)
+        if (oldWeapon != null && oldWeapon != playerInventory.unarmedRight && oldWeapon != playerInventory.unarmedLeft)
+        {
+            var back = CreateInventoryItemFromWeapon(oldWeapon);
+            currentItems[currentSelectedIndex] = back;
+            SetSourceItemAt(currentSelectedIndex, back);
+        }
+        else
+        {
+            currentItems[currentSelectedIndex] = null;
+            SetSourceItemAt(currentSelectedIndex, null);
+        }
+
+        RefreshSlot(currentSelectedIndex);
+        RefreshDetailSelection();
+        RefreshEquipmentCross();
+        ResetEquipTarget();
+    }
+
+    // Equip usable into bottom slot
+    public void OnEquipUsableButtonClick()
+    {
+        if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex)) return;
+        EnsurePlayerInventory();
+        if (playerInventory == null) return;
+
+        var item = currentItems[currentSelectedIndex];
+        if (item.usableData == null) return;
+
+        if (currentEquipTarget == EquipTarget.Bottom)
+        {
+            var old = playerInventory.equippedUsable;
+            playerInventory.equippedUsable = item.usableData;
+
+            // Rimetti l'usabile precedente nello slot (se esiste)
+            if (old != null)
+            {
+                var back = CreateInventoryItemFromUsable(old);
+                currentItems[currentSelectedIndex] = back;
+                SetSourceItemAt(currentSelectedIndex, back);
+            }
+            else
+            {
+                currentItems[currentSelectedIndex] = null;
+                SetSourceItemAt(currentSelectedIndex, null);
+            }
+        }
+        else
+            return;
+
+        RefreshSlot(currentSelectedIndex);
+        RefreshDetailSelection();
+        RefreshEquipmentCross();
+        ResetEquipTarget();
     }
 }

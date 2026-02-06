@@ -333,10 +333,12 @@ public class PlayerController : MonoBehaviour
     {
         bool opening = !isInventoryOpen;
 
-        // Se stiamo chiudendo, salviamo l'ordine corrente degli item
+        // Se stiamo chiudendo, salviamo l'ordine corrente degli item e resettiamo il filtro
         if (!opening && isInventoryOpen && inventoryUI != null && playerInventory != null)
         {
-            playerInventory.ReplaceAllItems(inventoryUI.GetCurrentItemsSnapshot());
+            playerInventory.ReplaceAllItems(inventoryUI.GetSourceItemsSnapshot());
+            inventoryUI.ResetFilterToAll();
+            inventoryUI.RefreshEquipmentCross(); // aggiorna anche la croce HUD esterna
         }
 
         isInventoryOpen = opening;
@@ -346,14 +348,18 @@ public class PlayerController : MonoBehaviour
             inventoryPanel.SetActive(isInventoryOpen);
             if (isInventoryOpen && inventoryUI != null)
             {
-                inventoryUI.SetActiveTab("Inventory");
+                // reset filtro a All ad ogni apertura
+                inventoryUI.ResetFilterToAll();
+                inventoryUI.SetActiveTab("Equipment");
                 // Popola la UI con gli item attuali del giocatore
                 if (playerInventory != null)
                 {
                     var list = new List<InventoryItem>(playerInventory.Items);
-                    inventoryUI.UpdateUI(list);
-                    // Workaround: una refresh al frame successivo evita che le icone restino vuote alla prima apertura
-                    StartCoroutine(RefreshInventoryNextFrame(list));
+                    inventoryUI.SetSourceItems(list);
+                    // All'apertura: nessun filtro di default finché l'utente non clicca la croce
+                    inventoryUI.ResetFilterToAll();
+                    // Workaround: refresh al frame successivo
+                    StartCoroutine(RefreshInventoryNextFrame(list, false));
                 }
             }
         }
@@ -386,12 +392,16 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private IEnumerator RefreshInventoryNextFrame(List<InventoryItem> snapshot)
+    private IEnumerator RefreshInventoryNextFrame(List<InventoryItem> snapshot, bool weaponsOnly = false)
     {
         yield return null; // aspetta un frame
         if (inventoryUI != null)
         {
-            inventoryUI.UpdateUI(snapshot);
+            inventoryUI.SetSourceItems(snapshot);
+            if (weaponsOnly)
+                inventoryUI.ShowWeaponsFilter();
+            else
+                inventoryUI.ResetFilterToAll();
         }
     }
 }

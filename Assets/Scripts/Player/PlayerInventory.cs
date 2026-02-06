@@ -14,6 +14,9 @@ public class PlayerInventory : MonoBehaviour
     public WeaponItem unarmedRight;
     public WeaponItem unarmedLeft;
 
+    [Header("Usable equip")]
+    public UsableItemData equippedUsable;
+
     [System.Serializable]
     public class StartingItemEntry
     {
