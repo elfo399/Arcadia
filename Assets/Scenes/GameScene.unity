@@ -516,7 +516,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: OnEquipBottom
         m_Mode: 3
@@ -875,7 +875,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: OnEquipUsableButtonClick
         m_Mode: 1
@@ -1592,8 +1592,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rightHandWeapon: {fileID: 0}
   leftHandWeapon: {fileID: 0}
-  unarmedRight: {fileID: 0}
-  unarmedLeft: {fileID: 0}
+  unarmedRight: {fileID: 11400000, guid: 0061e3ef9726e47438903ee06eaf267d, type: 2}
+  unarmedLeft: {fileID: 11400000, guid: 0061e3ef9726e47438903ee06eaf267d, type: 2}
   equippedUsable: {fileID: 0}
   rightLoadout:
   - {fileID: 0}
@@ -5157,7 +5157,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: OnEquipRight
         m_Mode: 3
@@ -5388,7 +5388,6 @@ GameObject:
   - component: {fileID: 866589187}
   - component: {fileID: 866589186}
   - component: {fileID: 866589185}
-  - component: {fileID: 866589184}
   m_Layer: 0
   m_Name: Menu
   m_TagString: Untagged
@@ -5417,93 +5416,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &866589184
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 866589182}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 64e2f15a783b5434e9351060c709acbc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  slotPrefab: {fileID: 3146139372920839725, guid: 8694c9e84f74c054fb9adb7618c38d3e, type: 3}
-  slotParent: {fileID: 386207103}
-  initialSlotCount: 30
-  tabs:
-  - key: Equipment
-    label: {fileID: 1292260251}
-    background: {fileID: 1434530136}
-  - key: Inventory
-    label: {fileID: 1076547279}
-    background: {fileID: 1988976284}
-  - key: Magic
-    label: {fileID: 1770883407}
-    background: {fileID: 329333683}
-  - key: Skill
-    label: {fileID: 1608254071}
-    background: {fileID: 183865919}
-  - key: Quest
-    label: {fileID: 1518875531}
-    background: {fileID: 1409404574}
-  - key: Setting
-    label: {fileID: 1155422006}
-    background: {fileID: 1139836401}
-  activeColor: {r: 1, g: 0, b: 0, a: 1}
-  inactiveColor: {r: 0.8, g: 0.8, b: 0.8, a: 1}
-  defaultTabKey: Equipment
-  goldValueText: {fileID: 1418464268}
-  silverValueText: {fileID: 1741583421}
-  copperValueText: {fileID: 1185486304}
-  walletSource: 0
-  autoRefreshWallet: 1
-  dragCanvas: {fileID: 0}
-  dragPreviewTemplate: {fileID: 0}
-  detailIcon: {fileID: 1274403195}
-  detailTitle: {fileID: 994162074}
-  detailDescription: {fileID: 2105926944}
-  detailRoot: {fileID: 428505100}
-  weaponStatsRoot: {fileID: 1346696718}
-  weaponDamageText: {fileID: 297938714}
-  weaponCriticalText: {fileID: 1001527649}
-  weaponWeightText: {fileID: 220577165}
-  weaponScalingText: {fileID: 669953987}
-  weaponRequirementsText: {fileID: 882914962}
-  weaponDetailRoot: {fileID: 1346696718}
-  weaponImage: {fileID: 1964505764}
-  weaponTitle: {fileID: 921491889}
-  weaponDesc: {fileID: 673157704}
-  itemDetailRoot: {fileID: 428505100}
-  itemImage: {fileID: 1274403195}
-  itemTitle: {fileID: 994162074}
-  itemDesc: {fileID: 2105926944}
-  onTabChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  hudCrossTop: {fileID: 1860084161}
-  hudCrossRight: {fileID: 116377125}
-  hudCrossBottom: {fileID: 1986265343}
-  hudCrossLeft: {fileID: 2012942249}
-  hudRightContainer: {fileID: 116377124}
-  hudLeftContainer: {fileID: 2012942248}
-  hudBottomContainer: {fileID: 1986265342}
-  hudTopContainer: {fileID: 1860084160}
-  rightEquipContainer: {fileID: 1954398404}
-  rightEquipContainer2: {fileID: 843154014}
-  rightEquipContainer3: {fileID: 1556922045}
-  leftEquipContainer: {fileID: 1219830668}
-  leftEquipContainer2: {fileID: 1531360429}
-  leftEquipContainer3: {fileID: 1205518342}
-  bottomEquipContainer: {fileID: 984844488}
-  bottomEquipContainer2: {fileID: 1292338674}
-  bottomEquipContainer3: {fileID: 106502106}
-  topEquipContainer: {fileID: 877258018}
-  equipmentBackground: {fileID: 1434530136}
-  inventoryBackground: {fileID: 1988976284}
-  equipWeaponButton: {fileID: 1856378498}
-  equipUsableButton: {fileID: 174473449}
 --- !u!114 &866589185
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6618,7 +6530,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: OnEquipBottom
         m_Mode: 3
@@ -7151,7 +7063,7 @@ MonoBehaviour:
   totalNormalRooms: 10
   xOffset: 50
   zOffset: 50
-  curchsRoomsChance: 30
+  curchsRoomsChance: 100
   normalBigRoomChance: 40
   bossBigRoomChance: 0
   shopBigRoomChance: 10
@@ -7836,7 +7748,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: ShowTab
         m_Mode: 5
@@ -8102,7 +8014,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: OnEquipLeft
         m_Mode: 3
@@ -8234,7 +8146,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: OnEquipLeft
         m_Mode: 3
@@ -8377,7 +8289,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: ShowTab
         m_Mode: 5
@@ -9110,7 +9022,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: OnEquipBottom
         m_Mode: 3
@@ -10282,7 +10194,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: OnEquipLeft
         m_Mode: 3
@@ -10415,7 +10327,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: ShowTab
         m_Mode: 5
@@ -10547,7 +10459,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: OnEquipRight
         m_Mode: 3
@@ -11127,7 +11039,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: ShowTab
         m_Mode: 5
@@ -11456,7 +11368,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: ShowTab
         m_Mode: 5
@@ -12383,7 +12295,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: OnEquipWeaponButtonClick
         m_Mode: 1
@@ -13239,7 +13151,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: OnEquipRight
         m_Mode: 3
@@ -13783,7 +13695,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 866589184}
+      - m_Target: {fileID: 1723032821}
         m_TargetAssemblyTypeName: InventoryUI, Assembly-CSharp
         m_MethodName: ShowTab
         m_Mode: 5

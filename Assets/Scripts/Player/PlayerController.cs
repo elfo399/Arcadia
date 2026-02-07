@@ -89,7 +89,13 @@ public class PlayerController : MonoBehaviour
 
         // Ensure inventory is closed on start
         if(inventoryPanel != null) inventoryPanel.SetActive(false);
-        if (inventoryUI == null && inventoryPanel != null) inventoryUI = inventoryPanel.GetComponentInChildren<InventoryUI>(true);
+        if (inventoryUI == null && inventoryPanel != null)
+        {
+            inventoryUI = inventoryPanel.GetComponentInChildren<InventoryUI>(true);
+            if (inventoryUI == null) inventoryUI = inventoryPanel.GetComponentInParent<InventoryUI>(true);
+        }
+        if (inventoryUI == null) inventoryUI = FindObjectOfType<InventoryUI>(true);
+        if (inventoryUI == null) Debug.LogWarning("[PlayerController] InventoryUI non trovato in scena.");
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }

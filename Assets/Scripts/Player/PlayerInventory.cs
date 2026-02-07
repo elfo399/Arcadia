@@ -138,6 +138,15 @@ public class PlayerInventory : MonoBehaviour
         currentUsableIndex = slot;
     }
 
+    public bool IsInstanceEquipped(string instanceId)
+    {
+        if (string.IsNullOrEmpty(instanceId)) return false;
+        EnsureLoadoutSize();
+        return ContainsInstanceId(rightInstanceIds, instanceId)
+               || ContainsInstanceId(leftInstanceIds, instanceId)
+               || ContainsInstanceId(usableInstanceIds, instanceId);
+    }
+
     // Inventory management
     public void AddItem(InventoryItem item) { if (item != null) items.Add(item); }
     public bool RemoveItem(InventoryItem item) { return items.Remove(item); }
@@ -156,7 +165,6 @@ public class PlayerInventory : MonoBehaviour
 
         if (weapon == null)
         {
-            if (previous != null) AddWeaponInstanceToInventory(prevId, previous);
             targetLoadout[targetSlot] = null;
             targetIds[targetSlot] = null;
             return null;
@@ -164,15 +172,13 @@ public class PlayerInventory : MonoBehaviour
 
         if (RemoveFromLoadouts(weapon, instanceId, targetLoadout, targetIds, targetSlot, otherLoadout, otherIds))
         {
-            if (previous != null) AddWeaponInstanceToInventory(prevId, previous);
             targetLoadout[targetSlot] = weapon;
             targetIds[targetSlot] = instanceId;
             return weapon;
         }
 
-        if (RemoveWeaponInstanceFromInventory(instanceId))
+        if (HasWeaponInstanceInInventory(instanceId, weapon))
         {
-            if (previous != null) AddWeaponInstanceToInventory(prevId, previous);
             targetLoadout[targetSlot] = weapon;
             targetIds[targetSlot] = instanceId;
             return weapon;
@@ -189,7 +195,6 @@ public class PlayerInventory : MonoBehaviour
 
         if (usable == null)
         {
-            if (previous != null) AddUsableInstanceToInventory(prevId, previous);
             targetLoadout[targetSlot] = null;
             targetIds[targetSlot] = null;
             return null;
@@ -197,15 +202,13 @@ public class PlayerInventory : MonoBehaviour
 
         if (RemoveFromLoadoutUsable(usable, instanceId, targetLoadout, targetIds, targetSlot))
         {
-            if (previous != null) AddUsableInstanceToInventory(prevId, previous);
             targetLoadout[targetSlot] = usable;
             targetIds[targetSlot] = instanceId;
             return usable;
         }
 
-        if (RemoveUsableInstanceFromInventory(instanceId))
+        if (HasUsableInstanceInInventory(instanceId, usable))
         {
-            if (previous != null) AddUsableInstanceToInventory(prevId, previous);
             targetLoadout[targetSlot] = usable;
             targetIds[targetSlot] = instanceId;
             return usable;
@@ -213,6 +216,38 @@ public class PlayerInventory : MonoBehaviour
 
         targetIds[targetSlot] = prevId;
         return previous;
+    }
+
+    private bool ContainsInstanceId(string[] ids, string instanceId)
+    {
+        if (ids == null || string.IsNullOrEmpty(instanceId)) return false;
+        for (int i = 0; i < ids.Length; i++)
+        {
+            if (ids[i] == instanceId) return true;
+        }
+        return false;
+    }
+
+    private bool HasWeaponInstanceInInventory(string instanceId, WeaponItem weapon)
+    {
+        if (string.IsNullOrEmpty(instanceId) || weapon == null) return false;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            if (it != null && it.weaponData == weapon && it.instanceId == instanceId) return true;
+        }
+        return false;
+    }
+
+    private bool HasUsableInstanceInInventory(string instanceId, UsableItemData usable)
+    {
+        if (string.IsNullOrEmpty(instanceId) || usable == null) return false;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            if (it != null && it.usableData == usable && it.instanceId == instanceId) return true;
+        }
+        return false;
     }
 
     private bool RemoveFromLoadouts(WeaponItem weapon, string instanceId, WeaponItem[] primary, string[] primaryIds, int targetSlot, WeaponItem[] secondary, string[] secondaryIds)

@@ -46,7 +46,7 @@ public class InventorySlot : MonoBehaviour,
     /// </summary>
     /// <param name="itemIcon">The sprite for the item icon.</param>
     /// <param name="quantity">The number of items in the stack.</param>
-    public void Setup(Sprite itemIcon, int quantity)
+    public void Setup(Sprite itemIcon, int quantity, bool isEquipped = false)
     {
         ResolveReferences();
 
@@ -70,7 +70,12 @@ public class InventorySlot : MonoBehaviour,
         if (quantity > 1)
         {
             quantityText.enabled = true;
-            quantityText.text = quantity.ToString();
+            quantityText.text = isEquipped ? $"{quantity} E" : quantity.ToString();
+        }
+        else if (isEquipped)
+        {
+            quantityText.enabled = true;
+            quantityText.text = "E";
         }
         else
         {

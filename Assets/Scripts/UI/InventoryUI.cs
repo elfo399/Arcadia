@@ -176,6 +176,7 @@ public class InventoryUI : MonoBehaviour
 
     void OnDestroy()
     {
+        ClearDragPreview();
         if (playerStats != null)
         {
             playerStats.OnBankChanged -= HandleBankChanged;
@@ -286,7 +287,7 @@ public class InventoryUI : MonoBehaviour
             InventoryItem item = i < currentItems.Count ? currentItems[i] : null;
             if (item != null)
             {
-                slots[i].Setup(GetItemIcon(item), item.amount);
+                slots[i].Setup(GetItemIcon(item), item.amount, IsItemEquipped(item));
             }
             else
             {
@@ -658,7 +659,7 @@ public class InventoryUI : MonoBehaviour
         var item = currentItems[index];
         if (item != null)
         {
-            slots[index].Setup(GetItemIcon(item), item.amount);
+            slots[index].Setup(GetItemIcon(item), item.amount, IsItemEquipped(item));
         }
         else
         {
@@ -928,12 +929,6 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
-    private void SetSourceItemAt(int index, InventoryItem item)
-    {
-        while (sourceItems.Count <= index) sourceItems.Add(null);
-        sourceItems[index] = item;
-    }
-
     private Sprite GetItemIcon(InventoryItem item)
     {
         if (item == null) return null;
@@ -942,6 +937,13 @@ public class InventoryUI : MonoBehaviour
         if (item.usableData != null && item.usableData.icon != null) return item.usableData.icon;
         if (item.itemData != null && item.itemData.icon != null) return item.itemData.icon;
         return null;
+    }
+
+    private bool IsItemEquipped(InventoryItem item)
+    {
+        if (item == null || string.IsNullOrEmpty(item.instanceId)) return false;
+        EnsurePlayerInventory();
+        return playerInventory != null && playerInventory.IsInstanceEquipped(item.instanceId);
     }
 
 
@@ -968,7 +970,7 @@ public class InventoryUI : MonoBehaviour
         {
             iconSize = slots[index].GetIconSize();
         }
-        CreateDragPreview(currentItems[index]?.icon, eventData, iconSize);
+        CreateDragPreview(GetItemIcon(currentItems[index]), eventData, iconSize);
     }
 
     public void HandleSlotDrag(PointerEventData eventData)
@@ -1032,11 +1034,16 @@ public class InventoryUI : MonoBehaviour
 
     private void CreateDragPreview(Sprite icon, PointerEventData eventData, Vector2 iconSize)
     {
+        // Prevent leaked previews if BeginDrag fires again without a matching EndDrag.
+        ClearDragPreview();
         if (icon == null) return;
 
         Canvas targetCanvas = dragCanvas;
         if (targetCanvas == null)
             targetCanvas = GetComponentInParent<Canvas>();
+        if (targetCanvas == null)
+            targetCanvas = FindObjectOfType<Canvas>();
+        if (targetCanvas == null) return;
 
         if (dragPreviewTemplate == null)
         {
@@ -1076,6 +1083,12 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
+    void OnDisable()
+    {
+        ClearDragPreview();
+        dragOriginIndex = -1;
+    }
+
     private void CloseEquipGrid()
     {
         // Nascondi la griglia inventario quando abbiamo equipaggiato
@@ -1112,10 +1125,6 @@ public class InventoryUI : MonoBehaviour
             return; // not a weapon target
         }
 
-        // Rimetti l'arma precedente nello slot inventario (se esiste e non è unarmed)
-        currentItems[currentSelectedIndex] = null;
-        SetSourceItemAt(currentSelectedIndex, null);
-
         RefreshSlot(currentSelectedIndex);
         RefreshDetailSelection();
         RefreshEquipmentCross();
@@ -1140,8 +1149,6 @@ public class InventoryUI : MonoBehaviour
         else
             return;
 
-        currentItems[currentSelectedIndex] = null;
-        SetSourceItemAt(currentSelectedIndex, null);
 
         RefreshSlot(currentSelectedIndex);
         RefreshDetailSelection();

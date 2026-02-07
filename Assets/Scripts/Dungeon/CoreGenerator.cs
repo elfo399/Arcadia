@@ -271,7 +271,7 @@ public class CoreGenerator : MonoBehaviour
         if (!PlaceSpecialRoom("Boss", layout, occupiedCells, deadEndNormalRooms, freeSockets, minBossDistance, bossBigRoomChance, cellToRoomMap)) return null;
 
         // 5.1 CURCH / EVIL CURCH (opzionale)
-        if (playerStats != null && prng.Next(0, 100) < curchsRoomsChance)
+        if (playerStats != null && prng.Next(0, 100) <= curchsRoomsChance)
         {
             string curchType = playerStats.benedetto > playerStats.malefico ? "Curch" : "EvilCurch";
             int curchChance = playerStats.benedetto > playerStats.malefico ? curchBigRoomChance : evilCurchBigRoomChance;
