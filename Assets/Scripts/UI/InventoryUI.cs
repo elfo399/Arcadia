@@ -813,18 +813,21 @@ public class InventoryUI : MonoBehaviour
         // right/left hands
         if (playerInventory != null)
         {
-            var right = playerInventory.rightHandWeapon ?? playerInventory.unarmedRight;
-            var left = playerInventory.leftHandWeapon ?? playerInventory.unarmedLeft;
-            var rightIcon = right != null ? right.icon : null;
-            var leftIcon = left != null ? left.icon : null;
-            SetCrossIcon(hudCrossRight, rightIcon);
-            SetCrossIcon(hudCrossLeft, leftIcon);
+            var rightEquipped = playerInventory.rightHandWeapon ?? playerInventory.unarmedRight;
+            var leftEquipped = playerInventory.leftHandWeapon ?? playerInventory.unarmedLeft;
+            var rightFrontIcon = rightEquipped != null ? rightEquipped.icon : null;
+            var leftFrontIcon = leftEquipped != null ? leftEquipped.icon : null;
+
+            // Back layer = solo sfondo.
+            SetBackLayerIcon(hudCrossRight);
+            SetBackLayerIcon(hudCrossLeft);
 
             UpdateEquipVisuals(rightEquipSlots, playerInventory.rightLoadout);
             UpdateEquipVisuals(leftEquipSlots, playerInventory.leftLoadout);
 
-            UpdateEquipVisual(hudRightSlot, rightIcon, 1);
-            UpdateEquipVisual(hudLeftSlot, leftIcon, 1);
+            // Front layer (invSlot) = icona equipaggiata, inclusa default/unarmed.
+            UpdateEquipVisual(hudRightSlot, rightFrontIcon, 1);
+            UpdateEquipVisual(hudLeftSlot, leftFrontIcon, 1);
         }
 
         // bottom: mostra solo l'usabile equipaggiato, niente fallback da inventario
@@ -833,21 +836,23 @@ public class InventoryUI : MonoBehaviour
         {
             usableIcon = playerInventory.GetCurrentUsable().icon;
         }
-        SetCrossIcon(hudCrossBottom, usableIcon);
+        SetBackLayerIcon(hudCrossBottom);
         UpdateEquipVisuals(bottomEquipSlots, playerInventory.usableLoadout);
         UpdateHudVisual(hudBottomSlot, usableIcon);
 
         // top: placeholder per future magie (per ora vuoto)
-        SetCrossIcon(hudCrossTop, null);
+        SetBackLayerIcon(hudCrossTop);
         UpdateEquipVisual(topEquipSlot, null, 0);
         UpdateHudVisual(hudTopSlot, null);
     }
 
-    private void SetCrossIcon(Image target, Sprite sprite)
+    private void SetBackLayerIcon(Image target)
     {
         if (target == null) return;
-        target.sprite = sprite;
-        target.enabled = sprite != null;
+
+        // Layer dietro sempre vuoto: l'icona deve essere solo nel prefab InventorySlot frontale.
+        target.sprite = null;
+        target.enabled = false;
     }
 
     private void UpdateEquipVisual(InventorySlot slot, Sprite icon, int amount)

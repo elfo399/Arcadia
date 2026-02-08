@@ -75,6 +75,7 @@ public class PlayerInventory : MonoBehaviour
         currentRightIndex = Mathf.Clamp(currentRightIndex, 0, rightLoadout.Length - 1);
         currentLeftIndex = Mathf.Clamp(currentLeftIndex, 0, leftLoadout.Length - 1);
         currentUsableIndex = Mathf.Clamp(currentUsableIndex, 0, usableLoadout.Length - 1);
+        SyncEquippedReferences();
     }
 
     private void EnsureLoadoutSize()
@@ -97,45 +98,48 @@ public class PlayerInventory : MonoBehaviour
     {
         EnsureLoadoutSize();
         currentRightIndex = Mathf.Clamp(currentRightIndex, 0, rightLoadout.Length - 1);
-        return rightLoadout[currentRightIndex] != null ? rightLoadout[currentRightIndex] : rightHandWeapon;
+        return rightLoadout[currentRightIndex];
     }
 
     public WeaponItem GetCurrentLeftWeapon()
     {
         EnsureLoadoutSize();
         currentLeftIndex = Mathf.Clamp(currentLeftIndex, 0, leftLoadout.Length - 1);
-        return leftLoadout[currentLeftIndex] != null ? leftLoadout[currentLeftIndex] : leftHandWeapon;
+        return leftLoadout[currentLeftIndex];
     }
 
     public UsableItemData GetCurrentUsable()
     {
         EnsureLoadoutSize();
         currentUsableIndex = Mathf.Clamp(currentUsableIndex, 0, usableLoadout.Length - 1);
-        return usableLoadout[currentUsableIndex] != null ? usableLoadout[currentUsableIndex] : equippedUsable;
+        return usableLoadout[currentUsableIndex];
     }
 
     public void SetRightAtSlot(int slot, WeaponItem weapon, string instanceId)
     {
         EnsureLoadoutSize();
         slot = Mathf.Clamp(slot, 0, rightLoadout.Length - 1);
-        rightHandWeapon = MoveWeaponWithInventorySync(weapon, instanceId, rightLoadout, rightInstanceIds, slot, leftLoadout, leftInstanceIds);
+        MoveWeaponWithInventorySync(weapon, instanceId, rightLoadout, rightInstanceIds, slot, leftLoadout, leftInstanceIds);
         currentRightIndex = slot;
+        SyncEquippedReferences();
     }
 
     public void SetLeftAtSlot(int slot, WeaponItem weapon, string instanceId)
     {
         EnsureLoadoutSize();
         slot = Mathf.Clamp(slot, 0, leftLoadout.Length - 1);
-        leftHandWeapon = MoveWeaponWithInventorySync(weapon, instanceId, leftLoadout, leftInstanceIds, slot, rightLoadout, rightInstanceIds);
+        MoveWeaponWithInventorySync(weapon, instanceId, leftLoadout, leftInstanceIds, slot, rightLoadout, rightInstanceIds);
         currentLeftIndex = slot;
+        SyncEquippedReferences();
     }
 
     public void SetUsableAtSlot(int slot, UsableItemData usable, string instanceId)
     {
         EnsureLoadoutSize();
         slot = Mathf.Clamp(slot, 0, usableLoadout.Length - 1);
-        equippedUsable = MoveUsableWithInventorySync(usable, instanceId, usableLoadout, usableInstanceIds, slot);
+        MoveUsableWithInventorySync(usable, instanceId, usableLoadout, usableInstanceIds, slot);
         currentUsableIndex = slot;
+        SyncEquippedReferences();
     }
 
     public bool IsInstanceEquipped(string instanceId)
@@ -350,6 +354,18 @@ public class PlayerInventory : MonoBehaviour
         var inv = new InventoryItem(usable, 1);
         if (!string.IsNullOrEmpty(instanceId)) inv.instanceId = instanceId;
         items.Add(inv);
+    }
+
+    private void SyncEquippedReferences()
+    {
+        EnsureLoadoutSize();
+        currentRightIndex = Mathf.Clamp(currentRightIndex, 0, rightLoadout.Length - 1);
+        currentLeftIndex = Mathf.Clamp(currentLeftIndex, 0, leftLoadout.Length - 1);
+        currentUsableIndex = Mathf.Clamp(currentUsableIndex, 0, usableLoadout.Length - 1);
+
+        rightHandWeapon = rightLoadout[currentRightIndex];
+        leftHandWeapon = leftLoadout[currentLeftIndex];
+        equippedUsable = usableLoadout[currentUsableIndex];
     }
 }
 

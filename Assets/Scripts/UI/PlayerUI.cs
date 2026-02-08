@@ -27,6 +27,8 @@ public class PlayerUI : MonoBehaviour
     public Image slotLeftIcon;
     // Icon shown for the right-hand weapon
     public Image slotRightIcon;
+    private InventorySlot leftFrontSlot;
+    private InventorySlot rightFrontSlot;
 
     // Update UI elements each frame
     void Update()
@@ -41,6 +43,12 @@ public class PlayerUI : MonoBehaviour
         {
             UpdateWeaponSlots();
         }
+    }
+
+    void Awake()
+    {
+        leftFrontSlot = ResolveFrontSlot(slotLeftIcon);
+        rightFrontSlot = ResolveFrontSlot(slotRightIcon);
     }
 
     // Refresh health, stamina, and mana bar fill amounts
@@ -77,38 +85,36 @@ public class PlayerUI : MonoBehaviour
     // Display the icons for equipped left and right weapons
     void UpdateWeaponSlots()
     {
-        if (slotRightIcon != null)
-        {
-            WeaponItem rightWeapon = playerInventory.rightHandWeapon != null
-                ? playerInventory.rightHandWeapon
-                : playerInventory.unarmedRight;
+        WeaponItem rightWeapon = playerInventory.rightHandWeapon != null
+            ? playerInventory.rightHandWeapon
+            : playerInventory.unarmedRight;
+        WeaponItem leftWeapon = playerInventory.leftHandWeapon != null
+            ? playerInventory.leftHandWeapon
+            : playerInventory.unarmedLeft;
 
-            if (rightWeapon != null && rightWeapon.icon != null)
-            {
-                slotRightIcon.enabled = true;
-                slotRightIcon.sprite  = rightWeapon.icon;
-            }
-            else
-            {
-                slotRightIcon.enabled = false;
-            }
+        UpdateFrontSlot(rightFrontSlot, slotRightIcon, rightWeapon);
+        UpdateFrontSlot(leftFrontSlot, slotLeftIcon, leftWeapon);
+    }
+
+    private static InventorySlot ResolveFrontSlot(Image parentImage)
+    {
+        if (parentImage == null) return null;
+        return parentImage.GetComponentInChildren<InventorySlot>(true);
+    }
+
+    private static void UpdateFrontSlot(InventorySlot frontSlot, Image parentImage, WeaponItem weapon)
+    {
+        Sprite icon = weapon != null ? weapon.icon : null;
+        if (frontSlot != null)
+        {
+            if (icon != null) frontSlot.Setup(icon, 1);
+            else frontSlot.Clear();
+            return;
         }
 
-        if (slotLeftIcon != null)
-        {
-            WeaponItem leftWeapon = playerInventory.leftHandWeapon != null
-                ? playerInventory.leftHandWeapon
-                : playerInventory.unarmedLeft;
-
-            if (leftWeapon != null && leftWeapon.icon != null)
-            {
-                slotLeftIcon.enabled = true;
-                slotLeftIcon.sprite  = leftWeapon.icon;
-            }
-            else
-            {
-                slotLeftIcon.enabled = false;
-            }
-        }
+        // Se manca il child slot, non scrivere l'icona sul parent.
+        if (parentImage == null) return;
+        parentImage.sprite = null;
+        parentImage.enabled = false;
     }
 }
