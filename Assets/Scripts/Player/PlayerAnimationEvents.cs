@@ -14,6 +14,8 @@ public class PlayerAnimationEvents : MonoBehaviour
     void Awake()
     {
         combat = GetComponentInParent<PlayerCombat>();
+        if (rightHandDamage != null) rightHandDamage.SetHand(Hand.Right);
+        if (leftHandDamage != null) leftHandDamage.SetHand(Hand.Left);
     }
 
     public void CallEndAttack()

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Gestisce equip (3 slot per lato), usabili e inventario base.
@@ -7,16 +8,21 @@ using UnityEngine;
 /// </summary>
 public class PlayerInventory : MonoBehaviour
 {
-    [Header("Armi equipaggiate")]
-    public WeaponItem rightHandWeapon;
-    public WeaponItem leftHandWeapon;
+    [SerializeField, HideInInspector, FormerlySerializedAs("rightHandWeapon")]
+    private WeaponItem legacyRightHandWeapon;
+    [SerializeField, HideInInspector, FormerlySerializedAs("leftHandWeapon")]
+    private WeaponItem legacyLeftHandWeapon;
 
     [Header("Default unarmed")]
     public WeaponItem unarmedRight;
     public WeaponItem unarmedLeft;
 
-    [Header("Usable equip")]
-    public UsableItemData equippedUsable;
+    [SerializeField, HideInInspector, FormerlySerializedAs("equippedUsable")]
+    private UsableItemData legacyEquippedUsable;
+
+    public WeaponItem rightHandWeapon => GetCurrentRightWeapon();
+    public WeaponItem leftHandWeapon => GetCurrentLeftWeapon();
+    public UsableItemData equippedUsable => GetCurrentUsable();
 
     [Header("Loadout (3 slot per lato)")]
     public WeaponItem[] rightLoadout = new WeaponItem[3];
@@ -28,6 +34,11 @@ public class PlayerInventory : MonoBehaviour
     public int currentRightIndex = 0;
     public int currentLeftIndex = 0;
     public int currentUsableIndex = 0;
+
+    [Header("Runtime Equipped (Debug)")]
+    [SerializeField] private WeaponItem equippedRightRuntime;
+    [SerializeField] private WeaponItem equippedLeftRuntime;
+    [SerializeField] private UsableItemData equippedUsableRuntime;
 
     [System.Serializable]
     public class StartingItemEntry
@@ -69,12 +80,10 @@ public class PlayerInventory : MonoBehaviour
         }
 
         EnsureLoadoutSize();
-        rightLoadout[0] = rightHandWeapon;
-        leftLoadout[0] = leftHandWeapon;
-        usableLoadout[0] = equippedUsable;
-        currentRightIndex = Mathf.Clamp(currentRightIndex, 0, rightLoadout.Length - 1);
-        currentLeftIndex = Mathf.Clamp(currentLeftIndex, 0, leftLoadout.Length - 1);
-        currentUsableIndex = Mathf.Clamp(currentUsableIndex, 0, usableLoadout.Length - 1);
+        SeedLoadoutFromLegacyFields();
+        currentRightIndex = SelectInitialIndex(rightLoadout);
+        currentLeftIndex = SelectInitialIndex(leftLoadout);
+        currentUsableIndex = SelectInitialIndex(usableLoadout);
         SyncEquippedReferences();
     }
 
@@ -140,6 +149,24 @@ public class PlayerInventory : MonoBehaviour
         MoveUsableWithInventorySync(usable, instanceId, usableLoadout, usableInstanceIds, slot);
         currentUsableIndex = slot;
         SyncEquippedReferences();
+    }
+
+    public bool CycleRightWeapon(int direction = 1)
+    {
+        EnsureLoadoutSize();
+        return CycleWeaponInternal(rightLoadout, ref currentRightIndex, direction);
+    }
+
+    public bool CycleLeftWeapon(int direction = 1)
+    {
+        EnsureLoadoutSize();
+        return CycleWeaponInternal(leftLoadout, ref currentLeftIndex, direction);
+    }
+
+    public bool CycleUsable(int direction = 1)
+    {
+        EnsureLoadoutSize();
+        return CycleUsableInternal(usableLoadout, ref currentUsableIndex, direction);
     }
 
     public bool IsInstanceEquipped(string instanceId)
@@ -356,6 +383,67 @@ public class PlayerInventory : MonoBehaviour
         items.Add(inv);
     }
 
+    private void SeedLoadoutFromLegacyFields()
+    {
+        if (IsAllNull(rightLoadout) && legacyRightHandWeapon != null)
+        {
+            rightLoadout[0] = legacyRightHandWeapon;
+        }
+        if (IsAllNull(leftLoadout) && legacyLeftHandWeapon != null)
+        {
+            leftLoadout[0] = legacyLeftHandWeapon;
+        }
+        if (IsAllNull(usableLoadout) && legacyEquippedUsable != null)
+        {
+            usableLoadout[0] = legacyEquippedUsable;
+        }
+    }
+
+    private static bool IsAllNull<T>(T[] array) where T : class
+    {
+        if (array == null || array.Length == 0) return true;
+        for (int i = 0; i < array.Length; i++)
+        {
+            if (array[i] != null) return false;
+        }
+        return true;
+    }
+
+    private static int SelectInitialIndex<T>(T[] loadout) where T : class
+    {
+        if (loadout == null || loadout.Length == 0) return 0;
+
+        // Default richiesto: preferisci sempre il primo slot se ha item.
+        if (loadout[0] != null) return 0;
+
+        // Fallback: primo slot non vuoto.
+        for (int i = 0; i < loadout.Length; i++)
+        {
+            if (loadout[i] != null) return i;
+        }
+        return 0;
+    }
+
+    private bool CycleWeaponInternal(WeaponItem[] loadout, ref int currentIndex, int direction)
+    {
+        if (loadout == null || loadout.Length == 0) return false;
+
+        int dir = direction >= 0 ? 1 : -1;
+        currentIndex = (Mathf.Clamp(currentIndex, 0, loadout.Length - 1) + dir + loadout.Length) % loadout.Length;
+        SyncEquippedReferences();
+        return true;
+    }
+
+    private bool CycleUsableInternal(UsableItemData[] loadout, ref int currentIndex, int direction)
+    {
+        if (loadout == null || loadout.Length == 0) return false;
+
+        int dir = direction >= 0 ? 1 : -1;
+        currentIndex = (Mathf.Clamp(currentIndex, 0, loadout.Length - 1) + dir + loadout.Length) % loadout.Length;
+        SyncEquippedReferences();
+        return true;
+    }
+
     private void SyncEquippedReferences()
     {
         EnsureLoadoutSize();
@@ -363,9 +451,12 @@ public class PlayerInventory : MonoBehaviour
         currentLeftIndex = Mathf.Clamp(currentLeftIndex, 0, leftLoadout.Length - 1);
         currentUsableIndex = Mathf.Clamp(currentUsableIndex, 0, usableLoadout.Length - 1);
 
-        rightHandWeapon = rightLoadout[currentRightIndex];
-        leftHandWeapon = leftLoadout[currentLeftIndex];
-        equippedUsable = usableLoadout[currentUsableIndex];
+        var right = rightLoadout[currentRightIndex];
+        var left = leftLoadout[currentLeftIndex];
+        var usable = usableLoadout[currentUsableIndex];
+        equippedRightRuntime = right != null ? right : unarmedRight;
+        equippedLeftRuntime = left != null ? left : unarmedLeft;
+        equippedUsableRuntime = usable;
     }
 }
 

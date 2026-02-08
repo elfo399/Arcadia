@@ -1590,11 +1590,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe3745d07460f2e4cb19e994669d988c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  rightHandWeapon: {fileID: 0}
-  leftHandWeapon: {fileID: 0}
+  legacyRightHandWeapon: {fileID: 0}
+  legacyLeftHandWeapon: {fileID: 0}
   unarmedRight: {fileID: 11400000, guid: 0061e3ef9726e47438903ee06eaf267d, type: 2}
   unarmedLeft: {fileID: 11400000, guid: 0061e3ef9726e47438903ee06eaf267d, type: 2}
-  equippedUsable: {fileID: 0}
+  legacyEquippedUsable: {fileID: 0}
   rightLoadout:
   - {fileID: 0}
   - {fileID: 0}
@@ -1610,6 +1610,9 @@ MonoBehaviour:
   currentRightIndex: 0
   currentLeftIndex: 0
   currentUsableIndex: 0
+  equippedRightRuntime: {fileID: 0}
+  equippedLeftRuntime: {fileID: 0}
+  equippedUsableRuntime: {fileID: 0}
   startingLoadout:
   - weapon: {fileID: 11400000, guid: 0061e3ef9726e47438903ee06eaf267d, type: 2}
     item: {fileID: 0}
@@ -11742,6 +11745,8 @@ MonoBehaviour:
   bottomEquipContainer2: {fileID: 1292338674}
   bottomEquipContainer3: {fileID: 106502106}
   topEquipContainer: {fileID: 877258018}
+  topEquipContainer2: {fileID: 229742195}
+  topEquipContainer3: {fileID: 2095627284}
   equipmentBackground: {fileID: 1434530136}
   inventoryBackground: {fileID: 1988976284}
   equipWeaponButton: {fileID: 1856378498}

@@ -53,6 +53,9 @@ public class PlayerController : MonoBehaviour
     private PlayerInventory playerInventory;
     private PlayerStats playerStats;
     private Transform cam;
+    private InputAction cycleRightEquipAction;
+    private InputAction cycleLeftEquipAction;
+    private InputAction cycleUsableAction;
 
     private Vector3 velocity;
     private float lastDodgeTime = -999f;
@@ -60,6 +63,8 @@ public class PlayerController : MonoBehaviour
     private float actionButtonDownTime = 0f;
     private bool actionButtonHeld = false;
     private float sprintThreshold = 0.25f;
+    private float lastInventoryPadMoveTime = -999f;
+    private float inventoryPadMoveCooldown = 0.20f;
 
     public bool IsGrounded => controller != null && controller.isGrounded;
 
@@ -79,6 +84,9 @@ public class PlayerController : MonoBehaviour
         controller = GetComponent<CharacterController>();
         cam = Camera.main.transform;
         Controls = new PlayerControls();
+        cycleRightEquipAction = Controls.asset.FindAction("Player/CycleRightEquip", throwIfNotFound: false);
+        cycleLeftEquipAction = Controls.asset.FindAction("Player/CycleLeftEquip", throwIfNotFound: false);
+        cycleUsableAction = Controls.asset.FindAction("Player/CycleUsable", throwIfNotFound: false);
 
         if (animator == null) animator = GetComponentInChildren<Animator>();
         playerStats = GetComponent<PlayerStats>();
@@ -145,6 +153,7 @@ public class PlayerController : MonoBehaviour
             }
 
             HandleJump();
+            HandleQuickSlotCycleInput();
         }
         else
         {
@@ -161,6 +170,8 @@ public class PlayerController : MonoBehaviour
                     inventoryUI.NextTab();
                 if (Controls.Player.TabPrev.WasPerformedThisFrame())
                     inventoryUI.PreviousTab();
+
+                HandleInventoryPadNavigation();
             }
         }
 
@@ -168,6 +179,101 @@ public class PlayerController : MonoBehaviour
         controller.Move(velocity * Time.deltaTime);
 
         UpdateFallingAnimator();
+    }
+
+    private void HandleQuickSlotCycleInput()
+    {
+        if (playerInventory == null) return;
+
+        bool changed = false;
+        if (cycleRightEquipAction != null && cycleRightEquipAction.WasPerformedThisFrame())
+        {
+            changed |= playerInventory.CycleRightWeapon(1);
+        }
+        if (cycleLeftEquipAction != null && cycleLeftEquipAction.WasPerformedThisFrame())
+        {
+            changed |= playerInventory.CycleLeftWeapon(1);
+        }
+        if (cycleUsableAction != null && cycleUsableAction.WasPerformedThisFrame())
+        {
+            changed |= playerInventory.CycleUsable(1);
+        }
+
+        if (changed && inventoryUI != null)
+        {
+            inventoryUI.RefreshEquipmentCross();
+        }
+    }
+
+    private void HandleInventoryPadNavigation()
+    {
+        if (inventoryUI == null) return;
+
+        bool rightPressed = (Keyboard.current != null && Keyboard.current.rightArrowKey.wasPressedThisFrame)
+            || (Gamepad.current != null && Gamepad.current.dpad.right.wasPressedThisFrame);
+        bool leftPressed = (Keyboard.current != null && Keyboard.current.leftArrowKey.wasPressedThisFrame)
+            || (Gamepad.current != null && Gamepad.current.dpad.left.wasPressedThisFrame);
+        bool downPressed = (Keyboard.current != null && Keyboard.current.downArrowKey.wasPressedThisFrame)
+            || (Gamepad.current != null && Gamepad.current.dpad.down.wasPressedThisFrame);
+        bool upPressed = (Keyboard.current != null && Keyboard.current.upArrowKey.wasPressedThisFrame)
+            || (Gamepad.current != null && Gamepad.current.dpad.up.wasPressedThisFrame);
+
+        bool inEquipmentCross = inventoryUI.IsEquipmentCrossModeActive();
+
+        // DPad dedicated actions
+        if ((cycleRightEquipAction != null && cycleRightEquipAction.WasPerformedThisFrame()) || rightPressed)
+        {
+            if (inEquipmentCross) inventoryUI.NavigateEquipmentRight();
+            else inventoryUI.MovePadFocusHorizontal(1);
+        }
+        if ((cycleLeftEquipAction != null && cycleLeftEquipAction.WasPerformedThisFrame()) || leftPressed)
+        {
+            if (inEquipmentCross) inventoryUI.NavigateEquipmentLeft();
+            else inventoryUI.MovePadFocusHorizontal(-1);
+        }
+        if ((cycleUsableAction != null && cycleUsableAction.WasPerformedThisFrame()) || downPressed)
+        {
+            if (inEquipmentCross) inventoryUI.NavigateEquipmentDown();
+            else inventoryUI.MovePadFocusVertical(1);
+        }
+        if (upPressed)
+        {
+            if (inEquipmentCross) inventoryUI.NavigateEquipmentUp();
+            else inventoryUI.MovePadFocusVertical(-1);
+        }
+
+        // Stick/keyboard fallback (WASD or left stick) with repeat cooldown.
+        Vector2 nav = Controls.Player.Move.ReadValue<Vector2>();
+        if (!inEquipmentCross && Time.time >= lastInventoryPadMoveTime + inventoryPadMoveCooldown)
+        {
+            if (nav.x > 0.5f)
+            {
+                inventoryUI.MovePadFocusHorizontal(1);
+                lastInventoryPadMoveTime = Time.time;
+            }
+            else if (nav.x < -0.5f)
+            {
+                inventoryUI.MovePadFocusHorizontal(-1);
+                lastInventoryPadMoveTime = Time.time;
+            }
+            else if (nav.y > 0.5f)
+            {
+                inventoryUI.MovePadFocusVertical(-1);
+                lastInventoryPadMoveTime = Time.time;
+            }
+            else if (nav.y < -0.5f)
+            {
+                inventoryUI.MovePadFocusVertical(1);
+                lastInventoryPadMoveTime = Time.time;
+            }
+        }
+
+        // Confirm with X / Space (Jump action in your map).
+        if (Controls.Player.Jump.WasPerformedThisFrame())
+        {
+            if (inEquipmentCross) inventoryUI.ConfirmEquipmentSelection();
+            else inventoryUI.ConfirmPadSelection();
+        }
     }
 
     void HandleMovement(Vector2 moveInput)
@@ -367,6 +473,9 @@ public class PlayerController : MonoBehaviour
                     // Workaround: refresh al frame successivo
                     StartCoroutine(RefreshInventoryNextFrame(list, false));
                 }
+
+                inventoryUI.FocusDefaultPadSlot();
+                lastInventoryPadMoveTime = Time.time;
             }
         }
         else

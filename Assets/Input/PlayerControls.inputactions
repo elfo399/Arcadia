@@ -131,6 +131,33 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "CycleRightEquip",
+                    "type": "Button",
+                    "id": "4b4bb4df-2aa4-48be-8d15-22be8f5d5a4f",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "CycleLeftEquip",
+                    "type": "Button",
+                    "id": "3a959d8e-70c2-4c9d-8cf5-949ef36c7ad6",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "CycleUsable",
+                    "type": "Button",
+                    "id": "eb6f77f6-a801-4d80-a19d-7712b170a86b",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -472,6 +499,39 @@
                     "processors": "",
                     "groups": "",
                     "action": "TabPrev",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f9ba2ffd-e06d-4b34-9a7f-f3791603852f",
+                    "path": "<Gamepad>/dpad/right",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "CycleRightEquip",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "950f6f65-bad3-42c8-bcd2-2160b2f7fda6",
+                    "path": "<Gamepad>/dpad/left",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "CycleLeftEquip",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "8ea1e12f-8975-437d-8761-5f77e3f39f6b",
+                    "path": "<Gamepad>/dpad/down",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "CycleUsable",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

@@ -217,6 +217,33 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""CycleRightEquip"",
+                    ""type"": ""Button"",
+                    ""id"": ""4b4bb4df-2aa4-48be-8d15-22be8f5d5a4f"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""CycleLeftEquip"",
+                    ""type"": ""Button"",
+                    ""id"": ""3a959d8e-70c2-4c9d-8cf5-949ef36c7ad6"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""CycleUsable"",
+                    ""type"": ""Button"",
+                    ""id"": ""eb6f77f6-a801-4d80-a19d-7712b170a86b"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -560,6 +587,39 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
                     ""action"": ""TabPrev"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""f9ba2ffd-e06d-4b34-9a7f-f3791603852f"",
+                    ""path"": ""<Gamepad>/dpad/right"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CycleRightEquip"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""950f6f65-bad3-42c8-bcd2-2160b2f7fda6"",
+                    ""path"": ""<Gamepad>/dpad/left"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CycleLeftEquip"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""8ea1e12f-8975-437d-8761-5f77e3f39f6b"",
+                    ""path"": ""<Gamepad>/dpad/down"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CycleUsable"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -582,6 +642,9 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
         m_Player_Inventory = m_Player.FindAction("Inventory", throwIfNotFound: true);
         m_Player_TabNext = m_Player.FindAction("TabNext", throwIfNotFound: true);
         m_Player_TabPrev = m_Player.FindAction("TabPrev", throwIfNotFound: true);
+        m_Player_CycleRightEquip = m_Player.FindAction("CycleRightEquip", throwIfNotFound: true);
+        m_Player_CycleLeftEquip = m_Player.FindAction("CycleLeftEquip", throwIfNotFound: true);
+        m_Player_CycleUsable = m_Player.FindAction("CycleUsable", throwIfNotFound: true);
     }
 
     ~@PlayerControls()
@@ -676,6 +739,9 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Inventory;
     private readonly InputAction m_Player_TabNext;
     private readonly InputAction m_Player_TabPrev;
+    private readonly InputAction m_Player_CycleRightEquip;
+    private readonly InputAction m_Player_CycleLeftEquip;
+    private readonly InputAction m_Player_CycleUsable;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -744,6 +810,18 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @TabPrev => m_Wrapper.m_Player_TabPrev;
         /// <summary>
+        /// Provides access to the underlying input action "Player/CycleRightEquip".
+        /// </summary>
+        public InputAction @CycleRightEquip => m_Wrapper.m_Player_CycleRightEquip;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/CycleLeftEquip".
+        /// </summary>
+        public InputAction @CycleLeftEquip => m_Wrapper.m_Player_CycleLeftEquip;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/CycleUsable".
+        /// </summary>
+        public InputAction @CycleUsable => m_Wrapper.m_Player_CycleUsable;
+        /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
         public InputActionMap Get() { return m_Wrapper.m_Player; }
@@ -811,6 +889,15 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
             @TabPrev.started += instance.OnTabPrev;
             @TabPrev.performed += instance.OnTabPrev;
             @TabPrev.canceled += instance.OnTabPrev;
+            @CycleRightEquip.started += instance.OnCycleRightEquip;
+            @CycleRightEquip.performed += instance.OnCycleRightEquip;
+            @CycleRightEquip.canceled += instance.OnCycleRightEquip;
+            @CycleLeftEquip.started += instance.OnCycleLeftEquip;
+            @CycleLeftEquip.performed += instance.OnCycleLeftEquip;
+            @CycleLeftEquip.canceled += instance.OnCycleLeftEquip;
+            @CycleUsable.started += instance.OnCycleUsable;
+            @CycleUsable.performed += instance.OnCycleUsable;
+            @CycleUsable.canceled += instance.OnCycleUsable;
         }
 
         /// <summary>
@@ -864,6 +951,15 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
             @TabPrev.started -= instance.OnTabPrev;
             @TabPrev.performed -= instance.OnTabPrev;
             @TabPrev.canceled -= instance.OnTabPrev;
+            @CycleRightEquip.started -= instance.OnCycleRightEquip;
+            @CycleRightEquip.performed -= instance.OnCycleRightEquip;
+            @CycleRightEquip.canceled -= instance.OnCycleRightEquip;
+            @CycleLeftEquip.started -= instance.OnCycleLeftEquip;
+            @CycleLeftEquip.performed -= instance.OnCycleLeftEquip;
+            @CycleLeftEquip.canceled -= instance.OnCycleLeftEquip;
+            @CycleUsable.started -= instance.OnCycleUsable;
+            @CycleUsable.performed -= instance.OnCycleUsable;
+            @CycleUsable.canceled -= instance.OnCycleUsable;
         }
 
         /// <summary>
@@ -1002,5 +1098,26 @@ public partial class @PlayerControls: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnTabPrev(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "CycleRightEquip" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnCycleRightEquip(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "CycleLeftEquip" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnCycleLeftEquip(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "CycleUsable" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnCycleUsable(InputAction.CallbackContext context);
     }
 }

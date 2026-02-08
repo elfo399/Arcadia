@@ -41,6 +41,9 @@ public class InventoryUI : MonoBehaviour
     private int dragOriginIndex = -1;
     private int selectedPadIndex = -1;
     private int currentSelectedIndex = -1;
+    private int padFocusIndex = -1;
+    private enum EquipCrossFocus { Right, Left, Bottom, Top }
+    private EquipCrossFocus equipCrossFocus = EquipCrossFocus.Right;
 
     [Header("Detail Panel - Common")]
     [SerializeField] private Image detailIcon;
@@ -96,6 +99,8 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private Transform bottomEquipContainer2;
     [SerializeField] private Transform bottomEquipContainer3;
     [SerializeField] private Transform topEquipContainer;
+    [SerializeField] private Transform topEquipContainer2;
+    [SerializeField] private Transform topEquipContainer3;
     [SerializeField] private GameObject equipmentBackground;
     [SerializeField] private GameObject inventoryBackground;
     [SerializeField] private Button equipWeaponButton;
@@ -108,7 +113,8 @@ public class InventoryUI : MonoBehaviour
     private InventorySlot[] rightEquipSlots = new InventorySlot[3];
     private InventorySlot[] leftEquipSlots = new InventorySlot[3];
     private InventorySlot[] bottomEquipSlots = new InventorySlot[3];
-    private InventorySlot topEquipSlot;
+    private InventorySlot[] topEquipSlots = new InventorySlot[3];
+    private int currentTopIndex = 0;
     private InventorySlot hudRightSlot;
     private InventorySlot hudLeftSlot;
     private InventorySlot hudBottomSlot;
@@ -251,11 +257,12 @@ public class InventoryUI : MonoBehaviour
         ShowUsablesFilter();
         UpdateEquipButtonState();
     }
-    public void OnEquipTop()
+    public void OnEquipTop(int slot = 0)
     {
         EnsurePlayerInventory();
         ShowEquipmentInventory(true);
         currentEquipTarget = EquipTarget.Top;
+        currentTopIndex = Mathf.Clamp(slot, 0, 2);
         SetSourceItemsFromPlayer();
         ShowMagicFilter(); // placeholder
         UpdateEquipButtonState();
@@ -299,6 +306,7 @@ public class InventoryUI : MonoBehaviour
 
         selectedPadIndex = -1;
         currentSelectedIndex = -1;
+        ApplyPadFocusVisual(-1);
         ClearDetailPanel();
         RefreshEquipmentCross();
         UpdateEquipButtonState();
@@ -368,6 +376,7 @@ public class InventoryUI : MonoBehaviour
 
         bool tabFound = false;
         bool isInventoryTab = string.Equals(tabKey, "Inventory", System.StringComparison.OrdinalIgnoreCase);
+        bool isEquipmentTab = string.Equals(tabKey, "Equipment", System.StringComparison.OrdinalIgnoreCase);
 
         foreach (var tab in tabs)
         {
@@ -404,6 +413,12 @@ public class InventoryUI : MonoBehaviour
 
         // Se la tab è Inventory, forza il filtro a "tutti"
         if (isInventoryTab) ResetFilterToAll();
+
+        if (isEquipmentTab)
+        {
+            ShowEquipmentInventory(false);
+            FocusEquipmentCrossDefault();
+        }
     }
 
     /// <summary>
@@ -570,8 +585,10 @@ public class InventoryUI : MonoBehaviour
         bottomEquipSlots[1] = CreateEquipSlot(bottomEquipContainer2);
         bottomEquipSlots[2] = CreateEquipSlot(bottomEquipContainer3);
 
-        // Top (per future magie, singolo)
-        topEquipSlot = CreateEquipSlot(topEquipContainer);
+        // Top (3 slot, placeholder magie)
+        topEquipSlots[0] = CreateEquipSlot(topEquipContainer);
+        topEquipSlots[1] = CreateEquipSlot(topEquipContainer2);
+        topEquipSlots[2] = CreateEquipSlot(topEquipContainer3);
         equipSlotsBuilt = true;
     }
 
@@ -813,8 +830,8 @@ public class InventoryUI : MonoBehaviour
         // right/left hands
         if (playerInventory != null)
         {
-            var rightEquipped = playerInventory.rightHandWeapon ?? playerInventory.unarmedRight;
-            var leftEquipped = playerInventory.leftHandWeapon ?? playerInventory.unarmedLeft;
+            var rightEquipped = playerInventory.GetWeaponForHand(Hand.Right);
+            var leftEquipped = playerInventory.GetWeaponForHand(Hand.Left);
             var rightFrontIcon = rightEquipped != null ? rightEquipped.icon : null;
             var leftFrontIcon = leftEquipped != null ? leftEquipped.icon : null;
 
@@ -840,10 +857,13 @@ public class InventoryUI : MonoBehaviour
         UpdateEquipVisuals(bottomEquipSlots, playerInventory.usableLoadout);
         UpdateHudVisual(hudBottomSlot, usableIcon);
 
-        // top: placeholder per future magie (per ora vuoto)
+        // top: placeholder magie (3 slot per coerenza con gli altri lati)
         SetBackLayerIcon(hudCrossTop);
-        UpdateEquipVisual(topEquipSlot, null, 0);
+        for (int i = 0; i < topEquipSlots.Length; i++)
+            UpdateEquipVisual(topEquipSlots[i], null, 0);
         UpdateHudVisual(hudTopSlot, null);
+
+        ApplyEquipmentCrossFocusVisual();
     }
 
     private void SetBackLayerIcon(Image target)
@@ -934,6 +954,60 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
+    public bool IsEquipmentCrossModeActive()
+    {
+        if (equipmentBackground == null) return false;
+        bool equipVisible = equipmentBackground.activeInHierarchy;
+        bool invHidden = inventoryBackground == null || !inventoryBackground.activeInHierarchy;
+        return equipVisible && invHidden;
+    }
+
+    public void FocusEquipmentCrossDefault()
+    {
+        EnsurePlayerInventory();
+        int idx = playerInventory != null ? Mathf.Clamp(playerInventory.currentRightIndex, 0, 2) : 0;
+        SetEquipmentCrossFocus(EquipCrossFocus.Right, idx);
+    }
+
+    public void NavigateEquipmentRight()
+    {
+        MoveEquipmentFocus(Vector2.right);
+    }
+
+    public void NavigateEquipmentLeft()
+    {
+        MoveEquipmentFocus(Vector2.left);
+    }
+
+    public void NavigateEquipmentDown()
+    {
+        MoveEquipmentFocus(Vector2.down);
+    }
+
+    public void NavigateEquipmentUp()
+    {
+        MoveEquipmentFocus(Vector2.up);
+    }
+
+    public void ConfirmEquipmentSelection()
+    {
+        switch (equipCrossFocus)
+        {
+            case EquipCrossFocus.Right:
+                OnEquipRight(GetCurrentCrossIndex(EquipCrossFocus.Right));
+                break;
+            case EquipCrossFocus.Left:
+                OnEquipLeft(GetCurrentCrossIndex(EquipCrossFocus.Left));
+                break;
+            case EquipCrossFocus.Bottom:
+                OnEquipBottom(GetCurrentCrossIndex(EquipCrossFocus.Bottom));
+                break;
+            case EquipCrossFocus.Top:
+                OnEquipTop(GetCurrentCrossIndex(EquipCrossFocus.Top));
+                break;
+        }
+    }
+
     private Sprite GetItemIcon(InventoryItem item)
     {
         if (item == null) return null;
@@ -958,10 +1032,12 @@ public class InventoryUI : MonoBehaviour
         if (!HasItem(index))
         {
             ClearDetailPanel();
+            ApplyPadFocusVisual(index);
             UpdateEquipButtonState();
             return;
         }
         selectedPadIndex = index;
+        ApplyPadFocusVisual(index);
         ShowItemDetailsByIndex(index);
         UpdateEquipButtonState();
     }
@@ -1009,11 +1085,13 @@ public class InventoryUI : MonoBehaviour
         // highlight handled by EventSystem; we only track and show details
         if (HasItem(index))
         {
+            ApplyPadFocusVisual(index);
             ShowItemDetailsByIndex(index);
             UpdateEquipButtonState();
         }
         else
         {
+            ApplyPadFocusVisual(index);
             ClearDetailPanel();
             UpdateEquipButtonState();
         }
@@ -1035,6 +1113,293 @@ public class InventoryUI : MonoBehaviour
             selectedPadIndex = -1;
             ShowItemDetailsByIndex(index);
         }
+    }
+
+    public void FocusDefaultPadSlot()
+    {
+        if (slots == null || slots.Count == 0) return;
+
+        int fallback = 0;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (HasItem(i))
+            {
+                fallback = i;
+                break;
+            }
+        }
+        SetPadFocus(fallback);
+    }
+
+    public void MovePadFocusHorizontal(int direction)
+    {
+        if (slots == null || slots.Count == 0) return;
+        int dir = direction >= 0 ? 1 : -1;
+
+        int start = padFocusIndex;
+        if (start < 0 || start >= slots.Count) start = 0;
+
+        int next = (start + dir + slots.Count) % slots.Count;
+        SetPadFocus(next);
+    }
+
+    public void MovePadFocusVertical(int direction)
+    {
+        if (slots == null || slots.Count == 0) return;
+        int dir = direction >= 0 ? 1 : -1;
+
+        int start = padFocusIndex;
+        if (start < 0 || start >= slots.Count) start = 0;
+
+        int step = GetGridColumnCount();
+        int next = (start + (dir * step)) % slots.Count;
+        if (next < 0) next += slots.Count;
+        SetPadFocus(next);
+    }
+
+    public void ConfirmPadSelection()
+    {
+        // Priorita' ai pulsanti equip quando visibili/interagibili.
+        if (equipWeaponButton != null && equipWeaponButton.gameObject.activeInHierarchy && equipWeaponButton.interactable)
+        {
+            OnEquipWeaponButtonClick();
+            return;
+        }
+        if (equipUsableButton != null && equipUsableButton.gameObject.activeInHierarchy && equipUsableButton.interactable)
+        {
+            OnEquipUsableButtonClick();
+            return;
+        }
+
+        if (padFocusIndex < 0 || padFocusIndex >= slots.Count)
+        {
+            FocusDefaultPadSlot();
+            if (padFocusIndex < 0 || padFocusIndex >= slots.Count) return;
+        }
+
+        HandleSlotSubmit(padFocusIndex);
+        SetPadFocus(padFocusIndex);
+    }
+
+    private void SetPadFocus(int index)
+    {
+        if (slots == null || slots.Count == 0) return;
+        if (index < 0 || index >= slots.Count) return;
+
+        padFocusIndex = index;
+        ApplyPadFocusVisual(index);
+        HandleSlotSelected(index);
+
+        if (EventSystem.current != null && slots[index] != null)
+        {
+            EventSystem.current.SetSelectedGameObject(slots[index].gameObject);
+        }
+    }
+
+    private void ApplyPadFocusVisual(int focusedIndex)
+    {
+        if (slots == null) return;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (slots[i] != null)
+            {
+                slots[i].SetFocused(i == focusedIndex);
+            }
+        }
+    }
+
+    private int GetCurrentCrossIndex(EquipCrossFocus focus)
+    {
+        EnsurePlayerInventory();
+        if (focus == EquipCrossFocus.Top) return Mathf.Clamp(currentTopIndex, 0, 2);
+        if (playerInventory == null) return 0;
+        switch (focus)
+        {
+            case EquipCrossFocus.Right: return Mathf.Clamp(playerInventory.currentRightIndex, 0, 2);
+            case EquipCrossFocus.Left: return Mathf.Clamp(playerInventory.currentLeftIndex, 0, 2);
+            case EquipCrossFocus.Bottom: return Mathf.Clamp(playerInventory.currentUsableIndex, 0, 2);
+            default: return 0;
+        }
+    }
+
+    private struct CrossSlotRef
+    {
+        public EquipCrossFocus focus;
+        public int index;
+        public InventorySlot slot;
+
+        public CrossSlotRef(EquipCrossFocus f, int i, InventorySlot s)
+        {
+            focus = f;
+            index = i;
+            slot = s;
+        }
+    }
+
+    private void MoveEquipmentFocus(Vector2 direction)
+    {
+        BuildEquipSlotsIfNeeded();
+
+        InventorySlot currentSlot = GetCurrentCrossSlot();
+        if (currentSlot == null)
+        {
+            FocusEquipmentCrossDefault();
+            return;
+        }
+
+        Vector2 dir = direction.normalized;
+        Vector2 currentPos = GetSlotCenter(currentSlot);
+
+        bool found = false;
+        float bestScore = float.NegativeInfinity;
+        CrossSlotRef best = default(CrossSlotRef);
+
+        foreach (var candidate in EnumerateCrossSlots())
+        {
+            if (candidate.slot == null) continue;
+
+            int focusedIndex = GetCurrentCrossIndex(candidate.focus);
+            if (candidate.focus == equipCrossFocus && candidate.index == focusedIndex) continue;
+
+            Vector2 delta = GetSlotCenter(candidate.slot) - currentPos;
+            if (delta.sqrMagnitude < 0.01f) continue;
+
+            Vector2 deltaNorm = delta.normalized;
+            float forward = Vector2.Dot(deltaNorm, dir);
+            if (forward <= 0.15f) continue; // deve essere almeno un po' nella direzione richiesta
+
+            float lateral = Mathf.Abs(Vector2.Dot(deltaNorm, new Vector2(-dir.y, dir.x)));
+            float distance = delta.magnitude;
+            float score = (forward * 3f) - lateral - (distance * 0.0025f);
+
+            if (!found || score > bestScore)
+            {
+                found = true;
+                bestScore = score;
+                best = candidate;
+            }
+        }
+
+        if (found)
+        {
+            SetEquipmentCrossFocus(best.focus, best.index);
+        }
+    }
+
+    private InventorySlot GetCurrentCrossSlot()
+    {
+        int idx = GetCurrentCrossIndex(equipCrossFocus);
+        switch (equipCrossFocus)
+        {
+            case EquipCrossFocus.Right:
+                return idx >= 0 && idx < rightEquipSlots.Length ? rightEquipSlots[idx] : null;
+            case EquipCrossFocus.Left:
+                return idx >= 0 && idx < leftEquipSlots.Length ? leftEquipSlots[idx] : null;
+            case EquipCrossFocus.Bottom:
+                return idx >= 0 && idx < bottomEquipSlots.Length ? bottomEquipSlots[idx] : null;
+            case EquipCrossFocus.Top:
+                return idx >= 0 && idx < topEquipSlots.Length ? topEquipSlots[idx] : null;
+            default:
+                return null;
+        }
+    }
+
+    private IEnumerable<CrossSlotRef> EnumerateCrossSlots()
+    {
+        for (int i = 0; i < rightEquipSlots.Length; i++)
+            yield return new CrossSlotRef(EquipCrossFocus.Right, i, rightEquipSlots[i]);
+
+        for (int i = 0; i < leftEquipSlots.Length; i++)
+            yield return new CrossSlotRef(EquipCrossFocus.Left, i, leftEquipSlots[i]);
+
+        for (int i = 0; i < bottomEquipSlots.Length; i++)
+            yield return new CrossSlotRef(EquipCrossFocus.Bottom, i, bottomEquipSlots[i]);
+
+        for (int i = 0; i < topEquipSlots.Length; i++)
+            yield return new CrossSlotRef(EquipCrossFocus.Top, i, topEquipSlots[i]);
+    }
+
+    private Vector2 GetSlotCenter(InventorySlot slot)
+    {
+        if (slot == null) return Vector2.zero;
+        var rt = slot.GetComponent<RectTransform>();
+        if (rt == null) return slot.transform.position;
+
+        Vector3[] corners = new Vector3[4];
+        rt.GetWorldCorners(corners);
+        Vector3 center = (corners[0] + corners[2]) * 0.5f;
+        return new Vector2(center.x, center.y);
+    }
+
+    private void SetEquipmentCrossFocus(EquipCrossFocus focus, int slotIndex)
+    {
+        BuildEquipSlotsIfNeeded();
+        EnsurePlayerInventory();
+
+        equipCrossFocus = focus;
+
+        if (playerInventory != null)
+        {
+            switch (focus)
+            {
+                case EquipCrossFocus.Right:
+                    playerInventory.currentRightIndex = Mathf.Clamp(slotIndex, 0, 2);
+                    break;
+                case EquipCrossFocus.Left:
+                    playerInventory.currentLeftIndex = Mathf.Clamp(slotIndex, 0, 2);
+                    break;
+                case EquipCrossFocus.Bottom:
+                    playerInventory.currentUsableIndex = Mathf.Clamp(slotIndex, 0, 2);
+                    break;
+                case EquipCrossFocus.Top:
+                    currentTopIndex = Mathf.Clamp(slotIndex, 0, 2);
+                    break;
+            }
+        }
+        else if (focus == EquipCrossFocus.Top)
+        {
+            currentTopIndex = Mathf.Clamp(slotIndex, 0, 2);
+        }
+
+        ApplyEquipmentCrossFocusVisual();
+    }
+
+    private void ApplyEquipmentCrossFocusVisual()
+    {
+        int rightIndex = GetCurrentCrossIndex(EquipCrossFocus.Right);
+        int leftIndex = GetCurrentCrossIndex(EquipCrossFocus.Left);
+        int bottomIndex = GetCurrentCrossIndex(EquipCrossFocus.Bottom);
+
+        for (int i = 0; i < rightEquipSlots.Length; i++)
+            if (rightEquipSlots[i] != null) rightEquipSlots[i].SetFocused(equipCrossFocus == EquipCrossFocus.Right && i == rightIndex);
+
+        for (int i = 0; i < leftEquipSlots.Length; i++)
+            if (leftEquipSlots[i] != null) leftEquipSlots[i].SetFocused(equipCrossFocus == EquipCrossFocus.Left && i == leftIndex);
+
+        for (int i = 0; i < bottomEquipSlots.Length; i++)
+            if (bottomEquipSlots[i] != null) bottomEquipSlots[i].SetFocused(equipCrossFocus == EquipCrossFocus.Bottom && i == bottomIndex);
+
+        int topIndex = GetCurrentCrossIndex(EquipCrossFocus.Top);
+        for (int i = 0; i < topEquipSlots.Length; i++)
+            if (topEquipSlots[i] != null) topEquipSlots[i].SetFocused(equipCrossFocus == EquipCrossFocus.Top && i == topIndex);
+    }
+
+    private int GetGridColumnCount()
+    {
+        var grid = slotParent != null ? slotParent.GetComponent<GridLayoutGroup>() : null;
+        if (grid != null && grid.constraintCount > 0)
+        {
+            if (grid.constraint == GridLayoutGroup.Constraint.FixedColumnCount)
+                return Mathf.Max(1, grid.constraintCount);
+
+            if (grid.constraint == GridLayoutGroup.Constraint.FixedRowCount)
+            {
+                int rows = Mathf.Max(1, grid.constraintCount);
+                return Mathf.Max(1, Mathf.CeilToInt((float)slots.Count / rows));
+            }
+        }
+
+        return Mathf.Max(1, Mathf.CeilToInt(Mathf.Sqrt(slots.Count)));
     }
 
     private void CreateDragPreview(Sprite icon, PointerEventData eventData, Vector2 iconSize)

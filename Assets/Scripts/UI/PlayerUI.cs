@@ -85,12 +85,8 @@ public class PlayerUI : MonoBehaviour
     // Display the icons for equipped left and right weapons
     void UpdateWeaponSlots()
     {
-        WeaponItem rightWeapon = playerInventory.rightHandWeapon != null
-            ? playerInventory.rightHandWeapon
-            : playerInventory.unarmedRight;
-        WeaponItem leftWeapon = playerInventory.leftHandWeapon != null
-            ? playerInventory.leftHandWeapon
-            : playerInventory.unarmedLeft;
+        WeaponItem rightWeapon = playerInventory.GetWeaponForHand(Hand.Right);
+        WeaponItem leftWeapon = playerInventory.GetWeaponForHand(Hand.Left);
 
         UpdateFrontSlot(rightFrontSlot, slotRightIcon, rightWeapon);
         UpdateFrontSlot(leftFrontSlot, slotLeftIcon, leftWeapon);

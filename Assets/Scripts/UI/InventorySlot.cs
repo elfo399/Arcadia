@@ -17,16 +17,25 @@ public class InventorySlot : MonoBehaviour,
     ISubmitHandler
 {
     [SerializeField] private Image iconImage;
+    [SerializeField] private Image backgroundImage;
     [SerializeField] private TextMeshProUGUI quantityText;
     [SerializeField] private bool logMissingReferences = false;
     [SerializeField] private bool displayOnly = false; // se true mostra solo l'icona, nessuna interazione
+    [SerializeField] private Outline focusOutline;
+    [SerializeField] private Color focusBorderColor = new Color(1f, 0.85f, 0.2f, 1f);
+    [SerializeField] private Vector2 focusBorderThickness = new Vector2(3f, 3f);
 
     private int slotIndex = -1;
     private InventoryUI owner;
+    private Color defaultBackgroundColor = Color.white;
+    private bool hasDefaultBackgroundColor = false;
 
     void Awake()
     {
         ResolveReferences();
+        CacheDefaultBackgroundColor();
+        EnsureFocusOutline();
+        SetFocused(false);
         Clear();
     }
 
@@ -39,6 +48,23 @@ public class InventorySlot : MonoBehaviour,
     public void SetDisplayOnly(bool value)
     {
         displayOnly = value;
+    }
+
+    public void SetFocused(bool focused)
+    {
+        ResolveReferences();
+        EnsureFocusOutline();
+
+        if (backgroundImage != null && hasDefaultBackgroundColor)
+        {
+            // Non alterare il tema dello slot: ripristina sempre il colore originale.
+            backgroundImage.color = defaultBackgroundColor;
+        }
+
+        if (focusOutline != null)
+        {
+            focusOutline.enabled = focused;
+        }
     }
 
     /// <summary>
@@ -162,6 +188,11 @@ public class InventorySlot : MonoBehaviour,
     // ------- Helpers --------
     private void ResolveReferences()
     {
+        if (backgroundImage == null)
+        {
+            backgroundImage = GetComponent<Image>();
+        }
+
         if (iconImage == null)
         {
             // 1) Cerca child chiamato "Icon"
@@ -193,6 +224,34 @@ public class InventorySlot : MonoBehaviour,
             {
                 quantityText = GetComponentInChildren<TextMeshProUGUI>(true);
             }
+        }
+    }
+
+    private void CacheDefaultBackgroundColor()
+    {
+        if (backgroundImage != null)
+        {
+            defaultBackgroundColor = backgroundImage.color;
+            hasDefaultBackgroundColor = true;
+        }
+    }
+
+    private void EnsureFocusOutline()
+    {
+        if (focusOutline == null)
+        {
+            focusOutline = GetComponent<Outline>();
+            if (focusOutline == null)
+            {
+                focusOutline = gameObject.AddComponent<Outline>();
+            }
+        }
+
+        if (focusOutline != null)
+        {
+            focusOutline.effectColor = focusBorderColor;
+            focusOutline.effectDistance = focusBorderThickness;
+            focusOutline.useGraphicAlpha = true;
         }
     }
 }
