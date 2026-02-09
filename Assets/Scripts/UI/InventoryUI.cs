@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine.UI;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 public class InventoryUI : MonoBehaviour
 {
@@ -42,6 +43,8 @@ public class InventoryUI : MonoBehaviour
     private int selectedPadIndex = -1;
     private int currentSelectedIndex = -1;
     private int padFocusIndex = -1;
+    [SerializeField] private float gamepadAxisDetectThreshold = 0.35f;
+    private bool showPadFocus = false;
     private enum EquipCrossFocus { Right, Left, Bottom, Top }
     private EquipCrossFocus equipCrossFocus = EquipCrossFocus.Right;
 
@@ -178,6 +181,12 @@ public class InventoryUI : MonoBehaviour
     {
         // quando il pannello viene riaperto, riallinea subito le icone HUD/equip
         RefreshEquipmentCross();
+        RefreshFocusVisualState();
+    }
+
+    void Update()
+    {
+        UpdateFocusInputMode();
     }
 
     void OnDestroy()
@@ -1203,7 +1212,7 @@ public class InventoryUI : MonoBehaviour
         {
             if (slots[i] != null)
             {
-                slots[i].SetFocused(i == focusedIndex);
+                slots[i].SetFocused(showPadFocus && i == focusedIndex);
             }
         }
     }
@@ -1371,17 +1380,80 @@ public class InventoryUI : MonoBehaviour
         int bottomIndex = GetCurrentCrossIndex(EquipCrossFocus.Bottom);
 
         for (int i = 0; i < rightEquipSlots.Length; i++)
-            if (rightEquipSlots[i] != null) rightEquipSlots[i].SetFocused(equipCrossFocus == EquipCrossFocus.Right && i == rightIndex);
+            if (rightEquipSlots[i] != null) rightEquipSlots[i].SetFocused(showPadFocus && equipCrossFocus == EquipCrossFocus.Right && i == rightIndex);
 
         for (int i = 0; i < leftEquipSlots.Length; i++)
-            if (leftEquipSlots[i] != null) leftEquipSlots[i].SetFocused(equipCrossFocus == EquipCrossFocus.Left && i == leftIndex);
+            if (leftEquipSlots[i] != null) leftEquipSlots[i].SetFocused(showPadFocus && equipCrossFocus == EquipCrossFocus.Left && i == leftIndex);
 
         for (int i = 0; i < bottomEquipSlots.Length; i++)
-            if (bottomEquipSlots[i] != null) bottomEquipSlots[i].SetFocused(equipCrossFocus == EquipCrossFocus.Bottom && i == bottomIndex);
+            if (bottomEquipSlots[i] != null) bottomEquipSlots[i].SetFocused(showPadFocus && equipCrossFocus == EquipCrossFocus.Bottom && i == bottomIndex);
 
         int topIndex = GetCurrentCrossIndex(EquipCrossFocus.Top);
         for (int i = 0; i < topEquipSlots.Length; i++)
-            if (topEquipSlots[i] != null) topEquipSlots[i].SetFocused(equipCrossFocus == EquipCrossFocus.Top && i == topIndex);
+            if (topEquipSlots[i] != null) topEquipSlots[i].SetFocused(showPadFocus && equipCrossFocus == EquipCrossFocus.Top && i == topIndex);
+    }
+
+    private void UpdateFocusInputMode()
+    {
+        bool gamepadUsed = DetectGamepadInputThisFrame();
+        bool kbMouseUsed = DetectKeyboardMouseInputThisFrame();
+
+        bool newState = showPadFocus;
+        if (gamepadUsed) newState = true;
+        if (kbMouseUsed) newState = false;
+
+        if (newState == showPadFocus) return;
+        showPadFocus = newState;
+        RefreshFocusVisualState();
+    }
+
+    private void RefreshFocusVisualState()
+    {
+        ApplyPadFocusVisual(showPadFocus ? padFocusIndex : -1);
+        ApplyEquipmentCrossFocusVisual();
+    }
+
+    private bool DetectGamepadInputThisFrame()
+    {
+        var gp = Gamepad.current;
+        if (gp == null) return false;
+
+        if (gp.buttonSouth.wasPressedThisFrame || gp.buttonNorth.wasPressedThisFrame ||
+            gp.buttonEast.wasPressedThisFrame || gp.buttonWest.wasPressedThisFrame ||
+            gp.leftShoulder.wasPressedThisFrame || gp.rightShoulder.wasPressedThisFrame ||
+            gp.startButton.wasPressedThisFrame || gp.selectButton.wasPressedThisFrame ||
+            gp.dpad.up.wasPressedThisFrame || gp.dpad.down.wasPressedThisFrame ||
+            gp.dpad.left.wasPressedThisFrame || gp.dpad.right.wasPressedThisFrame)
+            return true;
+
+        if (gp.leftStick.ReadValue().sqrMagnitude > gamepadAxisDetectThreshold * gamepadAxisDetectThreshold)
+            return true;
+
+        if (gp.rightStick.ReadValue().sqrMagnitude > gamepadAxisDetectThreshold * gamepadAxisDetectThreshold)
+            return true;
+
+        return false;
+    }
+
+    private bool DetectKeyboardMouseInputThisFrame()
+    {
+        var kb = Keyboard.current;
+        if (kb != null && kb.anyKey.wasPressedThisFrame)
+            return true;
+
+        var mouse = Mouse.current;
+        if (mouse == null) return false;
+
+        if (mouse.leftButton.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame || mouse.middleButton.wasPressedThisFrame)
+            return true;
+
+        if (mouse.delta.ReadValue().sqrMagnitude > 0.01f)
+            return true;
+
+        if (mouse.scroll.ReadValue().sqrMagnitude > 0.01f)
+            return true;
+
+        return false;
     }
 
     private int GetGridColumnCount()
