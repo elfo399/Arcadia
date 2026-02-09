@@ -27,6 +27,15 @@ public class InventoryUI : MonoBehaviour
 
     public enum WalletSource { Run, Bank }
 
+    [System.Serializable]
+    public class QuestEntryData
+    {
+        public string questId;
+        public string title;
+        public string location;
+        public bool completed;
+    }
+
     [Header("Wallet UI")]
     [SerializeField] private TextMeshProUGUI goldValueText;
     [SerializeField] private TextMeshProUGUI silverValueText;
@@ -34,6 +43,31 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private WalletSource walletSource = WalletSource.Run;
     [SerializeField] private bool autoRefreshWallet = true;
     private PlayerStats playerStats;
+
+    [Header("Quest UI")]
+    [SerializeField] private bool useQuestManager = true;
+    [SerializeField] private bool autoWireQuestUI = true;
+    [SerializeField] private Transform questListContainer;
+    [SerializeField] private GameObject questItemPrefab;
+    [SerializeField] private Button questActiveFilterButton;
+    [SerializeField] private Button questCompletedFilterButton;
+    [SerializeField] private TextMeshProUGUI questActiveCountText;
+    [SerializeField] private TextMeshProUGUI questCompletedCountText;
+    [SerializeField] private TextMeshProUGUI questActiveFilterLabelText;
+    [SerializeField] private TextMeshProUGUI questCompletedFilterLabelText;
+    [SerializeField] private Color questFilterSelectedColor = new Color(1f, 0.35f, 0.35f, 1f);
+    [SerializeField] private List<QuestEntryData> startingQuests = new();
+
+    private enum QuestFilter { All, Active, Completed }
+    private QuestFilter currentQuestFilter = QuestFilter.All;
+    private readonly List<QuestEntryData> questEntries = new();
+    private readonly List<GameObject> spawnedQuestRows = new();
+    private bool questUiInitialized = false;
+    private QuestManager questManager;
+    private bool questManagerSubscribed = false;
+    private bool questFilterBaseColorsCached = false;
+    private Color questActiveFilterBaseColor = Color.white;
+    private Color questCompletedFilterBaseColor = Color.white;
 
     [Header("Drag & Drop")]
     [SerializeField] private Canvas dragCanvas; // opzionale: se null usa quello più alto trovato
@@ -175,12 +209,17 @@ public class InventoryUI : MonoBehaviour
 
         // mostra subito gli equip correnti
         RefreshEquipmentCross();
+
+        TryBindQuestManager();
+        InitializeQuestUIIfNeeded();
     }
 
     void OnEnable()
     {
         // quando il pannello viene riaperto, riallinea subito le icone HUD/equip
         RefreshEquipmentCross();
+        TryBindQuestManager();
+        RefreshQuestUI();
         RefreshFocusVisualState();
     }
 
@@ -192,6 +231,11 @@ public class InventoryUI : MonoBehaviour
     void OnDestroy()
     {
         ClearDragPreview();
+        if (questActiveFilterButton != null)
+            questActiveFilterButton.onClick.RemoveListener(SetQuestFilterActive);
+        if (questCompletedFilterButton != null)
+            questCompletedFilterButton.onClick.RemoveListener(SetQuestFilterCompleted);
+        UnbindQuestManager();
         if (playerStats != null)
         {
             playerStats.OnBankChanged -= HandleBankChanged;
@@ -386,6 +430,8 @@ public class InventoryUI : MonoBehaviour
         bool tabFound = false;
         bool isInventoryTab = string.Equals(tabKey, "Inventory", System.StringComparison.OrdinalIgnoreCase);
         bool isEquipmentTab = string.Equals(tabKey, "Equipment", System.StringComparison.OrdinalIgnoreCase);
+        bool isQuestTab = string.Equals(tabKey, "Quest", System.StringComparison.OrdinalIgnoreCase)
+                          || string.Equals(tabKey, "Quests", System.StringComparison.OrdinalIgnoreCase);
 
         foreach (var tab in tabs)
         {
@@ -427,6 +473,12 @@ public class InventoryUI : MonoBehaviour
         {
             ShowEquipmentInventory(false);
             FocusEquipmentCrossDefault();
+        }
+
+        if (isQuestTab)
+        {
+            InitializeQuestUIIfNeeded();
+            RefreshQuestUI();
         }
     }
 
@@ -492,6 +544,540 @@ public class InventoryUI : MonoBehaviour
         if (goldValueText != null) goldValueText.text = gold.ToString();
         if (silverValueText != null) silverValueText.text = silver.ToString();
         if (copperValueText != null) copperValueText.text = copper.ToString();
+    }
+
+    // ------- QUEST UI --------
+    public void SetQuestFilterAll()
+    {
+        InitializeQuestUIIfNeeded();
+        currentQuestFilter = QuestFilter.All;
+        RefreshQuestUI();
+    }
+
+    public void SetQuestFilterActive()
+    {
+        InitializeQuestUIIfNeeded();
+        currentQuestFilter = QuestFilter.Active;
+        RefreshQuestUI();
+    }
+
+    public void SetQuestFilterCompleted()
+    {
+        InitializeQuestUIIfNeeded();
+        currentQuestFilter = QuestFilter.Completed;
+        RefreshQuestUI();
+    }
+
+    public void SetQuests(List<QuestEntryData> quests)
+    {
+        questEntries.Clear();
+        if (quests != null)
+        {
+            for (int i = 0; i < quests.Count; i++)
+            {
+                var copy = CloneQuest(quests[i]);
+                if (copy != null) questEntries.Add(copy);
+            }
+        }
+        RefreshQuestUI();
+    }
+
+    public void AddOrUpdateQuest(string questId, string title, string location, bool completed)
+    {
+        TryBindQuestManager();
+        if (useQuestManager && questManager != null)
+        {
+            questManager.AddOrUpdateQuest(questId, title, location, completed);
+            return;
+        }
+
+        string normalizedId = NormalizeQuestId(questId, title, location);
+        int index = FindQuestIndexById(normalizedId);
+
+        if (index >= 0)
+        {
+            questEntries[index].title = title;
+            questEntries[index].location = location;
+            questEntries[index].completed = completed;
+        }
+        else
+        {
+            questEntries.Add(new QuestEntryData
+            {
+                questId = normalizedId,
+                title = title,
+                location = location,
+                completed = completed
+            });
+        }
+
+        RefreshQuestUI();
+    }
+
+    public bool SetQuestCompleted(string questId, bool completed = true)
+    {
+        TryBindQuestManager();
+        if (useQuestManager && questManager != null)
+            return questManager.SetQuestCompleted(questId, completed);
+
+        int index = FindQuestIndexById(questId);
+        if (index < 0) return false;
+
+        questEntries[index].completed = completed;
+        RefreshQuestUI();
+        return true;
+    }
+
+    private void InitializeQuestUIIfNeeded()
+    {
+        if (questUiInitialized) return;
+        questUiInitialized = true;
+
+        if (autoWireQuestUI)
+            AutoWireQuestUIReferences();
+
+        if (questListContainer != null)
+        {
+            if (questItemPrefab == null && questListContainer.childCount > 0)
+            {
+                questItemPrefab = questListContainer.GetChild(0).gameObject;
+            }
+
+            if (questItemPrefab != null && questItemPrefab.transform.parent == questListContainer)
+            {
+                questItemPrefab.SetActive(false);
+            }
+        }
+
+        WireQuestFilterButtons();
+        CacheQuestFilterBaseColors();
+
+        TryBindQuestManager();
+
+        bool loadedFromManager = false;
+        if (useQuestManager && questManager != null)
+        {
+            if (questManager.QuestCount == 0 && startingQuests != null && startingQuests.Count > 0)
+            {
+                var initial = new List<QuestManager.QuestData>(startingQuests.Count);
+                for (int i = 0; i < startingQuests.Count; i++)
+                {
+                    if (startingQuests[i] == null) continue;
+                    initial.Add(new QuestManager.QuestData
+                    {
+                        questId = startingQuests[i].questId,
+                        title = startingQuests[i].title,
+                        location = startingQuests[i].location,
+                        completed = startingQuests[i].completed
+                    });
+                }
+                questManager.ReplaceAllQuests(initial);
+            }
+
+            HandleQuestManagerListChanged(questManager.GetQuestsSnapshot());
+            loadedFromManager = true;
+        }
+
+        if (!loadedFromManager && questEntries.Count == 0 && startingQuests != null && startingQuests.Count > 0)
+        {
+            for (int i = 0; i < startingQuests.Count; i++)
+            {
+                var copy = CloneQuest(startingQuests[i]);
+                if (copy != null) questEntries.Add(copy);
+            }
+        }
+
+        currentQuestFilter = QuestFilter.All;
+        UpdateQuestFilterVisuals();
+    }
+
+    private void RefreshQuestUI()
+    {
+        InitializeQuestUIIfNeeded();
+        UpdateQuestFilterVisuals();
+        UpdateQuestCounters();
+        RebuildQuestRows();
+    }
+
+    private void TryBindQuestManager()
+    {
+        if (!useQuestManager) return;
+
+        if (questManager == null)
+        {
+            questManager = QuestManager.Instance != null ? QuestManager.Instance : FindObjectOfType<QuestManager>();
+        }
+
+        if (questManager == null || questManagerSubscribed) return;
+
+        questManager.OnQuestListChanged += HandleQuestManagerListChanged;
+        questManagerSubscribed = true;
+        HandleQuestManagerListChanged(questManager.GetQuestsSnapshot());
+    }
+
+    private void UnbindQuestManager()
+    {
+        if (!questManagerSubscribed || questManager == null) return;
+
+        questManager.OnQuestListChanged -= HandleQuestManagerListChanged;
+        questManagerSubscribed = false;
+    }
+
+    private void HandleQuestManagerListChanged(List<QuestManager.QuestData> managerData)
+    {
+        var mapped = new List<QuestEntryData>();
+        if (managerData != null)
+        {
+            for (int i = 0; i < managerData.Count; i++)
+            {
+                var q = managerData[i];
+                if (q == null) continue;
+                mapped.Add(new QuestEntryData
+                {
+                    questId = q.questId,
+                    title = q.title,
+                    location = q.location,
+                    completed = q.completed
+                });
+            }
+        }
+
+        SetQuests(mapped);
+    }
+
+    private void UpdateQuestCounters()
+    {
+        int activeCount = 0;
+        int completedCount = 0;
+
+        for (int i = 0; i < questEntries.Count; i++)
+        {
+            if (questEntries[i] == null) continue;
+            if (questEntries[i].completed) completedCount++;
+            else activeCount++;
+        }
+
+        if (questActiveCountText != null) questActiveCountText.text = activeCount.ToString();
+        if (questCompletedCountText != null) questCompletedCountText.text = completedCount.ToString();
+    }
+
+    private void RebuildQuestRows()
+    {
+        if (questListContainer == null || questItemPrefab == null) return;
+
+        ClearSpawnedQuestRows();
+
+        for (int i = 0; i < questEntries.Count; i++)
+        {
+            var quest = questEntries[i];
+            if (quest == null) continue;
+            if (!MatchesQuestFilter(quest)) continue;
+
+            var row = Instantiate(questItemPrefab, questListContainer);
+            row.SetActive(true);
+
+            var rowUI = row.GetComponent<QuestItemUI>();
+            if (rowUI == null) rowUI = row.AddComponent<QuestItemUI>();
+            rowUI.SetData(quest.title, quest.location, quest.completed);
+
+            spawnedQuestRows.Add(row);
+        }
+    }
+
+    private void ClearSpawnedQuestRows()
+    {
+        for (int i = 0; i < spawnedQuestRows.Count; i++)
+        {
+            if (spawnedQuestRows[i] != null)
+                Destroy(spawnedQuestRows[i]);
+        }
+
+        if (questListContainer == null)
+        {
+            spawnedQuestRows.Clear();
+            return;
+        }
+
+        for (int i = questListContainer.childCount - 1; i >= 0; i--)
+        {
+            var child = questListContainer.GetChild(i).gameObject;
+            if (child == questItemPrefab) continue;
+
+            bool alreadyTracked = false;
+            for (int j = 0; j < spawnedQuestRows.Count; j++)
+            {
+                if (spawnedQuestRows[j] == child)
+                {
+                    alreadyTracked = true;
+                    break;
+                }
+            }
+            if (alreadyTracked) continue;
+
+            Destroy(child);
+        }
+
+        spawnedQuestRows.Clear();
+    }
+
+    private bool MatchesQuestFilter(QuestEntryData quest)
+    {
+        if (quest == null) return false;
+        switch (currentQuestFilter)
+        {
+            case QuestFilter.Active: return !quest.completed;
+            case QuestFilter.Completed: return quest.completed;
+            default: return true;
+        }
+    }
+
+    private void AutoWireQuestUIReferences()
+    {
+        Transform questRoot = null;
+
+        if (tabs != null)
+        {
+            for (int i = 0; i < tabs.Length; i++)
+            {
+                if (tabs[i] == null || tabs[i].background == null) continue;
+                if (!string.Equals(tabs[i].key, "Quest", System.StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(tabs[i].key, "Quests", System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                questRoot = tabs[i].background.transform;
+                break;
+            }
+        }
+
+        if (questRoot == null)
+            questRoot = FindDeepChildByName(transform, "QuestBackground");
+
+        if (questRoot == null) return;
+
+        if (questListContainer == null)
+            questListContainer = FindDescendantByPath(questRoot, "LeftSide/Quest");
+
+        Transform filterRoot = FindDescendantByPath(questRoot, "LeftSide/Filter");
+        if (filterRoot == null)
+            filterRoot = FindDeepChildByName(questRoot, "Filter");
+
+        if (filterRoot == null) return;
+
+        var activeRow = FindFilterRowByLabel(filterRoot, "ACTIVE");
+        var completedRow = FindFilterRowByLabel(filterRoot, "COMPLETED");
+
+        if (questActiveFilterButton == null && activeRow != null)
+            questActiveFilterButton = EnsureFilterButton(activeRow.gameObject);
+        if (questCompletedFilterButton == null && completedRow != null)
+            questCompletedFilterButton = EnsureFilterButton(completedRow.gameObject);
+
+        if (questActiveCountText == null && activeRow != null)
+            questActiveCountText = FindCounterTextOnFilterRow(activeRow, "ACTIVE");
+        if (questCompletedCountText == null && completedRow != null)
+            questCompletedCountText = FindCounterTextOnFilterRow(completedRow, "COMPLETED");
+
+        if (questActiveFilterLabelText == null && activeRow != null)
+            questActiveFilterLabelText = FindFilterLabelText(activeRow, "ACTIVE");
+        if (questCompletedFilterLabelText == null && completedRow != null)
+            questCompletedFilterLabelText = FindFilterLabelText(completedRow, "COMPLETED");
+
+        if ((questActiveCountText == null || questCompletedCountText == null))
+        {
+            var valueTexts = new List<TextMeshProUGUI>();
+            var allTexts = filterRoot.GetComponentsInChildren<TextMeshProUGUI>(true);
+            for (int i = 0; i < allTexts.Length; i++)
+            {
+                if (allTexts[i] == null) continue;
+                string n = allTexts[i].gameObject.name.ToLowerInvariant();
+                if (n.Contains("value")) valueTexts.Add(allTexts[i]);
+            }
+
+            if (questActiveCountText == null && valueTexts.Count > 0) questActiveCountText = valueTexts[0];
+            if (questCompletedCountText == null && valueTexts.Count > 1) questCompletedCountText = valueTexts[1];
+        }
+    }
+
+    private void WireQuestFilterButtons()
+    {
+        if (questActiveFilterButton != null)
+        {
+            questActiveFilterButton.onClick.RemoveListener(SetQuestFilterActive);
+            questActiveFilterButton.onClick.AddListener(SetQuestFilterActive);
+        }
+
+        if (questCompletedFilterButton != null)
+        {
+            questCompletedFilterButton.onClick.RemoveListener(SetQuestFilterCompleted);
+            questCompletedFilterButton.onClick.AddListener(SetQuestFilterCompleted);
+        }
+    }
+
+    private void CacheQuestFilterBaseColors()
+    {
+        if (questFilterBaseColorsCached) return;
+
+        if (questActiveFilterLabelText != null)
+            questActiveFilterBaseColor = questActiveFilterLabelText.color;
+        if (questCompletedFilterLabelText != null)
+            questCompletedFilterBaseColor = questCompletedFilterLabelText.color;
+
+        questFilterBaseColorsCached = true;
+    }
+
+    private void UpdateQuestFilterVisuals()
+    {
+        CacheQuestFilterBaseColors();
+
+        if (questActiveFilterLabelText != null)
+        {
+            questActiveFilterLabelText.color = currentQuestFilter == QuestFilter.Active
+                ? questFilterSelectedColor
+                : questActiveFilterBaseColor;
+        }
+
+        if (questCompletedFilterLabelText != null)
+        {
+            questCompletedFilterLabelText.color = currentQuestFilter == QuestFilter.Completed
+                ? questFilterSelectedColor
+                : questCompletedFilterBaseColor;
+        }
+    }
+
+    private static Button EnsureFilterButton(GameObject target)
+    {
+        if (target == null) return null;
+
+        var button = target.GetComponent<Button>();
+        if (button == null) button = target.AddComponent<Button>();
+
+        if (button.targetGraphic == null)
+        {
+            var graphic = target.GetComponent<Graphic>();
+            if (graphic == null) graphic = target.GetComponentInChildren<Graphic>(true);
+            button.targetGraphic = graphic;
+        }
+
+        return button;
+    }
+
+    private static Transform FindFilterRowByLabel(Transform filterRoot, string label)
+    {
+        if (filterRoot == null || string.IsNullOrEmpty(label)) return null;
+
+        var texts = filterRoot.GetComponentsInChildren<TextMeshProUGUI>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            if (texts[i] == null) continue;
+            if (!string.Equals(texts[i].text.Trim(), label, System.StringComparison.OrdinalIgnoreCase)) continue;
+            return texts[i].transform.parent != null ? texts[i].transform.parent : texts[i].transform;
+        }
+
+        return null;
+    }
+
+    private static TextMeshProUGUI FindCounterTextOnFilterRow(Transform row, string rowLabel)
+    {
+        if (row == null) return null;
+
+        var texts = row.GetComponentsInChildren<TextMeshProUGUI>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            if (texts[i] == null) continue;
+            if (!string.Equals(texts[i].text.Trim(), rowLabel, System.StringComparison.OrdinalIgnoreCase))
+                return texts[i];
+        }
+
+        for (int i = 0; i < texts.Length; i++)
+        {
+            if (texts[i] == null) continue;
+            if (texts[i].gameObject.name.ToLowerInvariant().Contains("value"))
+                return texts[i];
+        }
+
+        return null;
+    }
+
+    private static TextMeshProUGUI FindFilterLabelText(Transform row, string label)
+    {
+        if (row == null || string.IsNullOrEmpty(label)) return null;
+
+        var texts = row.GetComponentsInChildren<TextMeshProUGUI>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            if (texts[i] == null) continue;
+            if (string.Equals(texts[i].text.Trim(), label, System.StringComparison.OrdinalIgnoreCase))
+                return texts[i];
+        }
+
+        return null;
+    }
+
+    private static Transform FindDescendantByPath(Transform root, string path)
+    {
+        if (root == null || string.IsNullOrEmpty(path)) return null;
+
+        var parts = path.Split('/');
+        var current = root;
+        for (int i = 0; i < parts.Length; i++)
+        {
+            current = current.Find(parts[i]);
+            if (current == null) return null;
+        }
+
+        return current;
+    }
+
+    private static Transform FindDeepChildByName(Transform root, string name)
+    {
+        if (root == null || string.IsNullOrEmpty(name)) return null;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var child = root.GetChild(i);
+            if (string.Equals(child.name, name, System.StringComparison.OrdinalIgnoreCase))
+                return child;
+
+            var nested = FindDeepChildByName(child, name);
+            if (nested != null) return nested;
+        }
+
+        return null;
+    }
+
+    private static QuestEntryData CloneQuest(QuestEntryData source)
+    {
+        if (source == null) return null;
+        return new QuestEntryData
+        {
+            questId = source.questId,
+            title = source.title,
+            location = source.location,
+            completed = source.completed
+        };
+    }
+
+    private int FindQuestIndexById(string questId)
+    {
+        if (string.IsNullOrEmpty(questId)) return -1;
+
+        for (int i = 0; i < questEntries.Count; i++)
+        {
+            if (questEntries[i] == null) continue;
+            if (string.Equals(questEntries[i].questId, questId, System.StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+
+        return -1;
+    }
+
+    private static string NormalizeQuestId(string questId, string title, string location)
+    {
+        if (!string.IsNullOrWhiteSpace(questId))
+            return questId.Trim();
+
+        string safeTitle = string.IsNullOrWhiteSpace(title) ? "Quest" : title.Trim();
+        string safeLocation = string.IsNullOrWhiteSpace(location) ? "Unknown" : location.Trim();
+        return safeTitle + "|" + safeLocation;
     }
 
     /// <summary>
