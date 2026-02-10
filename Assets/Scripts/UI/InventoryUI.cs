@@ -5,6 +5,9 @@ using UnityEngine.UI;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class InventoryUI : MonoBehaviour
 {
@@ -28,12 +31,36 @@ public class InventoryUI : MonoBehaviour
     public enum WalletSource { Run, Bank }
 
     [System.Serializable]
+    public class QuestObjectiveEntryData
+    {
+        public string title;
+        public string description;
+        public bool completed;
+    }
+
+    [System.Serializable]
+    public class QuestRewardEntryData
+    {
+        public Sprite icon;
+        public string type;
+        public int amount = 1;
+        public string itemName;
+    }
+
+    [System.Serializable]
     public class QuestEntryData
     {
         public string questId;
         public string title;
         public string location;
         public bool completed;
+        public string questTypeLabel = "Main Quest";
+        public string recommendedLabel = "";
+        public string loreTitle = "";
+        [TextArea(2, 6)] public string loreDescription = "";
+        public string loreAuthor = "";
+        public List<QuestObjectiveEntryData> objectives = new();
+        public List<QuestRewardEntryData> rewards = new();
     }
 
     [Header("Wallet UI")]
@@ -57,17 +84,47 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI questCompletedFilterLabelText;
     [SerializeField] private Color questFilterSelectedColor = new Color(1f, 0.35f, 0.35f, 1f);
     [SerializeField] private List<QuestEntryData> startingQuests = new();
+    [Header("Quest Detail UI")]
+    [SerializeField] private TextMeshProUGUI questDetailTypeText;
+    [SerializeField] private TextMeshProUGUI questDetailRecommendedText;
+    [SerializeField] private TextMeshProUGUI questDetailTitleText;
+    [SerializeField] private TextMeshProUGUI questDetailLocationText;
+    [SerializeField] private TextMeshProUGUI questDetailLoreTitleText;
+    [SerializeField] private TextMeshProUGUI questDetailLoreDescriptionText;
+    [SerializeField] private TextMeshProUGUI questDetailLoreAuthorText;
+    [SerializeField] private RectTransform questDetailLoreRoot;
+    [SerializeField] private RectTransform questObjectivesSectionRoot;
+    [SerializeField] private GameObject questDetailPanelRoot;
+    [SerializeField] private bool showQuestDetailOnlyOnSelection = true;
+    [SerializeField] private bool collapseQuestLoreWhenEmpty = true;
+    [SerializeField] private float questObjectivesLiftWhenNoLore = -1f; // < 0 => auto (lore height + padding)
+    [SerializeField] private Transform questObjectivesContainer;
+    [SerializeField] private GameObject questObjectivePrefab;
+    [SerializeField] private Transform questRewardsContainer;
+    [SerializeField] private GameObject questRewardPrefab;
+    [SerializeField] private ScrollRect questDetailScrollRect;
+    [SerializeField] private bool preserveQuestScrollPosition = false;
+    [SerializeField] private bool smoothQuestMouseWheel = true;
+    [SerializeField] private float questMouseWheelStepNormalized = 0.10f;
+    [SerializeField] private float questMouseWheelSmoothSpeed = 14f;
 
     private enum QuestFilter { All, Active, Completed }
     private QuestFilter currentQuestFilter = QuestFilter.All;
     private readonly List<QuestEntryData> questEntries = new();
     private readonly List<GameObject> spawnedQuestRows = new();
+    private readonly List<GameObject> spawnedObjectiveRows = new();
+    private readonly List<GameObject> spawnedRewardRows = new();
     private bool questUiInitialized = false;
     private QuestManager questManager;
     private bool questManagerSubscribed = false;
     private bool questFilterBaseColorsCached = false;
     private Color questActiveFilterBaseColor = Color.white;
     private Color questCompletedFilterBaseColor = Color.white;
+    private string selectedQuestId = null;
+    private float questTargetScrollNormalized = 1f;
+    private bool questTargetScrollInitialized = false;
+    private bool questObjectivesDefaultPosCached = false;
+    private Vector2 questObjectivesDefaultAnchoredPos;
 
     [Header("Drag & Drop")]
     [SerializeField] private Canvas dragCanvas; // opzionale: se null usa quello più alto trovato
@@ -226,11 +283,14 @@ public class InventoryUI : MonoBehaviour
     void Update()
     {
         UpdateFocusInputMode();
+        UpdateQuestMouseWheelSmoothScroll();
     }
 
     void OnDestroy()
     {
         ClearDragPreview();
+        ClearSpawnedRows(spawnedObjectiveRows, questObjectivesContainer, questObjectivePrefab);
+        ClearSpawnedRows(spawnedRewardRows, questRewardsContainer, questRewardPrefab);
         if (questActiveFilterButton != null)
             questActiveFilterButton.onClick.RemoveListener(SetQuestFilterActive);
         if (questCompletedFilterButton != null)
@@ -557,19 +617,20 @@ public class InventoryUI : MonoBehaviour
     public void SetQuestFilterActive()
     {
         InitializeQuestUIIfNeeded();
-        currentQuestFilter = QuestFilter.Active;
+        currentQuestFilter = currentQuestFilter == QuestFilter.Active ? QuestFilter.All : QuestFilter.Active;
         RefreshQuestUI();
     }
 
     public void SetQuestFilterCompleted()
     {
         InitializeQuestUIIfNeeded();
-        currentQuestFilter = QuestFilter.Completed;
+        currentQuestFilter = currentQuestFilter == QuestFilter.Completed ? QuestFilter.All : QuestFilter.Completed;
         RefreshQuestUI();
     }
 
     public void SetQuests(List<QuestEntryData> quests)
     {
+        string previousSelected = selectedQuestId;
         questEntries.Clear();
         if (quests != null)
         {
@@ -579,6 +640,8 @@ public class InventoryUI : MonoBehaviour
                 if (copy != null) questEntries.Add(copy);
             }
         }
+
+        selectedQuestId = previousSelected;
         RefreshQuestUI();
     }
 
@@ -633,8 +696,11 @@ public class InventoryUI : MonoBehaviour
         if (questUiInitialized) return;
         questUiInitialized = true;
 
-        if (autoWireQuestUI)
+        bool needQuestListWiring = questListContainer == null || questItemPrefab == null;
+        if (autoWireQuestUI || needQuestListWiring)
             AutoWireQuestUIReferences();
+
+        TryEditorAutoAssignQuestPrefabs();
 
         if (questListContainer != null)
         {
@@ -648,6 +714,12 @@ public class InventoryUI : MonoBehaviour
                 questItemPrefab.SetActive(false);
             }
         }
+
+        if (questObjectivesContainer != null && questObjectivePrefab != null && questObjectivePrefab.transform.parent == questObjectivesContainer)
+            questObjectivePrefab.SetActive(false);
+
+        if (questRewardsContainer != null && questRewardPrefab != null && questRewardPrefab.transform.parent == questRewardsContainer)
+            questRewardPrefab.SetActive(false);
 
         WireQuestFilterButtons();
         CacheQuestFilterBaseColors();
@@ -663,15 +735,60 @@ public class InventoryUI : MonoBehaviour
                 for (int i = 0; i < startingQuests.Count; i++)
                 {
                     if (startingQuests[i] == null) continue;
+                    var src = startingQuests[i];
+                    var mappedObjectives = new List<QuestManager.QuestObjectiveData>();
+                    if (src.objectives != null)
+                    {
+                        for (int j = 0; j < src.objectives.Count; j++)
+                        {
+                            var o = src.objectives[j];
+                            if (o == null) continue;
+                            mappedObjectives.Add(new QuestManager.QuestObjectiveData
+                            {
+                                title = o.title,
+                                description = o.description,
+                                completed = o.completed
+                            });
+                        }
+                    }
+
+                    var mappedRewards = new List<QuestManager.QuestRewardData>();
+                    if (src.rewards != null)
+                    {
+                        for (int j = 0; j < src.rewards.Count; j++)
+                        {
+                            var r = src.rewards[j];
+                            if (r == null) continue;
+                            mappedRewards.Add(new QuestManager.QuestRewardData
+                            {
+                                icon = r.icon,
+                                type = r.type,
+                                amount = r.amount,
+                                itemName = r.itemName
+                            });
+                        }
+                    }
+
                     initial.Add(new QuestManager.QuestData
                     {
-                        questId = startingQuests[i].questId,
-                        title = startingQuests[i].title,
-                        location = startingQuests[i].location,
-                        completed = startingQuests[i].completed
+                        questId = src.questId,
+                        title = src.title,
+                        location = src.location,
+                        completed = src.completed,
+                        questTypeLabel = src.questTypeLabel,
+                        recommendedLabel = src.recommendedLabel,
+                        loreTitle = src.loreTitle,
+                        loreDescription = src.loreDescription,
+                        loreAuthor = src.loreAuthor,
+                        objectives = mappedObjectives,
+                        rewards = mappedRewards
                     });
                 }
                 questManager.ReplaceAllQuests(initial);
+            }
+            else if (startingQuests != null && startingQuests.Count > 0)
+            {
+                MergeStartingQuestDetailsIntoManager();
             }
 
             HandleQuestManagerListChanged(questManager.GetQuestsSnapshot());
@@ -697,6 +814,7 @@ public class InventoryUI : MonoBehaviour
         UpdateQuestFilterVisuals();
         UpdateQuestCounters();
         RebuildQuestRows();
+        RefreshSelectedQuestDetails();
     }
 
     private void TryBindQuestManager()
@@ -737,7 +855,14 @@ public class InventoryUI : MonoBehaviour
                     questId = q.questId,
                     title = q.title,
                     location = q.location,
-                    completed = q.completed
+                    completed = q.completed,
+                    questTypeLabel = q.questTypeLabel,
+                    recommendedLabel = q.recommendedLabel,
+                    loreTitle = q.loreTitle,
+                    loreDescription = q.loreDescription,
+                    loreAuthor = q.loreAuthor,
+                    objectives = MapObjectives(q.objectives),
+                    rewards = MapRewards(q.rewards)
                 });
             }
         }
@@ -761,6 +886,151 @@ public class InventoryUI : MonoBehaviour
         if (questCompletedCountText != null) questCompletedCountText.text = completedCount.ToString();
     }
 
+    private void OnQuestRowClicked(string questId)
+    {
+        if (string.IsNullOrWhiteSpace(questId)) return;
+        selectedQuestId = questId.Trim();
+        RebuildQuestRows();
+        RefreshSelectedQuestDetails();
+    }
+
+    private bool IsQuestSelected(string questId)
+    {
+        return !string.IsNullOrWhiteSpace(selectedQuestId)
+               && !string.IsNullOrWhiteSpace(questId)
+               && string.Equals(selectedQuestId, questId, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void RefreshSelectedQuestDetails()
+    {
+        var selected = GetSelectedVisibleQuest();
+        UpdateQuestDetailPanel(selected);
+    }
+
+    private QuestEntryData GetSelectedVisibleQuest()
+    {
+        if (string.IsNullOrWhiteSpace(selectedQuestId)) return null;
+
+        for (int i = 0; i < questEntries.Count; i++)
+        {
+            var q = questEntries[i];
+            if (q == null) continue;
+            if (!MatchesQuestFilter(q)) continue;
+            if (IsQuestSelected(q.questId))
+            {
+                return q;
+            }
+        }
+
+        return null;
+    }
+
+    private void UpdateQuestDetailPanel(QuestEntryData quest)
+    {
+        if (questDetailPanelRoot != null && showQuestDetailOnlyOnSelection)
+            questDetailPanelRoot.SetActive(quest != null);
+
+        if (questDetailTypeText != null) questDetailTypeText.text = quest != null ? (quest.questTypeLabel ?? string.Empty) : string.Empty;
+        if (questDetailRecommendedText != null) questDetailRecommendedText.text = quest != null ? (quest.recommendedLabel ?? string.Empty) : string.Empty;
+        if (questDetailTitleText != null) questDetailTitleText.text = quest != null ? (quest.title ?? string.Empty) : string.Empty;
+        if (questDetailLocationText != null) questDetailLocationText.text = quest != null ? (quest.location ?? string.Empty) : string.Empty;
+        if (questDetailLoreTitleText != null) questDetailLoreTitleText.text = quest != null ? (quest.loreTitle ?? string.Empty) : string.Empty;
+        if (questDetailLoreDescriptionText != null) questDetailLoreDescriptionText.text = quest != null ? (quest.loreDescription ?? string.Empty) : string.Empty;
+        if (questDetailLoreAuthorText != null) questDetailLoreAuthorText.text = quest != null ? (quest.loreAuthor ?? string.Empty) : string.Empty;
+        UpdateQuestLoreVisibilityAndLayout(quest);
+
+        RebuildQuestObjectiveRows(quest);
+        RebuildQuestRewardRows(quest);
+    }
+
+    private void UpdateQuestLoreVisibilityAndLayout(QuestEntryData quest)
+    {
+        bool hasLore = quest != null &&
+                       (!string.IsNullOrWhiteSpace(quest.loreTitle)
+                        || !string.IsNullOrWhiteSpace(quest.loreDescription)
+                        || !string.IsNullOrWhiteSpace(quest.loreAuthor));
+
+        if (collapseQuestLoreWhenEmpty && questDetailLoreRoot != null)
+            questDetailLoreRoot.gameObject.SetActive(hasLore);
+        else if (questDetailLoreRoot != null)
+            questDetailLoreRoot.gameObject.SetActive(true);
+
+        EnsureQuestObjectivesLayoutCache();
+
+        if (!collapseQuestLoreWhenEmpty || questObjectivesSectionRoot == null || !questObjectivesDefaultPosCached) return;
+
+        Vector2 targetPos = questObjectivesDefaultAnchoredPos;
+        if (!hasLore)
+        {
+            float lift = questObjectivesLiftWhenNoLore;
+            if (lift < 0f)
+            {
+                float loreHeight = questDetailLoreRoot != null ? questDetailLoreRoot.rect.height : 0f;
+                lift = loreHeight + 16f;
+            }
+            targetPos.y += lift;
+        }
+
+        questObjectivesSectionRoot.anchoredPosition = targetPos;
+    }
+
+    private void EnsureQuestObjectivesLayoutCache()
+    {
+        if (questObjectivesSectionRoot == null)
+        {
+            if (questObjectivesContainer != null && questObjectivesContainer.parent != null)
+                questObjectivesSectionRoot = questObjectivesContainer.parent as RectTransform;
+        }
+
+        if (questObjectivesSectionRoot != null && !questObjectivesDefaultPosCached)
+        {
+            questObjectivesDefaultAnchoredPos = questObjectivesSectionRoot.anchoredPosition;
+            questObjectivesDefaultPosCached = true;
+        }
+    }
+
+    private void RebuildQuestObjectiveRows(QuestEntryData quest)
+    {
+        ClearSpawnedRows(spawnedObjectiveRows, questObjectivesContainer, questObjectivePrefab);
+        if (questObjectivesContainer == null || questObjectivePrefab == null || quest == null || quest.objectives == null) return;
+
+        for (int i = 0; i < quest.objectives.Count; i++)
+        {
+            var obj = quest.objectives[i];
+            if (obj == null) continue;
+
+            var row = Instantiate(questObjectivePrefab, questObjectivesContainer);
+            row.SetActive(true);
+
+            var rowUi = row.GetComponent<QuestObjectiveItemUI>();
+            if (rowUi == null) rowUi = row.AddComponent<QuestObjectiveItemUI>();
+            rowUi.SetData(obj.title, obj.description, obj.completed);
+
+            spawnedObjectiveRows.Add(row);
+        }
+    }
+
+    private void RebuildQuestRewardRows(QuestEntryData quest)
+    {
+        ClearSpawnedRows(spawnedRewardRows, questRewardsContainer, questRewardPrefab);
+        if (questRewardsContainer == null || questRewardPrefab == null || quest == null || quest.rewards == null) return;
+
+        for (int i = 0; i < quest.rewards.Count; i++)
+        {
+            var reward = quest.rewards[i];
+            if (reward == null) continue;
+
+            var row = Instantiate(questRewardPrefab, questRewardsContainer);
+            row.SetActive(true);
+
+            var rowUi = row.GetComponent<QuestRewardItemUI>();
+            if (rowUi == null) rowUi = row.AddComponent<QuestRewardItemUI>();
+            rowUi.SetData(reward.icon, reward.type, reward.amount, reward.itemName);
+
+            spawnedRewardRows.Add(row);
+        }
+    }
+
     private void RebuildQuestRows()
     {
         if (questListContainer == null || questItemPrefab == null) return;
@@ -778,7 +1048,17 @@ public class InventoryUI : MonoBehaviour
 
             var rowUI = row.GetComponent<QuestItemUI>();
             if (rowUI == null) rowUI = row.AddComponent<QuestItemUI>();
+            bool selected = IsQuestSelected(quest.questId);
             rowUI.SetData(quest.title, quest.location, quest.completed);
+            rowUI.SetSelected(selected);
+
+            string capturedQuestId = quest.questId;
+            var rowButton = EnsureFilterButton(row);
+            if (rowButton != null)
+            {
+                rowButton.onClick.RemoveAllListeners();
+                rowButton.onClick.AddListener(() => OnQuestRowClicked(capturedQuestId));
+            }
 
             spawnedQuestRows.Add(row);
         }
@@ -818,6 +1098,27 @@ public class InventoryUI : MonoBehaviour
         }
 
         spawnedQuestRows.Clear();
+    }
+
+    private static void ClearSpawnedRows(List<GameObject> spawned, Transform container, GameObject prefabRef)
+    {
+        if (spawned != null)
+        {
+            for (int i = 0; i < spawned.Count; i++)
+            {
+                if (spawned[i] != null) Object.Destroy(spawned[i]);
+            }
+            spawned.Clear();
+        }
+
+        if (container == null) return;
+
+        for (int i = container.childCount - 1; i >= 0; i--)
+        {
+            var child = container.GetChild(i).gameObject;
+            if (prefabRef != null && child == prefabRef) continue;
+            Object.Destroy(child);
+        }
     }
 
     private bool MatchesQuestFilter(QuestEntryData quest)
@@ -895,6 +1196,139 @@ public class InventoryUI : MonoBehaviour
             if (questActiveCountText == null && valueTexts.Count > 0) questActiveCountText = valueTexts[0];
             if (questCompletedCountText == null && valueTexts.Count > 1) questCompletedCountText = valueTexts[1];
         }
+
+        Transform rightSide = FindDescendantByPath(questRoot, "RightSide");
+        if (rightSide != null)
+        {
+            if (questDetailScrollRect == null)
+                questDetailScrollRect = rightSide.GetComponent<ScrollRect>();
+
+            if (questDetailPanelRoot == null) questDetailPanelRoot = rightSide.gameObject;
+
+            Transform body = FindDeepChildByName(rightSide, "Body");
+            Transform lore = body != null ? FindDeepChildByName(body, "Lore") : FindDeepChildByName(rightSide, "Lore");
+            if (questDetailLoreRoot == null)
+                questDetailLoreRoot = lore as RectTransform;
+
+            if (questDetailTypeText == null)
+                questDetailTypeText = FindDeepTextByName(rightSide, "Type") ?? FindDeepTextByContains(rightSide, "main quest");
+            if (questDetailRecommendedText == null)
+                questDetailRecommendedText = FindDeepTextByName(rightSide, "Lvl") ?? FindDeepTextByContains(rightSide, "recommended");
+            if (questDetailTitleText == null)
+                questDetailTitleText = FindDeepTextByName(rightSide, "Title") ?? FindDeepTextByContains(rightSide, "ashen ritual");
+            if (questDetailLocationText == null)
+                questDetailLocationText = FindDeepTextByName(rightSide, "Location") ?? FindDeepTextByContains(rightSide, "hub");
+
+            if (questDetailLoreTitleText == null)
+                questDetailLoreTitleText = FindDeepTextByName(lore, "Title desc")
+                                           ?? FindDeepTextByObjectNameContains(lore, "title desc")
+                                           ?? FindDeepTextByName(lore, "Title")
+                                           ?? FindDeepTextByObjectNameContains(lore, "title")
+                                           ?? FindDeepTextByContains(rightSide, "legend");
+            if (questDetailLoreDescriptionText == null)
+                questDetailLoreDescriptionText = FindDeepTextByName(lore, "Desc")
+                                                 ?? FindDeepTextByObjectNameContains(lore, "desc")
+                                                 ?? FindDeepTextByContains(rightSide, "bells toll");
+            if (questDetailLoreAuthorText == null)
+                questDetailLoreAuthorText = FindDeepTextByName(lore, "Cit")
+                                            ?? FindDeepTextByObjectNameContains(lore, "cit", "author")
+                                            ?? FindDeepTextByContains(rightSide, "rosario");
+
+            if (questObjectivesContainer == null)
+                questObjectivesContainer = FindDeepChildByName(rightSide, "CurrentObjectivesContainer")
+                                          ?? FindDeepChildByName(rightSide, "CurrentObjectives")
+                                          ?? FindDeepChildByName(rightSide, "Objectives")
+                                          ?? FindDeepChildByName(rightSide, "ObjectiveContainer")
+                                          ?? FindDeepChildByName(rightSide, "ObjectiveList");
+
+            if (questObjectivesSectionRoot == null)
+            {
+                var objectivesRoot = FindDeepChildByName(rightSide, "Objectives");
+                if (objectivesRoot != null) questObjectivesSectionRoot = objectivesRoot as RectTransform;
+                else if (questObjectivesContainer != null && questObjectivesContainer.parent != null)
+                    questObjectivesSectionRoot = questObjectivesContainer.parent as RectTransform;
+            }
+
+            if (questRewardsContainer == null)
+                questRewardsContainer = FindDeepChildByName(rightSide, "RewardContainer")
+                                       ?? FindDeepChildByName(rightSide, "Rewards")
+                                       ?? FindDeepChildByName(rightSide, "RewardList");
+        }
+
+        if (questObjectivesContainer != null && questObjectivePrefab == null && questObjectivesContainer.childCount > 0)
+            questObjectivePrefab = questObjectivesContainer.GetChild(0).gameObject;
+
+        if (questRewardsContainer != null && questRewardPrefab == null && questRewardsContainer.childCount > 0)
+            questRewardPrefab = questRewardsContainer.GetChild(0).gameObject;
+    }
+
+    private void RestoreQuestScrollPosition(float normalizedY)
+    {
+        if (questDetailScrollRect == null || !questDetailScrollRect.vertical) return;
+        if (questDetailScrollRect.content == null) return;
+
+        normalizedY = Mathf.Clamp01(normalizedY);
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(questDetailScrollRect.content);
+        Canvas.ForceUpdateCanvases();
+        questDetailScrollRect.StopMovement();
+        questDetailScrollRect.verticalNormalizedPosition = normalizedY;
+        questTargetScrollNormalized = questDetailScrollRect.verticalNormalizedPosition;
+        questTargetScrollInitialized = true;
+    }
+
+    private void UpdateQuestMouseWheelSmoothScroll()
+    {
+        if (!smoothQuestMouseWheel) return;
+        if (questDetailScrollRect == null || !questDetailScrollRect.vertical) return;
+        if (Mouse.current == null) return;
+        if (!IsQuestTabActive()) return;
+
+        if (!questTargetScrollInitialized)
+        {
+            questTargetScrollNormalized = questDetailScrollRect.verticalNormalizedPosition;
+            questTargetScrollInitialized = true;
+        }
+
+        // Evita doppio effetto con lo scroll built-in a step.
+        if (questDetailScrollRect.scrollSensitivity != 0f)
+            questDetailScrollRect.scrollSensitivity = 0f;
+
+        var viewport = questDetailScrollRect.viewport != null ? questDetailScrollRect.viewport : questDetailScrollRect.transform as RectTransform;
+        if (viewport == null) return;
+
+        Vector2 mousePos = Mouse.current.position.ReadValue();
+        bool pointerOverViewport = RectTransformUtility.RectangleContainsScreenPoint(viewport, mousePos, null);
+        if (!pointerOverViewport) return;
+
+        float wheel = Mouse.current.scroll.ReadValue().y;
+        if (Mathf.Abs(wheel) > 0.01f)
+        {
+            // wheel > 0 = su, wheel < 0 = giu
+            questTargetScrollNormalized = Mathf.Clamp01(questTargetScrollNormalized + (wheel * questMouseWheelStepNormalized / 120f));
+        }
+
+        float current = questDetailScrollRect.verticalNormalizedPosition;
+        float t = 1f - Mathf.Exp(-questMouseWheelSmoothSpeed * Time.unscaledDeltaTime);
+        float next = Mathf.Lerp(current, questTargetScrollNormalized, t);
+        questDetailScrollRect.verticalNormalizedPosition = next;
+    }
+
+    private bool IsQuestTabActive()
+    {
+        if (tabs == null || tabs.Length == 0) return false;
+        for (int i = 0; i < tabs.Length; i++)
+        {
+            var tab = tabs[i];
+            if (tab == null || tab.background == null) continue;
+            if (!string.Equals(tab.key, "Quest", System.StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(tab.key, "Quests", System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            return tab.background.activeInHierarchy;
+        }
+
+        return false;
     }
 
     private void WireQuestFilterButtons()
@@ -1044,6 +1478,68 @@ public class InventoryUI : MonoBehaviour
         return null;
     }
 
+    private static TextMeshProUGUI FindDeepTextByContains(Transform root, string value)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(value)) return null;
+
+        string pattern = value.Trim();
+        var texts = root.GetComponentsInChildren<TextMeshProUGUI>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            if (texts[i] == null) continue;
+            if (texts[i].text != null && texts[i].text.IndexOf(pattern, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return texts[i];
+        }
+
+        return null;
+    }
+
+    private static TextMeshProUGUI FindDeepTextByName(Transform root, string objectName)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(objectName)) return null;
+
+        Transform t = FindDeepChildByName(root, objectName);
+        if (t == null) return null;
+        var own = t.GetComponent<TextMeshProUGUI>();
+        if (own != null) return own;
+        return t.GetComponentInChildren<TextMeshProUGUI>(true);
+    }
+
+    private static TextMeshProUGUI FindDeepTextByObjectNameContains(Transform root, params string[] objectNameParts)
+    {
+        if (root == null || objectNameParts == null || objectNameParts.Length == 0) return null;
+
+        var allTransforms = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < allTransforms.Length; i++)
+        {
+            var t = allTransforms[i];
+            if (t == null) continue;
+            string name = t.name ?? string.Empty;
+
+            bool matches = true;
+            for (int j = 0; j < objectNameParts.Length; j++)
+            {
+                string part = objectNameParts[j];
+                if (string.IsNullOrWhiteSpace(part)) continue;
+                if (name.IndexOf(part, System.StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    matches = false;
+                    break;
+                }
+            }
+
+            if (!matches) continue;
+
+            var own = t.GetComponent<TextMeshProUGUI>();
+            if (own != null) return own;
+
+            var nested = t.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (nested != null) return nested;
+        }
+
+        return null;
+    }
+
     private static QuestEntryData CloneQuest(QuestEntryData source)
     {
         if (source == null) return null;
@@ -1052,8 +1548,93 @@ public class InventoryUI : MonoBehaviour
             questId = source.questId,
             title = source.title,
             location = source.location,
-            completed = source.completed
+            completed = source.completed,
+            questTypeLabel = source.questTypeLabel,
+            recommendedLabel = source.recommendedLabel,
+            loreTitle = source.loreTitle,
+            loreDescription = source.loreDescription,
+            loreAuthor = source.loreAuthor,
+            objectives = CloneObjectives(source.objectives),
+            rewards = CloneRewards(source.rewards)
         };
+    }
+
+    private static List<QuestObjectiveEntryData> CloneObjectives(List<QuestObjectiveEntryData> source)
+    {
+        var result = new List<QuestObjectiveEntryData>();
+        if (source == null) return result;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            if (source[i] == null) continue;
+            result.Add(new QuestObjectiveEntryData
+            {
+                title = source[i].title,
+                description = source[i].description,
+                completed = source[i].completed
+            });
+        }
+
+        return result;
+    }
+
+    private static List<QuestRewardEntryData> CloneRewards(List<QuestRewardEntryData> source)
+    {
+        var result = new List<QuestRewardEntryData>();
+        if (source == null) return result;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            if (source[i] == null) continue;
+            result.Add(new QuestRewardEntryData
+            {
+                icon = source[i].icon,
+                type = source[i].type,
+                amount = source[i].amount,
+                itemName = source[i].itemName
+            });
+        }
+
+        return result;
+    }
+
+    private static List<QuestObjectiveEntryData> MapObjectives(List<QuestManager.QuestObjectiveData> source)
+    {
+        var result = new List<QuestObjectiveEntryData>();
+        if (source == null) return result;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            if (source[i] == null) continue;
+            result.Add(new QuestObjectiveEntryData
+            {
+                title = source[i].title,
+                description = source[i].description,
+                completed = source[i].completed
+            });
+        }
+
+        return result;
+    }
+
+    private static List<QuestRewardEntryData> MapRewards(List<QuestManager.QuestRewardData> source)
+    {
+        var result = new List<QuestRewardEntryData>();
+        if (source == null) return result;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            if (source[i] == null) continue;
+            result.Add(new QuestRewardEntryData
+            {
+                icon = source[i].icon,
+                type = source[i].type,
+                amount = source[i].amount,
+                itemName = source[i].itemName
+            });
+        }
+
+        return result;
     }
 
     private int FindQuestIndexById(string questId)
@@ -1078,6 +1659,134 @@ public class InventoryUI : MonoBehaviour
         string safeTitle = string.IsNullOrWhiteSpace(title) ? "Quest" : title.Trim();
         string safeLocation = string.IsNullOrWhiteSpace(location) ? "Unknown" : location.Trim();
         return safeTitle + "|" + safeLocation;
+    }
+
+    private void MergeStartingQuestDetailsIntoManager()
+    {
+        if (questManager == null || startingQuests == null || startingQuests.Count == 0) return;
+
+        var managerList = questManager.GetQuestsSnapshot();
+        if (managerList == null || managerList.Count == 0) return;
+
+        var changed = false;
+
+        for (int i = 0; i < managerList.Count; i++)
+        {
+            var m = managerList[i];
+            if (m == null) continue;
+
+            string managerId = NormalizeQuestId(m.questId, m.title, m.location);
+            QuestEntryData source = null;
+
+            for (int j = 0; j < startingQuests.Count; j++)
+            {
+                var s = startingQuests[j];
+                if (s == null) continue;
+                string startId = NormalizeQuestId(s.questId, s.title, s.location);
+                if (string.Equals(startId, managerId, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    source = s;
+                    break;
+                }
+            }
+
+            if (source == null) continue;
+
+            bool managerHasObjectives = m.objectives != null && m.objectives.Count > 0;
+            bool managerHasRewards = m.rewards != null && m.rewards.Count > 0;
+
+            if (!managerHasObjectives && source.objectives != null && source.objectives.Count > 0)
+            {
+                m.objectives = new List<QuestManager.QuestObjectiveData>();
+                for (int k = 0; k < source.objectives.Count; k++)
+                {
+                    var o = source.objectives[k];
+                    if (o == null) continue;
+                    m.objectives.Add(new QuestManager.QuestObjectiveData
+                    {
+                        title = o.title,
+                        description = o.description,
+                        completed = o.completed
+                    });
+                }
+                changed = true;
+            }
+
+            if (!managerHasRewards && source.rewards != null && source.rewards.Count > 0)
+            {
+                m.rewards = new List<QuestManager.QuestRewardData>();
+                for (int k = 0; k < source.rewards.Count; k++)
+                {
+                    var r = source.rewards[k];
+                    if (r == null) continue;
+                    m.rewards.Add(new QuestManager.QuestRewardData
+                    {
+                        icon = r.icon,
+                        type = r.type,
+                        amount = r.amount,
+                        itemName = r.itemName
+                    });
+                }
+                changed = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(m.questTypeLabel) && !string.IsNullOrWhiteSpace(source.questTypeLabel))
+            {
+                m.questTypeLabel = source.questTypeLabel;
+                changed = true;
+            }
+            if (string.IsNullOrWhiteSpace(m.recommendedLabel) && !string.IsNullOrWhiteSpace(source.recommendedLabel))
+            {
+                m.recommendedLabel = source.recommendedLabel;
+                changed = true;
+            }
+            if (string.IsNullOrWhiteSpace(m.loreTitle) && !string.IsNullOrWhiteSpace(source.loreTitle))
+            {
+                m.loreTitle = source.loreTitle;
+                changed = true;
+            }
+            if (string.IsNullOrWhiteSpace(m.loreDescription) && !string.IsNullOrWhiteSpace(source.loreDescription))
+            {
+                m.loreDescription = source.loreDescription;
+                changed = true;
+            }
+            if (string.IsNullOrWhiteSpace(m.loreAuthor) && !string.IsNullOrWhiteSpace(source.loreAuthor))
+            {
+                m.loreAuthor = source.loreAuthor;
+                changed = true;
+            }
+        }
+
+        if (changed)
+            questManager.ReplaceAllQuests(managerList);
+    }
+
+    private void TryEditorAutoAssignQuestPrefabs()
+    {
+#if UNITY_EDITOR
+        if (questItemPrefab == null)
+            questItemPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/Quest.prefab");
+
+        if (questObjectivePrefab == null)
+        {
+            var byName = AssetDatabase.FindAssets("t:prefab *Objective*");
+            if (byName != null && byName.Length > 0)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(byName[0]);
+                questObjectivePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            }
+        }
+
+        if (questRewardPrefab == null)
+        {
+            var byName = AssetDatabase.FindAssets("t:prefab *Reward*");
+            if (byName != null && byName.Length > 0)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(byName[0]);
+                questRewardPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            }
+        }
+#endif
     }
 
     /// <summary>

@@ -458,6 +458,283 @@ public class PlayerInventory : MonoBehaviour
         equippedLeftRuntime = left != null ? left : unarmedLeft;
         equippedUsableRuntime = usable;
     }
+
+    public SavedPlayerInventoryData CreateSaveData()
+    {
+        EnsureLoadoutSize();
+
+        var data = new SavedPlayerInventoryData
+        {
+            items = SerializeInventoryItems(),
+            rightLoadout = SerializeWeaponLoadout(rightLoadout, rightInstanceIds),
+            leftLoadout = SerializeWeaponLoadout(leftLoadout, leftInstanceIds),
+            usableLoadout = SerializeUsableLoadout(usableLoadout, usableInstanceIds),
+            currentRightIndex = currentRightIndex,
+            currentLeftIndex = currentLeftIndex,
+            currentUsableIndex = currentUsableIndex
+        };
+
+        return data;
+    }
+
+    public void ApplySaveData(SavedPlayerInventoryData data)
+    {
+        if (data == null) return;
+
+        EnsureLoadoutSize();
+
+        var lookups = BuildAssetLookups();
+
+        items.Clear();
+        if (data.items != null)
+        {
+            for (int i = 0; i < data.items.Length; i++)
+            {
+                var saved = data.items[i];
+                if (saved == null) continue;
+
+                var restored = DeserializeInventoryItem(saved, lookups);
+                if (restored != null) items.Add(restored);
+            }
+        }
+
+        DeserializeWeaponLoadout(data.rightLoadout, rightLoadout, rightInstanceIds, lookups.weapons);
+        DeserializeWeaponLoadout(data.leftLoadout, leftLoadout, leftInstanceIds, lookups.weapons);
+        DeserializeUsableLoadout(data.usableLoadout, usableLoadout, usableInstanceIds, lookups.usables);
+
+        currentRightIndex = Mathf.Clamp(data.currentRightIndex, 0, rightLoadout.Length - 1);
+        currentLeftIndex = Mathf.Clamp(data.currentLeftIndex, 0, leftLoadout.Length - 1);
+        currentUsableIndex = Mathf.Clamp(data.currentUsableIndex, 0, usableLoadout.Length - 1);
+        SyncEquippedReferences();
+    }
+
+    private SavedInventoryItemData[] SerializeInventoryItems()
+    {
+        if (items == null || items.Count == 0) return System.Array.Empty<SavedInventoryItemData>();
+
+        var result = new SavedInventoryItemData[items.Count];
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            if (it == null) continue;
+
+            string itemType = "item";
+            string assetName = string.Empty;
+            string itemName = string.Empty;
+
+            if (it.weaponData != null)
+            {
+                itemType = "weapon";
+                assetName = it.weaponData.name;
+                itemName = it.weaponData.weaponName;
+            }
+            else if (it.usableData != null)
+            {
+                itemType = "usable";
+                assetName = it.usableData.name;
+                itemName = it.usableData.itemName;
+            }
+            else if (it.itemData != null)
+            {
+                itemType = "item";
+                assetName = it.itemData.name;
+                itemName = it.itemData.itemName;
+            }
+
+            result[i] = new SavedInventoryItemData
+            {
+                itemType = itemType,
+                assetName = assetName,
+                itemName = string.IsNullOrWhiteSpace(itemName) ? it.title : itemName,
+                instanceId = it.instanceId,
+                amount = Mathf.Max(1, it.amount),
+                title = it.title,
+                description = it.description
+            };
+        }
+
+        return result;
+    }
+
+    private SavedLoadoutSlotData[] SerializeWeaponLoadout(WeaponItem[] loadout, string[] ids)
+    {
+        if (loadout == null || ids == null || loadout.Length == 0) return System.Array.Empty<SavedLoadoutSlotData>();
+        var result = new SavedLoadoutSlotData[loadout.Length];
+
+        for (int i = 0; i < loadout.Length; i++)
+        {
+            var w = loadout[i];
+            result[i] = new SavedLoadoutSlotData
+            {
+                assetName = w != null ? w.name : string.Empty,
+                instanceId = ids != null && i < ids.Length ? ids[i] : string.Empty
+            };
+        }
+
+        return result;
+    }
+
+    private SavedLoadoutSlotData[] SerializeUsableLoadout(UsableItemData[] loadout, string[] ids)
+    {
+        if (loadout == null || ids == null || loadout.Length == 0) return System.Array.Empty<SavedLoadoutSlotData>();
+        var result = new SavedLoadoutSlotData[loadout.Length];
+
+        for (int i = 0; i < loadout.Length; i++)
+        {
+            var u = loadout[i];
+            result[i] = new SavedLoadoutSlotData
+            {
+                assetName = u != null ? u.name : string.Empty,
+                instanceId = ids != null && i < ids.Length ? ids[i] : string.Empty
+            };
+        }
+
+        return result;
+    }
+
+    private void DeserializeWeaponLoadout(SavedLoadoutSlotData[] source, WeaponItem[] targetLoadout, string[] targetIds, Dictionary<string, WeaponItem> weaponLookup)
+    {
+        for (int i = 0; i < targetLoadout.Length; i++)
+        {
+            targetLoadout[i] = null;
+            targetIds[i] = null;
+        }
+        if (source == null || weaponLookup == null) return;
+
+        int len = Mathf.Min(source.Length, targetLoadout.Length);
+        for (int i = 0; i < len; i++)
+        {
+            var slot = source[i];
+            if (slot == null) continue;
+            targetLoadout[i] = ResolveWeapon(slot.assetName, weaponLookup);
+            targetIds[i] = string.IsNullOrWhiteSpace(slot.instanceId) ? null : slot.instanceId;
+        }
+    }
+
+    private void DeserializeUsableLoadout(SavedLoadoutSlotData[] source, UsableItemData[] targetLoadout, string[] targetIds, Dictionary<string, UsableItemData> usableLookup)
+    {
+        for (int i = 0; i < targetLoadout.Length; i++)
+        {
+            targetLoadout[i] = null;
+            targetIds[i] = null;
+        }
+        if (source == null || usableLookup == null) return;
+
+        int len = Mathf.Min(source.Length, targetLoadout.Length);
+        for (int i = 0; i < len; i++)
+        {
+            var slot = source[i];
+            if (slot == null) continue;
+            targetLoadout[i] = ResolveUsable(slot.assetName, usableLookup);
+            targetIds[i] = string.IsNullOrWhiteSpace(slot.instanceId) ? null : slot.instanceId;
+        }
+    }
+
+    private InventoryItem DeserializeInventoryItem(SavedInventoryItemData saved, (Dictionary<string, WeaponItem> weapons, Dictionary<string, UsableItemData> usables, Dictionary<string, ItemData> items) lookups)
+    {
+        if (saved == null) return null;
+        string type = string.IsNullOrWhiteSpace(saved.itemType) ? "item" : saved.itemType.Trim().ToLowerInvariant();
+        InventoryItem restored;
+
+        if (type == "weapon")
+        {
+            var weapon = ResolveWeapon(saved.assetName, lookups.weapons);
+            if (weapon == null) return null;
+            restored = new InventoryItem(weapon, 1, saved.title, saved.description);
+            restored.amount = 1;
+        }
+        else if (type == "usable")
+        {
+            var usable = ResolveUsable(saved.assetName, lookups.usables);
+            if (usable == null) return null;
+            restored = new InventoryItem(usable, Mathf.Max(1, saved.amount), saved.title, saved.description);
+        }
+        else
+        {
+            var item = ResolveItem(saved.assetName, lookups.items);
+            if (item == null) return null;
+            restored = new InventoryItem(item, Mathf.Max(1, saved.amount), saved.title, saved.description);
+        }
+
+        restored.instanceId = string.IsNullOrWhiteSpace(saved.instanceId) ? restored.instanceId : saved.instanceId;
+        if (!string.IsNullOrWhiteSpace(saved.title)) restored.title = saved.title;
+        if (!string.IsNullOrWhiteSpace(saved.description)) restored.description = saved.description;
+        return restored;
+    }
+
+    private static WeaponItem ResolveWeapon(string assetName, Dictionary<string, WeaponItem> lookup)
+    {
+        if (lookup == null || string.IsNullOrWhiteSpace(assetName)) return null;
+        lookup.TryGetValue(assetName.Trim().ToLowerInvariant(), out var result);
+        return result;
+    }
+
+    private static UsableItemData ResolveUsable(string assetName, Dictionary<string, UsableItemData> lookup)
+    {
+        if (lookup == null || string.IsNullOrWhiteSpace(assetName)) return null;
+        lookup.TryGetValue(assetName.Trim().ToLowerInvariant(), out var result);
+        return result;
+    }
+
+    private static ItemData ResolveItem(string assetName, Dictionary<string, ItemData> lookup)
+    {
+        if (lookup == null || string.IsNullOrWhiteSpace(assetName)) return null;
+        lookup.TryGetValue(assetName.Trim().ToLowerInvariant(), out var result);
+        return result;
+    }
+
+    private static (Dictionary<string, WeaponItem> weapons, Dictionary<string, UsableItemData> usables, Dictionary<string, ItemData> items) BuildAssetLookups()
+    {
+        var weaponLookup = new Dictionary<string, WeaponItem>();
+        var usableLookup = new Dictionary<string, UsableItemData>();
+        var itemLookup = new Dictionary<string, ItemData>();
+
+        RegisterWeapons(weaponLookup, Resources.LoadAll<WeaponItem>(""));
+        RegisterUsables(usableLookup, Resources.LoadAll<UsableItemData>(""));
+        RegisterItems(itemLookup, Resources.LoadAll<ItemData>(""));
+
+        RegisterWeapons(weaponLookup, Resources.FindObjectsOfTypeAll<WeaponItem>());
+        RegisterUsables(usableLookup, Resources.FindObjectsOfTypeAll<UsableItemData>());
+        RegisterItems(itemLookup, Resources.FindObjectsOfTypeAll<ItemData>());
+
+        return (weaponLookup, usableLookup, itemLookup);
+    }
+
+    private static void RegisterWeapons(Dictionary<string, WeaponItem> lookup, WeaponItem[] source)
+    {
+        if (lookup == null || source == null) return;
+        for (int i = 0; i < source.Length; i++)
+        {
+            var w = source[i];
+            if (w == null || string.IsNullOrWhiteSpace(w.name)) continue;
+            string key = w.name.Trim().ToLowerInvariant();
+            if (!lookup.ContainsKey(key)) lookup.Add(key, w);
+        }
+    }
+
+    private static void RegisterUsables(Dictionary<string, UsableItemData> lookup, UsableItemData[] source)
+    {
+        if (lookup == null || source == null) return;
+        for (int i = 0; i < source.Length; i++)
+        {
+            var u = source[i];
+            if (u == null || string.IsNullOrWhiteSpace(u.name)) continue;
+            string key = u.name.Trim().ToLowerInvariant();
+            if (!lookup.ContainsKey(key)) lookup.Add(key, u);
+        }
+    }
+
+    private static void RegisterItems(Dictionary<string, ItemData> lookup, ItemData[] source)
+    {
+        if (lookup == null || source == null) return;
+        for (int i = 0; i < source.Length; i++)
+        {
+            var it = source[i];
+            if (it == null || string.IsNullOrWhiteSpace(it.name)) continue;
+            string key = it.name.Trim().ToLowerInvariant();
+            if (!lookup.ContainsKey(key)) lookup.Add(key, it);
+        }
+    }
 }
 
 public enum Hand { Right, Left }

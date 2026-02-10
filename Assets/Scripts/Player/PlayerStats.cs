@@ -2,6 +2,7 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.SceneManagement;
 using System;
+using System.Collections.Generic;
 
 public class PlayerStats : MonoBehaviour, IDamageable
 {
@@ -59,6 +60,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private float lastStaminaUseTime;
     private float flaskTimer;
     private Animator animator;
+    private GameData loadedDataCache;
+    private bool loadedQuestStateApplied = false;
+    private bool loadedInventoryStateApplied = false;
 
     void Awake()
     {
@@ -92,6 +96,13 @@ public class PlayerStats : MonoBehaviour, IDamageable
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
+    void Start()
+    {
+        // Dopo tutti gli Awake, applica eventuale stato caricato (inventario/quest).
+        ApplyLoadedQuestStateIfPossible();
+        ApplyLoadedInventoryStateIfPossible();
+    }
+
     void OnDisable()
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
@@ -101,6 +112,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         AssignUIElements();
         UpdateAllUI();
+        ApplyLoadedQuestStateIfPossible();
+        ApplyLoadedInventoryStateIfPossible();
 
         // Ogni run parte senza monete portatili
         if (scene.name == "GameScene")
@@ -334,14 +347,31 @@ public class PlayerStats : MonoBehaviour, IDamageable
             bankSilver = this.bankSilver,
             bankCopper = this.bankCopper
         };
+
+        var questManager = QuestManager.Instance != null ? QuestManager.Instance : FindObjectOfType<QuestManager>();
+        if (questManager != null)
+        {
+            data.quests = SerializeQuests(questManager.GetQuestsSnapshot());
+        }
+        var playerInventory = FindObjectOfType<PlayerInventory>();
+        if (playerInventory != null)
+        {
+            data.playerInventory = playerInventory.CreateSaveData();
+        }
         // Aggiungi qui altre statistiche che vuoi salvare
 
         SaveSystem.SaveData(data);
+        loadedDataCache = data;
+        loadedQuestStateApplied = true;
+        loadedInventoryStateApplied = true;
     }
 
     public void LoadStats()
     {
         GameData data = SaveSystem.LoadData();
+        loadedDataCache = data;
+        loadedQuestStateApplied = false;
+        loadedInventoryStateApplied = false;
         if (data != null)
         {
             this.karma = data.karma;
@@ -350,6 +380,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
             this.bankGold = data.bankGold;
             this.bankSilver = data.bankSilver;
             this.bankCopper = data.bankCopper;
+            ApplyLoadedQuestStateIfPossible();
+            ApplyLoadedInventoryStateIfPossible();
             // Aggiungi qui altre statistiche che vuoi caricare
 
             Debug.Log("Dati persistenti caricati da file!");
@@ -508,5 +540,253 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private void NotifyRunWalletChanged()
     {
         OnRunWalletChanged?.Invoke(runGold, runSilver, runCopper);
+    }
+
+    private void ApplyLoadedQuestStateIfPossible()
+    {
+        if (loadedQuestStateApplied) return;
+        if (loadedDataCache == null || loadedDataCache.quests == null) return;
+
+        var questManager = QuestManager.Instance != null ? QuestManager.Instance : FindObjectOfType<QuestManager>();
+        if (questManager == null) return;
+
+        var mapped = DeserializeQuests(loadedDataCache.quests);
+        questManager.ReplaceAllQuests(mapped);
+        loadedQuestStateApplied = true;
+    }
+
+    private void ApplyLoadedInventoryStateIfPossible()
+    {
+        if (loadedInventoryStateApplied) return;
+        if (loadedDataCache == null || loadedDataCache.playerInventory == null) return;
+
+        var playerInventory = FindObjectOfType<PlayerInventory>();
+        if (playerInventory == null) return;
+
+        playerInventory.ApplySaveData(loadedDataCache.playerInventory);
+        loadedInventoryStateApplied = true;
+    }
+
+    private static SavedQuestData[] SerializeQuests(List<QuestManager.QuestData> source)
+    {
+        if (source == null || source.Count == 0) return Array.Empty<SavedQuestData>();
+
+        var result = new SavedQuestData[source.Count];
+        for (int i = 0; i < source.Count; i++)
+        {
+            var q = source[i];
+            if (q == null) continue;
+
+            result[i] = new SavedQuestData
+            {
+                questId = q.questId,
+                title = q.title,
+                location = q.location,
+                completed = q.completed,
+                questTypeLabel = q.questTypeLabel,
+                recommendedLabel = q.recommendedLabel,
+                loreTitle = q.loreTitle,
+                loreDescription = q.loreDescription,
+                loreAuthor = q.loreAuthor,
+                objectives = SerializeObjectives(q.objectives),
+                rewards = SerializeRewards(q.rewards)
+            };
+        }
+
+        return result;
+    }
+
+    private static SavedQuestObjectiveData[] SerializeObjectives(List<QuestManager.QuestObjectiveData> source)
+    {
+        if (source == null || source.Count == 0) return Array.Empty<SavedQuestObjectiveData>();
+
+        var result = new SavedQuestObjectiveData[source.Count];
+        for (int i = 0; i < source.Count; i++)
+        {
+            var obj = source[i];
+            if (obj == null) continue;
+            result[i] = new SavedQuestObjectiveData
+            {
+                title = obj.title,
+                description = obj.description,
+                completed = obj.completed
+            };
+        }
+
+        return result;
+    }
+
+    private static SavedQuestRewardData[] SerializeRewards(List<QuestManager.QuestRewardData> source)
+    {
+        if (source == null || source.Count == 0) return Array.Empty<SavedQuestRewardData>();
+
+        var result = new SavedQuestRewardData[source.Count];
+        for (int i = 0; i < source.Count; i++)
+        {
+            var r = source[i];
+            if (r == null) continue;
+            result[i] = new SavedQuestRewardData
+            {
+                type = r.type,
+                amount = r.amount,
+                itemName = r.itemName,
+                iconName = r.icon != null ? r.icon.name : string.Empty
+            };
+        }
+
+        return result;
+    }
+
+    private static List<QuestManager.QuestData> DeserializeQuests(SavedQuestData[] source)
+    {
+        var result = new List<QuestManager.QuestData>();
+        if (source == null || source.Length == 0) return result;
+        var iconLookup = BuildRewardIconLookup();
+
+        for (int i = 0; i < source.Length; i++)
+        {
+            var q = source[i];
+            if (q == null) continue;
+
+            result.Add(new QuestManager.QuestData
+            {
+                questId = q.questId,
+                title = q.title,
+                location = q.location,
+                completed = q.completed,
+                questTypeLabel = q.questTypeLabel,
+                recommendedLabel = q.recommendedLabel,
+                loreTitle = q.loreTitle,
+                loreDescription = q.loreDescription,
+                loreAuthor = q.loreAuthor,
+                objectives = DeserializeObjectives(q.objectives),
+                rewards = DeserializeRewards(q.rewards, iconLookup)
+            });
+        }
+
+        return result;
+    }
+
+    private static List<QuestManager.QuestObjectiveData> DeserializeObjectives(SavedQuestObjectiveData[] source)
+    {
+        var result = new List<QuestManager.QuestObjectiveData>();
+        if (source == null || source.Length == 0) return result;
+
+        for (int i = 0; i < source.Length; i++)
+        {
+            var obj = source[i];
+            if (obj == null) continue;
+            result.Add(new QuestManager.QuestObjectiveData
+            {
+                title = obj.title,
+                description = obj.description,
+                completed = obj.completed
+            });
+        }
+
+        return result;
+    }
+
+    private static List<QuestManager.QuestRewardData> DeserializeRewards(SavedQuestRewardData[] source, Dictionary<string, Sprite> iconLookup)
+    {
+        var result = new List<QuestManager.QuestRewardData>();
+        if (source == null || source.Length == 0) return result;
+
+        for (int i = 0; i < source.Length; i++)
+        {
+            var r = source[i];
+            if (r == null) continue;
+            Sprite resolvedIcon = ResolveRewardIcon(r, iconLookup);
+            result.Add(new QuestManager.QuestRewardData
+            {
+                type = r.type,
+                amount = r.amount,
+                itemName = r.itemName,
+                icon = resolvedIcon
+            });
+        }
+
+        return result;
+    }
+
+    private static Sprite ResolveRewardIcon(SavedQuestRewardData reward, Dictionary<string, Sprite> iconLookup)
+    {
+        if (reward == null || iconLookup == null || iconLookup.Count == 0) return null;
+
+        string iconKey = NormalizeLookupKey(reward.iconName);
+        if (!string.IsNullOrEmpty(iconKey) && iconLookup.TryGetValue(iconKey, out var iconByName))
+            return iconByName;
+
+        string itemKey = NormalizeLookupKey(reward.itemName);
+        if (!string.IsNullOrEmpty(itemKey) && iconLookup.TryGetValue(itemKey, out var iconByItemName))
+            return iconByItemName;
+
+        return null;
+    }
+
+    private static Dictionary<string, Sprite> BuildRewardIconLookup()
+    {
+        var lookup = new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
+        RegisterWeaponIcons(lookup, Resources.LoadAll<WeaponItem>(""));
+        RegisterUsableIcons(lookup, Resources.LoadAll<UsableItemData>(""));
+        RegisterItemIcons(lookup, Resources.LoadAll<ItemData>(""));
+
+        // Fallback: include anche asset già caricati in memoria (scene/editor/runtime)
+        RegisterWeaponIcons(lookup, Resources.FindObjectsOfTypeAll<WeaponItem>());
+        RegisterUsableIcons(lookup, Resources.FindObjectsOfTypeAll<UsableItemData>());
+        RegisterItemIcons(lookup, Resources.FindObjectsOfTypeAll<ItemData>());
+
+        return lookup;
+    }
+
+    private static void RegisterWeaponIcons(Dictionary<string, Sprite> lookup, WeaponItem[] items)
+    {
+        if (lookup == null || items == null) return;
+        for (int i = 0; i < items.Length; i++)
+        {
+            var w = items[i];
+            if (w == null) continue;
+            RegisterIcon(lookup, w.icon, w.weaponName);
+        }
+    }
+
+    private static void RegisterUsableIcons(Dictionary<string, Sprite> lookup, UsableItemData[] items)
+    {
+        if (lookup == null || items == null) return;
+        for (int i = 0; i < items.Length; i++)
+        {
+            var u = items[i];
+            if (u == null) continue;
+            RegisterIcon(lookup, u.icon, u.itemName);
+        }
+    }
+
+    private static void RegisterItemIcons(Dictionary<string, Sprite> lookup, ItemData[] items)
+    {
+        if (lookup == null || items == null) return;
+        for (int i = 0; i < items.Length; i++)
+        {
+            var it = items[i];
+            if (it == null) continue;
+            RegisterIcon(lookup, it.icon, it.itemName);
+        }
+    }
+
+    private static void RegisterIcon(Dictionary<string, Sprite> lookup, Sprite icon, string itemName)
+    {
+        if (lookup == null || icon == null) return;
+
+        string iconKey = NormalizeLookupKey(icon.name);
+        if (!string.IsNullOrEmpty(iconKey) && !lookup.ContainsKey(iconKey))
+            lookup.Add(iconKey, icon);
+
+        string itemKey = NormalizeLookupKey(itemName);
+        if (!string.IsNullOrEmpty(itemKey) && !lookup.ContainsKey(itemKey))
+            lookup.Add(itemKey, icon);
+    }
+
+    private static string NormalizeLookupKey(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
     }
 }

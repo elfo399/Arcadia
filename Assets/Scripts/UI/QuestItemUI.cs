@@ -1,10 +1,14 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class QuestItemUI : MonoBehaviour
 {
     [SerializeField] private TextMeshProUGUI questNameText;
     [SerializeField] private TextMeshProUGUI questLocationText;
+    [SerializeField] private Image backgroundImage;
+    [SerializeField] private Color selectedBackgroundColor = new Color(0.34f, 0.34f, 0.34f, 0.95f);
+    [SerializeField] private Color normalBackgroundColor = new Color(0.22f, 0.22f, 0.22f, 0.88f);
 
     private void Awake()
     {
@@ -22,13 +26,44 @@ public class QuestItemUI : MonoBehaviour
             questLocationText.text = string.IsNullOrWhiteSpace(location) ? "Unknown" : location;
     }
 
+    public void SetSelected(bool selected)
+    {
+        ResolveReferences();
+        if (backgroundImage != null)
+            backgroundImage.color = selected ? selectedBackgroundColor : normalBackgroundColor;
+    }
+
     private void ResolveReferences()
     {
+        if (backgroundImage == null)
+            backgroundImage = GetComponent<Image>();
+
+        if (backgroundImage == null)
+        {
+            var panel = transform.Find("Panel");
+            if (panel != null)
+                backgroundImage = panel.GetComponent<Image>();
+        }
+
         if (questNameText == null)
         {
             var nameTransform = transform.Find("Name");
             if (nameTransform != null)
                 questNameText = nameTransform.GetComponent<TextMeshProUGUI>();
+
+            if (questNameText == null)
+            {
+                var titleTransform = transform.Find("Title");
+                if (titleTransform != null)
+                    questNameText = titleTransform.GetComponent<TextMeshProUGUI>();
+            }
+
+            if (questNameText == null)
+            {
+                var panelTitle = transform.Find("Panel/Title");
+                if (panelTitle != null)
+                    questNameText = panelTitle.GetComponent<TextMeshProUGUI>();
+            }
         }
 
         if (questLocationText == null)
@@ -36,6 +71,20 @@ public class QuestItemUI : MonoBehaviour
             var locationTransform = transform.Find("Location");
             if (locationTransform != null)
                 questLocationText = locationTransform.GetComponent<TextMeshProUGUI>();
+
+            if (questLocationText == null)
+            {
+                var panelLocation = transform.Find("Panel/Location");
+                if (panelLocation != null)
+                    questLocationText = panelLocation.GetComponent<TextMeshProUGUI>();
+            }
+
+            if (questLocationText == null)
+            {
+                var panelLoction = transform.Find("Panel/Loction");
+                if (panelLoction != null)
+                    questLocationText = panelLoction.GetComponent<TextMeshProUGUI>();
+            }
         }
 
         if (questNameText == null || questLocationText == null)
@@ -46,8 +95,8 @@ public class QuestItemUI : MonoBehaviour
                 if (allTexts[i] == null) continue;
 
                 string n = allTexts[i].gameObject.name.ToLowerInvariant();
-                if (questNameText == null && n.Contains("name")) questNameText = allTexts[i];
-                if (questLocationText == null && n.Contains("location")) questLocationText = allTexts[i];
+                if (questNameText == null && (n.Contains("name") || n.Contains("title"))) questNameText = allTexts[i];
+                if (questLocationText == null && (n.Contains("location") || n.Contains("loction"))) questLocationText = allTexts[i];
             }
         }
     }

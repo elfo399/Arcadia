@@ -13,6 +13,30 @@ public class QuestManager : MonoBehaviour
         public string title;
         public string location;
         public bool completed;
+        public string questTypeLabel = "Main Quest";
+        public string recommendedLabel = "";
+        public string loreTitle = "";
+        [TextArea(2, 6)] public string loreDescription = "";
+        public string loreAuthor = "";
+        public List<QuestObjectiveData> objectives = new();
+        public List<QuestRewardData> rewards = new();
+    }
+
+    [Serializable]
+    public class QuestObjectiveData
+    {
+        public string title;
+        public string description;
+        public bool completed;
+    }
+
+    [Serializable]
+    public class QuestRewardData
+    {
+        public Sprite icon;
+        public string type;
+        public int amount = 1;
+        public string itemName;
     }
 
     [Header("Settings")]
@@ -172,8 +196,56 @@ public class QuestManager : MonoBehaviour
             questId = source.questId,
             title = source.title,
             location = source.location,
-            completed = source.completed
+            completed = source.completed,
+            questTypeLabel = source.questTypeLabel,
+            recommendedLabel = source.recommendedLabel,
+            loreTitle = source.loreTitle,
+            loreDescription = source.loreDescription,
+            loreAuthor = source.loreAuthor,
+            objectives = CloneObjectives(source.objectives),
+            rewards = CloneRewards(source.rewards)
         };
+    }
+
+    private static List<QuestObjectiveData> CloneObjectives(List<QuestObjectiveData> source)
+    {
+        var result = new List<QuestObjectiveData>();
+        if (source == null) return result;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            var entry = source[i];
+            if (entry == null) continue;
+            result.Add(new QuestObjectiveData
+            {
+                title = entry.title,
+                description = entry.description,
+                completed = entry.completed
+            });
+        }
+
+        return result;
+    }
+
+    private static List<QuestRewardData> CloneRewards(List<QuestRewardData> source)
+    {
+        var result = new List<QuestRewardData>();
+        if (source == null) return result;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            var entry = source[i];
+            if (entry == null) continue;
+            result.Add(new QuestRewardData
+            {
+                icon = entry.icon,
+                type = entry.type,
+                amount = entry.amount,
+                itemName = entry.itemName
+            });
+        }
+
+        return result;
     }
 
     private static string NormalizeQuestId(string questId, string title, string location)
