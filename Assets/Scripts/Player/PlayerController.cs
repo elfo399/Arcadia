@@ -209,6 +209,15 @@ public class PlayerController : MonoBehaviour
     {
         if (inventoryUI == null) return;
 
+        // Cerchio / back: prima prova a tornare indietro nel menu corrente, altrimenti chiude l'inventario.
+        if (Controls.Player.SprintOrDodge.WasPerformedThisFrame())
+        {
+            bool consumed = inventoryUI.HandlePadBack();
+            if (!consumed)
+                ToggleInventory();
+            return;
+        }
+
         bool rightPressed = (Keyboard.current != null && Keyboard.current.rightArrowKey.wasPressedThisFrame)
             || (Gamepad.current != null && Gamepad.current.dpad.right.wasPressedThisFrame);
         bool leftPressed = (Keyboard.current != null && Keyboard.current.leftArrowKey.wasPressedThisFrame)
@@ -219,6 +228,63 @@ public class PlayerController : MonoBehaviour
             || (Gamepad.current != null && Gamepad.current.dpad.up.wasPressedThisFrame);
 
         bool inEquipmentCross = inventoryUI.IsEquipmentCrossModeActive();
+        bool inQuestTab = inventoryUI.IsQuestTabOpen();
+
+        if (inQuestTab)
+        {
+            // Triangolo: shortcut ai filtri
+            bool trianglePressed = Controls.Player.Interact.WasPerformedThisFrame()
+                || (Gamepad.current != null && Gamepad.current.buttonNorth.wasPressedThisFrame);
+            if (trianglePressed)
+            {
+                inventoryUI.ForcePadFocusMode();
+                inventoryUI.FocusQuestPadFilters();
+                lastInventoryPadMoveTime = Time.time;
+                return;
+            }
+
+            if (rightPressed) inventoryUI.MoveQuestPadFocusHorizontal(1);
+            if (leftPressed) inventoryUI.MoveQuestPadFocusHorizontal(-1);
+            if (downPressed) inventoryUI.MoveQuestPadFocusVertical(1);
+            if (upPressed) inventoryUI.MoveQuestPadFocusVertical(-1);
+
+            Vector2 questNav = Controls.Player.Move.ReadValue<Vector2>();
+            if (Time.time >= lastInventoryPadMoveTime + inventoryPadMoveCooldown)
+            {
+                if (questNav.x > 0.5f)
+                {
+                    inventoryUI.MoveQuestPadFocusHorizontal(1);
+                    lastInventoryPadMoveTime = Time.time;
+                }
+                else if (questNav.x < -0.5f)
+                {
+                    inventoryUI.MoveQuestPadFocusHorizontal(-1);
+                    lastInventoryPadMoveTime = Time.time;
+                }
+                else if (questNav.y > 0.5f)
+                {
+                    inventoryUI.MoveQuestPadFocusVertical(-1);
+                    lastInventoryPadMoveTime = Time.time;
+                }
+                else if (questNav.y < -0.5f)
+                {
+                    inventoryUI.MoveQuestPadFocusVertical(1);
+                    lastInventoryPadMoveTime = Time.time;
+                }
+            }
+
+            if (Controls.Player.Jump.WasPerformedThisFrame())
+                inventoryUI.ConfirmQuestPadSelection();
+
+            // Analogico destro: scroll dettaglio quest
+            if (Gamepad.current != null)
+            {
+                Vector2 rightStick = Gamepad.current.rightStick.ReadValue();
+                inventoryUI.ScrollQuestDetailByPad(rightStick.y, Time.unscaledDeltaTime);
+            }
+
+            return;
+        }
 
         // DPad dedicated actions
         if ((cycleRightEquipAction != null && cycleRightEquipAction.WasPerformedThisFrame()) || rightPressed)

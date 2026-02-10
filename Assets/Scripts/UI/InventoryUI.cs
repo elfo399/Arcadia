@@ -102,11 +102,13 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private GameObject questObjectivePrefab;
     [SerializeField] private Transform questRewardsContainer;
     [SerializeField] private GameObject questRewardPrefab;
+    [SerializeField] private Button questClaimRewardButton;
     [SerializeField] private ScrollRect questDetailScrollRect;
     [SerializeField] private bool preserveQuestScrollPosition = false;
     [SerializeField] private bool smoothQuestMouseWheel = true;
     [SerializeField] private float questMouseWheelStepNormalized = 0.10f;
     [SerializeField] private float questMouseWheelSmoothSpeed = 14f;
+    [SerializeField] private float questPadRightStickScrollSpeed = 0.65f;
 
     private enum QuestFilter { All, Active, Completed }
     private QuestFilter currentQuestFilter = QuestFilter.All;
@@ -121,10 +123,22 @@ public class InventoryUI : MonoBehaviour
     private Color questActiveFilterBaseColor = Color.white;
     private Color questCompletedFilterBaseColor = Color.white;
     private string selectedQuestId = null;
+    private enum QuestPadSection { Filters, List, Detail }
+    private QuestPadSection questPadSection = QuestPadSection.Filters;
+    private int questPadFilterIndex = 0; // 0=Active, 1=Completed
+    private int questPadListIndex = 0;
+    [SerializeField] private Color questPadFocusBorderColor = new Color(1f, 0.85f, 0.2f, 1f);
+    [SerializeField] private Vector2 questPadFocusBorderThickness = new Vector2(3f, 3f);
+    private GameObject questFocusedObject;
+    private Outline questFocusOutline;
+    private float padFocusLockUntil = 0f;
+    private const float PadFocusLockDuration = 0.35f;
     private float questTargetScrollNormalized = 1f;
     private bool questTargetScrollInitialized = false;
     private bool questObjectivesDefaultPosCached = false;
     private Vector2 questObjectivesDefaultAnchoredPos;
+    private float suppressQuestRowClickUntil = 0f;
+    private int lastQuestFilterToggleFrame = -1;
 
     [Header("Drag & Drop")]
     [SerializeField] private Canvas dragCanvas; // opzionale: se null usa quello più alto trovato
@@ -539,6 +553,7 @@ public class InventoryUI : MonoBehaviour
         {
             InitializeQuestUIIfNeeded();
             RefreshQuestUI();
+            FocusQuestPadDefault();
         }
     }
 
@@ -616,15 +631,22 @@ public class InventoryUI : MonoBehaviour
 
     public void SetQuestFilterActive()
     {
-        InitializeQuestUIIfNeeded();
-        currentQuestFilter = currentQuestFilter == QuestFilter.Active ? QuestFilter.All : QuestFilter.Active;
-        RefreshQuestUI();
+        ToggleQuestFilter(QuestFilter.Active);
     }
 
     public void SetQuestFilterCompleted()
     {
+        ToggleQuestFilter(QuestFilter.Completed);
+    }
+
+    private void ToggleQuestFilter(QuestFilter target)
+    {
+        if (lastQuestFilterToggleFrame == Time.frameCount)
+            return;
+
+        lastQuestFilterToggleFrame = Time.frameCount;
         InitializeQuestUIIfNeeded();
-        currentQuestFilter = currentQuestFilter == QuestFilter.Completed ? QuestFilter.All : QuestFilter.Completed;
+        currentQuestFilter = currentQuestFilter == target ? QuestFilter.All : target;
         RefreshQuestUI();
     }
 
@@ -815,6 +837,9 @@ public class InventoryUI : MonoBehaviour
         UpdateQuestCounters();
         RebuildQuestRows();
         RefreshSelectedQuestDetails();
+        ClampQuestPadIndices();
+        if (showPadFocus && IsQuestTabActive())
+            ApplyQuestPadFocusVisual();
     }
 
     private void TryBindQuestManager()
@@ -888,8 +913,16 @@ public class InventoryUI : MonoBehaviour
 
     private void OnQuestRowClicked(string questId)
     {
+        if (Time.unscaledTime < suppressQuestRowClickUntil)
+            return;
+
+        // Evita submit "fantasma" della row quando il pad è in modalità filtri.
+        if (IsQuestTabActive() && showPadFocus && questPadSection == QuestPadSection.Filters)
+            return;
+
         if (string.IsNullOrWhiteSpace(questId)) return;
         selectedQuestId = questId.Trim();
+        SyncQuestPadListIndexToSelection();
         RebuildQuestRows();
         RefreshSelectedQuestDetails();
     }
@@ -938,9 +971,17 @@ public class InventoryUI : MonoBehaviour
         if (questDetailLoreDescriptionText != null) questDetailLoreDescriptionText.text = quest != null ? (quest.loreDescription ?? string.Empty) : string.Empty;
         if (questDetailLoreAuthorText != null) questDetailLoreAuthorText.text = quest != null ? (quest.loreAuthor ?? string.Empty) : string.Empty;
         UpdateQuestLoreVisibilityAndLayout(quest);
+        UpdateQuestClaimButtonState(quest);
 
         RebuildQuestObjectiveRows(quest);
         RebuildQuestRewardRows(quest);
+    }
+
+    private void UpdateQuestClaimButtonState(QuestEntryData quest)
+    {
+        if (questClaimRewardButton == null) return;
+        bool canClaim = quest != null && quest.completed && quest.rewards != null && quest.rewards.Count > 0;
+        questClaimRewardButton.interactable = canClaim;
     }
 
     private void UpdateQuestLoreVisibilityAndLayout(QuestEntryData quest)
@@ -1062,6 +1103,8 @@ public class InventoryUI : MonoBehaviour
 
             spawnedQuestRows.Add(row);
         }
+
+        ClampQuestPadIndices();
     }
 
     private void ClearSpawnedQuestRows()
@@ -1253,6 +1296,12 @@ public class InventoryUI : MonoBehaviour
                 questRewardsContainer = FindDeepChildByName(rightSide, "RewardContainer")
                                        ?? FindDeepChildByName(rightSide, "Rewards")
                                        ?? FindDeepChildByName(rightSide, "RewardList");
+
+            if (questClaimRewardButton == null)
+            {
+                var claim = FindDeepChildByName(rightSide, "Claim");
+                if (claim != null) questClaimRewardButton = claim.GetComponent<Button>();
+            }
         }
 
         if (questObjectivesContainer != null && questObjectivePrefab == null && questObjectivesContainer.childCount > 0)
@@ -1321,11 +1370,15 @@ public class InventoryUI : MonoBehaviour
         {
             var tab = tabs[i];
             if (tab == null || tab.background == null) continue;
-            if (!string.Equals(tab.key, "Quest", System.StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(tab.key, "Quests", System.StringComparison.OrdinalIgnoreCase))
-                continue;
+            if (!tab.background.activeInHierarchy) continue;
 
-            return tab.background.activeInHierarchy;
+            bool keyMatches = string.Equals(tab.key, "Quest", System.StringComparison.OrdinalIgnoreCase)
+                              || string.Equals(tab.key, "Quests", System.StringComparison.OrdinalIgnoreCase)
+                              || string.Equals(tab.key, "Journal", System.StringComparison.OrdinalIgnoreCase);
+            if (keyMatches) return true;
+
+            if (questListContainer != null && questListContainer.IsChildOf(tab.background.transform))
+                return true;
         }
 
         return false;
@@ -1375,6 +1428,8 @@ public class InventoryUI : MonoBehaviour
                 ? questFilterSelectedColor
                 : questCompletedFilterBaseColor;
         }
+
+        ApplyQuestFilterPadFocusHighlight();
     }
 
     private static Button EnsureFilterButton(GameObject target)
@@ -2694,8 +2749,12 @@ public class InventoryUI : MonoBehaviour
         bool kbMouseUsed = DetectKeyboardMouseInputThisFrame();
 
         bool newState = showPadFocus;
-        if (gamepadUsed) newState = true;
-        if (kbMouseUsed) newState = false;
+        if (gamepadUsed)
+        {
+            newState = true;
+            padFocusLockUntil = Time.unscaledTime + PadFocusLockDuration;
+        }
+        if (kbMouseUsed && Time.unscaledTime >= padFocusLockUntil) newState = false;
 
         if (newState == showPadFocus) return;
         showPadFocus = newState;
@@ -2706,6 +2765,10 @@ public class InventoryUI : MonoBehaviour
     {
         ApplyPadFocusVisual(showPadFocus ? padFocusIndex : -1);
         ApplyEquipmentCrossFocusVisual();
+        if (showPadFocus && IsQuestTabActive())
+            ApplyQuestPadFocusVisual();
+        else
+            ClearQuestPadFocusVisual();
     }
 
     private bool DetectGamepadInputThisFrame()
@@ -2769,6 +2832,502 @@ public class InventoryUI : MonoBehaviour
         return Mathf.Max(1, Mathf.CeilToInt(Mathf.Sqrt(slots.Count)));
     }
 
+    public bool IsQuestTabOpen()
+    {
+        return IsQuestTabActive();
+    }
+
+    public void FocusQuestPadDefault()
+    {
+        ForcePadFocusMode(PadFocusLockDuration);
+        questPadSection = HasVisibleQuests() ? QuestPadSection.List : QuestPadSection.Filters;
+        questPadFilterIndex = Mathf.Clamp(questPadFilterIndex, 0, 1);
+        SyncQuestPadListIndexToSelection();
+        ApplyQuestPadFocusVisual();
+    }
+
+    public void FocusQuestPadFilters()
+    {
+        ForcePadFocusMode(PadFocusLockDuration);
+        questPadSection = QuestPadSection.Filters;
+        questPadFilterIndex = currentQuestFilter == QuestFilter.Completed ? 1 : 0;
+        ApplyQuestPadFocusVisual();
+    }
+
+    public void ForcePadFocusMode(float lockDuration = 0.35f)
+    {
+        showPadFocus = true;
+        padFocusLockUntil = Mathf.Max(padFocusLockUntil, Time.unscaledTime + Mathf.Max(0f, lockDuration));
+        RefreshFocusVisualState();
+    }
+
+    public void MoveQuestPadFocusHorizontal(int direction)
+    {
+        if (questPadSection == QuestPadSection.Detail)
+        {
+            ApplyQuestPadFocusVisual();
+            return;
+        }
+
+        int dir = direction >= 0 ? 1 : -1;
+        if (dir > 0 && HasVisibleQuests())
+            questPadSection = QuestPadSection.List;
+        // Il passaggio ai filtri avviene solo con Triangolo.
+
+        ApplyQuestPadFocusVisual();
+    }
+
+    public void MoveQuestPadFocusVertical(int direction)
+    {
+        int dir = direction >= 0 ? 1 : -1;
+        if (questPadSection == QuestPadSection.Filters)
+        {
+            questPadFilterIndex = Mathf.Clamp(questPadFilterIndex + dir, 0, 1);
+        }
+        else if (questPadSection == QuestPadSection.List)
+        {
+            int count = GetVisibleQuestCount();
+            if (count > 0)
+                questPadListIndex = (questPadListIndex + dir + count) % count;
+        }
+
+        ApplyQuestPadFocusVisual();
+    }
+
+    public void ConfirmQuestPadSelection()
+    {
+        int focusedFilterIndex = GetFocusedQuestFilterIndex();
+        if (focusedFilterIndex >= 0)
+        {
+            questPadSection = QuestPadSection.Filters;
+            questPadFilterIndex = focusedFilterIndex;
+            suppressQuestRowClickUntil = Time.unscaledTime + 0.35f;
+
+            if (questPadFilterIndex == 0) SetQuestFilterActive();
+            else SetQuestFilterCompleted();
+
+            var filterButton = GetQuestFilterButtonObject(questPadFilterIndex);
+            if (filterButton != null && EventSystem.current != null)
+                EventSystem.current.SetSelectedGameObject(filterButton);
+
+            ApplyQuestPadFocusVisual();
+            return;
+        }
+
+        if (questPadSection == QuestPadSection.Filters)
+        {
+            suppressQuestRowClickUntil = Time.unscaledTime + 0.35f;
+
+            if (questPadFilterIndex == 0) SetQuestFilterActive();
+            else SetQuestFilterCompleted();
+
+            var filterButton = GetQuestFilterButtonObject(questPadFilterIndex);
+            if (filterButton != null && EventSystem.current != null)
+                EventSystem.current.SetSelectedGameObject(filterButton);
+
+            ApplyQuestPadFocusVisual();
+            return;
+        }
+
+        if (questPadSection == QuestPadSection.List)
+        {
+            string questId = GetVisibleQuestIdAt(questPadListIndex);
+            if (string.IsNullOrWhiteSpace(questId)) return;
+            OnQuestRowClicked(questId);
+            questPadSection = QuestPadSection.Detail;
+            ApplyQuestPadFocusVisual();
+            return;
+        }
+
+        if (questPadSection == QuestPadSection.Detail)
+        {
+            if (questClaimRewardButton != null && questClaimRewardButton.interactable)
+                questClaimRewardButton.onClick.Invoke();
+        }
+
+        ApplyQuestPadFocusVisual();
+    }
+
+    private int GetFocusedQuestFilterIndex()
+    {
+        var selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+        if (selected != null)
+        {
+            var activeFilter = GetQuestFilterButtonObject(0);
+            var completedFilter = GetQuestFilterButtonObject(1);
+            if (IsSameOrChildOf(selected, activeFilter)) return 0;
+            if (IsSameOrChildOf(selected, completedFilter)) return 1;
+            if (IsSameOrChildOf(selected, questActiveFilterLabelText != null ? questActiveFilterLabelText.gameObject : null)) return 0;
+            if (IsSameOrChildOf(selected, questCompletedFilterLabelText != null ? questCompletedFilterLabelText.gameObject : null)) return 1;
+            if (IsSameOrChildOf(selected, questActiveCountText != null ? questActiveCountText.gameObject : null)) return 0;
+            if (IsSameOrChildOf(selected, questCompletedCountText != null ? questCompletedCountText.gameObject : null)) return 1;
+        }
+
+        if (questPadSection == QuestPadSection.Filters)
+            return Mathf.Clamp(questPadFilterIndex, 0, 1);
+
+        return -1;
+    }
+
+    private bool IsQuestFilterSelectionActive()
+    {
+        return GetFocusedQuestFilterIndex() >= 0;
+    }
+
+    private static bool IsSameOrChildOf(GameObject current, GameObject target)
+    {
+        if (current == null || target == null) return false;
+        if (current == target) return true;
+        return current.transform.IsChildOf(target.transform);
+    }
+
+    private void ApplyQuestPadFilterSelection()
+    {
+        InitializeQuestUIIfNeeded();
+
+        var target = questPadFilterIndex == 0 ? QuestFilter.Active : QuestFilter.Completed;
+        currentQuestFilter = currentQuestFilter == target ? QuestFilter.All : target;
+
+        // Se la selezione attuale non è più visibile nel nuovo filtro, aggancia la prima disponibile.
+        var selectedVisible = GetSelectedVisibleQuest();
+        if (selectedVisible == null)
+            selectedQuestId = GetVisibleQuestIdAt(0);
+
+        UpdateQuestFilterVisuals();
+        UpdateQuestCounters();
+        RebuildQuestRows();
+        RefreshSelectedQuestDetails();
+        ClampQuestPadIndices();
+
+        questPadSection = HasVisibleQuests() ? QuestPadSection.List : QuestPadSection.Filters;
+        ApplyQuestPadFocusVisual();
+    }
+
+    public void ScrollQuestDetailByPad(float axisY, float deltaTime)
+    {
+        if (!IsQuestTabActive()) return;
+        if (questPadSection != QuestPadSection.Detail) return;
+        if (questDetailScrollRect == null || !questDetailScrollRect.vertical) return;
+        if (Mathf.Abs(axisY) < 0.15f) return;
+
+        float delta = axisY * questPadRightStickScrollSpeed * Mathf.Max(0.001f, deltaTime);
+        float next = Mathf.Clamp01(questDetailScrollRect.verticalNormalizedPosition + delta);
+        questDetailScrollRect.verticalNormalizedPosition = next;
+    }
+
+    public bool HandlePadBack()
+    {
+        // Quest flow: dettaglio -> lista -> filtri -> close menu
+        if (IsQuestTabActive())
+        {
+            if (questPadSection == QuestPadSection.Detail)
+            {
+                questPadSection = HasVisibleQuests() ? QuestPadSection.List : QuestPadSection.Filters;
+                ApplyQuestPadFocusVisual();
+                return true;
+            }
+            if (questPadSection == QuestPadSection.Filters && HasVisibleQuests())
+            {
+                questPadSection = QuestPadSection.List;
+                ApplyQuestPadFocusVisual();
+                return true;
+            }
+        }
+
+        // Equipment flow: dalla griglia inventario torna alla croce
+        if (currentEquipTarget != EquipTarget.None && inventoryBackground != null && inventoryBackground.activeInHierarchy)
+        {
+            CloseEquipGrid();
+            FocusEquipmentCrossDefault();
+            return true;
+        }
+
+        return false;
+    }
+
+    private void ApplyQuestPadFocusVisual()
+    {
+        if (!IsQuestTabActive())
+        {
+            ClearQuestPadFocusVisual();
+            ApplyQuestFilterPadFocusHighlight();
+            return;
+        }
+
+        GameObject selectedTarget = null;
+        GameObject visualTarget = null;
+        if (questPadSection == QuestPadSection.Filters)
+        {
+            selectedTarget = GetQuestFilterButtonObject(questPadFilterIndex);
+            visualTarget = GetQuestFilterVisualObject(questPadFilterIndex);
+        }
+        else if (questPadSection == QuestPadSection.List)
+        {
+            var rowButton = GetVisibleQuestRowAt(questPadListIndex);
+            selectedTarget = rowButton != null ? rowButton.gameObject : null;
+            visualTarget = selectedTarget;
+        }
+        else if (questPadSection == QuestPadSection.Detail)
+        {
+            selectedTarget = questClaimRewardButton != null ? questClaimRewardButton.gameObject : null;
+            visualTarget = selectedTarget;
+        }
+
+        bool allowVisualAsSelection = questPadSection != QuestPadSection.Filters;
+        if (selectedTarget == null && allowVisualAsSelection) selectedTarget = visualTarget;
+        if (visualTarget == null) visualTarget = selectedTarget;
+
+        if (EventSystem.current != null)
+        {
+            if (selectedTarget != null)
+                EventSystem.current.SetSelectedGameObject(selectedTarget);
+            else if (questPadSection == QuestPadSection.Filters)
+                EventSystem.current.SetSelectedGameObject(null);
+        }
+
+        SetQuestPadFocusVisualTarget(showPadFocus ? visualTarget : null);
+        ApplyQuestFilterPadFocusHighlight();
+    }
+
+    private void SetQuestPadFocusVisualTarget(GameObject target)
+    {
+        target = ResolveQuestFocusGraphicTarget(target);
+
+        if (target == questFocusedObject && questFocusOutline != null)
+        {
+            questFocusOutline.enabled = true;
+            questFocusOutline.effectColor = questPadFocusBorderColor;
+            questFocusOutline.effectDistance = questPadFocusBorderThickness;
+            return;
+        }
+
+        ClearQuestPadFocusVisual();
+        if (target == null) return;
+
+        var outline = target.GetComponent<Outline>();
+        bool created = false;
+        if (outline == null)
+        {
+            outline = target.AddComponent<Outline>();
+            created = true;
+        }
+
+        outline.effectColor = questPadFocusBorderColor;
+        outline.effectDistance = questPadFocusBorderThickness;
+        outline.enabled = true;
+
+        questFocusedObject = target;
+        questFocusOutline = outline;
+        if (created && outline.useGraphicAlpha == false)
+            outline.useGraphicAlpha = true;
+    }
+
+    private void ClearQuestPadFocusVisual()
+    {
+        if (questFocusOutline != null)
+            questFocusOutline.enabled = false;
+        questFocusedObject = null;
+        questFocusOutline = null;
+    }
+
+    private void ApplyQuestFilterPadFocusHighlight()
+    {
+        if (questActiveFilterLabelText == null && questCompletedFilterLabelText == null) return;
+
+        // Ripristina colori base (stato filtro attivo/completato)
+        if (questActiveFilterLabelText != null)
+        {
+            questActiveFilterLabelText.color = currentQuestFilter == QuestFilter.Active
+                ? questFilterSelectedColor
+                : questActiveFilterBaseColor;
+        }
+        if (questCompletedFilterLabelText != null)
+        {
+            questCompletedFilterLabelText.color = currentQuestFilter == QuestFilter.Completed
+                ? questFilterSelectedColor
+                : questCompletedFilterBaseColor;
+        }
+
+        // Override focus pad sui filtri: giallo
+        if (!showPadFocus || !IsQuestTabActive() || questPadSection != QuestPadSection.Filters) return;
+
+        if (questPadFilterIndex <= 0)
+        {
+            if (questActiveFilterLabelText != null) questActiveFilterLabelText.color = questPadFocusBorderColor;
+        }
+        else
+        {
+            if (questCompletedFilterLabelText != null) questCompletedFilterLabelText.color = questPadFocusBorderColor;
+        }
+    }
+
+    private static GameObject ResolveQuestFocusGraphicTarget(GameObject target)
+    {
+        if (target == null) return null;
+
+        var button = target.GetComponent<Button>();
+        if (button != null && button.targetGraphic != null)
+            return button.targetGraphic.gameObject;
+
+        var ownGraphic = target.GetComponent<Graphic>();
+        if (ownGraphic != null)
+            return ownGraphic.gameObject;
+
+        var nestedGraphic = target.GetComponentInChildren<Graphic>(true);
+        if (nestedGraphic != null)
+            return nestedGraphic.gameObject;
+
+        return target;
+    }
+
+    private GameObject GetQuestFilterButtonObject(int index)
+    {
+        InitializeQuestUIIfNeeded();
+        if (index <= 0)
+        {
+            if (questActiveFilterButton == null)
+            {
+                questActiveFilterButton = EnsureFilterButtonFromLabelOrCount(questActiveFilterLabelText, questActiveCountText);
+                if (questActiveFilterButton != null)
+                {
+                    questActiveFilterButton.onClick.RemoveListener(SetQuestFilterActive);
+                    questActiveFilterButton.onClick.AddListener(SetQuestFilterActive);
+                }
+            }
+
+            return questActiveFilterButton != null ? questActiveFilterButton.gameObject : null;
+        }
+
+        if (questCompletedFilterButton == null)
+        {
+            questCompletedFilterButton = EnsureFilterButtonFromLabelOrCount(questCompletedFilterLabelText, questCompletedCountText);
+            if (questCompletedFilterButton != null)
+            {
+                questCompletedFilterButton.onClick.RemoveListener(SetQuestFilterCompleted);
+                questCompletedFilterButton.onClick.AddListener(SetQuestFilterCompleted);
+            }
+        }
+
+        return questCompletedFilterButton != null ? questCompletedFilterButton.gameObject : null;
+    }
+
+    private static Button EnsureFilterButtonFromLabelOrCount(TextMeshProUGUI label, TextMeshProUGUI count)
+    {
+        Transform row = null;
+        if (label != null)
+            row = label.transform.parent != null ? label.transform.parent : label.transform;
+        else if (count != null)
+            row = count.transform.parent != null ? count.transform.parent : count.transform;
+
+        if (row == null) return null;
+        return EnsureFilterButton(row.gameObject);
+    }
+
+    private GameObject GetQuestFilterVisualObject(int index)
+    {
+        InitializeQuestUIIfNeeded();
+        if (index <= 0)
+        {
+            if (questActiveFilterLabelText != null) return questActiveFilterLabelText.gameObject;
+            if (questActiveFilterButton != null) return questActiveFilterButton.gameObject;
+            return questActiveCountText != null ? questActiveCountText.gameObject : null;
+        }
+
+        if (questCompletedFilterLabelText != null) return questCompletedFilterLabelText.gameObject;
+        if (questCompletedFilterButton != null) return questCompletedFilterButton.gameObject;
+        return questCompletedCountText != null ? questCompletedCountText.gameObject : null;
+    }
+
+    private int GetVisibleQuestCount()
+    {
+        int count = 0;
+        for (int i = 0; i < questEntries.Count; i++)
+        {
+            var q = questEntries[i];
+            if (q == null) continue;
+            if (!MatchesQuestFilter(q)) continue;
+            count++;
+        }
+        return count;
+    }
+
+    private bool HasVisibleQuests()
+    {
+        return GetVisibleQuestCount() > 0;
+    }
+
+    private string GetVisibleQuestIdAt(int index)
+    {
+        if (index < 0) return null;
+        int cursor = 0;
+        for (int i = 0; i < questEntries.Count; i++)
+        {
+            var q = questEntries[i];
+            if (q == null) continue;
+            if (!MatchesQuestFilter(q)) continue;
+            if (cursor == index) return q.questId;
+            cursor++;
+        }
+
+        return null;
+    }
+
+    private Button GetVisibleQuestRowAt(int index)
+    {
+        if (index < 0 || spawnedQuestRows == null) return null;
+        int cursor = 0;
+        for (int i = 0; i < spawnedQuestRows.Count; i++)
+        {
+            var row = spawnedQuestRows[i];
+            if (row == null || !row.activeInHierarchy) continue;
+            if (cursor == index) return row.GetComponent<Button>();
+            cursor++;
+        }
+        return null;
+    }
+
+    private void ClampQuestPadIndices()
+    {
+        questPadFilterIndex = Mathf.Clamp(questPadFilterIndex, 0, 1);
+        int visibleCount = GetVisibleQuestCount();
+        if (visibleCount <= 0)
+        {
+            questPadListIndex = 0;
+            questPadSection = QuestPadSection.Filters;
+            return;
+        }
+
+        questPadListIndex = Mathf.Clamp(questPadListIndex, 0, visibleCount - 1);
+        if (questPadSection == QuestPadSection.Detail && (selectedQuestId == null || !IsQuestSelected(GetVisibleQuestIdAt(questPadListIndex))))
+            questPadSection = QuestPadSection.List;
+    }
+
+    private void SyncQuestPadListIndexToSelection()
+    {
+        if (string.IsNullOrWhiteSpace(selectedQuestId))
+        {
+            ClampQuestPadIndices();
+            return;
+        }
+
+        int cursor = 0;
+        for (int i = 0; i < questEntries.Count; i++)
+        {
+            var q = questEntries[i];
+            if (q == null) continue;
+            if (!MatchesQuestFilter(q)) continue;
+            if (string.Equals(q.questId, selectedQuestId, System.StringComparison.OrdinalIgnoreCase))
+            {
+                questPadListIndex = cursor;
+                ClampQuestPadIndices();
+                return;
+            }
+            cursor++;
+        }
+
+        ClampQuestPadIndices();
+    }
+
     private void CreateDragPreview(Sprite icon, PointerEventData eventData, Vector2 iconSize)
     {
         // Prevent leaked previews if BeginDrag fires again without a matching EndDrag.
@@ -2824,6 +3383,7 @@ public class InventoryUI : MonoBehaviour
     {
         ClearDragPreview();
         dragOriginIndex = -1;
+        ClearQuestPadFocusVisual();
     }
 
     private void CloseEquipGrid()
@@ -2894,3 +3454,4 @@ public class InventoryUI : MonoBehaviour
         CloseEquipGrid();
     }
 }
+
