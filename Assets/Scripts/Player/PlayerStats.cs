@@ -380,8 +380,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
             this.bankGold = data.bankGold;
             this.bankSilver = data.bankSilver;
             this.bankCopper = data.bankCopper;
-            ApplyLoadedQuestStateIfPossible();
-            ApplyLoadedInventoryStateIfPossible();
+            // Non applicare qui quest/inventory: se avviene prima degli Awake degli altri componenti
+            // (es. PlayerInventory), il loro Awake può sovrascrivere i dati caricati.
+            // L'applicazione viene fatta in Start() e OnSceneLoaded().
             // Aggiungi qui altre statistiche che vuoi caricare
 
             Debug.Log("Dati persistenti caricati da file!");
