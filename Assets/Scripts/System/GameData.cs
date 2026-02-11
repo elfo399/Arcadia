@@ -68,6 +68,21 @@ public class SavedPlayerInventoryData
 [System.Serializable]
 public class GameData
 {
+    // Leveling
+    public int playerLevel;
+    public int levelExperience;
+    public int experienceToNextLevel;
+    public int unspentAttributePoints;
+
+    // Character attributes
+    public int vigor;
+    public int mind;
+    public int endurance;
+    public int strength;
+    public int dexterity;
+    public int intelligence;
+    public int faith;
+
     public int karma;
     public int benedetto;
     public int malefico;

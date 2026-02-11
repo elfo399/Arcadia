@@ -11,6 +11,7 @@ public class EnemyData : ScriptableObject
     public int maxHealth = 30;
     public int damage = 10;
     public float moveSpeed = 3.5f;
+    [Min(0)] public int experienceReward = 10;
 
     [Header("Rarità")]
     [Range(1, 100)] 

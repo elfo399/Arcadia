@@ -22,6 +22,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public float maxMana = 50f;
     public float currentMana = 50f;
 
+    [Header("Attribute Scaling")]
+    [SerializeField] private float healthPerVigor = 5f;
+    [SerializeField] private float manaPerMind = 3f;
+    [SerializeField] private float staminaPerEndurance = 4f;
+
     [Header("Flasks")]
     public int maxFlasks = 3;
     public int currentFlasks = 3;
@@ -45,6 +50,17 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public TextMeshProUGUI keyText;
 
     [Header("Statistiche Persistenti")]
+    public int playerLevel = 1;
+    public int levelExperience = 0;
+    public int experienceToNextLevel = 100;
+    public int unspentAttributePoints = 0;
+    public int vigor = 10;
+    public int mind = 10;
+    public int endurance = 10;
+    public int strength = 10;
+    public int dexterity = 10;
+    public int intelligence = 10;
+    public int faith = 10;
     public int karma = 0;
     public int benedetto = 0;
     public int malefico = 0;
@@ -63,6 +79,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private GameData loadedDataCache;
     private bool loadedQuestStateApplied = false;
     private bool loadedInventoryStateApplied = false;
+    private float baseMaxHealth;
+    private float baseMaxStamina;
+    private float baseMaxMana;
 
     void Awake()
     {
@@ -79,12 +98,17 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         animator = GetComponentInChildren<Animator>();
 
+        baseMaxHealth = maxHealth;
+        baseMaxStamina = maxStamina;
+        baseMaxMana = maxMana;
+
         currentHealth = maxHealth;
         currentStamina = maxStamina;
         currentMana = maxMana;
         currentFlasks = maxFlasks;
 
         LoadStats();
+        RecalculateDerivedStats(keepCurrentRatio: true);
         AssignUIElements();
         UpdateAllUI();
         NotifyBankChanged();
@@ -110,6 +134,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        RecalculateDerivedStats(keepCurrentRatio: true);
         AssignUIElements();
         UpdateAllUI();
         ApplyLoadedQuestStateIfPossible();
@@ -339,6 +364,17 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         GameData data = new GameData
         {
+            playerLevel = this.playerLevel,
+            levelExperience = this.levelExperience,
+            experienceToNextLevel = this.experienceToNextLevel,
+            unspentAttributePoints = this.unspentAttributePoints,
+            vigor = this.vigor,
+            mind = this.mind,
+            endurance = this.endurance,
+            strength = this.strength,
+            dexterity = this.dexterity,
+            intelligence = this.intelligence,
+            faith = this.faith,
             karma = this.karma,
             benedetto = this.benedetto,
             malefico = this.malefico
@@ -374,6 +410,17 @@ public class PlayerStats : MonoBehaviour, IDamageable
         loadedInventoryStateApplied = false;
         if (data != null)
         {
+            this.playerLevel = Mathf.Max(1, data.playerLevel > 0 ? data.playerLevel : this.playerLevel);
+            this.levelExperience = Mathf.Max(0, data.levelExperience);
+            this.experienceToNextLevel = Mathf.Max(1, data.experienceToNextLevel > 0 ? data.experienceToNextLevel : this.experienceToNextLevel);
+            this.unspentAttributePoints = Mathf.Max(0, data.unspentAttributePoints);
+            this.vigor = data.vigor > 0 ? data.vigor : this.vigor;
+            this.mind = data.mind > 0 ? data.mind : this.mind;
+            this.endurance = data.endurance > 0 ? data.endurance : this.endurance;
+            this.strength = data.strength > 0 ? data.strength : this.strength;
+            this.dexterity = data.dexterity > 0 ? data.dexterity : this.dexterity;
+            this.intelligence = data.intelligence > 0 ? data.intelligence : this.intelligence;
+            this.faith = data.faith > 0 ? data.faith : this.faith;
             this.karma = data.karma;
             this.benedetto = data.benedetto;
             this.malefico = data.malefico;
@@ -396,6 +443,20 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public void AddPersistentStat(string statName, int amount)
     {
+        if (amount == 0) return;
+
+        if (IsLevelBasedAttribute(statName))
+        {
+            // Gli attributi principali consumano punti livello (1 punto per click/livello).
+            bool spent = TrySpendAttributePoint(statName);
+            if (!spent)
+            {
+                Debug.Log("Nessun punto attributo disponibile.");
+                return;
+            }
+            return;
+        }
+
         switch (statName)
         {
             case "karma":
@@ -414,7 +475,157 @@ public class PlayerStats : MonoBehaviour, IDamageable
                 Debug.LogWarning($"Statistica persistente '{statName}' non trovata.");
                 return;
         }
+
+        RecalculateDerivedStats(keepCurrentRatio: true);
+        UpdateAllUI();
         SaveStats();
+    }
+
+    public bool TrySpendAttributePoint(string statName)
+    {
+        if (!IsLevelBasedAttribute(statName)) return false;
+        if (unspentAttributePoints <= 0) return false;
+
+        switch (statName)
+        {
+            case "vigor": vigor = Mathf.Max(1, vigor + 1); break;
+            case "mind": mind = Mathf.Max(1, mind + 1); break;
+            case "endurance": endurance = Mathf.Max(1, endurance + 1); break;
+            case "strength": strength = Mathf.Max(1, strength + 1); break;
+            case "dexterity": dexterity = Mathf.Max(1, dexterity + 1); break;
+            case "intelligence": intelligence = Mathf.Max(1, intelligence + 1); break;
+            case "faith": faith = Mathf.Max(1, faith + 1); break;
+            default: return false;
+        }
+
+        unspentAttributePoints = Mathf.Max(0, unspentAttributePoints - 1);
+        RecalculateDerivedStats(keepCurrentRatio: true);
+        UpdateAllUI();
+        SaveStats();
+        return true;
+    }
+
+    public void AddExperience(int amount)
+    {
+        if (amount <= 0) return;
+
+        levelExperience += amount;
+        int guard = 0;
+        while (levelExperience >= experienceToNextLevel && guard < 1000)
+        {
+            levelExperience -= experienceToNextLevel;
+            playerLevel += 1;
+            unspentAttributePoints += 1;
+            experienceToNextLevel = Mathf.Max(1, Mathf.RoundToInt(experienceToNextLevel * 1.12f));
+            guard++;
+        }
+
+        SaveStats();
+    }
+
+    public void GainLevels(int levels)
+    {
+        if (levels <= 0) return;
+        playerLevel += levels;
+        unspentAttributePoints += levels;
+        SaveStats();
+    }
+
+    public float GetLevelProgress01()
+    {
+        if (experienceToNextLevel <= 0) return 0f;
+        return Mathf.Clamp01((float)levelExperience / experienceToNextLevel);
+    }
+
+    private static bool IsLevelBasedAttribute(string statName)
+    {
+        switch (statName)
+        {
+            case "vigor":
+            case "mind":
+            case "endurance":
+            case "strength":
+            case "dexterity":
+            case "intelligence":
+            case "faith":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    public int GetPersistentStat(string statName)
+    {
+        switch (statName)
+        {
+            case "vigor": return vigor;
+            case "mind": return mind;
+            case "endurance": return endurance;
+            case "strength": return strength;
+            case "dexterity": return dexterity;
+            case "intelligence": return intelligence;
+            case "faith": return faith;
+            case "karma": return karma;
+            case "evil":
+            case "malefico": return malefico;
+            case "benedetto": return benedetto;
+            default: return 0;
+        }
+    }
+
+    public float GetCurrentEquipLoad()
+    {
+        var inventory = FindObjectOfType<PlayerInventory>();
+        if (inventory == null) return 0f;
+
+        float load = 0f;
+        var items = inventory.Items;
+        if (items != null)
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                var it = items[i];
+                if (it == null) continue;
+
+                int qty = Mathf.Max(1, it.amount);
+                float unitWeight = 0f;
+
+                if (it.weaponData != null)
+                    unitWeight = Mathf.Max(0f, it.weaponData.weight);
+                else if (it.usableData != null)
+                    unitWeight = Mathf.Max(0f, it.usableData.weight);
+                else if (it.itemData != null)
+                    unitWeight = Mathf.Max(0f, it.itemData.weight);
+
+                load += unitWeight * qty;
+            }
+        }
+
+        return load;
+    }
+
+    public float GetMaxEquipLoad()
+    {
+        return Mathf.Max(1f, endurance * 2f);
+    }
+
+    public void RecalculateDerivedStats(bool keepCurrentRatio)
+    {
+        float oldMaxHealth = Mathf.Max(1f, maxHealth);
+        float oldMaxMana = Mathf.Max(1f, maxMana);
+        float oldMaxStamina = Mathf.Max(1f, maxStamina);
+
+        float healthRatio = keepCurrentRatio ? Mathf.Clamp01(currentHealth / oldMaxHealth) : 1f;
+        float manaRatio = keepCurrentRatio ? Mathf.Clamp01(currentMana / oldMaxMana) : 1f;
+        float staminaRatio = keepCurrentRatio ? Mathf.Clamp01(currentStamina / oldMaxStamina) : 1f;
+
+        maxHealth = Mathf.Max(1f, baseMaxHealth + Mathf.Max(0, vigor - 1) * healthPerVigor);
+        maxMana = Mathf.Max(1f, baseMaxMana + Mathf.Max(0, mind - 1) * manaPerMind);
+        maxStamina = Mathf.Max(1f, baseMaxStamina + Mathf.Max(0, endurance - 1) * staminaPerEndurance);
+
+        currentHealth = Mathf.Clamp(maxHealth * healthRatio, 0f, maxHealth);
+        currentMana = Mathf.Clamp(maxMana * manaRatio, 0f, maxMana);
+        currentStamina = Mathf.Clamp(maxStamina * staminaRatio, 0f, maxStamina);
     }
 
     // --- BANCA PERSISTENTE ---

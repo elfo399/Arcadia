@@ -7,4 +7,7 @@ public class ItemData : ScriptableObject
     public string itemName;
     [TextArea] public string description;
     public Sprite icon;
+
+    [Header("Stats")]
+    [Min(0f)] public float weight = 0.2f;
 }

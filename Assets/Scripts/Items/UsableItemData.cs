@@ -7,6 +7,7 @@ public class UsableItemData : ScriptableObject
     public string itemName;
     [TextArea] public string description;
     public Sprite icon;
+    [Min(0f)] public float weight = 0.1f;
 
     public enum UsableEffectType
     {
