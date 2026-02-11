@@ -6,6 +6,7 @@ using System.Collections.Generic;
 
 public class PlayerStats : MonoBehaviour, IDamageable
 {
+    public const int MaxAllocatableAttributeLevel = 99;
     public static PlayerStats instance;
 
     [Header("Health")]
@@ -488,13 +489,30 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         switch (statName)
         {
-            case "vigor": vigor = Mathf.Max(1, vigor + 1); break;
-            case "mind": mind = Mathf.Max(1, mind + 1); break;
-            case "endurance": endurance = Mathf.Max(1, endurance + 1); break;
-            case "strength": strength = Mathf.Max(1, strength + 1); break;
-            case "dexterity": dexterity = Mathf.Max(1, dexterity + 1); break;
-            case "intelligence": intelligence = Mathf.Max(1, intelligence + 1); break;
-            case "faith": faith = Mathf.Max(1, faith + 1); break;
+            case "vigor":
+                if (vigor >= MaxAllocatableAttributeLevel) return false;
+                vigor = Mathf.Clamp(vigor + 1, 1, MaxAllocatableAttributeLevel);
+                break;
+            case "mind":
+                if (mind >= MaxAllocatableAttributeLevel) return false;
+                mind = Mathf.Clamp(mind + 1, 1, MaxAllocatableAttributeLevel);
+                break;
+            case "endurance":
+                if (endurance >= MaxAllocatableAttributeLevel) return false;
+                endurance = Mathf.Clamp(endurance + 1, 1, MaxAllocatableAttributeLevel);
+                break;
+            case "strength":
+                if (strength >= MaxAllocatableAttributeLevel) return false;
+                strength = Mathf.Clamp(strength + 1, 1, MaxAllocatableAttributeLevel);
+                break;
+            case "dexterity":
+                if (dexterity >= MaxAllocatableAttributeLevel) return false;
+                dexterity = Mathf.Clamp(dexterity + 1, 1, MaxAllocatableAttributeLevel);
+                break;
+            case "intelligence":
+                if (intelligence >= MaxAllocatableAttributeLevel) return false;
+                intelligence = Mathf.Clamp(intelligence + 1, 1, MaxAllocatableAttributeLevel);
+                break;
             default: return false;
         }
 
@@ -547,7 +565,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
             case "strength":
             case "dexterity":
             case "intelligence":
-            case "faith":
                 return true;
             default:
                 return false;

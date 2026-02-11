@@ -172,6 +172,7 @@ public class InventoryUI : MonoBehaviour
     private Vector2 questObjectivesDefaultAnchoredPos;
     private float suppressQuestRowClickUntil = 0f;
     private int lastQuestFilterToggleFrame = -1;
+    private int attributesPadIndex = 0;
 
     [Header("Drag & Drop")]
     [SerializeField] private Canvas dragCanvas; // opzionale: se null usa quello più alto trovato
@@ -606,6 +607,7 @@ public class InventoryUI : MonoBehaviour
         {
             InitializeAttributesUIIfNeeded();
             RefreshAttributesUI();
+            FocusAttributesPadDefault();
         }
     }
 
@@ -815,10 +817,26 @@ public class InventoryUI : MonoBehaviour
         RefreshAttributeSelectionVisual();
     }
 
+    public bool HasAttributePointsToSpend()
+    {
+        CachePlayerStats();
+        if (playerStats == null || playerStats.unspentAttributePoints <= 0) return false;
+        if (attributeRows == null || attributeRows.Count == 0) return false;
+
+        for (int i = 0; i < attributeRows.Count; i++)
+        {
+            var row = attributeRows[i];
+            if (row == null || string.IsNullOrWhiteSpace(row.key)) continue;
+            if (CanAllocateAttributeKey(row.key)) return true;
+        }
+
+        return false;
+    }
+
     private void RefreshAttributeRowsValues()
     {
         if (attributeRows == null || playerStats == null) return;
-        bool canSpend = playerStats.unspentAttributePoints > 0;
+        bool canSpend = HasAttributePointsToSpend();
 
         for (int i = 0; i < attributeRows.Count; i++)
         {
@@ -830,7 +848,7 @@ public class InventoryUI : MonoBehaviour
             if (row.valueText != null) row.valueText.text = value.ToString();
             if (row.descText != null && string.IsNullOrWhiteSpace(row.descText.text))
                 row.descText.text = GetDefaultAttributeDescription(row.key);
-            if (row.addButton != null) row.addButton.gameObject.SetActive(canSpend && IsAllocatableAttribute(row.key));
+            if (row.addButton != null) row.addButton.gameObject.SetActive(canSpend && CanAllocateAttributeKey(row.key));
         }
     }
 
@@ -884,13 +902,14 @@ public class InventoryUI : MonoBehaviour
         if (attributeRows == null) return;
         if (string.IsNullOrWhiteSpace(selectedAttributeKey))
             selectedAttributeKey = GetFirstAttributeKey();
+        bool canSpend = HasAttributePointsToSpend();
 
         for (int i = 0; i < attributeRows.Count; i++)
         {
             var row = attributeRows[i];
             if (row == null || string.IsNullOrWhiteSpace(row.key)) continue;
 
-            bool selected = string.Equals(row.key, selectedAttributeKey, System.StringComparison.OrdinalIgnoreCase);
+            bool selected = canSpend && string.Equals(row.key, selectedAttributeKey, System.StringComparison.OrdinalIgnoreCase);
             Color color = selected ? attributesSelectedColor : attributesNormalColor;
             if (row.labelText != null) row.labelText.color = color;
             if (row.valueText != null) row.valueText.color = color;
@@ -909,6 +928,107 @@ public class InventoryUI : MonoBehaviour
         if (!playerStats.TrySpendAttributePoint(statName)) return;
         selectedAttributeKey = key;
         RefreshAttributesUI();
+    }
+
+    public bool IsAttributesTabOpen()
+    {
+        return IsAttributesTabActive();
+    }
+
+    public void FocusAttributesPadDefault()
+    {
+        InitializeAttributesUIIfNeeded();
+        if (!HasAttributePointsToSpend())
+        {
+            showPadFocus = false;
+            RefreshAttributesUI();
+            return;
+        }
+        ForcePadFocusMode(PadFocusLockDuration);
+        attributesPadIndex = GetSelectedAttributeIndex();
+        if (attributesPadIndex < 0) attributesPadIndex = 0;
+        SyncAttributeSelectionFromPadIndex();
+        RefreshAttributesUI();
+    }
+
+    public void MoveAttributesPadFocusVertical(int direction)
+    {
+        InitializeAttributesUIIfNeeded();
+        if (!HasAttributePointsToSpend()) return;
+        if (attributeRows == null || attributeRows.Count == 0) return;
+
+        int dir = direction >= 0 ? 1 : -1;
+        int count = attributeRows.Count;
+        if (count <= 0) return;
+
+        int guard = 0;
+        int idx = Mathf.Clamp(attributesPadIndex, 0, count - 1);
+        do
+        {
+            idx = (idx + dir + count) % count;
+            guard++;
+        } while (guard <= count && !IsAttributeRowNavigable(idx));
+
+        attributesPadIndex = Mathf.Clamp(idx, 0, count - 1);
+        SyncAttributeSelectionFromPadIndex();
+        RefreshAttributesUI();
+    }
+
+    public void ConfirmAttributesPadSelection()
+    {
+        InitializeAttributesUIIfNeeded();
+        if (!HasAttributePointsToSpend()) return;
+        SyncAttributeSelectionFromPadIndex();
+        if (attributeRows == null || attributeRows.Count == 0) return;
+        if (attributesPadIndex < 0 || attributesPadIndex >= attributeRows.Count) return;
+
+        var row = attributeRows[attributesPadIndex];
+        if (row == null || string.IsNullOrWhiteSpace(row.key)) return;
+
+        OnAttributeAddClicked(row.key.Trim().ToLowerInvariant());
+    }
+
+    private int GetSelectedAttributeIndex()
+    {
+        if (attributeRows == null || attributeRows.Count == 0) return -1;
+        if (string.IsNullOrWhiteSpace(selectedAttributeKey))
+        {
+            for (int i = 0; i < attributeRows.Count; i++)
+            {
+                if (IsAttributeRowNavigable(i)) return i;
+            }
+            return 0;
+        }
+
+        for (int i = 0; i < attributeRows.Count; i++)
+        {
+            var row = attributeRows[i];
+            if (row == null || string.IsNullOrWhiteSpace(row.key)) continue;
+            if (string.Equals(row.key.Trim(), selectedAttributeKey.Trim(), System.StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+
+        for (int i = 0; i < attributeRows.Count; i++)
+        {
+            if (IsAttributeRowNavigable(i)) return i;
+        }
+        return 0;
+    }
+
+    private void SyncAttributeSelectionFromPadIndex()
+    {
+        if (attributeRows == null || attributeRows.Count == 0) return;
+        attributesPadIndex = Mathf.Clamp(attributesPadIndex, 0, attributeRows.Count - 1);
+        var row = attributeRows[attributesPadIndex];
+        if (row == null || string.IsNullOrWhiteSpace(row.key)) return;
+        selectedAttributeKey = row.key.Trim().ToLowerInvariant();
+    }
+
+    private bool IsAttributeRowNavigable(int index)
+    {
+        if (attributeRows == null || index < 0 || index >= attributeRows.Count) return false;
+        var row = attributeRows[index];
+        return row != null && row.root != null && row.root.gameObject.activeInHierarchy && !string.IsNullOrWhiteSpace(row.key);
     }
 
     private string GetFirstAttributeKey()
@@ -941,11 +1061,21 @@ public class InventoryUI : MonoBehaviour
             case "strength":
             case "dexterity":
             case "intelligence":
-            case "faith":
                 return true;
             default:
                 return false;
         }
+    }
+
+    private bool CanAllocateAttributeKey(string key)
+    {
+        if (!IsAllocatableAttribute(key)) return false;
+        CachePlayerStats();
+        if (playerStats == null) return false;
+
+        string statName = MapAttributeKeyToStatName(key);
+        int current = playerStats.GetPersistentStat(statName);
+        return current < PlayerStats.MaxAllocatableAttributeLevel;
     }
 
     private static string GetDefaultAttributeDescription(string key)
@@ -1723,6 +1853,26 @@ public class InventoryUI : MonoBehaviour
             if (keyMatches) return true;
 
             if (questListContainer != null && questListContainer.IsChildOf(tab.background.transform))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsAttributesTabActive()
+    {
+        if (tabs == null || tabs.Length == 0) return false;
+        for (int i = 0; i < tabs.Length; i++)
+        {
+            var tab = tabs[i];
+            if (tab == null || tab.background == null) continue;
+            if (!tab.background.activeInHierarchy) continue;
+
+            bool keyMatches = string.Equals(tab.key, "Skill", System.StringComparison.OrdinalIgnoreCase)
+                              || string.Equals(tab.key, "Attributes", System.StringComparison.OrdinalIgnoreCase);
+            if (keyMatches) return true;
+
+            if (attributesRoot != null && attributesRoot.IsChildOf(tab.background.transform))
                 return true;
         }
 

@@ -229,6 +229,38 @@ public class PlayerController : MonoBehaviour
 
         bool inEquipmentCross = inventoryUI.IsEquipmentCrossModeActive();
         bool inQuestTab = inventoryUI.IsQuestTabOpen();
+        bool inAttributesTab = inventoryUI.IsAttributesTabOpen();
+
+        if (inAttributesTab)
+        {
+            if (!inventoryUI.HasAttributePointsToSpend())
+                return;
+
+            inventoryUI.ForcePadFocusMode();
+
+            if (downPressed) inventoryUI.MoveAttributesPadFocusVertical(1);
+            if (upPressed) inventoryUI.MoveAttributesPadFocusVertical(-1);
+
+            Vector2 attrNav = Controls.Player.Move.ReadValue<Vector2>();
+            if (Time.time >= lastInventoryPadMoveTime + inventoryPadMoveCooldown)
+            {
+                if (attrNav.y > 0.5f)
+                {
+                    inventoryUI.MoveAttributesPadFocusVertical(-1);
+                    lastInventoryPadMoveTime = Time.time;
+                }
+                else if (attrNav.y < -0.5f)
+                {
+                    inventoryUI.MoveAttributesPadFocusVertical(1);
+                    lastInventoryPadMoveTime = Time.time;
+                }
+            }
+
+            if (Controls.Player.Jump.WasPerformedThisFrame())
+                inventoryUI.ConfirmAttributesPadSelection();
+
+            return;
+        }
 
         if (inQuestTab)
         {
