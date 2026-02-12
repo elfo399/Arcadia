@@ -485,9 +485,10 @@ public class PlayerInventory : MonoBehaviour
 
         var lookups = BuildAssetLookups();
 
-        items.Clear();
-        if (data.items != null)
+        bool hasSavedItems = data.items != null && data.items.Length > 0;
+        if (hasSavedItems)
         {
+            items.Clear();
             for (int i = 0; i < data.items.Length; i++)
             {
                 var saved = data.items[i];
@@ -497,10 +498,16 @@ public class PlayerInventory : MonoBehaviour
                 if (restored != null) items.Add(restored);
             }
         }
+        // Fallback: se il save non contiene item, mantieni quelli iniziali (startingLoadout).
 
-        DeserializeWeaponLoadout(data.rightLoadout, rightLoadout, rightInstanceIds, lookups.weapons);
-        DeserializeWeaponLoadout(data.leftLoadout, leftLoadout, leftInstanceIds, lookups.weapons);
-        DeserializeUsableLoadout(data.usableLoadout, usableLoadout, usableInstanceIds, lookups.usables);
+        // Se il save non ha slot validi, mantieni il loadout iniziale già costruito in Awake().
+        if (HasAnyValidWeaponSlot(data.rightLoadout, lookups.weapons))
+            DeserializeWeaponLoadout(data.rightLoadout, rightLoadout, rightInstanceIds, lookups.weapons);
+        if (HasAnyValidWeaponSlot(data.leftLoadout, lookups.weapons))
+            DeserializeWeaponLoadout(data.leftLoadout, leftLoadout, leftInstanceIds, lookups.weapons);
+        if (HasAnyValidUsableSlot(data.usableLoadout, lookups.usables))
+            DeserializeUsableLoadout(data.usableLoadout, usableLoadout, usableInstanceIds, lookups.usables);
+        EnsureLoadoutInstancesInInventory();
 
         currentRightIndex = Mathf.Clamp(data.currentRightIndex, 0, rightLoadout.Length - 1);
         currentLeftIndex = Mathf.Clamp(data.currentLeftIndex, 0, leftLoadout.Length - 1);
@@ -733,6 +740,73 @@ public class PlayerInventory : MonoBehaviour
             if (it == null || string.IsNullOrWhiteSpace(it.name)) continue;
             string key = it.name.Trim().ToLowerInvariant();
             if (!lookup.ContainsKey(key)) lookup.Add(key, it);
+        }
+    }
+
+    private static bool HasAnyValidWeaponSlot(SavedLoadoutSlotData[] source, Dictionary<string, WeaponItem> weaponLookup)
+    {
+        if (source == null || source.Length == 0 || weaponLookup == null) return false;
+        for (int i = 0; i < source.Length; i++)
+        {
+            var slot = source[i];
+            if (slot == null || string.IsNullOrWhiteSpace(slot.assetName)) continue;
+            if (ResolveWeapon(slot.assetName, weaponLookup) != null) return true;
+        }
+        return false;
+    }
+
+    private static bool HasAnyValidUsableSlot(SavedLoadoutSlotData[] source, Dictionary<string, UsableItemData> usableLookup)
+    {
+        if (source == null || source.Length == 0 || usableLookup == null) return false;
+        for (int i = 0; i < source.Length; i++)
+        {
+            var slot = source[i];
+            if (slot == null || string.IsNullOrWhiteSpace(slot.assetName)) continue;
+            if (ResolveUsable(slot.assetName, usableLookup) != null) return true;
+        }
+        return false;
+    }
+
+    private void EnsureLoadoutInstancesInInventory()
+    {
+        EnsureLoadoutSize();
+
+        EnsureWeaponLoadoutInInventory(rightLoadout, rightInstanceIds);
+        EnsureWeaponLoadoutInInventory(leftLoadout, leftInstanceIds);
+        EnsureUsableLoadoutInInventory(usableLoadout, usableInstanceIds);
+    }
+
+    private void EnsureWeaponLoadoutInInventory(WeaponItem[] loadout, string[] ids)
+    {
+        if (loadout == null || ids == null) return;
+        int len = Mathf.Min(loadout.Length, ids.Length);
+        for (int i = 0; i < len; i++)
+        {
+            var weapon = loadout[i];
+            string instanceId = ids[i];
+            if (weapon == null || string.IsNullOrWhiteSpace(instanceId)) continue;
+            if (HasWeaponInstanceInInventory(instanceId, weapon)) continue;
+
+            var restored = new InventoryItem(weapon, 1);
+            restored.instanceId = instanceId;
+            items.Add(restored);
+        }
+    }
+
+    private void EnsureUsableLoadoutInInventory(UsableItemData[] loadout, string[] ids)
+    {
+        if (loadout == null || ids == null) return;
+        int len = Mathf.Min(loadout.Length, ids.Length);
+        for (int i = 0; i < len; i++)
+        {
+            var usable = loadout[i];
+            string instanceId = ids[i];
+            if (usable == null || string.IsNullOrWhiteSpace(instanceId)) continue;
+            if (HasUsableInstanceInInventory(instanceId, usable)) continue;
+
+            var restored = new InventoryItem(usable, 1);
+            restored.instanceId = instanceId;
+            items.Add(restored);
         }
     }
 }

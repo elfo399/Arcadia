@@ -9,23 +9,30 @@ public class PlayerInteraction : MonoBehaviour
 
     private PlayerControls controls;
     private Transform cam;
+    private System.Action<InputAction.CallbackContext> interactCallback;
 
     void Awake()
     {
         controls = new PlayerControls();
-        cam = Camera.main.transform;
+        cam = Camera.main != null ? Camera.main.transform : null;
+        interactCallback = _ => TryInteract();
     }
 
     void OnEnable()
     {
+        if (controls == null)
+            controls = new PlayerControls();
         controls.Player.Enable();
-        controls.Player.Interact.performed += _ => TryInteract();
+        controls.Player.Interact.performed += interactCallback;
     }
 
     void OnDisable()
     {
-        controls.Player.Interact.performed -= _ => TryInteract();
-        controls.Player.Disable();
+        if (controls != null)
+        {
+            controls.Player.Interact.performed -= interactCallback;
+            controls.Player.Disable();
+        }
     }
 
     void TryInteract()

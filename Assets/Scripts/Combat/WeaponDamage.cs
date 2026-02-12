@@ -7,10 +7,18 @@ public class WeaponDamage : MonoBehaviour
     [SerializeField] private Hand hand = Hand.Right;
     [SerializeField] private int fallbackDamage = 10; // Danno usato se non trova un'arma valida
     [SerializeField] private int damage = 10; // Danno runtime applicato in questo swing
+    [SerializeField] private bool logDamage = true;
 
     [Header("Debug")]
     [SerializeField] private Collider damageCollider;
     [SerializeField] private WeaponItem currentWeapon;
+    [SerializeField] private bool usedPreparedDamage = false;
+    [SerializeField] private bool lastHitWasCritical = false;
+    [SerializeField] private AttackType lastAttackType = AttackType.Light;
+    private bool hasPreparedDamage = false;
+    private int preparedDamage = 0;
+    private bool preparedCritical = false;
+    private AttackType preparedAttackType = AttackType.Light;
     // Lista per ricordarsi chi abbiamo gia colpito in questo singolo attacco
     // (Cosi non colpiamo lo stesso nemico 30 volte in un secondo)
     private readonly List<IDamageable> hitTargets = new List<IDamageable>();
@@ -36,7 +44,21 @@ public class WeaponDamage : MonoBehaviour
     // Chiamata dall'Animation Event (tramite PlayerAnimationEvents)
     public void EnableDamage()
     {
-        RefreshDamageFromEquippedWeapon();
+        if (hasPreparedDamage)
+        {
+            damage = Mathf.Max(0, preparedDamage);
+            usedPreparedDamage = true;
+            lastHitWasCritical = preparedCritical;
+            lastAttackType = preparedAttackType;
+            hasPreparedDamage = false;
+        }
+        else
+        {
+            usedPreparedDamage = false;
+            lastHitWasCritical = false;
+            lastAttackType = AttackType.Light;
+            RefreshDamageFromEquippedWeapon();
+        }
         hitTargets.Clear(); // Nuovo colpo, resetta la lista dei colpiti
         if (damageCollider != null) damageCollider.enabled = true;
     }
@@ -50,6 +72,14 @@ public class WeaponDamage : MonoBehaviour
     public void SetHand(Hand value)
     {
         hand = value;
+    }
+
+    public void SetPreparedHit(int computedDamage, bool isCritical, AttackType attackType)
+    {
+        preparedDamage = Mathf.Max(0, computedDamage);
+        preparedCritical = isCritical;
+        preparedAttackType = attackType;
+        hasPreparedDamage = true;
     }
 
     private void RefreshDamageFromEquippedWeapon()
@@ -96,6 +126,17 @@ public class WeaponDamage : MonoBehaviour
             {
                 // Applica il danno
                 target.TakeDamage(damage);
+
+                if (logDamage)
+                {
+                    string weaponName = currentWeapon != null && !string.IsNullOrWhiteSpace(currentWeapon.weaponName)
+                        ? currentWeapon.weaponName
+                        : (currentWeapon != null ? currentWeapon.name : "Fallback");
+                    string targetName = other != null ? other.name : "Unknown";
+                    string attackTypeName = lastAttackType.ToString();
+                    string critTag = lastHitWasCritical ? " CRIT" : string.Empty;
+                    Debug.Log($"[Damage] {weaponName} | Hand:{hand} | Type:{attackTypeName} | Dmg:{damage}{critTag} -> Target:{targetName}");
+                }
 
                 // Aggiungi alla lista dei "gia colpiti" per questo attacco
                 hitTargets.Add(target);

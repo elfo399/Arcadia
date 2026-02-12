@@ -11,6 +11,7 @@ public class PlayerCombat : MonoBehaviour
     private PlayerInventory inventory;
     private PlayerStats stats;
     private PlayerController controller;
+    private PlayerAnimationEvents animationEvents;
 
     [Header("Stato Combattimento")]
     public bool isAttacking = false;
@@ -22,6 +23,7 @@ public class PlayerCombat : MonoBehaviour
         inventory = GetComponent<PlayerInventory>();
         stats = GetComponent<PlayerStats>();
         controller = GetComponent<PlayerController>();
+        animationEvents = GetComponentInChildren<PlayerAnimationEvents>(true);
     }
 
     void Update()
@@ -116,6 +118,10 @@ public class PlayerCombat : MonoBehaviour
             return;
         }
 
+        var computed = ComputeAttackDamage(weapon, type);
+        if (animationEvents != null)
+            animationEvents.PrepareAttackDamage(hand, computed.damage, computed.isCritical, type);
+
         // 1. Ferma il movimento (Feeling Souls-like)
         if (controller != null) controller.StopMovementImmediate();
 
@@ -124,6 +130,60 @@ public class PlayerCombat : MonoBehaviour
 
         // 3. Lancia animazione (CrossFade basso per reattività istantanea)
         animator.CrossFadeInFixedTime(animToPlay, 0.1f);
+    }
+
+    private (int damage, bool isCritical) ComputeAttackDamage(WeaponItem weapon, AttackType type)
+    {
+        if (weapon == null || stats == null)
+            return (0, false);
+
+        bool isRangedWeapon = weapon.rangeType == WeaponItem.WeaponRangeType.Ranged;
+        bool isMagicWeapon = weapon.damageType == WeaponItem.DamageType.Magic;
+        float playerBaseDamage = isRangedWeapon
+            ? Mathf.Max(0, stats.GetBaseRangedDamage())
+            : (isMagicWeapon
+                ? Mathf.Max(0, stats.GetBaseMagicDamage())
+                : Mathf.Max(0, stats.GetBasePhysicalDamage()));
+        float weaponBaseDamage = isMagicWeapon
+            ? Mathf.Max(0, weapon.magicDamage)
+            : Mathf.Max(0, weapon.physicalDamage);
+        float baseDamage = playerBaseDamage + weaponBaseDamage;
+
+        // Lo scaling viene definito nel WeaponData:
+        // - Physical: STR/DEX
+        // - Magic: INT only
+        float scalingBonus = 0f;
+        if (isRangedWeapon)
+        {
+            // Ranged: scala con DEX (archi e affini)
+            scalingBonus = Mathf.Max(0f, weapon.dexterityScaling) * Mathf.Max(0, stats.dexterity);
+        }
+        else if (isMagicWeapon)
+        {
+            scalingBonus = Mathf.Max(0f, weapon.intelligenceScaling) * Mathf.Max(0, stats.intelligence);
+        }
+        else
+        {
+            scalingBonus = Mathf.Max(0f, weapon.strengthScaling) * Mathf.Max(0, stats.strength)
+                           + Mathf.Max(0f, weapon.dexterityScaling) * Mathf.Max(0, stats.dexterity);
+        }
+
+        float attackMultiplier = type == AttackType.Heavy
+            ? Mathf.Max(0.1f, weapon.heavyDamageMultiplier)
+            : Mathf.Max(0.1f, weapon.lightDamageMultiplier);
+
+        float rawDamage = (baseDamage + scalingBonus) * attackMultiplier;
+
+        bool isCritical = false;
+        float critChance = Mathf.Clamp01(weapon.criticalChance);
+        if (critChance > 0f && Random.value <= critChance)
+        {
+            isCritical = true;
+            rawDamage *= Mathf.Max(1f, weapon.criticalHit);
+        }
+
+        int finalDamage = Mathf.Max(1, Mathf.RoundToInt(rawDamage));
+        return (finalDamage, isCritical);
     }
 
     // Chiamata dall'Animation Event (tramite PlayerAnimationEvents.cs)

@@ -863,13 +863,13 @@ public class InventoryUI : MonoBehaviour
             attributesLevelLabelText.text = $"Level (Points: {playerStats.unspentAttributePoints})";
         if (attributesLevelValueText != null) attributesLevelValueText.text = level.ToString();
         if (attributesXpValueText != null) attributesXpValueText.text = $"{playerStats.levelExperience}/{playerStats.experienceToNextLevel}";
-        if (attributesXpScrollbar != null) attributesXpScrollbar.value = Mathf.Clamp01(xpProgress);
+        ApplyReadOnlyProgressToScrollbar(attributesXpScrollbar, xpProgress);
 
         int hp = Mathf.RoundToInt(playerStats.maxHealth);
         int mana = Mathf.RoundToInt(playerStats.maxMana);
         int stamina = Mathf.RoundToInt(playerStats.maxStamina);
-        int basePhyDamage = Mathf.Max(1, playerStats.strength + Mathf.RoundToInt(playerStats.dexterity * 0.5f));
-        int magicDamage = Mathf.Max(0, playerStats.intelligence + Mathf.RoundToInt(playerStats.faith * 0.5f));
+        int basePhyDamage = playerStats.GetBasePhysicalDamage();
+        int magicDamage = playerStats.GetBaseMagicDamage();
         int phyDef = Mathf.Max(0, playerStats.endurance + Mathf.RoundToInt(playerStats.vigor * 0.5f));
         int magicDef = Mathf.Max(0, playerStats.intelligence + playerStats.faith);
 
@@ -885,7 +885,7 @@ public class InventoryUI : MonoBehaviour
         if (attributesPhyDefValueText != null) attributesPhyDefValueText.text = phyDef.ToString();
         if (attributesMagicDefValueText != null) attributesMagicDefValueText.text = magicDef.ToString();
         if (attributesLoadValueText != null) attributesLoadValueText.text = equipWeight.ToString("0.0") + " / " + maxLoad.ToString("0.0");
-        if (attributesLoadScrollbar != null) attributesLoadScrollbar.value = loadRatio;
+        ApplyReadOnlyProgressToScrollbar(attributesLoadScrollbar, loadRatio);
     }
 
     private static void SetReadOnlyScrollbar(Scrollbar bar)
@@ -895,6 +895,26 @@ public class InventoryUI : MonoBehaviour
         var nav = bar.navigation;
         nav.mode = Navigation.Mode.None;
         bar.navigation = nav;
+    }
+
+    private static void ApplyReadOnlyProgressToScrollbar(Scrollbar bar, float normalized)
+    {
+        if (bar == null) return;
+
+        normalized = Mathf.Clamp01(normalized);
+        bar.size = normalized; // lunghezza "riempimento"
+
+        switch (bar.direction)
+        {
+            case Scrollbar.Direction.LeftToRight:
+            case Scrollbar.Direction.BottomToTop:
+                bar.value = 0f; // ancora a sinistra/basso
+                break;
+            case Scrollbar.Direction.RightToLeft:
+            case Scrollbar.Direction.TopToBottom:
+                bar.value = 1f; // ancora a destra/alto
+                break;
+        }
     }
 
     private void RefreshAttributeSelectionVisual()
@@ -1083,12 +1103,12 @@ public class InventoryUI : MonoBehaviour
         string k = string.IsNullOrWhiteSpace(key) ? string.Empty : key.Trim().ToLowerInvariant();
         switch (k)
         {
-            case "vigor": return "Increases max HP and survivability.";
-            case "mind": return "Increases mana and focus capacity.";
+            case "vigor": return "Increases max HP and base physical damage.";
+            case "mind": return "Increases mana and base magic damage.";
             case "endurance": return "Increases stamina, defense and equip load.";
-            case "strength": return "Increases physical damage scaling.";
-            case "dexterity": return "Improves finesse and weapon handling.";
-            case "intelligence": return "Increases magic damage and resistance.";
+            case "strength": return "Increases base physical damage and physical scaling.";
+            case "dexterity": return "Increases ranged (bow) damage.";
+            case "intelligence": return "Increases base magic damage and magic scaling.";
             case "faith": return "Increases holy power and magic defense.";
             case "evil": return "Represents your dark alignment.";
             case "karma": return "Represents your moral balance.";

@@ -12,6 +12,8 @@ public enum WeaponCategory
     Axe,
     // Spear or polearm weapons
     Spear,
+    // Ranged bow-like weapons
+    Bow,
     // Unique or boss weapons
     Special
 }

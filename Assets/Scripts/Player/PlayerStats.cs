@@ -590,6 +590,27 @@ public class PlayerStats : MonoBehaviour, IDamageable
         }
     }
 
+    public int GetBasePhysicalDamage()
+    {
+        // Richiesta design:
+        // Vigor + Strength -> base physical damage
+        return Mathf.Max(1, strength + Mathf.RoundToInt(vigor * 0.5f));
+    }
+
+    public int GetBaseMagicDamage()
+    {
+        // Richiesta design:
+        // Mind + Intelligence -> base magic damage
+        return Mathf.Max(0, intelligence + Mathf.RoundToInt(mind * 0.5f));
+    }
+
+    public int GetBaseRangedDamage()
+    {
+        // Richiesta design:
+        // Dexterity -> ranged base damage
+        return Mathf.Max(1, dexterity);
+    }
+
     public float GetCurrentEquipLoad()
     {
         var inventory = FindObjectOfType<PlayerInventory>();

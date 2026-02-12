@@ -11,6 +11,11 @@ public class PlayerController : MonoBehaviour
     public float sprintMultiplier = 1.5f;
     public float rotationSpeed = 720f;
     public float gravity = -20f;
+    [Header("Equip Load Speed")]
+    [Range(0f, 1f)] public float lightLoadThreshold = 0.20f;
+    [Range(0f, 1f)] public float heavyLoadThreshold = 0.80f;
+    [Min(0.1f)] public float lightLoadSpeedMultiplier = 1.15f;
+    [Min(0.1f)] public float heavyLoadSpeedMultiplier = 0.75f;
 
     [Header("Jump")]
     public float jumpHeight = 1.2f;
@@ -65,6 +70,7 @@ public class PlayerController : MonoBehaviour
     private float sprintThreshold = 0.25f;
     private float lastInventoryPadMoveTime = -999f;
     private float inventoryPadMoveCooldown = 0.20f;
+    private bool controlsInitialized = false;
 
     public bool IsGrounded => controller != null && controller.isGrounded;
 
@@ -82,19 +88,14 @@ public class PlayerController : MonoBehaviour
     void Awake()
     {
         controller = GetComponent<CharacterController>();
-        cam = Camera.main.transform;
-        Controls = new PlayerControls();
-        cycleRightEquipAction = Controls.asset.FindAction("Player/CycleRightEquip", throwIfNotFound: false);
-        cycleLeftEquipAction = Controls.asset.FindAction("Player/CycleLeftEquip", throwIfNotFound: false);
-        cycleUsableAction = Controls.asset.FindAction("Player/CycleUsable", throwIfNotFound: false);
+        cam = Camera.main != null ? Camera.main.transform : null;
+        EnsureControlsInitialized();
 
         if (animator == null) animator = GetComponentInChildren<Animator>();
         playerStats = GetComponent<PlayerStats>();
         playerInventory = GetComponent<PlayerInventory>();
         combat = GetComponent<PlayerCombat>();
         
-        Controls.Player.Inventory.performed += OnInventoryPerformed;
-
         // Ensure inventory is closed on start
         if(inventoryPanel != null) inventoryPanel.SetActive(false);
         if (inventoryUI == null && inventoryPanel != null)
@@ -108,16 +109,28 @@ public class PlayerController : MonoBehaviour
         Cursor.visible = false;
     }
 
-    void OnEnable() => Controls.Player.Enable();
-    void OnDisable() => Controls.Player.Disable();
+    void OnEnable()
+    {
+        EnsureControlsInitialized();
+        if (Controls != null) Controls.Player.Enable();
+    }
+
+    void OnDisable()
+    {
+        if (Controls != null) Controls.Player.Disable();
+    }
 
     private void OnDestroy()
     {
-        Controls.Player.Inventory.performed -= OnInventoryPerformed;
+        if (controlsInitialized && Controls != null)
+            Controls.Player.Inventory.performed -= OnInventoryPerformed;
     }
 
     void Update()
     {
+        if (Controls == null || controller == null) return;
+        if (cam == null && Camera.main != null) cam = Camera.main.transform;
+
         if (controller.isGrounded)
         {
             lastGroundedTime = Time.time;
@@ -179,6 +192,18 @@ public class PlayerController : MonoBehaviour
         controller.Move(velocity * Time.deltaTime);
 
         UpdateFallingAnimator();
+    }
+
+    private void EnsureControlsInitialized()
+    {
+        if (controlsInitialized && Controls != null) return;
+        Controls = new PlayerControls();
+        cycleRightEquipAction = Controls.asset.FindAction("Player/CycleRightEquip", throwIfNotFound: false);
+        cycleLeftEquipAction = Controls.asset.FindAction("Player/CycleLeftEquip", throwIfNotFound: false);
+        cycleUsableAction = Controls.asset.FindAction("Player/CycleUsable", throwIfNotFound: false);
+        Controls.Player.Inventory.performed -= OnInventoryPerformed;
+        Controls.Player.Inventory.performed += OnInventoryPerformed;
+        controlsInitialized = true;
     }
 
     private void HandleQuickSlotCycleInput()
@@ -376,7 +401,8 @@ public class PlayerController : MonoBehaviour
 
     void HandleMovement(Vector2 moveInput)
     {
-        float targetSpeed = moveSpeed * (isSprinting ? sprintMultiplier : 1f);
+        float equipLoadMultiplier = GetEquipLoadSpeedMultiplier();
+        float targetSpeed = moveSpeed * equipLoadMultiplier * (isSprinting ? sprintMultiplier : 1f);
         
         Vector3 camForward = cam.forward; camForward.y = 0f; camForward.Normalize();
         Vector3 camRight = cam.right; camRight.y = 0f; camRight.Normalize();
@@ -394,6 +420,23 @@ public class PlayerController : MonoBehaviour
 
         animator.SetFloat("Speed", moveAmount); 
         animator.SetBool("IsSprinting", isSprinting);
+    }
+
+    private float GetEquipLoadSpeedMultiplier()
+    {
+        if (playerStats == null)
+            playerStats = GetComponent<PlayerStats>();
+        if (playerStats == null) return 1f;
+
+        float maxLoad = Mathf.Max(0.001f, playerStats.GetMaxEquipLoad());
+        float currentLoad = Mathf.Max(0f, playerStats.GetCurrentEquipLoad());
+        float loadRatio = currentLoad / maxLoad;
+
+        if (loadRatio < lightLoadThreshold)
+            return Mathf.Max(0.1f, lightLoadSpeedMultiplier);
+        if (loadRatio > heavyLoadThreshold)
+            return Mathf.Max(0.1f, heavyLoadSpeedMultiplier);
+        return 1f;
     }
 
     void HandleSprintAndDodgeInput(Vector2 moveInput)

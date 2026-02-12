@@ -44,4 +44,17 @@ public class PlayerAnimationEvents : MonoBehaviour
     {
         if (leftHandDamage != null) leftHandDamage.DisableDamage();
     }
+
+    public void PrepareAttackDamage(Hand hand, int computedDamage, bool isCritical, AttackType attackType)
+    {
+        if (hand == Hand.Right)
+        {
+            if (rightHandDamage != null)
+                rightHandDamage.SetPreparedHit(computedDamage, isCritical, attackType);
+            return;
+        }
+
+        if (leftHandDamage != null)
+            leftHandDamage.SetPreparedHit(computedDamage, isCritical, attackType);
+    }
 }
