@@ -34,7 +34,7 @@ public class SavedQuestData
 [System.Serializable]
 public class SavedInventoryItemData
 {
-    // weapon | usable | item
+    // weapon | magic | armor | usable | item
     public string itemType;
     // Nome asset ScriptableObject (es. Sword)
     public string assetName;
@@ -59,9 +59,11 @@ public class SavedPlayerInventoryData
     public SavedInventoryItemData[] items;
     public SavedLoadoutSlotData[] rightLoadout;
     public SavedLoadoutSlotData[] leftLoadout;
+    public SavedLoadoutSlotData[] magicLoadout;
     public SavedLoadoutSlotData[] usableLoadout;
     public int currentRightIndex;
     public int currentLeftIndex;
+    public int currentMagicIndex;
     public int currentUsableIndex;
 }
 

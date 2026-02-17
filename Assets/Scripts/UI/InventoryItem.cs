@@ -20,6 +20,10 @@ public class InventoryItem
     public ItemData itemData;
     // Per oggetti usabili/consumabili
     public UsableItemData usableData;
+    // Per armature
+    public ArmorItemData armorData;
+    // Per magie/spell
+    public MagicItemData magicData;
 
     public InventoryItem(Sprite itemIcon, int quantity)
     {
@@ -30,6 +34,8 @@ public class InventoryItem
         weaponData = null;
         itemData = null;
         usableData = null;
+        armorData = null;
+        magicData = null;
     }
 
     public InventoryItem(WeaponItem weapon, int quantity = 1, string overrideTitle = null, string overrideDescription = null)
@@ -42,6 +48,8 @@ public class InventoryItem
         description = overrideDescription ?? (weapon != null ? weapon.description : string.Empty);
         itemData = null;
         usableData = null;
+        armorData = null;
+        magicData = null;
         instanceId = System.Guid.NewGuid().ToString();
     }
 
@@ -54,6 +62,8 @@ public class InventoryItem
         description = overrideDescription ?? (item != null ? item.description : string.Empty);
         weaponData = null;
         usableData = null;
+        armorData = null;
+        magicData = null;
         instanceId = System.Guid.NewGuid().ToString();
     }
 
@@ -66,6 +76,36 @@ public class InventoryItem
         description = overrideDescription ?? (usable != null ? usable.description : string.Empty);
         weaponData = null;
         itemData = null;
+        armorData = null;
+        magicData = null;
+        instanceId = System.Guid.NewGuid().ToString();
+    }
+
+    public InventoryItem(ArmorItemData armor, int quantity = 1, string overrideTitle = null, string overrideDescription = null)
+    {
+        armorData = armor;
+        icon = armor != null ? armor.icon : null;
+        amount = quantity;
+        title = overrideTitle ?? (armor != null ? armor.itemName : string.Empty);
+        description = overrideDescription ?? (armor != null ? armor.description : string.Empty);
+        weaponData = null;
+        itemData = null;
+        usableData = null;
+        magicData = null;
+        instanceId = System.Guid.NewGuid().ToString();
+    }
+
+    public InventoryItem(MagicItemData magic, int quantity = 1, string overrideTitle = null, string overrideDescription = null)
+    {
+        magicData = magic;
+        icon = magic != null ? magic.icon : null;
+        amount = quantity;
+        title = overrideTitle ?? (magic != null ? magic.magicName : string.Empty);
+        description = overrideDescription ?? (magic != null ? magic.description : string.Empty);
+        weaponData = null;
+        itemData = null;
+        usableData = null;
+        armorData = null;
         instanceId = System.Guid.NewGuid().ToString();
     }
 }

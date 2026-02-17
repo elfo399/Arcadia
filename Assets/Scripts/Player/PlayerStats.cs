@@ -83,6 +83,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private float baseMaxHealth;
     private float baseMaxStamina;
     private float baseMaxMana;
+    [Header("Debug / Bootstrap")]
+    [SerializeField] private bool forceStartDataIgnoreSave = false;
 
     void Awake()
     {
@@ -405,6 +407,15 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public void LoadStats()
     {
+        if (forceStartDataIgnoreSave)
+        {
+            loadedDataCache = null;
+            loadedQuestStateApplied = true;
+            loadedInventoryStateApplied = true;
+            Debug.Log("ForceStartData attivo: caricamento save ignorato, uso dati iniziali da Inspector/StartingLoadout.");
+            return;
+        }
+
         GameData data = SaveSystem.LoadData();
         loadedDataCache = data;
         loadedQuestStateApplied = false;
@@ -630,6 +641,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
                 if (it.weaponData != null)
                     unitWeight = Mathf.Max(0f, it.weaponData.weight);
+                else if (it.armorData != null)
+                    unitWeight = Mathf.Max(0f, it.armorData.weight);
                 else if (it.usableData != null)
                     unitWeight = Mathf.Max(0f, it.usableData.weight);
                 else if (it.itemData != null)

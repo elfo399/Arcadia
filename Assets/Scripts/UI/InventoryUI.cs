@@ -15,6 +15,8 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private InventorySlot slotPrefab;
     [SerializeField] private Transform slotParent;
     [SerializeField] private int initialSlotCount = 0; // facoltativo: crea slot all'avvio
+    [SerializeField] private Transform magicSlotParent;
+    [SerializeField] private int magicInitialSlotCount = 12;
     private readonly List<InventorySlot> slots = new();
     private List<InventoryItem> currentItems = new();
     private List<InventoryItem> sourceItems = new(); // lista completa, non filtrata
@@ -245,8 +247,21 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private Transform topEquipContainer3;
     [SerializeField] private GameObject equipmentBackground;
     [SerializeField] private GameObject inventoryBackground;
+    [SerializeField] private GameObject magicBackground;
     [SerializeField] private Button equipWeaponButton;
     [SerializeField] private Button equipUsableButton;
+    [SerializeField] private Button equipMagicButton;
+
+    [Header("Detail Panel - Magic")]
+    [SerializeField] private GameObject magicDetailRoot;   // DescMagic
+    [SerializeField] private Image magicImage;             // DescMagic/.../Image
+    [SerializeField] private TextMeshProUGUI magicTitle;   // DescMagic/.../Title
+    [SerializeField] private TextMeshProUGUI magicDesc;    // DescMagic/.../Desc
+    [SerializeField] private TextMeshProUGUI magicDamageText;
+    [SerializeField] private TextMeshProUGUI magicCriticalText;
+    [SerializeField] private TextMeshProUGUI magicWeightText;
+    [SerializeField] private TextMeshProUGUI magicScalingText;
+    [SerializeField] private TextMeshProUGUI magicRequirementsText;
 
     private PlayerInventory playerInventory;
     private enum EquipTarget { None, Right, Left, Bottom, Top }
@@ -257,6 +272,8 @@ public class InventoryUI : MonoBehaviour
     private InventorySlot[] bottomEquipSlots = new InventorySlot[3];
     private InventorySlot[] topEquipSlots = new InventorySlot[3];
     private int currentTopIndex = 0;
+    private Transform inventorySlotParent;
+    private int inventoryInitialSlotCount = 0;
     private InventorySlot hudRightSlot;
     private InventorySlot hudLeftSlot;
     private InventorySlot hudBottomSlot;
@@ -276,6 +293,8 @@ public class InventoryUI : MonoBehaviour
     {
         // fallback: se non assegnato, usa il proprio transform come parent
         if (slotParent == null) slotParent = transform;
+        inventorySlotParent = slotParent;
+        inventoryInitialSlotCount = initialSlotCount;
         playerInventory = FindObjectOfType<PlayerInventory>();
 
         // se non usiamo prefab, conserva eventuali slot già presenti come figli
@@ -399,6 +418,7 @@ public class InventoryUI : MonoBehaviour
     public void OnEquipRight(int slot = 0)
     {
         EnsurePlayerInventory();
+        SwitchSlotContainer(inventorySlotParent != null ? inventorySlotParent : slotParent, inventoryInitialSlotCount);
         ShowEquipmentInventory(true);
         currentEquipTarget = EquipTarget.Right;
         currentEquipSlot = Mathf.Clamp(slot, 0, 2);
@@ -410,6 +430,7 @@ public class InventoryUI : MonoBehaviour
     public void OnEquipLeft(int slot = 0)
     {
         EnsurePlayerInventory();
+        SwitchSlotContainer(inventorySlotParent != null ? inventorySlotParent : slotParent, inventoryInitialSlotCount);
         ShowEquipmentInventory(true);
         currentEquipTarget = EquipTarget.Left;
         currentEquipSlot = Mathf.Clamp(slot, 0, 2);
@@ -421,6 +442,7 @@ public class InventoryUI : MonoBehaviour
     public void OnEquipBottom(int slot = 0)
     {
         EnsurePlayerInventory();
+        SwitchSlotContainer(inventorySlotParent != null ? inventorySlotParent : slotParent, inventoryInitialSlotCount);
         ShowEquipmentInventory(true);
         currentEquipTarget = EquipTarget.Bottom;
         currentEquipSlot = Mathf.Clamp(slot, 0, 2);
@@ -432,11 +454,14 @@ public class InventoryUI : MonoBehaviour
     public void OnEquipTop(int slot = 0)
     {
         EnsurePlayerInventory();
-        ShowEquipmentInventory(true);
+        InitializeMagicUIIfNeeded();
+        SwitchSlotContainer(magicSlotParent != null ? magicSlotParent : slotParent, magicInitialSlotCount);
+        ShowEquipmentMagic(true);
         currentEquipTarget = EquipTarget.Top;
         currentTopIndex = Mathf.Clamp(slot, 0, 2);
+        if (playerInventory != null) playerInventory.currentMagicIndex = currentTopIndex;
         SetSourceItemsFromPlayer();
-        ShowMagicFilter(); // placeholder
+        ShowMagicFilter();
         UpdateEquipButtonState();
     }
 
@@ -444,25 +469,43 @@ public class InventoryUI : MonoBehaviour
     {
         currentFilter = filter;
 
-        // crea lista filtrata mantenendo la lunghezza per non rompere gli indici degli slot
-        currentItems = new List<InventoryItem>(sourceItems.Count);
+        bool compactFilter = filter == Filter.Magic;
+
+        // Per Magic usiamo lista compatta (solo item matching),
+        // per gli altri filtri manteniamo la lunghezza originale.
+        currentItems = compactFilter ? new List<InventoryItem>() : new List<InventoryItem>(sourceItems.Count);
         for (int i = 0; i < sourceItems.Count; i++)
         {
             var item = sourceItems[i];
             if (MatchesFilter(item, filter))
+            {
                 currentItems.Add(item);
+            }
             else
-                currentItems.Add(null);
+            {
+                if (!compactFilter)
+                    currentItems.Add(null);
+            }
         }
 
         // Garantisce almeno gli slot richiesti dagli item o dal valore iniziale configurato
-        int neededSlots = Mathf.Max(currentItems.Count, initialSlotCount);
+        int baselineSlots = currentFilter == Filter.Magic ? magicInitialSlotCount : initialSlotCount;
+        int neededSlots = currentFilter == Filter.Magic
+            ? Mathf.Max(1, baselineSlots)
+            : Mathf.Max(currentItems.Count, baselineSlots);
         EnsureSlots(neededSlots);
 
         ClearAllSlots();
 
         for (int i = 0; i < slots.Count; i++)
         {
+            if (i >= neededSlots)
+            {
+                slots[i].Clear();
+                slots[i].gameObject.SetActive(false);
+                continue;
+            }
+
             InventoryItem item = i < currentItems.Count ? currentItems[i] : null;
             if (item != null)
             {
@@ -486,14 +529,22 @@ public class InventoryUI : MonoBehaviour
 
     private bool MatchesFilter(InventoryItem item, Filter filter)
     {
-        if (filter == Filter.All || item == null) return true;
+        if (item == null) return true;
         switch (filter)
         {
-            case Filter.Weapons: return item.weaponData != null;
+            case Filter.All:     return !IsMagicInventoryItem(item);
+            case Filter.Weapons: return item.weaponData != null && item.weaponData.damageType != WeaponItem.DamageType.Magic;
             case Filter.Usables: return item.usableData != null;
-            case Filter.Magic:   return false; // placeholder per future magie
+            case Filter.Magic:   return IsMagicInventoryItem(item);
             default: return true;
         }
+    }
+
+    private static bool IsMagicInventoryItem(InventoryItem item)
+    {
+        if (item == null) return false;
+        if (item.magicData != null) return true;
+        return item.weaponData != null && item.weaponData.damageType == WeaponItem.DamageType.Magic;
     }
 
     private void EnsurePlayerInventory()
@@ -536,7 +587,68 @@ public class InventoryUI : MonoBehaviour
         // quando apri la griglia inventario per scegliere un equip, nascondi lo sfondo degli slot equip
         if (equipmentBackground != null) equipmentBackground.SetActive(!showInventoryPanel);
         if (inventoryBackground != null) inventoryBackground.SetActive(showInventoryPanel);
-        // opzionale: potresti spegnere altri background (magic/skill/quest etc) se sono presenti
+        if (magicBackground != null) magicBackground.SetActive(false);
+    }
+
+    private void ShowEquipmentMagic(bool showMagicPanel)
+    {
+        if (equipmentBackground != null) equipmentBackground.SetActive(!showMagicPanel);
+        if (inventoryBackground != null) inventoryBackground.SetActive(false);
+        if (magicBackground != null) magicBackground.SetActive(showMagicPanel);
+    }
+
+    private void SwitchSlotContainer(Transform newParent, int minSlotCount)
+    {
+        if (newParent == null) return;
+
+        if (slotParent != newParent)
+        {
+            slotParent = newParent;
+            slots.Clear();
+        }
+
+        if (slotParent != null && slots.Count == 0)
+        {
+            var existing = slotParent.GetComponentsInChildren<InventorySlot>(true);
+            slots.AddRange(existing);
+            for (int i = 0; i < slots.Count; i++)
+                slots[i].Init(i, this);
+        }
+
+        int targetCount = Mathf.Max(0, minSlotCount);
+        if (targetCount > 0)
+            EnsureSlots(targetCount);
+    }
+
+    private void InitializeMagicUIIfNeeded()
+    {
+        if (magicBackground == null)
+            magicBackground = FindDeepChildByName(transform, "MagicBackground")?.gameObject;
+
+        var root = magicBackground != null ? magicBackground.transform : null;
+        if (root == null) return;
+
+        if (magicSlotParent == null)
+            magicSlotParent = FindDescendantByPath(root, "GridBackground/GridInv") ?? FindDeepChildByName(root, "GridInv");
+
+        if (magicDetailRoot == null)
+            magicDetailRoot = FindDeepChildByName(root, "DescMagic")?.gameObject;
+
+        var detailTf = magicDetailRoot != null ? magicDetailRoot.transform : null;
+        if (detailTf == null) return;
+
+        if (magicImage == null)
+        {
+            var imageTf = FindDeepChildByName(detailTf, "Image");
+            if (imageTf != null) magicImage = imageTf.GetComponent<Image>();
+        }
+        if (magicTitle == null) magicTitle = FindDeepTextByName(detailTf, "Title");
+        if (magicDesc == null) magicDesc = FindDeepTextByName(detailTf, "Desc");
+        if (magicDamageText == null) magicDamageText = FindDeepTextByName(detailTf, "Damage");
+        if (magicCriticalText == null) magicCriticalText = FindDeepTextByName(detailTf, "Critical");
+        if (magicWeightText == null) magicWeightText = FindDeepTextByName(detailTf, "Weight");
+        if (magicScalingText == null) magicScalingText = FindDeepTextByName(detailTf, "Scaling");
+        if (magicRequirementsText == null) magicRequirementsText = FindDeepTextByName(detailTf, "Requirement");
     }
 
     /// <summary>
@@ -549,6 +661,7 @@ public class InventoryUI : MonoBehaviour
         bool tabFound = false;
         bool isInventoryTab = string.Equals(tabKey, "Inventory", System.StringComparison.OrdinalIgnoreCase);
         bool isEquipmentTab = string.Equals(tabKey, "Equipment", System.StringComparison.OrdinalIgnoreCase);
+        bool isMagicTab = string.Equals(tabKey, "Magic", System.StringComparison.OrdinalIgnoreCase);
         bool isSkillTab = string.Equals(tabKey, "Skill", System.StringComparison.OrdinalIgnoreCase)
                           || string.Equals(tabKey, "Attributes", System.StringComparison.OrdinalIgnoreCase);
         bool isQuestTab = string.Equals(tabKey, "Quest", System.StringComparison.OrdinalIgnoreCase)
@@ -588,12 +701,29 @@ public class InventoryUI : MonoBehaviour
         }
 
         // Se la tab è Inventory, forza il filtro a "tutti"
-        if (isInventoryTab) ResetFilterToAll();
+        if (isInventoryTab)
+        {
+            SwitchSlotContainer(inventorySlotParent, inventoryInitialSlotCount);
+            SetSourceItemsFromPlayer();
+            ResetFilterToAll();
+            FocusDefaultPadSlot();
+        }
 
         if (isEquipmentTab)
         {
+            SwitchSlotContainer(inventorySlotParent, inventoryInitialSlotCount);
+            SetSourceItemsFromPlayer();
             ShowEquipmentInventory(false);
             FocusEquipmentCrossDefault();
+        }
+
+        if (isMagicTab)
+        {
+            InitializeMagicUIIfNeeded();
+            SwitchSlotContainer(magicSlotParent != null ? magicSlotParent : inventorySlotParent, magicInitialSlotCount);
+            SetSourceItemsFromPlayer();
+            ShowMagicFilter();
+            FocusDefaultPadSlot();
         }
 
         if (isQuestTab)
@@ -2568,6 +2698,7 @@ public class InventoryUI : MonoBehaviour
 
         if (weaponDetailRoot != null) weaponDetailRoot.SetActive(false);
         if (itemDetailRoot != null) itemDetailRoot.SetActive(false);
+        if (magicDetailRoot != null) magicDetailRoot.SetActive(false);
 
         if (detailIcon != null)
         {
@@ -2584,6 +2715,11 @@ public class InventoryUI : MonoBehaviour
         if (weaponWeightText != null) weaponWeightText.text = string.Empty;
         if (weaponScalingText != null) weaponScalingText.text = string.Empty;
         if (weaponRequirementsText != null) weaponRequirementsText.text = string.Empty;
+        if (magicDamageText != null) magicDamageText.text = string.Empty;
+        if (magicCriticalText != null) magicCriticalText.text = string.Empty;
+        if (magicWeightText != null) magicWeightText.text = string.Empty;
+        if (magicScalingText != null) magicScalingText.text = string.Empty;
+        if (magicRequirementsText != null) magicRequirementsText.text = string.Empty;
 
         if (detailRoot != null) detailRoot.SetActive(false);
     }
@@ -2621,6 +2757,7 @@ public class InventoryUI : MonoBehaviour
         // disattiva entrambi i pannelli specifici, poi attiva quello corretto
         if (weaponDetailRoot != null) weaponDetailRoot.SetActive(false);
         if (itemDetailRoot != null) itemDetailRoot.SetActive(false);
+        if (magicDetailRoot != null) magicDetailRoot.SetActive(false);
 
         // Preferisce i dati dell'arma se presenti, altrimenti quelli degli usabili o degli item generici
         Sprite icon = GetItemIcon(item);
@@ -2629,7 +2766,9 @@ public class InventoryUI : MonoBehaviour
 
         var weapon = item.weaponData;
         var usable = item.usableData;
+        var armor = item.armorData;
         var itemData = item.itemData;
+        var magic = item.magicData;
 
         if (weapon != null)
         {
@@ -2657,12 +2796,41 @@ public class InventoryUI : MonoBehaviour
             return;
         }
 
-        // Item o Usable
+        if (magic != null)
+        {
+            if (magic.icon != null) icon = magic.icon;
+            if (!string.IsNullOrEmpty(magic.magicName)) title = magic.magicName;
+            if (!string.IsNullOrEmpty(magic.description)) description = magic.description;
+
+            if (magicDetailRoot != null) magicDetailRoot.SetActive(true);
+            if (magicImage != null) magicImage.sprite = icon;
+            if (magicTitle != null) magicTitle.text = title ?? string.Empty;
+            if (magicDesc != null) magicDesc.text = description ?? string.Empty;
+            if (magicDamageText != null) magicDamageText.text = magic.magicDamage.ToString();
+            if (magicCriticalText != null) magicCriticalText.text = magic.criticalHit.ToString("0.##");
+            if (magicWeightText != null) magicWeightText.text = string.Empty;
+            if (magicScalingText != null) magicScalingText.text = magic.scaling ?? string.Empty;
+            if (magicRequirementsText != null) magicRequirementsText.text = magic.requirements ?? string.Empty;
+
+            if (weaponStatsRoot != null) weaponStatsRoot.SetActive(false);
+            if (detailIcon != null) { detailIcon.enabled = icon != null; detailIcon.sprite = icon; }
+            if (detailTitle != null) detailTitle.text = title ?? string.Empty;
+            if (detailDescription != null) detailDescription.text = description ?? string.Empty;
+            return;
+        }
+
+        // Item / Armor / Usable
         if (usable != null)
         {
             if (usable.icon != null) icon = usable.icon;
             if (!string.IsNullOrEmpty(usable.itemName)) title = usable.itemName;
             if (!string.IsNullOrEmpty(usable.description)) description = usable.description;
+        }
+        else if (armor != null)
+        {
+            if (armor.icon != null) icon = armor.icon;
+            if (!string.IsNullOrEmpty(armor.itemName)) title = armor.itemName;
+            if (!string.IsNullOrEmpty(armor.description)) description = armor.description;
         }
         else if (itemData != null)
         {
@@ -2733,9 +2901,9 @@ public class InventoryUI : MonoBehaviour
 
         // top: placeholder magie (3 slot per coerenza con gli altri lati)
         SetBackLayerIcon(hudCrossTop);
-        for (int i = 0; i < topEquipSlots.Length; i++)
-            UpdateEquipVisual(topEquipSlots[i], null, 0);
-        UpdateHudVisual(hudTopSlot, null);
+        UpdateEquipVisuals(topEquipSlots, playerInventory != null ? playerInventory.magicLoadout : null);
+        var magicEquipped = playerInventory != null ? playerInventory.GetCurrentMagic() : null;
+        UpdateHudVisual(hudTopSlot, magicEquipped != null ? magicEquipped.icon : null);
 
         ApplyEquipmentCrossFocusVisual();
         if (attributesUiInitialized)
@@ -2796,6 +2964,17 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
+    private void UpdateEquipVisuals(InventorySlot[] slots, MagicItemData[] loadout)
+    {
+        if (slots == null || loadout == null) return;
+        int len = Mathf.Min(slots.Length, loadout.Length);
+        for (int i = 0; i < len; i++)
+        {
+            var icon = loadout[i] != null ? loadout[i].icon : null;
+            UpdateEquipVisual(slots[i], icon, 1);
+        }
+    }
+
     private void UpdateEquipButtonState()
     {
         bool hasSelection = currentSelectedIndex >= 0 && HasItem(currentSelectedIndex);
@@ -2813,6 +2992,15 @@ public class InventoryUI : MonoBehaviour
             equipUsableButton.gameObject.SetActive(showU);
             equipUsableButton.interactable = showU && hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.usableData != null;
         }
+
+        if (equipMagicButton != null)
+        {
+            bool showM = (currentEquipTarget == EquipTarget.Top) && currentFilter == Filter.Magic;
+            equipMagicButton.gameObject.SetActive(showM);
+            bool hasMagicSelection = showM && hasSelection && currentSelectedIndex < currentItems.Count;
+            var selected = hasMagicSelection ? currentItems[currentSelectedIndex] : null;
+            equipMagicButton.interactable = hasMagicSelection && selected != null && IsMagicInventoryItem(selected);
+        }
     }
 
     private void ResetEquipTarget()
@@ -2827,6 +3015,11 @@ public class InventoryUI : MonoBehaviour
         {
             equipUsableButton.gameObject.SetActive(false);
             equipUsableButton.interactable = false;
+        }
+        if (equipMagicButton != null)
+        {
+            equipMagicButton.gameObject.SetActive(false);
+            equipMagicButton.interactable = false;
         }
     }
 
@@ -2889,6 +3082,8 @@ public class InventoryUI : MonoBehaviour
         if (item == null) return null;
         if (item.icon != null) return item.icon;
         if (item.weaponData != null && item.weaponData.icon != null) return item.weaponData.icon;
+        if (item.magicData != null && item.magicData.icon != null) return item.magicData.icon;
+        if (item.armorData != null && item.armorData.icon != null) return item.armorData.icon;
         if (item.usableData != null && item.usableData.icon != null) return item.usableData.icon;
         if (item.itemData != null && item.itemData.icon != null) return item.itemData.icon;
         return null;
@@ -2912,6 +3107,7 @@ public class InventoryUI : MonoBehaviour
             UpdateEquipButtonState();
             return;
         }
+
         selectedPadIndex = index;
         ApplyPadFocusVisual(index);
         ShowItemDetailsByIndex(index);
@@ -3046,6 +3242,43 @@ public class InventoryUI : MonoBehaviour
             OnEquipUsableButtonClick();
             return;
         }
+        if (equipMagicButton != null && equipMagicButton.gameObject.activeInHierarchy && equipMagicButton.interactable)
+        {
+            OnEquipMagicButtonClick();
+            return;
+        }
+
+        // Fallback: equip diretto dall'item in focus quando siamo in modalita' equip selection.
+        if (currentEquipTarget != EquipTarget.None && padFocusIndex >= 0 && HasItem(padFocusIndex))
+        {
+            currentSelectedIndex = padFocusIndex;
+            var focused = currentItems[padFocusIndex];
+            switch (currentEquipTarget)
+            {
+                case EquipTarget.Right:
+                case EquipTarget.Left:
+                    if (focused != null && focused.weaponData != null && focused.weaponData.damageType != WeaponItem.DamageType.Magic)
+                    {
+                        OnEquipWeaponButtonClick();
+                        return;
+                    }
+                    break;
+                case EquipTarget.Bottom:
+                    if (focused != null && focused.usableData != null)
+                    {
+                        OnEquipUsableButtonClick();
+                        return;
+                    }
+                    break;
+                case EquipTarget.Top:
+                    if (focused != null && IsMagicInventoryItem(focused))
+                    {
+                        OnEquipMagicButtonClick();
+                        return;
+                    }
+                    break;
+            }
+        }
 
         if (padFocusIndex < 0 || padFocusIndex >= slots.Count)
         {
@@ -3087,7 +3320,11 @@ public class InventoryUI : MonoBehaviour
     private int GetCurrentCrossIndex(EquipCrossFocus focus)
     {
         EnsurePlayerInventory();
-        if (focus == EquipCrossFocus.Top) return Mathf.Clamp(currentTopIndex, 0, 2);
+        if (focus == EquipCrossFocus.Top)
+        {
+            if (playerInventory != null) return Mathf.Clamp(playerInventory.currentMagicIndex, 0, 2);
+            return Mathf.Clamp(currentTopIndex, 0, 2);
+        }
         if (playerInventory == null) return 0;
         switch (focus)
         {
@@ -3228,6 +3465,7 @@ public class InventoryUI : MonoBehaviour
                     playerInventory.currentUsableIndex = Mathf.Clamp(slotIndex, 0, 2);
                     break;
                 case EquipCrossFocus.Top:
+                    playerInventory.currentMagicIndex = Mathf.Clamp(slotIndex, 0, 2);
                     currentTopIndex = Mathf.Clamp(slotIndex, 0, 2);
                     break;
             }
@@ -3551,8 +3789,10 @@ public class InventoryUI : MonoBehaviour
             }
         }
 
-        // Equipment flow: dalla griglia inventario torna alla croce
-        if (currentEquipTarget != EquipTarget.None && inventoryBackground != null && inventoryBackground.activeInHierarchy)
+        // Equipment flow: dalla griglia inventario/magic torna alla croce
+        bool equipGridOpen = (inventoryBackground != null && inventoryBackground.activeInHierarchy)
+                            || (magicBackground != null && magicBackground.activeInHierarchy);
+        if (currentEquipTarget != EquipTarget.None && equipGridOpen)
         {
             CloseEquipGrid();
             FocusEquipmentCrossDefault();
@@ -3969,6 +4209,57 @@ public class InventoryUI : MonoBehaviour
         RefreshEquipmentCross();
         ResetEquipTarget();
         CloseEquipGrid();
+    }
+
+    // Equip magic into top slot
+    public void OnEquipMagicButtonClick()
+    {
+        if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex)) return;
+        EnsurePlayerInventory();
+        if (playerInventory == null) return;
+
+        var item = currentItems[currentSelectedIndex];
+        MagicItemData magic = item != null ? item.magicData : null;
+        bool fromLegacyWeaponMagic = false;
+        if (magic == null && item != null && item.weaponData != null && item.weaponData.damageType == WeaponItem.DamageType.Magic)
+        {
+            magic = BuildRuntimeMagicFromWeapon(item.weaponData);
+            fromLegacyWeaponMagic = true;
+        }
+        if (magic == null) return;
+
+        if (currentEquipTarget == EquipTarget.Top)
+        {
+            if (fromLegacyWeaponMagic)
+                playerInventory.ForceSetMagicAtSlot(currentTopIndex, magic, item.instanceId);
+            else
+                playerInventory.SetMagicAtSlot(currentTopIndex, magic, item.instanceId);
+        }
+        else
+        {
+            return;
+        }
+
+        RefreshSlot(currentSelectedIndex);
+        RefreshDetailSelection();
+        RefreshEquipmentCross();
+        ResetEquipTarget();
+        CloseEquipGrid();
+    }
+
+    private static MagicItemData BuildRuntimeMagicFromWeapon(WeaponItem weapon)
+    {
+        if (weapon == null) return null;
+        var runtime = ScriptableObject.CreateInstance<MagicItemData>();
+        runtime.hideFlags = HideFlags.HideAndDontSave;
+        runtime.magicName = string.IsNullOrWhiteSpace(weapon.weaponName) ? weapon.name : weapon.weaponName;
+        runtime.description = weapon.description;
+        runtime.icon = weapon.icon;
+        runtime.magicDamage = Mathf.Max(0, weapon.magicDamage);
+        runtime.criticalHit = weapon.criticalHit;
+        runtime.scaling = weapon.scaling;
+        runtime.requirements = weapon.requirements;
+        return runtime;
     }
 }
 
