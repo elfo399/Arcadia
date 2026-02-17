@@ -61,6 +61,7 @@ public class PlayerController : MonoBehaviour
     private InputAction cycleRightEquipAction;
     private InputAction cycleLeftEquipAction;
     private InputAction cycleUsableAction;
+    private InputAction cycleMagicAction;
 
     private Vector3 velocity;
     private float lastDodgeTime = -999f;
@@ -201,6 +202,7 @@ public class PlayerController : MonoBehaviour
         cycleRightEquipAction = Controls.asset.FindAction("Player/CycleRightEquip", throwIfNotFound: false);
         cycleLeftEquipAction = Controls.asset.FindAction("Player/CycleLeftEquip", throwIfNotFound: false);
         cycleUsableAction = Controls.asset.FindAction("Player/CycleUsable", throwIfNotFound: false);
+        cycleMagicAction = Controls.asset.FindAction("Player/CycleMagic", throwIfNotFound: false);
         Controls.Player.Inventory.performed -= OnInventoryPerformed;
         Controls.Player.Inventory.performed += OnInventoryPerformed;
         controlsInitialized = true;
@@ -222,6 +224,15 @@ public class PlayerController : MonoBehaviour
         if (cycleUsableAction != null && cycleUsableAction.WasPerformedThisFrame())
         {
             changed |= playerInventory.CycleUsable(1);
+        }
+        if (cycleMagicAction != null && cycleMagicAction.WasPerformedThisFrame())
+        {
+            changed |= playerInventory.CycleMagic(1);
+        }
+        else if (cycleMagicAction == null && Gamepad.current != null && Gamepad.current.dpad.up.wasPressedThisFrame)
+        {
+            // Fallback: se l'InputAction non è ancora configurata, usa D-Pad Up.
+            changed |= playerInventory.CycleMagic(1);
         }
 
         if (changed && inventoryUI != null)

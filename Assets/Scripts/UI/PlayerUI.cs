@@ -29,6 +29,12 @@ public class PlayerUI : MonoBehaviour
     public Image slotRightIcon;
     private InventorySlot leftFrontSlot;
     private InventorySlot rightFrontSlot;
+    private Sprite lastLeftWeaponIcon;
+    private Sprite lastRightWeaponIcon;
+    private float lastHealthFill = -1f;
+    private float lastStaminaFill = -1f;
+    private float lastManaFill = -1f;
+    private int lastFlaskCount = int.MinValue;
 
     // Update UI elements each frame
     void Update()
@@ -57,19 +63,34 @@ public class PlayerUI : MonoBehaviour
         if (healthBarFill != null)
         {
             float t = playerStats.currentHealth / playerStats.maxHealth;
-            healthBarFill.fillAmount = Mathf.Clamp01(t);
+            float v = Mathf.Clamp01(t);
+            if (!Mathf.Approximately(v, lastHealthFill))
+            {
+                healthBarFill.fillAmount = v;
+                lastHealthFill = v;
+            }
         }
 
         if (staminaBarFill != null)
         {
             float t = playerStats.currentStamina / playerStats.maxStamina;
-            staminaBarFill.fillAmount = Mathf.Clamp01(t);
+            float v = Mathf.Clamp01(t);
+            if (!Mathf.Approximately(v, lastStaminaFill))
+            {
+                staminaBarFill.fillAmount = v;
+                lastStaminaFill = v;
+            }
         }
 
         if (manaBarFill != null)
         {
             float t = playerStats.currentMana / playerStats.maxMana;
-            manaBarFill.fillAmount = Mathf.Clamp01(t);
+            float v = Mathf.Clamp01(t);
+            if (!Mathf.Approximately(v, lastManaFill))
+            {
+                manaBarFill.fillAmount = v;
+                lastManaFill = v;
+            }
         }
     }
 
@@ -78,7 +99,11 @@ public class PlayerUI : MonoBehaviour
     {
         if (flaskCountText != null)
         {
-            flaskCountText.text = "x" + playerStats.currentFlasks.ToString();
+            if (playerStats.currentFlasks != lastFlaskCount)
+            {
+                flaskCountText.text = "x" + playerStats.currentFlasks.ToString();
+                lastFlaskCount = playerStats.currentFlasks;
+            }
         }
     }
 
@@ -87,9 +112,20 @@ public class PlayerUI : MonoBehaviour
     {
         WeaponItem rightWeapon = playerInventory.GetWeaponForHand(Hand.Right);
         WeaponItem leftWeapon = playerInventory.GetWeaponForHand(Hand.Left);
+        Sprite rightIcon = rightWeapon != null ? rightWeapon.icon : null;
+        Sprite leftIcon = leftWeapon != null ? leftWeapon.icon : null;
 
-        UpdateFrontSlot(rightFrontSlot, slotRightIcon, rightWeapon);
-        UpdateFrontSlot(leftFrontSlot, slotLeftIcon, leftWeapon);
+        if (rightIcon != lastRightWeaponIcon)
+        {
+            UpdateFrontSlot(rightFrontSlot, slotRightIcon, rightWeapon);
+            lastRightWeaponIcon = rightIcon;
+        }
+
+        if (leftIcon != lastLeftWeaponIcon)
+        {
+            UpdateFrontSlot(leftFrontSlot, slotLeftIcon, leftWeapon);
+            lastLeftWeaponIcon = leftIcon;
+        }
     }
 
     private static InventorySlot ResolveFrontSlot(Image parentImage)

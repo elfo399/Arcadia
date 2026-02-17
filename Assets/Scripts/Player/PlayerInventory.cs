@@ -200,19 +200,25 @@ public class PlayerInventory : MonoBehaviour
     public bool CycleRightWeapon(int direction = 1)
     {
         EnsureLoadoutSize();
-        return CycleWeaponInternal(rightLoadout, ref currentRightIndex, direction);
+        return CycleIndexInternal(rightLoadout, ref currentRightIndex, direction);
     }
 
     public bool CycleLeftWeapon(int direction = 1)
     {
         EnsureLoadoutSize();
-        return CycleWeaponInternal(leftLoadout, ref currentLeftIndex, direction);
+        return CycleIndexInternal(leftLoadout, ref currentLeftIndex, direction);
     }
 
     public bool CycleUsable(int direction = 1)
     {
         EnsureLoadoutSize();
-        return CycleUsableInternal(usableLoadout, ref currentUsableIndex, direction);
+        return CycleIndexInternal(usableLoadout, ref currentUsableIndex, direction);
+    }
+
+    public bool CycleMagic(int direction = 1)
+    {
+        EnsureLoadoutSize();
+        return CycleIndexInternal(magicLoadout, ref currentMagicIndex, direction);
     }
 
     public bool IsInstanceEquipped(string instanceId)
@@ -431,62 +437,6 @@ public class PlayerInventory : MonoBehaviour
         return false;
     }
 
-    private bool RemoveWeaponInstanceFromInventory(string instanceId)
-    {
-        if (string.IsNullOrEmpty(instanceId)) return false;
-        for (int i = 0; i < items.Count; i++)
-        {
-            var it = items[i];
-            if (it != null && it.weaponData != null && it.instanceId == instanceId)
-            {
-                items.RemoveAt(i);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void AddWeaponInstanceToInventory(string instanceId, WeaponItem weapon)
-    {
-        if (weapon == null) return;
-        var inv = new InventoryItem(weapon, 1);
-        if (!string.IsNullOrEmpty(instanceId)) inv.instanceId = instanceId;
-        items.Add(inv);
-    }
-
-    private bool RemoveUsableInstanceFromInventory(string instanceId)
-    {
-        if (string.IsNullOrEmpty(instanceId)) return false;
-        for (int i = 0; i < items.Count; i++)
-        {
-            var it = items[i];
-            if (it != null && it.usableData != null && it.instanceId == instanceId)
-            {
-                if (it.amount > 1) it.amount -= 1;
-                else items.RemoveAt(i);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void AddUsableInstanceToInventory(string instanceId, UsableItemData usable)
-    {
-        if (usable == null) return;
-        for (int i = 0; i < items.Count; i++)
-        {
-            var it = items[i];
-            if (it != null && it.usableData == usable && it.instanceId == instanceId)
-            {
-                it.amount += 1;
-                return;
-            }
-        }
-        var inv = new InventoryItem(usable, 1);
-        if (!string.IsNullOrEmpty(instanceId)) inv.instanceId = instanceId;
-        items.Add(inv);
-    }
-
     private void SeedLoadoutFromLegacyFields()
     {
         if (IsAllNull(rightLoadout) && legacyRightHandWeapon != null)
@@ -528,17 +478,7 @@ public class PlayerInventory : MonoBehaviour
         return 0;
     }
 
-    private bool CycleWeaponInternal(WeaponItem[] loadout, ref int currentIndex, int direction)
-    {
-        if (loadout == null || loadout.Length == 0) return false;
-
-        int dir = direction >= 0 ? 1 : -1;
-        currentIndex = (Mathf.Clamp(currentIndex, 0, loadout.Length - 1) + dir + loadout.Length) % loadout.Length;
-        SyncEquippedReferences();
-        return true;
-    }
-
-    private bool CycleUsableInternal(UsableItemData[] loadout, ref int currentIndex, int direction)
+    private bool CycleIndexInternal<T>(T[] loadout, ref int currentIndex, int direction) where T : class
     {
         if (loadout == null || loadout.Length == 0) return false;
 

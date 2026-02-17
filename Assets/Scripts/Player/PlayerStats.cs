@@ -83,6 +83,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private float baseMaxHealth;
     private float baseMaxStamina;
     private float baseMaxMana;
+    private QuestManager cachedQuestManager;
+    private PlayerInventory cachedPlayerInventory;
     [Header("Debug / Bootstrap")]
     [SerializeField] private bool forceStartDataIgnoreSave = false;
 
@@ -387,12 +389,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
             bankCopper = this.bankCopper
         };
 
-        var questManager = QuestManager.Instance != null ? QuestManager.Instance : FindObjectOfType<QuestManager>();
+        var questManager = GetCachedQuestManager();
         if (questManager != null)
         {
             data.quests = SerializeQuests(questManager.GetQuestsSnapshot());
         }
-        var playerInventory = FindObjectOfType<PlayerInventory>();
+        var playerInventory = GetCachedPlayerInventory();
         if (playerInventory != null)
         {
             data.playerInventory = playerInventory.CreateSaveData();
@@ -624,7 +626,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public float GetCurrentEquipLoad()
     {
-        var inventory = FindObjectOfType<PlayerInventory>();
+        var inventory = GetCachedPlayerInventory();
         if (inventory == null) return 0f;
 
         float load = 0f;
@@ -727,22 +729,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     private void NormalizeBank()
     {
-        // Converte overflow di rame/argento in tagli superiori (100:1 di default)
-        const int rate = 100;
-        if (bankCopper >= rate)
-        {
-            bankSilver += bankCopper / rate;
-            bankCopper = bankCopper % rate;
-        }
-        if (bankSilver >= rate)
-        {
-            bankGold += bankSilver / rate;
-            bankSilver = bankSilver % rate;
-        }
-        // Nessun prestito: clamp a zero min
-        bankGold = Mathf.Max(0, bankGold);
-        bankSilver = Mathf.Max(0, bankSilver);
-        bankCopper = Mathf.Max(0, bankCopper);
+        NormalizeWallet(ref bankGold, ref bankSilver, ref bankCopper);
     }
 
     private void NotifyBankChanged()
@@ -782,22 +769,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     private void NormalizeRunWallet()
     {
-        const int rate = 100; // 100 rame = 1 argento, 100 argento = 1 oro
-
-        if (runCopper >= rate)
-        {
-            runSilver += runCopper / rate;
-            runCopper = runCopper % rate;
-        }
-        if (runSilver >= rate)
-        {
-            runGold += runSilver / rate;
-            runSilver = runSilver % rate;
-        }
-
-        runGold = Mathf.Max(0, runGold);
-        runSilver = Mathf.Max(0, runSilver);
-        runCopper = Mathf.Max(0, runCopper);
+        NormalizeWallet(ref runGold, ref runSilver, ref runCopper);
     }
 
     private void NotifyRunWalletChanged()
@@ -810,7 +782,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (loadedQuestStateApplied) return;
         if (loadedDataCache == null || loadedDataCache.quests == null) return;
 
-        var questManager = QuestManager.Instance != null ? QuestManager.Instance : FindObjectOfType<QuestManager>();
+        var questManager = GetCachedQuestManager();
         if (questManager == null) return;
 
         var mapped = DeserializeQuests(loadedDataCache.quests);
@@ -823,7 +795,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (loadedInventoryStateApplied) return;
         if (loadedDataCache == null || loadedDataCache.playerInventory == null) return;
 
-        var playerInventory = FindObjectOfType<PlayerInventory>();
+        var playerInventory = GetCachedPlayerInventory();
         if (playerInventory == null) return;
 
         playerInventory.ApplySaveData(loadedDataCache.playerInventory);
@@ -1051,5 +1023,38 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private static string NormalizeLookupKey(string value)
     {
         return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
+    }
+
+    private QuestManager GetCachedQuestManager()
+    {
+        if (cachedQuestManager != null) return cachedQuestManager;
+        cachedQuestManager = QuestManager.Instance != null ? QuestManager.Instance : FindObjectOfType<QuestManager>();
+        return cachedQuestManager;
+    }
+
+    private PlayerInventory GetCachedPlayerInventory()
+    {
+        if (cachedPlayerInventory != null) return cachedPlayerInventory;
+        cachedPlayerInventory = FindObjectOfType<PlayerInventory>();
+        return cachedPlayerInventory;
+    }
+
+    private static void NormalizeWallet(ref int gold, ref int silver, ref int copper)
+    {
+        const int rate = 100; // 100 rame = 1 argento, 100 argento = 1 oro
+        if (copper >= rate)
+        {
+            silver += copper / rate;
+            copper %= rate;
+        }
+        if (silver >= rate)
+        {
+            gold += silver / rate;
+            silver %= rate;
+        }
+
+        gold = Mathf.Max(0, gold);
+        silver = Mathf.Max(0, silver);
+        copper = Mathf.Max(0, copper);
     }
 }

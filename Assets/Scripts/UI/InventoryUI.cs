@@ -138,6 +138,8 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private Transform questRewardsContainer;
     [SerializeField] private GameObject questRewardPrefab;
     [SerializeField] private Button questClaimRewardButton;
+    [SerializeField] private int questRewardInventoryCapacity = -1; // <=0 => usa initialSlotCount
+    [SerializeField] private int questRewardMagicCapacity = -1;     // <=0 => usa magicInitialSlotCount
     [SerializeField] private ScrollRect questDetailScrollRect;
     [SerializeField] private bool preserveQuestScrollPosition = false;
     [SerializeField] private bool smoothQuestMouseWheel = true;
@@ -175,6 +177,11 @@ public class InventoryUI : MonoBehaviour
     private float suppressQuestRowClickUntil = 0f;
     private int lastQuestFilterToggleFrame = -1;
     private int attributesPadIndex = 0;
+    private Dictionary<string, WeaponItem> questRewardWeaponLookup;
+    private Dictionary<string, UsableItemData> questRewardUsableLookup;
+    private Dictionary<string, ItemData> questRewardItemLookup;
+    private Dictionary<string, MagicItemData> questRewardMagicLookup;
+    private Dictionary<string, ArmorItemData> questRewardArmorLookup;
 
     [Header("Drag & Drop")]
     [SerializeField] private Canvas dragCanvas; // opzionale: se null usa quello più alto trovato
@@ -364,6 +371,8 @@ public class InventoryUI : MonoBehaviour
             questActiveFilterButton.onClick.RemoveListener(SetQuestFilterActive);
         if (questCompletedFilterButton != null)
             questCompletedFilterButton.onClick.RemoveListener(SetQuestFilterCompleted);
+        if (questClaimRewardButton != null)
+            questClaimRewardButton.onClick.RemoveListener(OnQuestClaimRewardButtonClicked);
         if (attributeRows != null)
         {
             for (int i = 0; i < attributeRows.Count; i++)
@@ -515,7 +524,7 @@ public class InventoryUI : MonoBehaviour
             {
                 slots[i].Clear();
             }
-            // mantieni attivo lo slot anche se vuoto, cosï¿½ si vede la griglia di placeholder
+            // Mantieni attivo lo slot anche se vuoto per non collassare la griglia.
             slots[i].gameObject.SetActive(true);
         }
 
@@ -1369,6 +1378,7 @@ public class InventoryUI : MonoBehaviour
             questRewardPrefab.SetActive(false);
 
         WireQuestFilterButtons();
+        WireQuestClaimButton();
         CacheQuestFilterBaseColors();
 
         TryBindQuestManager();
@@ -1605,8 +1615,274 @@ public class InventoryUI : MonoBehaviour
     private void UpdateQuestClaimButtonState(QuestEntryData quest)
     {
         if (questClaimRewardButton == null) return;
-        bool canClaim = quest != null && quest.completed && quest.rewards != null && quest.rewards.Count > 0;
+        bool canClaim = quest != null
+                        && IsQuestReadyToClaim(quest)
+                        && quest.rewards != null
+                        && quest.rewards.Count > 0
+                        && CanClaimQuestRewards(quest);
         questClaimRewardButton.interactable = canClaim;
+    }
+
+    private void OnQuestClaimRewardButtonClicked()
+    {
+        var quest = GetSelectedVisibleQuest();
+        if (quest == null) return;
+        if (!IsQuestReadyToClaim(quest) || quest.rewards == null || quest.rewards.Count == 0) return;
+        if (!CanClaimQuestRewards(quest))
+        {
+            Debug.LogWarning("[InventoryUI] Ricompensa non riscattabile: spazio inventario insufficiente.");
+            RefreshQuestUI();
+            return;
+        }
+
+        if (!TryApplyQuestRewards(quest))
+        {
+            Debug.LogWarning("[InventoryUI] Ricompensa non riscattata: impossibile risolvere una o piu' reward.");
+            RefreshQuestUI();
+            return;
+        }
+
+        ConsumeQuestRewards(quest.questId);
+        SetSourceItemsFromPlayer();
+        RefreshQuestUI();
+    }
+
+    private bool CanClaimQuestRewards(QuestEntryData quest)
+    {
+        EnsurePlayerInventory();
+        CachePlayerStats();
+        if (playerInventory == null) return false;
+
+        int normalUsed = 0;
+        int magicUsed = 0;
+        CountInventoryUsage(playerInventory.Items, out normalUsed, out magicUsed);
+
+        int normalCap = GetQuestRewardNormalCapacity();
+        int magicCap = GetQuestRewardMagicCapacity();
+
+        int normalAdditional = 0;
+        int magicAdditional = 0;
+        var normalStacks = new HashSet<string>();
+        var magicStacks = new HashSet<string>();
+
+        if (quest.rewards == null) return false;
+        for (int i = 0; i < quest.rewards.Count; i++)
+        {
+            var reward = quest.rewards[i];
+            if (reward == null) continue;
+            int amount = Mathf.Max(1, reward.amount);
+
+            if (!TryResolveQuestRewardType(reward, out var kind))
+                return false;
+
+            switch (kind)
+            {
+                case QuestRewardKind.Experience:
+                    continue;
+
+                case QuestRewardKind.Weapon:
+                    if (!TryResolveWeaponReward(reward, out _)) return false;
+                    normalAdditional += amount;
+                    break;
+
+                case QuestRewardKind.Armor:
+                    if (!TryResolveArmorReward(reward, out _)) return false;
+                    normalAdditional += amount;
+                    break;
+
+                case QuestRewardKind.Usable:
+                    if (!TryResolveUsableReward(reward, out var usable)) return false;
+                    if (!WouldStackUsable(usable, normalStacks))
+                        normalAdditional += 1;
+                    break;
+
+                case QuestRewardKind.Item:
+                    if (!TryResolveItemReward(reward, out var item)) return false;
+                    if (!WouldStackItem(item, normalStacks))
+                        normalAdditional += 1;
+                    break;
+
+                case QuestRewardKind.Magic:
+                    if (!TryResolveMagicReward(reward, out var magic)) return false;
+                    if (!WouldStackMagic(magic, magicStacks))
+                        magicAdditional += 1;
+                    break;
+            }
+        }
+
+        bool normalOk = normalCap <= 0 || (normalUsed + normalAdditional) <= normalCap;
+        bool magicOk = magicCap <= 0 || (magicUsed + magicAdditional) <= magicCap;
+        return normalOk && magicOk;
+    }
+
+    private bool TryApplyQuestRewards(QuestEntryData quest)
+    {
+        EnsurePlayerInventory();
+        CachePlayerStats();
+        if (playerInventory == null) return false;
+
+        for (int i = 0; i < quest.rewards.Count; i++)
+        {
+            var reward = quest.rewards[i];
+            if (reward == null) continue;
+            int amount = Mathf.Max(1, reward.amount);
+
+            if (!TryResolveQuestRewardType(reward, out var kind))
+                return false;
+
+            switch (kind)
+            {
+                case QuestRewardKind.Experience:
+                    if (playerStats == null) return false;
+                    playerStats.AddExperience(amount);
+                    break;
+
+                case QuestRewardKind.Weapon:
+                    if (!TryResolveWeaponReward(reward, out var weapon)) return false;
+                    for (int n = 0; n < amount; n++)
+                        playerInventory.AddItem(new InventoryItem(weapon, 1));
+                    break;
+
+                case QuestRewardKind.Armor:
+                    if (!TryResolveArmorReward(reward, out var armor)) return false;
+                    for (int n = 0; n < amount; n++)
+                        playerInventory.AddItem(new InventoryItem(armor, 1));
+                    break;
+
+                case QuestRewardKind.Usable:
+                    if (!TryResolveUsableReward(reward, out var usable)) return false;
+                    AddOrStackUsableReward(usable, amount);
+                    break;
+
+                case QuestRewardKind.Item:
+                    if (!TryResolveItemReward(reward, out var item)) return false;
+                    AddOrStackItemReward(item, amount);
+                    break;
+
+                case QuestRewardKind.Magic:
+                    if (!TryResolveMagicReward(reward, out var magic)) return false;
+                    AddOrStackMagicReward(magic, amount);
+                    break;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsQuestReadyToClaim(QuestEntryData quest)
+    {
+        if (quest == null) return false;
+
+        // Claim abilitato quando tutti gli obiettivi risultano completati.
+        // Se la quest non ha obiettivi, fallback sul flag completed.
+        if (quest.objectives == null || quest.objectives.Count == 0)
+            return quest.completed;
+
+        for (int i = 0; i < quest.objectives.Count; i++)
+        {
+            var objective = quest.objectives[i];
+            if (objective == null) continue;
+            if (!objective.completed)
+                return false;
+        }
+
+        return true;
+    }
+
+    private void ConsumeQuestRewards(string questId)
+    {
+        if (string.IsNullOrWhiteSpace(questId)) return;
+        string normalized = questId.Trim();
+
+        bool changedLocal = false;
+        for (int i = 0; i < questEntries.Count; i++)
+        {
+            var q = questEntries[i];
+            if (q == null) continue;
+            if (!string.Equals(q.questId, normalized, System.StringComparison.OrdinalIgnoreCase)) continue;
+            q.completed = true;
+            if (q.rewards == null || q.rewards.Count == 0) break;
+            q.rewards.Clear();
+            changedLocal = true;
+            break;
+        }
+
+        TryBindQuestManager();
+        if (useQuestManager && questManager != null)
+        {
+            var list = questManager.GetQuestsSnapshot();
+            bool changedManager = false;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var q = list[i];
+                if (q == null) continue;
+                if (!string.Equals(q.questId, normalized, System.StringComparison.OrdinalIgnoreCase)) continue;
+                q.completed = true;
+                if (q.rewards == null || q.rewards.Count == 0) break;
+                q.rewards.Clear();
+                changedManager = true;
+                break;
+            }
+
+            if (changedManager)
+            {
+                questManager.ReplaceAllQuests(list);
+                return;
+            }
+        }
+
+        if (changedLocal)
+            RefreshQuestUI();
+    }
+
+    private enum QuestRewardKind { Item, Weapon, Usable, Magic, Armor, Experience }
+
+    private static bool TryResolveQuestRewardType(QuestRewardEntryData reward, out QuestRewardKind kind)
+    {
+        kind = QuestRewardKind.Item;
+        if (reward == null) return false;
+
+        string raw = string.IsNullOrWhiteSpace(reward.type) ? string.Empty : reward.type.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(raw)) return false;
+
+        // Tolleranza a typo/suffissi (es. "weaponj", "magic_spell", ecc.).
+        if (raw.Contains("weapon")) { kind = QuestRewardKind.Weapon; return true; }
+        if (raw.Contains("usable") || raw.Contains("consumable") || raw.Contains("potion")) { kind = QuestRewardKind.Usable; return true; }
+        if (raw.Contains("magic") || raw.Contains("spell") || raw.Contains("magia")) { kind = QuestRewardKind.Magic; return true; }
+        if (raw.Contains("armor") || raw.Contains("helmet") || raw.Contains("chestplate") || raw.Contains("leggings") || raw.Contains("boots")) { kind = QuestRewardKind.Armor; return true; }
+        if (raw.Contains("experience") || raw == "xp" || raw.Contains("exp") || raw.Contains("esperienza")) { kind = QuestRewardKind.Experience; return true; }
+        if (raw.Contains("item")) { kind = QuestRewardKind.Item; return true; }
+
+        switch (raw)
+        {
+            case "item":
+            case "items":
+                kind = QuestRewardKind.Item; return true;
+            case "weapon":
+            case "weapons":
+                kind = QuestRewardKind.Weapon; return true;
+            case "usable":
+            case "consumable":
+            case "potion":
+                kind = QuestRewardKind.Usable; return true;
+            case "magic":
+            case "spell":
+            case "magia":
+                kind = QuestRewardKind.Magic; return true;
+            case "armor":
+            case "helmet":
+            case "chestplate":
+            case "leggings":
+            case "boots":
+                kind = QuestRewardKind.Armor; return true;
+            case "experience":
+            case "xp":
+            case "exp":
+            case "esperienza":
+                kind = QuestRewardKind.Experience; return true;
+            default:
+                return false;
+        }
     }
 
     private void UpdateQuestLoreVisibilityAndLayout(QuestEntryData quest)
@@ -2044,6 +2320,13 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
+    private void WireQuestClaimButton()
+    {
+        if (questClaimRewardButton == null) return;
+        questClaimRewardButton.onClick.RemoveListener(OnQuestClaimRewardButtonClicked);
+        questClaimRewardButton.onClick.AddListener(OnQuestClaimRewardButtonClicked);
+    }
+
     private void CacheQuestFilterBaseColors()
     {
         if (questFilterBaseColorsCached) return;
@@ -2337,6 +2620,261 @@ public class InventoryUI : MonoBehaviour
         return result;
     }
 
+    private void CountInventoryUsage(IReadOnlyList<InventoryItem> source, out int normalUsed, out int magicUsed)
+    {
+        normalUsed = 0;
+        magicUsed = 0;
+        if (source == null) return;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            var it = source[i];
+            if (it == null) continue;
+            if (IsMagicInventoryItem(it)) magicUsed++;
+            else normalUsed++;
+        }
+    }
+
+    private int GetQuestRewardNormalCapacity()
+    {
+        if (questRewardInventoryCapacity > 0) return questRewardInventoryCapacity;
+        if (initialSlotCount > 0) return initialSlotCount;
+        return 0; // 0 => no hard cap
+    }
+
+    private int GetQuestRewardMagicCapacity()
+    {
+        if (questRewardMagicCapacity > 0) return questRewardMagicCapacity;
+        if (magicInitialSlotCount > 0) return magicInitialSlotCount;
+        return 0; // 0 => no hard cap
+    }
+
+    private bool WouldStackItem(ItemData item, HashSet<string> plannedStacks)
+    {
+        if (item == null || playerInventory == null) return false;
+        string key = "item:" + item.name;
+        if (plannedStacks != null && plannedStacks.Contains(key)) return true;
+
+        var items = playerInventory.Items;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            if (it == null) continue;
+            if (it.itemData == item)
+            {
+                plannedStacks?.Add(key);
+                return true;
+            }
+        }
+
+        plannedStacks?.Add(key);
+        return false;
+    }
+
+    private bool WouldStackUsable(UsableItemData usable, HashSet<string> plannedStacks)
+    {
+        if (usable == null || playerInventory == null) return false;
+        string key = "usable:" + usable.name;
+        if (plannedStacks != null && plannedStacks.Contains(key)) return true;
+
+        var items = playerInventory.Items;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            if (it == null) continue;
+            if (it.usableData == usable)
+            {
+                plannedStacks?.Add(key);
+                return true;
+            }
+        }
+
+        plannedStacks?.Add(key);
+        return false;
+    }
+
+    private bool WouldStackMagic(MagicItemData magic, HashSet<string> plannedStacks)
+    {
+        if (magic == null || playerInventory == null) return false;
+        string key = "magic:" + magic.name;
+        if (plannedStacks != null && plannedStacks.Contains(key)) return true;
+
+        var items = playerInventory.Items;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            if (it == null) continue;
+            if (it.magicData == magic)
+            {
+                plannedStacks?.Add(key);
+                return true;
+            }
+        }
+
+        plannedStacks?.Add(key);
+        return false;
+    }
+
+    private void AddOrStackItemReward(ItemData item, int amount)
+    {
+        if (item == null || playerInventory == null || amount <= 0) return;
+
+        var items = playerInventory.Items;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            if (it == null) continue;
+            if (it.itemData == item)
+            {
+                it.amount += amount;
+                return;
+            }
+        }
+
+        playerInventory.AddItem(new InventoryItem(item, amount));
+    }
+
+    private void AddOrStackUsableReward(UsableItemData usable, int amount)
+    {
+        if (usable == null || playerInventory == null || amount <= 0) return;
+
+        var items = playerInventory.Items;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            if (it == null) continue;
+            if (it.usableData == usable)
+            {
+                it.amount += amount;
+                return;
+            }
+        }
+
+        playerInventory.AddItem(new InventoryItem(usable, amount));
+    }
+
+    private void AddOrStackMagicReward(MagicItemData magic, int amount)
+    {
+        if (magic == null || playerInventory == null || amount <= 0) return;
+
+        var items = playerInventory.Items;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            if (it == null) continue;
+            if (it.magicData == magic)
+            {
+                it.amount += amount;
+                return;
+            }
+        }
+
+        playerInventory.AddItem(new InventoryItem(magic, amount));
+    }
+
+    private bool TryResolveWeaponReward(QuestRewardEntryData reward, out WeaponItem weapon)
+    {
+        EnsureQuestRewardLookups();
+        weapon = null;
+        if (reward == null || questRewardWeaponLookup == null) return false;
+        return TryLookupByRewardName(reward, questRewardWeaponLookup, out weapon);
+    }
+
+    private bool TryResolveUsableReward(QuestRewardEntryData reward, out UsableItemData usable)
+    {
+        EnsureQuestRewardLookups();
+        usable = null;
+        if (reward == null || questRewardUsableLookup == null) return false;
+        return TryLookupByRewardName(reward, questRewardUsableLookup, out usable);
+    }
+
+    private bool TryResolveItemReward(QuestRewardEntryData reward, out ItemData item)
+    {
+        EnsureQuestRewardLookups();
+        item = null;
+        if (reward == null || questRewardItemLookup == null) return false;
+        return TryLookupByRewardName(reward, questRewardItemLookup, out item);
+    }
+
+    private bool TryResolveMagicReward(QuestRewardEntryData reward, out MagicItemData magic)
+    {
+        EnsureQuestRewardLookups();
+        magic = null;
+        if (reward == null || questRewardMagicLookup == null) return false;
+        return TryLookupByRewardName(reward, questRewardMagicLookup, out magic);
+    }
+
+    private bool TryResolveArmorReward(QuestRewardEntryData reward, out ArmorItemData armor)
+    {
+        EnsureQuestRewardLookups();
+        armor = null;
+        if (reward == null || questRewardArmorLookup == null) return false;
+        return TryLookupByRewardName(reward, questRewardArmorLookup, out armor);
+    }
+
+    private void EnsureQuestRewardLookups()
+    {
+        if (questRewardWeaponLookup != null
+            && questRewardUsableLookup != null
+            && questRewardItemLookup != null
+            && questRewardMagicLookup != null
+            && questRewardArmorLookup != null)
+            return;
+
+        questRewardWeaponLookup = new Dictionary<string, WeaponItem>();
+        questRewardUsableLookup = new Dictionary<string, UsableItemData>();
+        questRewardItemLookup = new Dictionary<string, ItemData>();
+        questRewardMagicLookup = new Dictionary<string, MagicItemData>();
+        questRewardArmorLookup = new Dictionary<string, ArmorItemData>();
+
+        RegisterAssets(questRewardWeaponLookup, Resources.LoadAll<WeaponItem>(""), x => x != null ? x.weaponName : null);
+        RegisterAssets(questRewardUsableLookup, Resources.LoadAll<UsableItemData>(""), x => x != null ? x.itemName : null);
+        RegisterAssets(questRewardItemLookup, Resources.LoadAll<ItemData>(""), x => x != null ? x.itemName : null);
+        RegisterAssets(questRewardMagicLookup, Resources.LoadAll<MagicItemData>(""), x => x != null ? x.magicName : null);
+        RegisterAssets(questRewardArmorLookup, Resources.LoadAll<ArmorItemData>(""), x => x != null ? x.itemName : null);
+
+        RegisterAssets(questRewardWeaponLookup, Resources.FindObjectsOfTypeAll<WeaponItem>(), x => x != null ? x.weaponName : null);
+        RegisterAssets(questRewardUsableLookup, Resources.FindObjectsOfTypeAll<UsableItemData>(), x => x != null ? x.itemName : null);
+        RegisterAssets(questRewardItemLookup, Resources.FindObjectsOfTypeAll<ItemData>(), x => x != null ? x.itemName : null);
+        RegisterAssets(questRewardMagicLookup, Resources.FindObjectsOfTypeAll<MagicItemData>(), x => x != null ? x.magicName : null);
+        RegisterAssets(questRewardArmorLookup, Resources.FindObjectsOfTypeAll<ArmorItemData>(), x => x != null ? x.itemName : null);
+    }
+
+    private static void RegisterAssets<T>(Dictionary<string, T> lookup, T[] source, System.Func<T, string> displayNameResolver) where T : UnityEngine.Object
+    {
+        if (lookup == null || source == null) return;
+        for (int i = 0; i < source.Length; i++)
+        {
+            T asset = source[i];
+            if (asset == null) continue;
+
+            string assetName = NormalizeLookupKey(asset.name);
+            if (!string.IsNullOrEmpty(assetName) && !lookup.ContainsKey(assetName))
+                lookup.Add(assetName, asset);
+
+            string display = NormalizeLookupKey(displayNameResolver != null ? displayNameResolver(asset) : null);
+            if (!string.IsNullOrEmpty(display) && !lookup.ContainsKey(display))
+                lookup.Add(display, asset);
+        }
+    }
+
+    private static bool TryLookupByRewardName<T>(QuestRewardEntryData reward, Dictionary<string, T> lookup, out T resolved) where T : UnityEngine.Object
+    {
+        resolved = null;
+        if (reward == null || lookup == null) return false;
+
+        string key = NormalizeLookupKey(reward.itemName);
+        if (!string.IsNullOrEmpty(key) && lookup.TryGetValue(key, out resolved))
+            return true;
+
+        return false;
+    }
+
+    private static string NormalizeLookupKey(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
+    }
+
     private int FindQuestIndexById(string questId)
     {
         if (string.IsNullOrEmpty(questId)) return -1;
@@ -2589,7 +3127,7 @@ public class InventoryUI : MonoBehaviour
         bottomEquipSlots[1] = CreateEquipSlot(bottomEquipContainer2);
         bottomEquipSlots[2] = CreateEquipSlot(bottomEquipContainer3);
 
-        // Top (3 slot, placeholder magie)
+        // Top (3 slot magie)
         topEquipSlots[0] = CreateEquipSlot(topEquipContainer);
         topEquipSlots[1] = CreateEquipSlot(topEquipContainer2);
         topEquipSlots[2] = CreateEquipSlot(topEquipContainer3);
@@ -2899,7 +3437,7 @@ public class InventoryUI : MonoBehaviour
         UpdateEquipVisuals(bottomEquipSlots, playerInventory.usableLoadout);
         UpdateHudVisual(hudBottomSlot, usableIcon);
 
-        // top: placeholder magie (3 slot per coerenza con gli altri lati)
+        // Top: 3 slot magie
         SetBackLayerIcon(hudCrossTop);
         UpdateEquipVisuals(topEquipSlots, playerInventory != null ? playerInventory.magicLoadout : null);
         var magicEquipped = playerInventory != null ? playerInventory.GetCurrentMagic() : null;
@@ -3249,36 +3787,8 @@ public class InventoryUI : MonoBehaviour
         }
 
         // Fallback: equip diretto dall'item in focus quando siamo in modalita' equip selection.
-        if (currentEquipTarget != EquipTarget.None && padFocusIndex >= 0 && HasItem(padFocusIndex))
-        {
-            currentSelectedIndex = padFocusIndex;
-            var focused = currentItems[padFocusIndex];
-            switch (currentEquipTarget)
-            {
-                case EquipTarget.Right:
-                case EquipTarget.Left:
-                    if (focused != null && focused.weaponData != null && focused.weaponData.damageType != WeaponItem.DamageType.Magic)
-                    {
-                        OnEquipWeaponButtonClick();
-                        return;
-                    }
-                    break;
-                case EquipTarget.Bottom:
-                    if (focused != null && focused.usableData != null)
-                    {
-                        OnEquipUsableButtonClick();
-                        return;
-                    }
-                    break;
-                case EquipTarget.Top:
-                    if (focused != null && IsMagicInventoryItem(focused))
-                    {
-                        OnEquipMagicButtonClick();
-                        return;
-                    }
-                    break;
-            }
-        }
+        if (TryEquipFocusedPadItem())
+            return;
 
         if (padFocusIndex < 0 || padFocusIndex >= slots.Count)
         {
@@ -4179,11 +4689,7 @@ public class InventoryUI : MonoBehaviour
             return; // not a weapon target
         }
 
-        RefreshSlot(currentSelectedIndex);
-        RefreshDetailSelection();
-        RefreshEquipmentCross();
-        ResetEquipTarget();
-        CloseEquipGrid();
+        CompleteEquipAction();
     }
 
     // Equip usable into bottom slot
@@ -4204,11 +4710,7 @@ public class InventoryUI : MonoBehaviour
             return;
 
 
-        RefreshSlot(currentSelectedIndex);
-        RefreshDetailSelection();
-        RefreshEquipmentCross();
-        ResetEquipTarget();
-        CloseEquipGrid();
+        CompleteEquipAction();
     }
 
     // Equip magic into top slot
@@ -4240,11 +4742,7 @@ public class InventoryUI : MonoBehaviour
             return;
         }
 
-        RefreshSlot(currentSelectedIndex);
-        RefreshDetailSelection();
-        RefreshEquipmentCross();
-        ResetEquipTarget();
-        CloseEquipGrid();
+        CompleteEquipAction();
     }
 
     private static MagicItemData BuildRuntimeMagicFromWeapon(WeaponItem weapon)
@@ -4260,6 +4758,44 @@ public class InventoryUI : MonoBehaviour
         runtime.scaling = weapon.scaling;
         runtime.requirements = weapon.requirements;
         return runtime;
+    }
+
+    private bool TryEquipFocusedPadItem()
+    {
+        if (currentEquipTarget == EquipTarget.None) return false;
+        if (padFocusIndex < 0 || !HasItem(padFocusIndex)) return false;
+
+        currentSelectedIndex = padFocusIndex;
+        var focused = currentItems[padFocusIndex];
+        if (focused == null) return false;
+
+        switch (currentEquipTarget)
+        {
+            case EquipTarget.Right:
+            case EquipTarget.Left:
+                if (focused.weaponData == null || focused.weaponData.damageType == WeaponItem.DamageType.Magic) return false;
+                OnEquipWeaponButtonClick();
+                return true;
+            case EquipTarget.Bottom:
+                if (focused.usableData == null) return false;
+                OnEquipUsableButtonClick();
+                return true;
+            case EquipTarget.Top:
+                if (!IsMagicInventoryItem(focused)) return false;
+                OnEquipMagicButtonClick();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void CompleteEquipAction()
+    {
+        RefreshSlot(currentSelectedIndex);
+        RefreshDetailSelection();
+        RefreshEquipmentCross();
+        ResetEquipTarget();
+        CloseEquipGrid();
     }
 }
 

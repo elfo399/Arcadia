@@ -7,6 +7,7 @@ public class QuestItemUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI questNameText;
     [SerializeField] private TextMeshProUGUI questLocationText;
     [SerializeField] private Image backgroundImage;
+    [SerializeField] private GameObject completedIndicator;
     [SerializeField] private Color selectedBackgroundColor = new Color(0.34f, 0.34f, 0.34f, 0.95f);
     [SerializeField] private Color normalBackgroundColor = new Color(0.22f, 0.22f, 0.22f, 0.88f);
 
@@ -24,6 +25,9 @@ public class QuestItemUI : MonoBehaviour
 
         if (questLocationText != null)
             questLocationText.text = string.IsNullOrWhiteSpace(location) ? "Unknown" : location;
+
+        if (completedIndicator != null)
+            completedIndicator.SetActive(completed);
     }
 
     public void SetSelected(bool selected)
@@ -84,6 +88,31 @@ public class QuestItemUI : MonoBehaviour
                 var panelLoction = transform.Find("Panel/Loction");
                 if (panelLoction != null)
                     questLocationText = panelLoction.GetComponent<TextMeshProUGUI>();
+            }
+        }
+
+        if (completedIndicator == null)
+        {
+            var completedTransform = transform.Find("Completed");
+            if (completedTransform == null)
+                completedTransform = transform.Find("Panel/Completed");
+
+            if (completedTransform != null)
+                completedIndicator = completedTransform.gameObject;
+            else
+            {
+                var allTransforms = GetComponentsInChildren<Transform>(true);
+                for (int i = 0; i < allTransforms.Length; i++)
+                {
+                    var t = allTransforms[i];
+                    if (t == null) continue;
+                    if (t == transform) continue;
+                    if (t.name.ToLowerInvariant().Contains("completed"))
+                    {
+                        completedIndicator = t.gameObject;
+                        break;
+                    }
+                }
             }
         }
 
