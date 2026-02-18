@@ -2005,8 +2005,8 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 1
-  m_Height: 3.5
+  m_Radius: 1.18
+  m_Height: 3
   m_Direction: 2
   m_Center: {x: 0, y: 0.5, z: 0}
 --- !u!54 &-2357325322087390589
@@ -2049,6 +2049,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 100
+  currentHealth: 0
+  experienceReward: 0
   healthBar: {fileID: 0}
 --- !u!114 &5555881492000501823
 MonoBehaviour:
@@ -2064,8 +2066,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   agent: {fileID: -6468112106111219341}
   playerTarget: {fileID: 1438546959266459337, guid: 60770bdb4dc667c45bea53db0339dc05, type: 3}
+  animator: {fileID: 3734775969355451150}
   sightRange: 15
   attackRange: 2
+  leashRange: 22
+  repathInterval: 0.15
+  returnStopDistance: 0.4
+  attackDamage: 10
+  windupDuration: 0.45
+  hitDelay: 0.22
+  recoveryDuration: 0.55
+  attackCooldown: 1.1
+  attackHitRangeMultiplier: 1.15
+  requireLineOfSight: 0
+  sightBlockMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  eyeHeight: 1.2
+  debugLogs: 1
+  moveSpeedParameter: MoveSpeed
+  inCombatParameter: InCombat
+  attackTriggerParameter: Attack
+  forceAlwaysAnimate: 1
 --- !u!114 &-6676925969532822805
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2078,7 +2100,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 345a37c676d78f04b9b81f879161acd3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  heightOffset: 2
+  defaultHeightOffset: 2
   healthBarScale: 0.01
   customHealthBarPrefab: {fileID: 0}
 --- !u!1 &8002475675295336084

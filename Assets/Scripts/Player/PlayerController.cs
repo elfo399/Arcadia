@@ -27,6 +27,8 @@ public class PlayerController : MonoBehaviour
     public float dodgeCooldown = 0.8f;   
     public float rollStartDelay = 0.05f; 
     public AnimationCurve dodgeSpeedCurve = new AnimationCurve(new Keyframe(0, 1), new Keyframe(1, 0));
+    [Range(0f, 1f)] public float rollIFrameStartNormalized = 0.15f;
+    [Range(0f, 1f)] public float rollIFrameEndNormalized = 0.65f;
 
     [Header("Stamina Costs")]
     public float rollStaminaCost = 25f;
@@ -119,6 +121,7 @@ public class PlayerController : MonoBehaviour
     void OnDisable()
     {
         if (Controls != null) Controls.Player.Disable();
+        if (playerStats != null) playerStats.SetInvulnerable(false);
     }
 
     private void OnDestroy()
@@ -560,11 +563,21 @@ public class PlayerController : MonoBehaviour
         yield return new WaitForSeconds(rollStartDelay);
 
         float elapsed = 0f;
+        bool iframeActive = false;
+        float iframeStart = Mathf.Clamp01(rollIFrameStartNormalized);
+        float iframeEnd = Mathf.Clamp(rollIFrameEndNormalized, iframeStart, 1f);
         while (elapsed < dodgeDuration)
         {
             float t = elapsed / dodgeDuration;
             float curveValue = dodgeSpeedCurve.Evaluate(t);
             float currentSpeed = (dodgeDistance / dodgeDuration) * curveValue;
+
+            bool shouldBeInvulnerable = t >= iframeStart && t <= iframeEnd;
+            if (playerStats != null && shouldBeInvulnerable != iframeActive)
+            {
+                iframeActive = shouldBeInvulnerable;
+                playerStats.SetInvulnerable(iframeActive);
+            }
 
             controller.Move(dodgeDir * currentSpeed * Time.deltaTime);
 
@@ -572,6 +585,7 @@ public class PlayerController : MonoBehaviour
             yield return null;
         }
 
+        if (playerStats != null) playerStats.SetInvulnerable(false);
         isDodging = false;
         canMove = true;
         if (combat != null) combat.canAttack = true;

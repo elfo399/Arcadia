@@ -9,9 +9,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 145c5e650275e224084462d56455812a, type: 3}
-  m_Name: Table_Level1
+  m_Script: {fileID: 11500000, guid: 401c1e9321695e54f8ff820829fc2b12, type: 3}
+  m_Name: Prince
   m_EditorClassIdentifier: 
-  enemies:
-  - {fileID: 11400000, guid: e1685252d400b0a4581d81f517eaa60a, type: 2}
-  - {fileID: 11400000, guid: de3a6ed4d975566498fc93fbe94229fa, type: 2}
+  enemyName: Prince
+  prefab: {fileID: 1782702501690864755, guid: cd0fa76feca931f41add1d6d741f316c, type: 3}
+  maxHealth: 30
+  damage: 10
+  moveSpeed: 3.5
+  experienceReward: 10
+  spawnWeight: 10

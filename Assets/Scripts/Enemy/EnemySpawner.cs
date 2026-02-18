@@ -5,19 +5,12 @@ public class EnemySpawner : MonoBehaviour
 {
     [Header("Configurazione")]
     public SpawnTable spawnTable;
-    [Range(0, 100)] public int spawnChance = 50;
 
     void Start()
     {
         int masterSeed = (CoreGenerator.Instance != null) ? CoreGenerator.Instance.currentMasterSeed : 0;
         int localSeed = masterSeed + (int)(transform.position.x * 1000) + (int)(transform.position.z * 1000);
         System.Random prng = new System.Random(localSeed);
-
-        if (prng.Next(0, 101) > spawnChance)
-        {
-            Destroy(gameObject);
-            return;
-        }
 
         if (spawnTable == null) return;
 
@@ -41,6 +34,9 @@ public class EnemySpawner : MonoBehaviour
 
         NavMeshAgent agent = enemy.GetComponent<NavMeshAgent>();
         if (agent != null) agent.speed = data.moveSpeed;
+
+        SimpleEnemyAI ai = enemy.GetComponent<SimpleEnemyAI>();
+        if (ai != null) ai.ConfigureFromData(data);
 
         if (enemy.CompareTag("Enemy"))
         {

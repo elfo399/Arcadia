@@ -204,6 +204,10 @@ PrefabInstance:
       propertyPath: m_Controller
       value: 
       objectReference: {fileID: 9100000, guid: b96483bad95afb5469743561c4bdaace, type: 2}
+    - target: {fileID: 5866666021909216657, guid: c0e8ec4be6a4d554881a5c8bb6d0c0cf, type: 3}
+      propertyPath: m_CullingMode
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6608632893917367558, guid: c0e8ec4be6a4d554881a5c8bb6d0c0cf, type: 3}
       propertyPath: m_Layer
       value: 6
@@ -275,6 +279,11 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: -3285459165009577865}
   m_SourcePrefab: {fileID: 100100000, guid: c0e8ec4be6a4d554881a5c8bb6d0c0cf, type: 3}
+--- !u!95 &2829917917779058644 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 5866666021909216657, guid: c0e8ec4be6a4d554881a5c8bb6d0c0cf, type: 3}
+  m_PrefabInstance: {fileID: 8516156209441235525}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &8858051749441068820 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: c0e8ec4be6a4d554881a5c8bb6d0c0cf, type: 3}
@@ -294,8 +303,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   agent: {fileID: 5703584580488840807}
   playerTarget: {fileID: 1438546959266459337, guid: 60770bdb4dc667c45bea53db0339dc05, type: 3}
+  animator: {fileID: 2829917917779058644}
   sightRange: 15
   attackRange: 2
+  leashRange: 22
+  repathInterval: 0.15
+  returnStopDistance: 0.4
+  attackDamage: 10
+  windupDuration: 0.45
+  hitDelay: 0.22
+  recoveryDuration: 0.55
+  attackCooldown: 1.1
+  attackHitRangeMultiplier: 1.15
+  requireLineOfSight: 0
+  sightBlockMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  eyeHeight: 1.2
+  debugLogs: 1
+  moveSpeedParameter: MoveSpeed
+  inCombatParameter: InCombat
+  attackTriggerParameter: Attack
+  forceAlwaysAnimate: 1
 --- !u!195 &5703584580488840807
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -354,6 +383,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 20
+  currentHealth: 0
+  experienceReward: 0
   healthBar: {fileID: 0}
 --- !u!54 &2192625802350867949
 Rigidbody:
@@ -394,6 +425,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 345a37c676d78f04b9b81f879161acd3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  heightOffset: 2
+  defaultHeightOffset: 2
   healthBarScale: 0.01
   customHealthBarPrefab: {fileID: 0}

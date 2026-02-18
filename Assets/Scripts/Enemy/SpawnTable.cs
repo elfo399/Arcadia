@@ -9,19 +9,37 @@ public class SpawnTable : ScriptableObject
     public EnemyData GetRandomEnemy(System.Random prng)
     {
         if (enemies == null || enemies.Count == 0) return null;
+        if (prng == null) prng = new System.Random();
 
         int totalWeight = 0;
-        foreach (var e in enemies) totalWeight += e.spawnWeight;
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            var e = enemies[i];
+            if (e == null || e.prefab == null) continue;
+            totalWeight += Mathf.Max(0, e.spawnWeight);
+        }
+        if (totalWeight <= 0) return null;
 
         int randomValue = prng.Next(0, totalWeight);
         int currentWeight = 0;
 
-        foreach (var e in enemies)
+        for (int i = 0; i < enemies.Count; i++)
         {
-            currentWeight += e.spawnWeight;
+            var e = enemies[i];
+            if (e == null || e.prefab == null) continue;
+            int weight = Mathf.Max(0, e.spawnWeight);
+            if (weight <= 0) continue;
+
+            currentWeight += weight;
             if (randomValue < currentWeight) return e;
         }
-        return enemies[0];
+
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            var e = enemies[i];
+            if (e != null && e.prefab != null) return e;
+        }
+        return null;
     }
 
     // Fallback per random standard

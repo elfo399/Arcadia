@@ -74,6 +74,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
     [Header("UI Flask Counter")]
     public TextMeshProUGUI flaskCounterText;
 
+    [Header("Combat Flags")]
+    [SerializeField] private bool invulnerable;
+
     private float lastStaminaUseTime;
     private float flaskTimer;
     private Animator animator;
@@ -229,6 +232,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public void TakeDamage(float amount)
     {
         if (amount <= 0f) return;
+        if (invulnerable) return;
 
         currentHealth -= amount;
         if (currentHealth < 0) currentHealth = 0;
@@ -244,6 +248,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
         currentHealth += amount;
         currentHealth = Mathf.Min(currentHealth, maxHealth);
         UpdateHealthBar();
+    }
+
+    public void SetInvulnerable(bool value)
+    {
+        invulnerable = value;
     }
 
     // --- FLASKS & STAMINA & MANA ---
