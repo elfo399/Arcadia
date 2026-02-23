@@ -12,10 +12,23 @@ public class PlayerCombat : MonoBehaviour
     private PlayerStats stats;
     private PlayerController controller;
     private PlayerAnimationEvents animationEvents;
+    private TargetLockSystem targetLockSystem;
 
     [Header("Stato Combattimento")]
     public bool isAttacking = false;
     public bool canAttack = true;
+
+    [Header("Magic Cast (Prototype)")]
+    [SerializeField] private bool enableMagicCastPrototype = false;
+    [SerializeField] private Transform magicCastPoint;
+    [SerializeField] private float magicCastPointHeightOffset = -0.35f;
+    [SerializeField] private Key magicCastKey = Key.C;
+    [SerializeField] private float fallbackMagicCooldown = 0.45f;
+    [SerializeField] private float fallbackProjectileSpeed = 18f;
+    [SerializeField] private float fallbackProjectileLifetime = 4f;
+    private float lastMagicCastTime = -999f;
+    private readonly float[] lastWandLightCastTime = { -999f, -999f };
+    private readonly float[] lastWandHeavyCastTime = { -999f, -999f };
 
     void Awake()
     {
@@ -24,11 +37,15 @@ public class PlayerCombat : MonoBehaviour
         stats = GetComponent<PlayerStats>();
         controller = GetComponent<PlayerController>();
         animationEvents = GetComponentInChildren<PlayerAnimationEvents>(true);
+        targetLockSystem = GetComponentInChildren<TargetLockSystem>(true);
+        if (targetLockSystem == null)
+            targetLockSystem = GetComponentInParent<TargetLockSystem>();
     }
 
     void Update()
     {
         HandleAttackInput();
+        HandleMagicInput();
         HandleFlaskInput();
     }
 
@@ -68,8 +85,19 @@ public class PlayerCombat : MonoBehaviour
         bool isGrounded = controller.IsGrounded;
 
         if (isRolling || isAttacking || !isGrounded) return;
+        if (inventory == null || stats == null) return;
+        if (stats.IsUsableOnCooldown()) return;
 
-        stats.UseFlask();
+        if (!inventory.TryPeekCurrentUsable(out var usable, out _)) return;
+        if (usable == null) return;
+        if (!stats.TryApplyUsableEffect(usable)) return;
+
+        if (!inventory.TryConsumeCurrentUsable(out _, out int remainingAmount))
+            return;
+
+        stats.SetFlaskCountVisual(remainingAmount);
+        if (controller.inventoryUI != null)
+            controller.inventoryUI.RefreshEquipmentCross();
     }
 
     void TryAttack(Hand hand, AttackType type)
@@ -82,6 +110,12 @@ public class PlayerCombat : MonoBehaviour
         {
             Debug.LogError($"[PlayerCombat] ERRORE GRAVE: Nessuna arma trovata per la mano {hand}! " +
                            "Controlla PlayerInventory: gli slot 'Unarmed Right/Left' DEVONO avere il file 'Unarmed_Item'.");
+            return;
+        }
+
+        if (weapon.category == WeaponCategory.Wand)
+        {
+            TryCastWithWand(weapon, hand, type);
             return;
         }
 
@@ -98,6 +132,105 @@ public class PlayerCombat : MonoBehaviour
         // 3. Esegui
         stats.SpendStamina(staminaCost);
         PerformAttack(weapon, hand, type);
+    }
+
+    private void TryCastWithWand(WeaponItem wand, Hand hand, AttackType type)
+    {
+        if (wand == null || stats == null) return;
+        if (controller != null && (!controller.IsGrounded || controller.IsRolling || controller.IsInventoryOpen)) return;
+
+        int handIndex = hand == Hand.Right ? 0 : 1;
+        Vector3 fireDir = GetMagicFireDirection();
+
+        if (type == AttackType.Light)
+        {
+            GameObject projectilePrefab = wand.wandLightProjectilePrefab;
+            if (projectilePrefab == null)
+            {
+                var equippedMagic = inventory != null ? inventory.GetCurrentMagic() : null;
+                if (equippedMagic != null) projectilePrefab = equippedMagic.projectilePrefab;
+            }
+            if (projectilePrefab == null) return;
+
+            float cooldown = Mathf.Max(0f, wand.wandLightCooldown);
+            if (Time.time < lastWandLightCastTime[handIndex] + cooldown) return;
+
+            if (!stats.UseMana(Mathf.Max(0f, wand.wandLightManaCost))) return;
+
+            int damage = ComputeAttackDamage(wand, AttackType.Light).damage;
+            Vector3 spawnPos = GetSpawnPosition(magicCastPoint, wand.wandLightSpawnOffset);
+            SpawnProjectile(projectilePrefab, spawnPos, fireDir, damage, wand.wandLightProjectileSpeed, wand.wandLightProjectileLifetime, wand.wandHitMask);
+            lastWandLightCastTime[handIndex] = Time.time;
+            return;
+        }
+
+        MagicItemData equipped = inventory != null ? inventory.GetCurrentMagic() : null;
+        if (equipped == null || equipped.projectilePrefab == null) return;
+
+        float heavyCooldown = equipped.castCooldown > 0f ? equipped.castCooldown : fallbackMagicCooldown;
+        if (Time.time < lastWandHeavyCastTime[handIndex] + heavyCooldown) return;
+        if (!stats.UseMana(Mathf.Max(0f, equipped.manaCost))) return;
+
+        int finalMagicDamage = Mathf.Max(1, Mathf.RoundToInt(Mathf.Max(0, stats.GetBaseMagicDamage()) + Mathf.Max(0, equipped.magicDamage)));
+        Vector3 heavySpawnPos = GetSpawnPosition(magicCastPoint, equipped.spawnOffset);
+        float heavySpeed = equipped.projectileSpeed > 0f ? equipped.projectileSpeed : fallbackProjectileSpeed;
+        float heavyLifetime = equipped.projectileLifetime > 0f ? equipped.projectileLifetime : fallbackProjectileLifetime;
+        SpawnProjectile(equipped.projectilePrefab, heavySpawnPos, fireDir, finalMagicDamage, heavySpeed, heavyLifetime, equipped.hitMask);
+        lastWandHeavyCastTime[handIndex] = Time.time;
+    }
+
+    private Vector3 GetSpawnPosition(Transform castPoint, Vector3 localOffset)
+    {
+        Vector3 verticalOffset = transform.up * magicCastPointHeightOffset;
+        if (castPoint != null)
+            return castPoint.position + verticalOffset;
+        return transform.position + transform.TransformDirection(localOffset) + verticalOffset;
+    }
+
+    private void SpawnProjectile(GameObject projectilePrefab, Vector3 spawnPos, Vector3 fireDir, int damage, float speed, float lifetime, LayerMask hitMask)
+    {
+        if (projectilePrefab == null) return;
+
+        Quaternion rotation = fireDir.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(fireDir) : transform.rotation;
+        GameObject projectileObj = Instantiate(projectilePrefab, spawnPos, rotation);
+        MagicProjectile projectile = projectileObj.GetComponent<MagicProjectile>();
+        if (projectile == null)
+            projectile = projectileObj.AddComponent<MagicProjectile>();
+
+        float finalSpeed = speed > 0f ? speed : fallbackProjectileSpeed;
+        float finalLifetime = lifetime > 0f ? lifetime : fallbackProjectileLifetime;
+        projectile.Initialize(transform, fireDir, Mathf.Max(1, damage), finalSpeed, finalLifetime, hitMask);
+    }
+
+    private Vector3 GetMagicFireDirection()
+    {
+        if (targetLockSystem == null)
+            targetLockSystem = GetComponentInChildren<TargetLockSystem>(true) ?? GetComponentInParent<TargetLockSystem>();
+
+        if (targetLockSystem != null && targetLockSystem.isLockedOn && targetLockSystem.currentTarget != null)
+        {
+            Vector3 origin = magicCastPoint != null ? magicCastPoint.position : transform.position + Vector3.up * 1.2f;
+            Vector3 targetPoint = GetLockTargetAimPoint(targetLockSystem.currentTarget);
+            Vector3 toTarget = targetPoint - origin;
+            if (toTarget.sqrMagnitude > 0.0001f)
+                return toTarget.normalized;
+        }
+
+        return transform.forward;
+    }
+
+    private static Vector3 GetLockTargetAimPoint(Transform target)
+    {
+        if (target == null) return Vector3.zero;
+        Transform lockPoint = target.Find("LockOnPoint");
+        if (lockPoint != null) return lockPoint.position;
+
+        // Preferisci il centro collider (petto/corpo) invece del pivot ai piedi.
+        Collider col = target.GetComponentInChildren<Collider>();
+        if (col != null)
+            return col.bounds.center;
+
+        return target.position + Vector3.up * 1.1f;
     }
 
     void PerformAttack(WeaponItem weapon, Hand hand, AttackType type)
@@ -130,6 +263,35 @@ public class PlayerCombat : MonoBehaviour
 
         // 3. Lancia animazione (CrossFade basso per reattività istantanea)
         animator.CrossFadeInFixedTime(animToPlay, 0.1f);
+    }
+
+    void HandleMagicInput()
+    {
+        if (!enableMagicCastPrototype) return;
+        if (controller == null || controller.Controls == null) return;
+        if (controller.IsInventoryOpen) return;
+        if (controller.IsRolling || isAttacking || !canAttack) return;
+
+        if (Keyboard.current == null || !Keyboard.current[magicCastKey].wasPressedThisFrame) return;
+
+        MagicItemData equippedMagic = inventory != null ? inventory.GetCurrentMagic() : null;
+        if (equippedMagic == null || equippedMagic.projectilePrefab == null) return;
+
+        float cooldown = equippedMagic.castCooldown > 0f ? equippedMagic.castCooldown : fallbackMagicCooldown;
+        if (Time.time < lastMagicCastTime + cooldown) return;
+
+        float manaCost = Mathf.Max(0f, equippedMagic.manaCost);
+        if (stats != null && !stats.UseMana(manaCost)) return;
+
+        Vector3 spawnPos = GetSpawnPosition(magicCastPoint, equippedMagic.spawnOffset);
+
+        Vector3 fireDir = GetMagicFireDirection();
+        int finalMagicDamage = Mathf.Max(1, Mathf.RoundToInt(Mathf.Max(0, stats != null ? stats.GetBaseMagicDamage() : 0) + Mathf.Max(0, equippedMagic.magicDamage)));
+        float speed = equippedMagic.projectileSpeed > 0f ? equippedMagic.projectileSpeed : fallbackProjectileSpeed;
+        float lifetime = equippedMagic.projectileLifetime > 0f ? equippedMagic.projectileLifetime : fallbackProjectileLifetime;
+        SpawnProjectile(equippedMagic.projectilePrefab, spawnPos, fireDir, finalMagicDamage, speed, lifetime, equippedMagic.hitMask);
+
+        lastMagicCastTime = Time.time;
     }
 
     private (int damage, bool isCritical) ComputeAttackDamage(WeaponItem weapon, AttackType type)

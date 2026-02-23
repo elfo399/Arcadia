@@ -542,7 +542,7 @@ public class InventoryUI : MonoBehaviour
         switch (filter)
         {
             case Filter.All:     return !IsMagicInventoryItem(item);
-            case Filter.Weapons: return item.weaponData != null && item.weaponData.damageType != WeaponItem.DamageType.Magic;
+            case Filter.Weapons: return item.weaponData != null;
             case Filter.Usables: return item.usableData != null;
             case Filter.Magic:   return IsMagicInventoryItem(item);
             default: return true;
@@ -552,8 +552,9 @@ public class InventoryUI : MonoBehaviour
     private static bool IsMagicInventoryItem(InventoryItem item)
     {
         if (item == null) return false;
-        if (item.magicData != null) return true;
-        return item.weaponData != null && item.weaponData.damageType == WeaponItem.DamageType.Magic;
+        // Le magie nello slot Top sono solo MagicItemData.
+        // Le armi (incluse wand/damageType magic) restano nel flusso Weapons.
+        return item.magicData != null;
     }
 
     private void EnsurePlayerInventory()
@@ -3429,19 +3430,22 @@ public class InventoryUI : MonoBehaviour
 
         // bottom: mostra solo l'usabile equipaggiato, niente fallback da inventario
         Sprite usableIcon = null;
+        int usableAmount = 1;
         if (playerInventory != null && playerInventory.GetCurrentUsable() != null)
         {
             usableIcon = playerInventory.GetCurrentUsable().icon;
+            if (playerInventory.TryPeekCurrentUsable(out _, out int currentAmount))
+                usableAmount = Mathf.Max(1, currentAmount);
         }
         SetBackLayerIcon(hudCrossBottom);
         UpdateEquipVisuals(bottomEquipSlots, playerInventory.usableLoadout);
-        UpdateHudVisual(hudBottomSlot, usableIcon);
+        UpdateHudVisual(hudBottomSlot, usableIcon, usableAmount);
 
         // Top: 3 slot magie
         SetBackLayerIcon(hudCrossTop);
         UpdateEquipVisuals(topEquipSlots, playerInventory != null ? playerInventory.magicLoadout : null);
         var magicEquipped = playerInventory != null ? playerInventory.GetCurrentMagic() : null;
-        UpdateHudVisual(hudTopSlot, magicEquipped != null ? magicEquipped.icon : null);
+        UpdateHudVisual(hudTopSlot, magicEquipped != null ? magicEquipped.icon : null, 1);
 
         ApplyEquipmentCrossFocusVisual();
         if (attributesUiInitialized)
@@ -3466,13 +3470,13 @@ public class InventoryUI : MonoBehaviour
             slot.Clear();
     }
 
-    private void UpdateHudVisual(InventorySlot slot, Sprite icon)
+    private void UpdateHudVisual(InventorySlot slot, Sprite icon, int amount)
     {
         if (slot == null) return;
         slot.gameObject.SetActive(true); // mostra il fondo anche se vuoto
         if (icon != null)
         {
-            slot.Setup(icon, 1);
+            slot.Setup(icon, Mathf.Max(1, amount));
         }
         else
         {
@@ -4773,7 +4777,7 @@ public class InventoryUI : MonoBehaviour
         {
             case EquipTarget.Right:
             case EquipTarget.Left:
-                if (focused.weaponData == null || focused.weaponData.damageType == WeaponItem.DamageType.Magic) return false;
+                if (focused.weaponData == null) return false;
                 OnEquipWeaponButtonClick();
                 return true;
             case EquipTarget.Bottom:

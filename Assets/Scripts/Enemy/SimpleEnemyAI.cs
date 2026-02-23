@@ -25,6 +25,8 @@ public class SimpleEnemyAI : MonoBehaviour
     public float sightRange = 15f;
     public float attackRange = 2f;
     [SerializeField] private float leashRange = 22f;
+    [SerializeField] private float aggroDetectionMultiplier = 2.5f;
+    [SerializeField] private float disengageDistanceFromTarget = 35f;
     [SerializeField] private float repathInterval = 0.15f;
     [SerializeField] private float returnStopDistance = 0.4f;
     [SerializeField] private float preferredCombatDistance = 1.2f;
@@ -58,6 +60,7 @@ public class SimpleEnemyAI : MonoBehaviour
     private bool playerInSight;
     private bool playerInDetectionRange;
     private bool playerInAttackRange;
+    private bool hasAggro;
     private AiState currentState = AiState.Idle;
     private Vector3 spawnPosition;
     private float stateTimer;
@@ -128,7 +131,8 @@ public class SimpleEnemyAI : MonoBehaviour
         float distanceFromSpawn = Vector3.Distance(transform.position, spawnPosition);
 
         bool hasLos = HasLineOfSightToPlayer();
-        playerInDetectionRange = distance <= sightRange;
+        float effectiveDetectionRange = hasAggro ? sightRange * Mathf.Max(1f, aggroDetectionMultiplier) : sightRange;
+        playerInDetectionRange = distance <= effectiveDetectionRange;
         playerInSight = requireLineOfSight ? (playerInDetectionRange && hasLos) : playerInDetectionRange;
         playerInAttackRange = distance <= attackRange;
 
@@ -137,11 +141,14 @@ public class SimpleEnemyAI : MonoBehaviour
             case AiState.Idle:
                 agent.isStopped = true;
                 if (playerInDetectionRange)
+                {
+                    hasAggro = true;
                     EnterState(AiState.Chase);
+                }
                 break;
 
             case AiState.Chase:
-                if (distanceFromSpawn > leashRange)
+                if (hasAggro && distance > disengageDistanceFromTarget && distanceFromSpawn > leashRange)
                 {
                     EnterState(AiState.Return);
                     break;
@@ -154,7 +161,7 @@ public class SimpleEnemyAI : MonoBehaviour
                     break;
                 }
 
-                if (!playerInDetectionRange)
+                if (!playerInDetectionRange && !hasAggro)
                 {
                     agent.isStopped = true;
                     EnterState(AiState.Idle);
@@ -196,7 +203,7 @@ public class SimpleEnemyAI : MonoBehaviour
                 FacePlayer();
                 if (stateTimer >= recoveryDuration)
                 {
-                    if (distanceFromSpawn > leashRange)
+                    if (hasAggro && distance > disengageDistanceFromTarget && distanceFromSpawn > leashRange)
                         EnterState(AiState.Return);
                     else
                         EnterState(playerInDetectionRange ? AiState.Chase : AiState.Idle);
@@ -209,10 +216,12 @@ public class SimpleEnemyAI : MonoBehaviour
                 if (Vector3.Distance(transform.position, spawnPosition) <= returnStopDistance)
                 {
                     agent.isStopped = true;
+                    hasAggro = false;
                     EnterState(AiState.Idle);
                 }
                 else if (playerInDetectionRange && distanceFromSpawn <= leashRange * 0.9f)
                 {
+                    hasAggro = true;
                     EnterState(AiState.Chase);
                 }
                 break;

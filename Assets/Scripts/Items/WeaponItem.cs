@@ -81,4 +81,14 @@ public class WeaponItem : ScriptableObject
     [Header("Special Weapon")]
     // Marks the weapon as special or unique
     public bool isSpecialWeapon;
+
+    [Header("Wand (Magic Casting)")]
+    // Projectile used by light attack when category == Wand.
+    public GameObject wandLightProjectilePrefab;
+    [Min(0f)] public float wandLightManaCost = 6f;
+    [Min(0f)] public float wandLightCooldown = 0.20f;
+    [Min(0.1f)] public float wandLightProjectileSpeed = 22f;
+    [Min(0.1f)] public float wandLightProjectileLifetime = 2.5f;
+    public Vector3 wandLightSpawnOffset = new Vector3(0f, 1.2f, 0.75f);
+    public LayerMask wandHitMask = ~0;
 }

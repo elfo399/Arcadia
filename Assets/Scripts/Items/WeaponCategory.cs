@@ -14,6 +14,8 @@ public enum WeaponCategory
     Spear,
     // Ranged bow-like weapons
     Bow,
+    // Magic wand/catalyst weapons
+    Wand,
     // Unique or boss weapons
     Special
 }

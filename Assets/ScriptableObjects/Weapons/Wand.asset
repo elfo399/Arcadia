@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a544078287434a34b9eda1b7e6dec126, type: 3}
+  m_Name: Wand
+  m_EditorClassIdentifier: 
+  weaponName: Wand
+  icon: {fileID: 21300000, guid: 2535af4ce7557994d999818a1b7ff6c6, type: 3}
+  modelPrefab: {fileID: 0}
+  description: 
+  category: 7
+  rangeType: 1
+  damageType: 1
+  physicalDamage: 10
+  magicDamage: 10
+  criticalHit: 1.1
+  criticalChance: 0
+  lightDamageMultiplier: 1
+  heavyDamageMultiplier: 1.25
+  weight: 3
+  scaling: STR C / DEX D
+  strengthScaling: 0
+  dexterityScaling: 0
+  intelligenceScaling: 0
+  faithScaling: 0
+  requirements: STR 10 / DEX 8
+  animationProfile: {fileID: 0}
+  lightAttackStaminaCost: 10
+  heavyAttackStaminaCost: 20
+  hasRightSkill: 0
+  hasLeftSkill: 0
+  isSpecialWeapon: 0
+  wandLightProjectilePrefab: {fileID: 1171546011100446755, guid: 5f47ba743600fb4468bc67bc06854fa5, type: 3}
+  wandLightManaCost: 6
+  wandLightCooldown: 0.2
+  wandLightProjectileSpeed: 22
+  wandLightProjectileLifetime: 2.5
+  wandLightSpawnOffset: {x: 0, y: 1.2, z: 0.75}
+  wandHitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295

@@ -150,6 +150,63 @@ public class PlayerInventory : MonoBehaviour
         return magicLoadout[currentMagicIndex];
     }
 
+    public bool TryPeekCurrentUsable(out UsableItemData usable, out int amount)
+    {
+        EnsureLoadoutSize();
+        usable = GetCurrentUsable();
+        amount = 0;
+        if (usable == null) return false;
+
+        string currentInstanceId = usableInstanceIds != null && currentUsableIndex >= 0 && currentUsableIndex < usableInstanceIds.Length
+            ? usableInstanceIds[currentUsableIndex]
+            : null;
+
+        var entry = FindUsableInventoryEntry(usable, currentInstanceId);
+        if (entry == null) return false;
+
+        amount = Mathf.Max(0, entry.amount);
+        return amount > 0;
+    }
+
+    public bool TryConsumeCurrentUsable(out UsableItemData consumedUsable, out int remainingAmount)
+    {
+        EnsureLoadoutSize();
+        consumedUsable = null;
+        remainingAmount = 0;
+
+        int slot = Mathf.Clamp(currentUsableIndex, 0, usableLoadout.Length - 1);
+        var usable = usableLoadout[slot];
+        if (usable == null) return false;
+
+        string currentInstanceId = usableInstanceIds != null && slot < usableInstanceIds.Length
+            ? usableInstanceIds[slot]
+            : null;
+
+        var entry = FindUsableInventoryEntry(usable, currentInstanceId);
+        if (entry == null || entry.amount <= 0) return false;
+
+        consumedUsable = usable;
+        entry.amount = Mathf.Max(0, entry.amount - 1);
+        remainingAmount = entry.amount;
+
+        if (entry.amount <= 0)
+        {
+            items.Remove(entry);
+            // Se lo stack finisce, svuota gli slot che puntano a quella stessa istanza.
+            for (int i = 0; i < usableLoadout.Length; i++)
+            {
+                bool sameId = !string.IsNullOrEmpty(currentInstanceId) && usableInstanceIds[i] == currentInstanceId;
+                bool fallbackSameUsable = string.IsNullOrEmpty(currentInstanceId) && usableLoadout[i] == usable;
+                if (!sameId && !fallbackSameUsable) continue;
+                usableLoadout[i] = null;
+                usableInstanceIds[i] = null;
+            }
+        }
+
+        SyncEquippedReferences();
+        return true;
+    }
+
     public void SetRightAtSlot(int slot, WeaponItem weapon, string instanceId)
     {
         EnsureLoadoutSize();
@@ -362,6 +419,32 @@ public class PlayerInventory : MonoBehaviour
             if (it != null && it.usableData == usable && it.instanceId == instanceId) return true;
         }
         return false;
+    }
+
+    private InventoryItem FindUsableInventoryEntry(UsableItemData usable, string instanceId)
+    {
+        if (usable == null) return null;
+
+        if (!string.IsNullOrEmpty(instanceId))
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                var it = items[i];
+                if (it == null) continue;
+                if (it.usableData == usable && it.instanceId == instanceId)
+                    return it;
+            }
+        }
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            if (it == null) continue;
+            if (it.usableData == usable)
+                return it;
+        }
+
+        return null;
     }
 
     private bool HasMagicInstanceInInventory(string instanceId, MagicItemData magic)

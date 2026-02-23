@@ -3252,6 +3252,8 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  rollIFrameStartNormalized: 0.15
+  rollIFrameEndNormalized: 0.65
   rollStaminaCost: 30
   jumpStaminaCost: 15
   sprintStaminaCostPerSecond: 12
@@ -3320,6 +3322,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   isAttacking: 0
   canAttack: 1
+  enableMagicCastPrototype: 1
+  magicCastPoint: {fileID: 0}
+  magicCastPointHeightOffset: -0.5
+  magicCastKey: 17
+  fallbackMagicCooldown: 0.45
+  fallbackProjectileSpeed: 18
+  fallbackProjectileLifetime: 4
 --- !u!114 &220392753
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3373,6 +3382,7 @@ MonoBehaviour:
   staminaBar: {fileID: 425995996}
   manaBar: {fileID: 628399916}
   flaskCounterText: {fileID: 0}
+  invulnerable: 0
   forceStartDataIgnoreSave: 1
 --- !u!114 &220392754
 MonoBehaviour:
@@ -3448,6 +3458,12 @@ MonoBehaviour:
     quantity: 1
   - weapon: {fileID: 0}
     magic: {fileID: 11400000, guid: 22a9a5d32d5e81840a572d2aa3f15506, type: 2}
+    armor: {fileID: 0}
+    item: {fileID: 0}
+    usable: {fileID: 0}
+    quantity: 1
+  - weapon: {fileID: 11400000, guid: f896d280dd1dc4a42b07b9ec56e1fdf9, type: 2}
+    magic: {fileID: 11400000, guid: e26d7453bf2a33d4b963ffa35a68b1d4, type: 2}
     armor: {fileID: 0}
     item: {fileID: 0}
     usable: {fileID: 0}
@@ -25143,6 +25159,8 @@ MonoBehaviour:
   questRewardsContainer: {fileID: 746800977}
   questRewardPrefab: {fileID: 4132313452766036673, guid: 92c7398312fb65f4cb3f2adfcfa8cbe2, type: 3}
   questClaimRewardButton: {fileID: 0}
+  questRewardInventoryCapacity: -1
+  questRewardMagicCapacity: -1
   questDetailScrollRect: {fileID: 0}
   preserveQuestScrollPosition: 1
   smoothQuestMouseWheel: 1

@@ -257,6 +257,42 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     // --- FLASKS & STAMINA & MANA ---
 
+    public bool IsUsableOnCooldown()
+    {
+        return flaskTimer > 0f;
+    }
+
+    public bool TryApplyUsableEffect(UsableItemData usable)
+    {
+        if (usable == null) return false;
+        if (flaskTimer > 0f) return false;
+
+        switch (usable.effectType)
+        {
+            case UsableItemData.UsableEffectType.Heal:
+                RestoreHealth(usable.healAmount > 0 ? usable.healAmount : flaskHealAmount);
+                break;
+            case UsableItemData.UsableEffectType.Mana:
+                RestoreMana(usable.manaRestore > 0 ? usable.manaRestore : 0f);
+                break;
+            case UsableItemData.UsableEffectType.Invisibility:
+            case UsableItemData.UsableEffectType.Custom:
+                // Placeholder: effetti custom da implementare nel sistema status/effects.
+                break;
+        }
+
+        float configuredCooldown = usable.cooldownSeconds > 0f ? usable.cooldownSeconds : flaskUseCooldown;
+        flaskTimer = Mathf.Max(0f, configuredCooldown);
+        if (animator != null) animator.SetTrigger("DrinkPotion");
+        return true;
+    }
+
+    public void SetFlaskCountVisual(int value)
+    {
+        currentFlasks = Mathf.Max(0, value);
+        UpdateFlaskUI();
+    }
+
     public void UseFlask()
     {
         if (currentFlasks <= 0 || flaskTimer > 0f) return;
