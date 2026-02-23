@@ -85,7 +85,16 @@ public class MagicProjectile : MonoBehaviour
             damageable = other.GetComponentInParent<IDamageable>();
 
         if (damageable != null)
+        {
             damageable.TakeDamage(damage);
+        }
+        else
+        {
+            // Ignore non-damageable trigger volumes (enemy detection, lock helpers, etc.).
+            // This prevents premature projectile vanish while lock-on is active.
+            if (other.isTrigger)
+                return;
+        }
 
         if (impactVfxPrefab != null)
             Instantiate(impactVfxPrefab, transform.position, Quaternion.identity);
