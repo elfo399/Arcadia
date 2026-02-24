@@ -207,6 +207,56 @@ public class PlayerInventory : MonoBehaviour
         return true;
     }
 
+    public int GetTotalItemAmount(ItemData itemData)
+    {
+        if (itemData == null) return 0;
+        int total = 0;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            if (it == null || it.itemData != itemData) continue;
+            total += Mathf.Max(0, it.amount);
+        }
+        return total;
+    }
+
+    public bool TryConsumeItem(ItemData itemData, int amount, out int remainingTotal)
+    {
+        remainingTotal = 0;
+        if (itemData == null) return false;
+        int toConsume = Mathf.Max(1, amount);
+
+        for (int i = items.Count - 1; i >= 0 && toConsume > 0; i--)
+        {
+            var it = items[i];
+            if (it == null || it.itemData != itemData) continue;
+
+            int stack = Mathf.Max(0, it.amount);
+            if (stack <= 0)
+            {
+                items.RemoveAt(i);
+                continue;
+            }
+
+            int used = Mathf.Min(stack, toConsume);
+            it.amount = stack - used;
+            toConsume -= used;
+
+            if (it.amount <= 0)
+                items.RemoveAt(i);
+        }
+
+        remainingTotal = GetTotalItemAmount(itemData);
+        return toConsume == 0;
+    }
+
+    public int GetAmmoCountForWeapon(WeaponItem weapon)
+    {
+        if (weapon == null || weapon.category != WeaponCategory.Bow || weapon.bowAmmoItem == null)
+            return 0;
+        return GetTotalItemAmount(weapon.bowAmmoItem);
+    }
+
     public void SetRightAtSlot(int slot, WeaponItem weapon, string instanceId)
     {
         EnsureLoadoutSize();

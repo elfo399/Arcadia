@@ -3415,6 +3415,21 @@ public class InventoryUI : MonoBehaviour
             var leftEquipped = playerInventory.GetWeaponForHand(Hand.Left);
             var rightFrontIcon = rightEquipped != null ? rightEquipped.icon : null;
             var leftFrontIcon = leftEquipped != null ? leftEquipped.icon : null;
+            int rightHudAmount = 1;
+            int leftHudAmount = 1;
+            bool rightShowAmmo = false;
+            bool leftShowAmmo = false;
+
+            if (rightEquipped != null && rightEquipped.category == WeaponCategory.Bow)
+            {
+                rightHudAmount = playerInventory.GetAmmoCountForWeapon(rightEquipped);
+                rightShowAmmo = true;
+            }
+            if (leftEquipped != null && leftEquipped.category == WeaponCategory.Bow)
+            {
+                leftHudAmount = playerInventory.GetAmmoCountForWeapon(leftEquipped);
+                leftShowAmmo = true;
+            }
 
             // Back layer = solo sfondo.
             SetBackLayerIcon(hudCrossRight);
@@ -3424,8 +3439,8 @@ public class InventoryUI : MonoBehaviour
             UpdateEquipVisuals(leftEquipSlots, playerInventory.leftLoadout);
 
             // Front layer (invSlot) = icona equipaggiata, inclusa default/unarmed.
-            UpdateEquipVisual(hudRightSlot, rightFrontIcon, 1);
-            UpdateEquipVisual(hudLeftSlot, leftFrontIcon, 1);
+            UpdateEquipVisual(hudRightSlot, rightFrontIcon, rightHudAmount, rightShowAmmo);
+            UpdateEquipVisual(hudLeftSlot, leftFrontIcon, leftHudAmount, leftShowAmmo);
         }
 
         // bottom: mostra solo l'usabile equipaggiato, niente fallback da inventario
@@ -3439,7 +3454,7 @@ public class InventoryUI : MonoBehaviour
         }
         SetBackLayerIcon(hudCrossBottom);
         UpdateEquipVisuals(bottomEquipSlots, playerInventory.usableLoadout);
-        UpdateHudVisual(hudBottomSlot, usableIcon, usableAmount);
+        UpdateHudVisual(hudBottomSlot, usableIcon, usableAmount, usableAmount > 0);
 
         // Top: 3 slot magie
         SetBackLayerIcon(hudCrossTop);
@@ -3461,22 +3476,22 @@ public class InventoryUI : MonoBehaviour
         target.enabled = false;
     }
 
-    private void UpdateEquipVisual(InventorySlot slot, Sprite icon, int amount)
+    private void UpdateEquipVisual(InventorySlot slot, Sprite icon, int amount, bool forceShowQuantity = false)
     {
         if (slot == null) return;
         if (icon != null)
-            slot.Setup(icon, amount);
+            slot.Setup(icon, amount, false, forceShowQuantity);
         else
             slot.Clear();
     }
 
-    private void UpdateHudVisual(InventorySlot slot, Sprite icon, int amount)
+    private void UpdateHudVisual(InventorySlot slot, Sprite icon, int amount, bool forceShowQuantity = false)
     {
         if (slot == null) return;
         slot.gameObject.SetActive(true); // mostra il fondo anche se vuoto
         if (icon != null)
         {
-            slot.Setup(icon, Mathf.Max(1, amount));
+            slot.Setup(icon, Mathf.Max(forceShowQuantity ? 0 : 1, amount), false, forceShowQuantity);
         }
         else
         {

@@ -29,6 +29,7 @@ public class PlayerCombat : MonoBehaviour
     private float lastMagicCastTime = -999f;
     private readonly float[] lastWandLightCastTime = { -999f, -999f };
     private readonly float[] lastWandHeavyCastTime = { -999f, -999f };
+    private readonly float[] lastBowShotTime = { -999f, -999f };
 
     void Awake()
     {
@@ -118,6 +119,11 @@ public class PlayerCombat : MonoBehaviour
             TryCastWithWand(weapon, hand, type);
             return;
         }
+        if (weapon.category == WeaponCategory.Bow)
+        {
+            TryShootBow(weapon, hand, type);
+            return;
+        }
 
         // 2. Calcola costo Stamina
         float staminaCost = (type == AttackType.Light) ? weapon.lightAttackStaminaCost : weapon.heavyAttackStaminaCost;
@@ -141,6 +147,8 @@ public class PlayerCombat : MonoBehaviour
 
         int handIndex = hand == Hand.Right ? 0 : 1;
         Vector3 fireDir = GetMagicFireDirection();
+        float staminaCost = (type == AttackType.Light) ? wand.lightAttackStaminaCost : wand.heavyAttackStaminaCost;
+        if (!stats.HasStamina(staminaCost)) return;
 
         if (type == AttackType.Light)
         {
@@ -156,6 +164,7 @@ public class PlayerCombat : MonoBehaviour
             if (Time.time < lastWandLightCastTime[handIndex] + cooldown) return;
 
             if (!stats.UseMana(Mathf.Max(0f, wand.wandLightManaCost))) return;
+            stats.SpendStamina(staminaCost);
 
             int damage = ComputeAttackDamage(wand, AttackType.Light).damage;
             Vector3 spawnPos = GetSpawnPosition(magicCastPoint, wand.wandLightSpawnOffset);
@@ -170,6 +179,7 @@ public class PlayerCombat : MonoBehaviour
         float heavyCooldown = equipped.castCooldown > 0f ? equipped.castCooldown : fallbackMagicCooldown;
         if (Time.time < lastWandHeavyCastTime[handIndex] + heavyCooldown) return;
         if (!stats.UseMana(Mathf.Max(0f, equipped.manaCost))) return;
+        stats.SpendStamina(staminaCost);
 
         int finalMagicDamage = Mathf.Max(1, Mathf.RoundToInt(Mathf.Max(0, stats.GetBaseMagicDamage()) + Mathf.Max(0, equipped.magicDamage)));
         Vector3 heavySpawnPos = GetSpawnPosition(magicCastPoint, equipped.spawnOffset);
@@ -177,6 +187,44 @@ public class PlayerCombat : MonoBehaviour
         float heavyLifetime = equipped.projectileLifetime > 0f ? equipped.projectileLifetime : fallbackProjectileLifetime;
         SpawnProjectile(equipped.projectilePrefab, heavySpawnPos, fireDir, finalMagicDamage, heavySpeed, heavyLifetime, equipped.hitMask);
         lastWandHeavyCastTime[handIndex] = Time.time;
+    }
+
+    private void TryShootBow(WeaponItem bow, Hand hand, AttackType type)
+    {
+        if (bow == null || stats == null || inventory == null) return;
+        if (controller != null && (!controller.IsGrounded || controller.IsRolling || controller.IsInventoryOpen)) return;
+        if (bow.bowProjectilePrefab == null || bow.bowAmmoItem == null) return;
+
+        int handIndex = hand == Hand.Right ? 0 : 1;
+        float cooldown = Mathf.Max(0f, bow.bowShotCooldown);
+        if (Time.time < lastBowShotTime[handIndex] + cooldown) return;
+
+        float staminaCost = (type == AttackType.Light) ? bow.lightAttackStaminaCost : bow.heavyAttackStaminaCost;
+        if (!stats.HasStamina(staminaCost)) return;
+
+        int ammoCount = inventory.GetAmmoCountForWeapon(bow);
+        if (ammoCount <= 0) return;
+
+        Vector3 fireDir = GetMagicFireDirection();
+        Vector3 spawnPos = GetSpawnPosition(magicCastPoint, bow.bowSpawnOffset);
+        int damage = ComputeAttackDamage(bow, type).damage;
+
+        SpawnProjectile(
+            bow.bowProjectilePrefab,
+            spawnPos,
+            fireDir,
+            damage,
+            bow.bowProjectileSpeed > 0f ? bow.bowProjectileSpeed : fallbackProjectileSpeed,
+            bow.bowProjectileLifetime > 0f ? bow.bowProjectileLifetime : fallbackProjectileLifetime,
+            bow.bowHitMask
+        );
+
+        stats.SpendStamina(staminaCost);
+        inventory.TryConsumeItem(bow.bowAmmoItem, 1, out _);
+        if (controller != null && controller.inventoryUI != null)
+            controller.inventoryUI.RefreshEquipmentCross();
+
+        lastBowShotTime[handIndex] = Time.time;
     }
 
     private Vector3 GetSpawnPosition(Transform castPoint, Vector3 localOffset)

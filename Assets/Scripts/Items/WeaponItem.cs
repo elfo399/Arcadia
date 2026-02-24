@@ -91,4 +91,15 @@ public class WeaponItem : ScriptableObject
     [Min(0.1f)] public float wandLightProjectileLifetime = 2.5f;
     public Vector3 wandLightSpawnOffset = new Vector3(0f, 1.2f, 0.75f);
     public LayerMask wandHitMask = ~0;
+
+    [Header("Bow (Arrow Shooting)")]
+    // Projectile used when category == Bow.
+    public GameObject bowProjectilePrefab;
+    // Ammo item required to shoot (e.g., Arrow).
+    public ItemData bowAmmoItem;
+    [Min(0f)] public float bowShotCooldown = 0.20f;
+    [Min(0.1f)] public float bowProjectileSpeed = 26f;
+    [Min(0.1f)] public float bowProjectileLifetime = 3.5f;
+    public Vector3 bowSpawnOffset = new Vector3(0f, 1.2f, 0.9f);
+    public LayerMask bowHitMask = ~0;
 }
