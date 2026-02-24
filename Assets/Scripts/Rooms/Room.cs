@@ -46,10 +46,10 @@ public class Room : MonoBehaviour
 
     void Start()
     {
-        // Lock iniziale per Shop/Treasure
+        // Lock iniziale per le stanze speciali che richiedono chiave
         if (roomData != null)
         {
-            if ((roomData.isShopRoom || roomData.isTreasureRoom) && !roomData.isStartRoom)
+            if ((roomData.isShopRoom || roomData.isTreasureRoom || roomData.isBlessedRoom || roomData.isEvilRoom) && !roomData.isStartRoom)
             {
                 isLocked = true;
             }
