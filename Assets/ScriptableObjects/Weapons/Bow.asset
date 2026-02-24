@@ -12,12 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a544078287434a34b9eda1b7e6dec126, type: 3}
   m_Name: Bow
   m_EditorClassIdentifier: 
-  weaponName: 
-  icon: {fileID: 0}
+  weaponName: Bow
+  icon: {fileID: 21300000, guid: f662ea7b3189fe044922a4bcfb036b2c, type: 3}
   modelPrefab: {fileID: 0}
   description: 
-  category: 0
-  rangeType: 0
+  category: 6
+  rangeType: 1
   damageType: 0
   physicalDamage: 10
   magicDamage: 0
@@ -47,8 +47,8 @@ MonoBehaviour:
   wandHitMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  bowProjectilePrefab: {fileID: 0}
-  bowAmmoItem: {fileID: 0}
+  bowProjectilePrefab: {fileID: 1171546011100446755, guid: 914b60f537db37c49b37262c9ef89d9a, type: 3}
+  bowAmmoItem: {fileID: 11400000, guid: 8dcc8513464141c40a0a38dc44690d46, type: 2}
   bowShotCooldown: 0.2
   bowProjectileSpeed: 26
   bowProjectileLifetime: 3.5

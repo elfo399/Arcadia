@@ -17,10 +17,20 @@ MonoBehaviour:
   modelPrefab: {fileID: 0}
   description: 
   category: 0
+  rangeType: 0
+  damageType: 0
   physicalDamage: 25
+  magicDamage: 0
   criticalHit: 1.1
+  criticalChance: 0
+  lightDamageMultiplier: 1
+  heavyDamageMultiplier: 1.25
   weight: 3
   scaling: STR C / DEX D
+  strengthScaling: 0
+  dexterityScaling: 0
+  intelligenceScaling: 0
+  faithScaling: 0
   requirements: STR 10 / DEX 8
   animationProfile: {fileID: 11400000, guid: 83aa8dbcfcce8614f95a879fa83d9545, type: 2}
   lightAttackStaminaCost: 10
@@ -28,3 +38,21 @@ MonoBehaviour:
   hasRightSkill: 0
   hasLeftSkill: 0
   isSpecialWeapon: 0
+  wandLightProjectilePrefab: {fileID: 0}
+  wandLightManaCost: 6
+  wandLightCooldown: 0.2
+  wandLightProjectileSpeed: 22
+  wandLightProjectileLifetime: 2.5
+  wandLightSpawnOffset: {x: 0, y: 1.2, z: 0.75}
+  wandHitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  bowProjectilePrefab: {fileID: 0}
+  bowAmmoItem: {fileID: 11400000, guid: 8dcc8513464141c40a0a38dc44690d46, type: 2}
+  bowShotCooldown: 0.2
+  bowProjectileSpeed: 26
+  bowProjectileLifetime: 3.5
+  bowSpawnOffset: {x: 0, y: 1.2, z: 0.9}
+  bowHitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
