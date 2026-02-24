@@ -1467,35 +1467,37 @@ MonoBehaviour:
     direction: {x: 0, y: 1}
     doorObject: {fileID: 75610467913206445}
     wallObject: {fileID: 6690670704869111997}
-    lockObject: {fileID: 0}
+    lockObject: {fileID: 1197154053706293757}
     isConnected: 0
   - label: South
     gridOffset: {x: 0, y: 0}
     direction: {x: 0, y: -1}
     doorObject: {fileID: 8050985167038856448}
     wallObject: {fileID: 5190223399547746128}
-    lockObject: {fileID: 0}
+    lockObject: {fileID: 7562417622534084626}
     isConnected: 0
   - label: West
     gridOffset: {x: 0, y: 0}
     direction: {x: -1, y: 0}
     doorObject: {fileID: 3278329207975274429}
     wallObject: {fileID: 6820404311904105720}
-    lockObject: {fileID: 0}
+    lockObject: {fileID: 204388892950216809}
     isConnected: 0
   - label: East
     gridOffset: {x: 0, y: 0}
     direction: {x: 1, y: 0}
     doorObject: {fileID: 3067673834399767491}
     wallObject: {fileID: 6023095682210919977}
-    lockObject: {fileID: 0}
+    lockObject: {fileID: 3188106367838310050}
     isConnected: 0
   isLocked: 0
   roomCleared: 0
   activeEnemies: []
-  coinPrefab: {fileID: 0}
-  minCoins: 2
-  maxCoins: 5
+  floorPortalPrefab: {fileID: 0}
+  preplacedFloorPortal: {fileID: 0}
+  portalSpawnOffset: {x: 0, y: 0, z: 0}
+  portalDistanceFromCenter: 10
+  playerSpawnPoint: {fileID: 0}
 --- !u!65 &7697756487544316354
 BoxCollider:
   m_ObjectHideFlags: 0
