@@ -12,7 +12,6 @@ public class WeaponDamage : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private Collider damageCollider;
     [SerializeField] private WeaponItem currentWeapon;
-    [SerializeField] private bool usedPreparedDamage = false;
     [SerializeField] private bool lastHitWasCritical = false;
     [SerializeField] private AttackType lastAttackType = AttackType.Light;
     private bool hasPreparedDamage = false;
@@ -47,14 +46,12 @@ public class WeaponDamage : MonoBehaviour
         if (hasPreparedDamage)
         {
             damage = Mathf.Max(0, preparedDamage);
-            usedPreparedDamage = true;
             lastHitWasCritical = preparedCritical;
             lastAttackType = preparedAttackType;
             hasPreparedDamage = false;
         }
         else
         {
-            usedPreparedDamage = false;
             lastHitWasCritical = false;
             lastAttackType = AttackType.Light;
             RefreshDamageFromEquippedWeapon();

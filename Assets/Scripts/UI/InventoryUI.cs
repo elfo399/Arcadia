@@ -141,7 +141,6 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private int questRewardInventoryCapacity = -1; // <=0 => usa initialSlotCount
     [SerializeField] private int questRewardMagicCapacity = -1;     // <=0 => usa magicInitialSlotCount
     [SerializeField] private ScrollRect questDetailScrollRect;
-    [SerializeField] private bool preserveQuestScrollPosition = false;
     [SerializeField] private bool smoothQuestMouseWheel = true;
     [SerializeField] private float questMouseWheelStepNormalized = 0.10f;
     [SerializeField] private float questMouseWheelSmoothSpeed = 14f;

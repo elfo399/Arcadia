@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System.Collections;
 
 [RequireComponent(typeof(PlayerInventory))]
 [RequireComponent(typeof(PlayerStats))]
@@ -26,10 +27,21 @@ public class PlayerCombat : MonoBehaviour
     [SerializeField] private float fallbackMagicCooldown = 0.45f;
     [SerializeField] private float fallbackProjectileSpeed = 18f;
     [SerializeField] private float fallbackProjectileLifetime = 4f;
+    [SerializeField] private float wandLightCastWindup = 0.16f;
+    [SerializeField] private float wandHeavyCastWindup = 0.26f;
+    [SerializeField] private float bowLightShotWindup = 0.2f;
+    [SerializeField] private float bowHeavyShotWindup = 0.3f;
+    [SerializeField] private float rangedRecoveryTime = 0.12f;
+    [SerializeField] private bool lockRangedUntilAnimationEnds = true;
+    [SerializeField] private float rangedMinTotalLockTime = 0.55f;
+    [SerializeField] private float fallbackMeleeUnlockTime = 0.9f;
     private float lastMagicCastTime = -999f;
     private readonly float[] lastWandLightCastTime = { -999f, -999f };
     private readonly float[] lastWandHeavyCastTime = { -999f, -999f };
     private readonly float[] lastBowShotTime = { -999f, -999f };
+    private Coroutine rangedActionRoutine;
+    private Coroutine meleeUnlockRoutine;
+    private bool rangedAttackLockActive;
 
     void Awake()
     {
@@ -61,7 +73,7 @@ public class PlayerCombat : MonoBehaviour
         if (controller != null && controller.IsRolling) return;
         
         // Se stiamo già attaccando o siamo bloccati, esci
-        if (!canAttack || isAttacking) return;
+        if (!canAttack || isAttacking || rangedActionRoutine != null) return;
 
         if (controller.Controls.Player.LightAttackRight.WasPerformedThisFrame())
             TryAttack(Hand.Right, AttackType.Light);
@@ -143,7 +155,8 @@ public class PlayerCombat : MonoBehaviour
     private void TryCastWithWand(WeaponItem wand, Hand hand, AttackType type)
     {
         if (wand == null || stats == null) return;
-        if (controller != null && (!controller.IsGrounded || controller.IsRolling || controller.IsInventoryOpen)) return;
+        if (rangedActionRoutine != null) return;
+        if (controller != null && (controller.IsRolling || controller.IsInventoryOpen)) return;
 
         int handIndex = hand == Hand.Right ? 0 : 1;
         Vector3 fireDir = GetMagicFireDirection();
@@ -163,14 +176,20 @@ public class PlayerCombat : MonoBehaviour
             float cooldown = Mathf.Max(0f, wand.wandLightCooldown);
             if (Time.time < lastWandLightCastTime[handIndex] + cooldown) return;
 
-            if (!stats.UseMana(Mathf.Max(0f, wand.wandLightManaCost))) return;
-            stats.SpendStamina(staminaCost);
-
             int damage = ComputeAttackDamage(wand, AttackType.Light).damage;
             Vector3 spawnPos = GetSpawnPosition(magicCastPoint, wand.wandLightSpawnOffset);
-            PlayWeaponActionAnimation(wand, hand, AttackType.Light);
-            SpawnProjectile(projectilePrefab, spawnPos, fireDir, damage, wand.wandLightProjectileSpeed, wand.wandLightProjectileLifetime, wand.wandHitMask);
+            if (!TryPlayWeaponActionAnimation(wand, hand, AttackType.Light, out string lightAnim))
+                return;
+
             lastWandLightCastTime[handIndex] = Time.time;
+            float lightClipLength = GetAnimationClipLength(lightAnim);
+            StartRangedAction(ResolveActionWindup(lightAnim, wandLightCastWindup, 0.5f), lightClipLength, () =>
+            {
+                if (!stats.UseMana(Mathf.Max(0f, wand.wandLightManaCost))) return;
+                if (!stats.HasStamina(staminaCost)) return;
+                stats.SpendStamina(staminaCost);
+                SpawnProjectile(projectilePrefab, spawnPos, fireDir, damage, wand.wandLightProjectileSpeed, wand.wandLightProjectileLifetime, wand.wandHitMask);
+            });
             return;
         }
 
@@ -179,22 +198,30 @@ public class PlayerCombat : MonoBehaviour
 
         float heavyCooldown = equipped.castCooldown > 0f ? equipped.castCooldown : fallbackMagicCooldown;
         if (Time.time < lastWandHeavyCastTime[handIndex] + heavyCooldown) return;
-        if (!stats.UseMana(Mathf.Max(0f, equipped.manaCost))) return;
-        stats.SpendStamina(staminaCost);
 
         int finalMagicDamage = Mathf.Max(1, Mathf.RoundToInt(Mathf.Max(0, stats.GetBaseMagicDamage()) + Mathf.Max(0, equipped.magicDamage)));
         Vector3 heavySpawnPos = GetSpawnPosition(magicCastPoint, equipped.spawnOffset);
         float heavySpeed = equipped.projectileSpeed > 0f ? equipped.projectileSpeed : fallbackProjectileSpeed;
         float heavyLifetime = equipped.projectileLifetime > 0f ? equipped.projectileLifetime : fallbackProjectileLifetime;
-        PlayWeaponActionAnimation(wand, hand, AttackType.Heavy);
-        SpawnProjectile(equipped.projectilePrefab, heavySpawnPos, fireDir, finalMagicDamage, heavySpeed, heavyLifetime, equipped.hitMask);
+        if (!TryPlayWeaponActionAnimation(wand, hand, AttackType.Heavy, out string heavyAnim))
+            return;
+
         lastWandHeavyCastTime[handIndex] = Time.time;
+        float heavyClipLength = GetAnimationClipLength(heavyAnim);
+        StartRangedAction(ResolveActionWindup(heavyAnim, wandHeavyCastWindup, 0.58f), heavyClipLength, () =>
+        {
+            if (!stats.UseMana(Mathf.Max(0f, equipped.manaCost))) return;
+            if (!stats.HasStamina(staminaCost)) return;
+            stats.SpendStamina(staminaCost);
+            SpawnProjectile(equipped.projectilePrefab, heavySpawnPos, fireDir, finalMagicDamage, heavySpeed, heavyLifetime, equipped.hitMask);
+        });
     }
 
     private void TryShootBow(WeaponItem bow, Hand hand, AttackType type)
     {
         if (bow == null || stats == null || inventory == null) return;
-        if (controller != null && (!controller.IsGrounded || controller.IsRolling || controller.IsInventoryOpen)) return;
+        if (rangedActionRoutine != null) return;
+        if (controller != null && (controller.IsRolling || controller.IsInventoryOpen)) return;
         if (bow.bowProjectilePrefab == null || bow.bowAmmoItem == null) return;
 
         int handIndex = hand == Hand.Right ? 0 : 1;
@@ -210,33 +237,133 @@ public class PlayerCombat : MonoBehaviour
         Vector3 fireDir = GetMagicFireDirection();
         Vector3 spawnPos = GetSpawnPosition(magicCastPoint, bow.bowSpawnOffset);
         int damage = ComputeAttackDamage(bow, type).damage;
-        PlayWeaponActionAnimation(bow, hand, type);
+        if (!TryPlayWeaponActionAnimation(bow, hand, type, out string bowAnim))
+            return;
 
-        SpawnProjectile(
-            bow.bowProjectilePrefab,
-            spawnPos,
-            fireDir,
-            damage,
-            bow.bowProjectileSpeed > 0f ? bow.bowProjectileSpeed : fallbackProjectileSpeed,
-            bow.bowProjectileLifetime > 0f ? bow.bowProjectileLifetime : fallbackProjectileLifetime,
-            bow.bowHitMask
-        );
-
-        stats.SpendStamina(staminaCost);
-        inventory.TryConsumeItem(bow.bowAmmoItem, 1, out _);
-        if (controller != null && controller.inventoryUI != null)
-            controller.inventoryUI.RefreshEquipmentCross();
-
+        float windup = type == AttackType.Heavy ? bowHeavyShotWindup : bowLightShotWindup;
+        float normalizedFirePoint = type == AttackType.Heavy ? 0.62f : 0.52f;
         lastBowShotTime[handIndex] = Time.time;
+        float bowClipLength = GetAnimationClipLength(bowAnim);
+        StartRangedAction(ResolveActionWindup(bowAnim, windup, normalizedFirePoint), bowClipLength, () =>
+        {
+            if (!stats.HasStamina(staminaCost)) return;
+            if (!inventory.TryConsumeItem(bow.bowAmmoItem, 1, out _)) return;
+
+            stats.SpendStamina(staminaCost);
+            SpawnProjectile(
+                bow.bowProjectilePrefab,
+                spawnPos,
+                fireDir,
+                damage,
+                bow.bowProjectileSpeed > 0f ? bow.bowProjectileSpeed : fallbackProjectileSpeed,
+                bow.bowProjectileLifetime > 0f ? bow.bowProjectileLifetime : fallbackProjectileLifetime,
+                bow.bowHitMask
+            );
+
+            if (controller != null && controller.inventoryUI != null)
+                controller.inventoryUI.RefreshEquipmentCross();
+        });
     }
 
-    private void PlayWeaponActionAnimation(WeaponItem weapon, Hand hand, AttackType type)
+    private bool TryPlayWeaponActionAnimation(WeaponItem weapon, Hand hand, AttackType type, out string animToPlay)
     {
-        if (weapon == null || weapon.animationProfile == null || animator == null) return;
+        animToPlay = null;
+        if (weapon == null || weapon.animationProfile == null || animator == null) return false;
         bool isAirAttack = controller != null && !controller.IsGrounded;
-        string animToPlay = GetAttackAnimation(weapon.animationProfile, hand, type, isAirAttack);
-        if (string.IsNullOrWhiteSpace(animToPlay)) return;
+        animToPlay = GetAttackAnimation(weapon.animationProfile, hand, type, isAirAttack);
+        if (string.IsNullOrWhiteSpace(animToPlay)) return false;
+
+        int stateHash = Animator.StringToHash(animToPlay);
+        if (!animator.HasState(0, stateHash))
+        {
+            Debug.LogWarning($"[PlayerCombat] Stato animazione non trovato: '{animToPlay}'. Colpo annullato.");
+            return false;
+        }
+
         animator.CrossFadeInFixedTime(animToPlay, 0.08f);
+        return true;
+    }
+
+    private float ResolveActionWindup(string animName, float fallbackWindup, float firePointNormalized)
+    {
+        if (animator == null || animator.runtimeAnimatorController == null || string.IsNullOrWhiteSpace(animName))
+            return Mathf.Max(0f, fallbackWindup);
+
+        var clips = animator.runtimeAnimatorController.animationClips;
+        if (clips == null || clips.Length == 0)
+            return Mathf.Max(0f, fallbackWindup);
+
+        float clipLength = -1f;
+        for (int i = 0; i < clips.Length; i++)
+        {
+            var clip = clips[i];
+            if (clip == null) continue;
+            if (clip.name == animName)
+            {
+                clipLength = clip.length;
+                break;
+            }
+        }
+
+        if (clipLength <= 0f)
+            return Mathf.Max(0f, fallbackWindup);
+
+        float normalized = Mathf.Clamp(firePointNormalized, 0.1f, 0.9f);
+        float byClip = clipLength * normalized;
+        return Mathf.Max(Mathf.Max(0f, fallbackWindup), byClip);
+    }
+
+    private float GetAnimationClipLength(string animName)
+    {
+        if (animator == null || animator.runtimeAnimatorController == null || string.IsNullOrWhiteSpace(animName))
+            return 0f;
+
+        var clips = animator.runtimeAnimatorController.animationClips;
+        if (clips == null || clips.Length == 0)
+            return 0f;
+
+        for (int i = 0; i < clips.Length; i++)
+        {
+            var clip = clips[i];
+            if (clip == null) continue;
+            if (clip.name == animName)
+                return Mathf.Max(0f, clip.length);
+        }
+
+        return 0f;
+    }
+
+    private void StartRangedAction(float windup, float clipLength, System.Action onFire)
+    {
+        if (rangedActionRoutine != null)
+            return;
+        rangedActionRoutine = StartCoroutine(RangedActionRoutine(windup, clipLength, onFire));
+    }
+
+    private IEnumerator RangedActionRoutine(float windup, float clipLength, System.Action onFire)
+    {
+        if (controller != null)
+            controller.StopMovementImmediate();
+
+        rangedAttackLockActive = true;
+        isAttacking = true;
+        if (windup > 0f)
+            yield return new WaitForSeconds(windup);
+
+        onFire?.Invoke();
+
+        float remainingAnimTime = 0f;
+        if (lockRangedUntilAnimationEnds && clipLength > 0f)
+            remainingAnimTime = Mathf.Max(0f, clipLength - Mathf.Max(0f, windup));
+
+        float minAfterFireFromTotalLock = Mathf.Max(0f, rangedMinTotalLockTime - Mathf.Max(0f, windup));
+        float waitAfterFire = Mathf.Max(remainingAnimTime, rangedRecoveryTime, minAfterFireFromTotalLock);
+        if (waitAfterFire > 0f)
+            yield return new WaitForSeconds(waitAfterFire);
+
+        rangedAttackLockActive = false;
+        isAttacking = false;
+        rangedActionRoutine = null;
     }
 
     private Vector3 GetSpawnPosition(Transform castPoint, Vector3 localOffset)
@@ -323,6 +450,8 @@ public class PlayerCombat : MonoBehaviour
 
         // 3. Lancia animazione (CrossFade basso per reattività istantanea)
         animator.CrossFadeInFixedTime(animToPlay, 0.1f);
+        float clipLength = GetAnimationClipLength(animToPlay);
+        StartMeleeUnlockFallback(clipLength > 0f ? clipLength : fallbackMeleeUnlockTime);
     }
 
     void HandleMagicInput()
@@ -408,9 +537,47 @@ public class PlayerCombat : MonoBehaviour
         return (finalDamage, isCritical);
     }
 
+    private void StartMeleeUnlockFallback(float duration)
+    {
+        if (meleeUnlockRoutine != null)
+            StopCoroutine(meleeUnlockRoutine);
+        meleeUnlockRoutine = StartCoroutine(MeleeUnlockFallbackRoutine(Mathf.Max(0.05f, duration + 0.05f)));
+    }
+
+    private IEnumerator MeleeUnlockFallbackRoutine(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (!rangedAttackLockActive)
+            isAttacking = false;
+        meleeUnlockRoutine = null;
+    }
+
     // Chiamata dall'Animation Event (tramite PlayerAnimationEvents.cs)
     public void EndAttack()
     {
+        if (rangedAttackLockActive)
+            return;
+        if (meleeUnlockRoutine != null)
+        {
+            StopCoroutine(meleeUnlockRoutine);
+            meleeUnlockRoutine = null;
+        }
+        isAttacking = false;
+    }
+
+    private void OnDisable()
+    {
+        if (rangedActionRoutine != null)
+        {
+            StopCoroutine(rangedActionRoutine);
+            rangedActionRoutine = null;
+        }
+        if (meleeUnlockRoutine != null)
+        {
+            StopCoroutine(meleeUnlockRoutine);
+            meleeUnlockRoutine = null;
+        }
+        rangedAttackLockActive = false;
         isAttacking = false;
     }
 

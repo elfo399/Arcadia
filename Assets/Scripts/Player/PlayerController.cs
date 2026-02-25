@@ -512,7 +512,12 @@ public class PlayerController : MonoBehaviour
         if (animator != null)
         {
             var state = animator.GetCurrentAnimatorStateInfo(0);
-            bool fallingCondition = !controller.isGrounded && !IsRolling && !state.IsName("Jump") && velocity.y < fallingSpeedThreshold;
+            bool isAirAttacking = combat != null && combat.isAttacking && !controller.isGrounded;
+            bool fallingCondition = !controller.isGrounded
+                                    && !IsRolling
+                                    && !isAirAttacking
+                                    && !state.IsName("Jump")
+                                    && velocity.y < fallingSpeedThreshold;
             animator.SetBool("IsFalling", fallingCondition);
         }
     }
