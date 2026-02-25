@@ -168,6 +168,7 @@ public class PlayerCombat : MonoBehaviour
 
             int damage = ComputeAttackDamage(wand, AttackType.Light).damage;
             Vector3 spawnPos = GetSpawnPosition(magicCastPoint, wand.wandLightSpawnOffset);
+            PlayWeaponActionAnimation(wand, hand, AttackType.Light);
             SpawnProjectile(projectilePrefab, spawnPos, fireDir, damage, wand.wandLightProjectileSpeed, wand.wandLightProjectileLifetime, wand.wandHitMask);
             lastWandLightCastTime[handIndex] = Time.time;
             return;
@@ -185,6 +186,7 @@ public class PlayerCombat : MonoBehaviour
         Vector3 heavySpawnPos = GetSpawnPosition(magicCastPoint, equipped.spawnOffset);
         float heavySpeed = equipped.projectileSpeed > 0f ? equipped.projectileSpeed : fallbackProjectileSpeed;
         float heavyLifetime = equipped.projectileLifetime > 0f ? equipped.projectileLifetime : fallbackProjectileLifetime;
+        PlayWeaponActionAnimation(wand, hand, AttackType.Heavy);
         SpawnProjectile(equipped.projectilePrefab, heavySpawnPos, fireDir, finalMagicDamage, heavySpeed, heavyLifetime, equipped.hitMask);
         lastWandHeavyCastTime[handIndex] = Time.time;
     }
@@ -208,6 +210,7 @@ public class PlayerCombat : MonoBehaviour
         Vector3 fireDir = GetMagicFireDirection();
         Vector3 spawnPos = GetSpawnPosition(magicCastPoint, bow.bowSpawnOffset);
         int damage = ComputeAttackDamage(bow, type).damage;
+        PlayWeaponActionAnimation(bow, hand, type);
 
         SpawnProjectile(
             bow.bowProjectilePrefab,
@@ -225,6 +228,15 @@ public class PlayerCombat : MonoBehaviour
             controller.inventoryUI.RefreshEquipmentCross();
 
         lastBowShotTime[handIndex] = Time.time;
+    }
+
+    private void PlayWeaponActionAnimation(WeaponItem weapon, Hand hand, AttackType type)
+    {
+        if (weapon == null || weapon.animationProfile == null || animator == null) return;
+        bool isAirAttack = controller != null && !controller.IsGrounded;
+        string animToPlay = GetAttackAnimation(weapon.animationProfile, hand, type, isAirAttack);
+        if (string.IsNullOrWhiteSpace(animToPlay)) return;
+        animator.CrossFadeInFixedTime(animToPlay, 0.08f);
     }
 
     private Vector3 GetSpawnPosition(Transform castPoint, Vector3 localOffset)
