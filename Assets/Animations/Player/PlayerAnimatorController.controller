@@ -29,7 +29,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Right_Fist_Light
+  m_Name: Right_Punch_Light
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:
@@ -146,7 +146,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 190365492218098281, guid: d79dd69391fe30d489e95f62d14a0f69, type: 3}
+  m_Motion: {fileID: -5620764869361886090, guid: b613763f1d5b22442a8a27b87669f37c, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -267,7 +267,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -5620764869361886090, guid: b613763f1d5b22442a8a27b87669f37c, type: 3}
+  m_Motion: {fileID: 190365492218098281, guid: d79dd69391fe30d489e95f62d14a0f69, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -386,7 +386,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Right_Fist_Heavy
+  m_Name: Right_Punch_Heavy
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:
@@ -435,7 +435,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Left_Fist_Light
+  m_Name: Left_Punch_Light
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:
@@ -462,7 +462,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Left_Fist_AirAttack
+  m_Name: Left_Punch_AirAttack
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:
@@ -611,19 +611,19 @@ AnimatorStateMachine:
     m_Position: {x: -230, y: -210, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -4240158174751671217}
-    m_Position: {x: 160, y: -90, z: 0}
+    m_Position: {x: 160, y: -140, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 1710577504850929256}
-    m_Position: {x: 160, y: -140, z: 0}
+    m_Position: {x: 160, y: -90, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -173262810979191822}
     m_Position: {x: -370, y: 60, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -5132702199176658201}
-    m_Position: {x: 580, y: -140, z: 0}
+    m_Position: {x: 580, y: -90, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 1510413612984297672}
-    m_Position: {x: 580, y: -90, z: 0}
+    m_Position: {x: 580, y: -140, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -1081776147254323182}
     m_Position: {x: 580, y: 100, z: 0}
@@ -762,7 +762,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 190365492218098281, guid: d79dd69391fe30d489e95f62d14a0f69, type: 3}
+  m_Motion: {fileID: -5620764869361886090, guid: b613763f1d5b22442a8a27b87669f37c, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -974,7 +974,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Left_Fist_Heavy
+  m_Name: Left_Punch_Heavy
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:
@@ -1026,7 +1026,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Right_Fist_AirAttack
+  m_Name: Right_Punch_AirAttack
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions:
@@ -1565,7 +1565,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -5620764869361886090, guid: b613763f1d5b22442a8a27b87669f37c, type: 3}
+  m_Motion: {fileID: 190365492218098281, guid: d79dd69391fe30d489e95f62d14a0f69, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
