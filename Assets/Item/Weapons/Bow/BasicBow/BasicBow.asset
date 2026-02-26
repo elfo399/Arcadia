@@ -26,12 +26,16 @@ MonoBehaviour:
   lightDamageMultiplier: 1
   heavyDamageMultiplier: 1.25
   weight: 3
-  scaling: STR C / DEX D
-  strengthScaling: 0
-  dexterityScaling: 0
-  intelligenceScaling: 0
-  faithScaling: 0
-  requirements: STR 10 / DEX 8
+  scaling: DEX D
+  strengthScalingRank: 0
+  dexterityScalingRank: 2
+  intelligenceScalingRank: 0
+  faithScalingRank: 0
+  strengthRequirement: 0
+  dexterityRequirement: 10
+  intelligenceRequirement: 0
+  faithRequirement: 0
+  requirements: DEX 10
   animationProfile: {fileID: 11400000, guid: ec30b1160936fd04a953ace192e6f517, type: 2}
   lightAttackStaminaCost: 10
   heavyAttackStaminaCost: 20
