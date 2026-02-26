@@ -3336,8 +3336,8 @@ public class InventoryUI : MonoBehaviour
             if (weaponDamageText != null) weaponDamageText.text = weapon.physicalDamage.ToString();
             if (weaponCriticalText != null) weaponCriticalText.text = weapon.criticalHit.ToString("0.##");
             if (weaponWeightText != null) weaponWeightText.text = weapon.weight.ToString("0.##");
-            if (weaponScalingText != null) weaponScalingText.text = weapon.scaling ?? string.Empty;
-            if (weaponRequirementsText != null) weaponRequirementsText.text = weapon.requirements ?? string.Empty;
+            if (weaponScalingText != null) weaponScalingText.text = weapon.GetScalingLabel();
+            if (weaponRequirementsText != null) weaponRequirementsText.text = weapon.GetRequirementsLabel();
 
             // weaponStatsRoot è la sezione stat arma: lasciala attiva
             if (weaponStatsRoot != null) weaponStatsRoot.SetActive(true);
@@ -4788,8 +4788,8 @@ public class InventoryUI : MonoBehaviour
         runtime.icon = weapon.icon;
         runtime.magicDamage = Mathf.Max(0, weapon.magicDamage);
         runtime.criticalHit = weapon.criticalHit;
-        runtime.scaling = weapon.scaling;
-        runtime.requirements = weapon.requirements;
+        runtime.scaling = weapon.GetScalingLabel();
+        runtime.requirements = weapon.GetRequirementsLabel();
         return runtime;
     }
 

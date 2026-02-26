@@ -176,7 +176,8 @@ public class PlayerCombat : MonoBehaviour
             float cooldown = Mathf.Max(0f, wand.wandLightCooldown);
             if (Time.time < lastWandLightCastTime[handIndex] + cooldown) return;
 
-            int damage = ComputeAttackDamage(wand, AttackType.Light).damage;
+            var computed = ComputeAttackDamage(wand, AttackType.Light);
+            int damage = computed.damage;
             Vector3 spawnPos = GetSpawnPosition(magicCastPoint, wand.wandLightSpawnOffset);
             if (!TryPlayWeaponActionAnimation(wand, hand, AttackType.Light, out string lightAnim))
                 return;
@@ -188,7 +189,8 @@ public class PlayerCombat : MonoBehaviour
                 if (!stats.UseMana(Mathf.Max(0f, wand.wandLightManaCost))) return;
                 if (!stats.HasStamina(staminaCost)) return;
                 stats.SpendStamina(staminaCost);
-                SpawnProjectile(projectilePrefab, spawnPos, fireDir, damage, wand.wandLightProjectileSpeed, wand.wandLightProjectileLifetime, wand.wandHitMask);
+                string sourceLabel = $"{(string.IsNullOrWhiteSpace(wand.weaponName) ? wand.name : wand.weaponName)} | Hand:{hand} | Type:Light";
+                SpawnProjectile(projectilePrefab, spawnPos, fireDir, damage, wand.wandLightProjectileSpeed, wand.wandLightProjectileLifetime, wand.wandHitMask, sourceLabel, computed.isCritical);
             });
             return;
         }
@@ -215,7 +217,8 @@ public class PlayerCombat : MonoBehaviour
             if (!stats.UseMana(Mathf.Max(0f, equipped.manaCost))) return;
             if (!stats.HasStamina(staminaCost)) return;
             stats.SpendStamina(staminaCost);
-            SpawnProjectile(equipped.projectilePrefab, heavySpawnPos, fireDir, finalMagicDamage, heavySpeed, heavyLifetime, equipped.hitMask);
+            string sourceLabel = $"{(string.IsNullOrWhiteSpace(wand.weaponName) ? wand.name : wand.weaponName)} | Hand:{hand} | Type:Heavy(Magic:{equipped.magicName})";
+            SpawnProjectile(equipped.projectilePrefab, heavySpawnPos, fireDir, finalMagicDamage, heavySpeed, heavyLifetime, equipped.hitMask, sourceLabel, false);
         });
     }
 
@@ -238,7 +241,8 @@ public class PlayerCombat : MonoBehaviour
 
         Vector3 fireDir = GetMagicFireDirection();
         Vector3 spawnPos = GetSpawnPosition(magicCastPoint, bow.bowSpawnOffset);
-        int damage = ComputeAttackDamage(bow, type).damage;
+        var computed = ComputeAttackDamage(bow, type);
+        int damage = computed.damage;
         if (!TryPlayWeaponActionAnimation(bow, hand, type, out string bowAnim))
             return;
 
@@ -259,7 +263,9 @@ public class PlayerCombat : MonoBehaviour
                 damage,
                 bow.bowProjectileSpeed > 0f ? bow.bowProjectileSpeed : fallbackProjectileSpeed,
                 bow.bowProjectileLifetime > 0f ? bow.bowProjectileLifetime : fallbackProjectileLifetime,
-                bow.bowHitMask
+                bow.bowHitMask,
+                $"{(string.IsNullOrWhiteSpace(bow.weaponName) ? bow.name : bow.weaponName)} | Hand:{hand} | Type:{type}",
+                computed.isCritical
             );
 
             if (controller != null && controller.inventoryUI != null)
@@ -376,7 +382,7 @@ public class PlayerCombat : MonoBehaviour
         return transform.position + transform.TransformDirection(localOffset) + verticalOffset;
     }
 
-    private void SpawnProjectile(GameObject projectilePrefab, Vector3 spawnPos, Vector3 fireDir, int damage, float speed, float lifetime, LayerMask hitMask)
+    private void SpawnProjectile(GameObject projectilePrefab, Vector3 spawnPos, Vector3 fireDir, int damage, float speed, float lifetime, LayerMask hitMask, string sourceLabel = "Projectile", bool isCritical = false)
     {
         if (projectilePrefab == null) return;
 
@@ -388,7 +394,7 @@ public class PlayerCombat : MonoBehaviour
 
         float finalSpeed = speed > 0f ? speed : fallbackProjectileSpeed;
         float finalLifetime = lifetime > 0f ? lifetime : fallbackProjectileLifetime;
-        projectile.Initialize(transform, fireDir, Mathf.Max(1, damage), finalSpeed, finalLifetime, hitMask);
+        projectile.Initialize(transform, fireDir, Mathf.Max(1, damage), finalSpeed, finalLifetime, hitMask, sourceLabel, isCritical);
     }
 
     private Vector3 GetMagicFireDirection()
@@ -484,7 +490,8 @@ public class PlayerCombat : MonoBehaviour
         lastMagicCastTime = Time.time;
         StartRangedAction(castTime, 0f, () =>
         {
-            SpawnProjectile(equippedMagic.projectilePrefab, spawnPos, fireDir, finalMagicDamage, speed, lifetime, equippedMagic.hitMask);
+            string sourceLabel = $"MagicCastKey | Magic:{equippedMagic.magicName}";
+            SpawnProjectile(equippedMagic.projectilePrefab, spawnPos, fireDir, finalMagicDamage, speed, lifetime, equippedMagic.hitMask, sourceLabel, false);
         });
     }
 
@@ -512,16 +519,16 @@ public class PlayerCombat : MonoBehaviour
         if (isRangedWeapon)
         {
             // Ranged: scala con DEX (archi e affini)
-            scalingBonus = Mathf.Max(0f, weapon.dexterityScaling) * Mathf.Max(0, stats.dexterity);
+            scalingBonus = Mathf.Max(0f, weapon.GetDexterityScalingFactor()) * Mathf.Max(0, stats.dexterity);
         }
         else if (isMagicWeapon)
         {
-            scalingBonus = Mathf.Max(0f, weapon.intelligenceScaling) * Mathf.Max(0, stats.intelligence);
+            scalingBonus = Mathf.Max(0f, weapon.GetIntelligenceScalingFactor()) * Mathf.Max(0, stats.intelligence);
         }
         else
         {
-            scalingBonus = Mathf.Max(0f, weapon.strengthScaling) * Mathf.Max(0, stats.strength)
-                           + Mathf.Max(0f, weapon.dexterityScaling) * Mathf.Max(0, stats.dexterity);
+            scalingBonus = Mathf.Max(0f, weapon.GetStrengthScalingFactor()) * Mathf.Max(0, stats.strength)
+                           + Mathf.Max(0f, weapon.GetDexterityScalingFactor()) * Mathf.Max(0, stats.dexterity);
         }
 
         float attackMultiplier = type == AttackType.Heavy
@@ -538,8 +545,24 @@ public class PlayerCombat : MonoBehaviour
             rawDamage *= Mathf.Max(1f, weapon.criticalHit);
         }
 
+        // Se i requisiti non sono soddisfatti, il danno effettivo è al 50%.
+        if (!HasWeaponRequirements(weapon))
+            rawDamage *= 0.5f;
+
         int finalDamage = Mathf.Max(1, Mathf.RoundToInt(rawDamage));
         return (finalDamage, isCritical);
+    }
+
+    private bool HasWeaponRequirements(WeaponItem weapon)
+    {
+        if (weapon == null || stats == null) return true;
+
+        if (weapon.strengthRequirement > 0 && stats.strength < weapon.strengthRequirement) return false;
+        if (weapon.dexterityRequirement > 0 && stats.dexterity < weapon.dexterityRequirement) return false;
+        if (weapon.intelligenceRequirement > 0 && stats.intelligence < weapon.intelligenceRequirement) return false;
+        if (weapon.faithRequirement > 0 && stats.faith < weapon.faithRequirement) return false;
+
+        return true;
     }
 
     private void StartMeleeUnlockFallback(float duration)

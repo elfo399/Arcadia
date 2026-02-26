@@ -132,7 +132,7 @@ public class WeaponDamage : MonoBehaviour
                     string targetName = other != null ? other.name : "Unknown";
                     string attackTypeName = lastAttackType.ToString();
                     string critTag = lastHitWasCritical ? " CRIT" : string.Empty;
-                    Debug.Log($"[Damage] {weaponName} | Hand:{hand} | Type:{attackTypeName} | Dmg:{damage}{critTag} -> Target:{targetName}");
+                    Debug.Log($"[PlayerDamage] {weaponName} | Hand:{hand} | Type:{attackTypeName} | Dmg:{damage}{critTag} -> Target:{targetName}");
                 }
 
                 // Aggiungi alla lista dei "gia colpiti" per questo attacco

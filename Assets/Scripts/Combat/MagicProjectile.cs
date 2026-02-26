@@ -15,8 +15,18 @@ public class MagicProjectile : MonoBehaviour
     private Vector3 direction;
     private bool initialized;
     private float spawnTime;
+    private string sourceLabel = "Projectile";
+    private bool isCriticalHit = false;
 
-    public void Initialize(Transform ownerTransform, Vector3 fireDirection, int projectileDamage, float projectileSpeed, float projectileLifetime, LayerMask mask)
+    public void Initialize(
+        Transform ownerTransform,
+        Vector3 fireDirection,
+        int projectileDamage,
+        float projectileSpeed,
+        float projectileLifetime,
+        LayerMask mask,
+        string source = "Projectile",
+        bool critical = false)
     {
         owner = ownerTransform;
         direction = fireDirection.sqrMagnitude > 0.0001f ? fireDirection.normalized : transform.forward;
@@ -24,6 +34,8 @@ public class MagicProjectile : MonoBehaviour
         speed = Mathf.Max(0.1f, projectileSpeed);
         lifetime = Mathf.Max(0.1f, projectileLifetime);
         hitMask = mask;
+        sourceLabel = string.IsNullOrWhiteSpace(source) ? "Projectile" : source;
+        isCriticalHit = critical;
         spawnTime = Time.time;
         initialized = true;
 
@@ -87,6 +99,10 @@ public class MagicProjectile : MonoBehaviour
         if (damageable != null)
         {
             damageable.TakeDamage(damage);
+            string ownerName = owner != null ? owner.name : "UnknownOwner";
+            string targetName = other != null ? other.name : "UnknownTarget";
+            string critTag = isCriticalHit ? " CRIT" : string.Empty;
+            Debug.Log($"[PlayerDamage] {sourceLabel} | Dmg:{damage}{critTag} -> Target:{targetName} | Owner:{ownerName}");
         }
         else
         {
