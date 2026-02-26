@@ -80,6 +80,7 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI goldValueText;
     [SerializeField] private TextMeshProUGUI silverValueText;
     [SerializeField] private TextMeshProUGUI copperValueText;
+    [SerializeField] private TextMeshProUGUI keyValueText;
     [SerializeField] private WalletSource walletSource = WalletSource.Run;
     [SerializeField] private bool autoRefreshWallet = true;
     private PlayerStats playerStats;
@@ -386,6 +387,7 @@ public class InventoryUI : MonoBehaviour
         {
             playerStats.OnBankChanged -= HandleBankChanged;
             playerStats.OnRunWalletChanged -= HandleRunWalletChanged;
+            playerStats.OnKeysChanged -= HandleKeysChanged;
         }
     }
 
@@ -780,6 +782,7 @@ public class InventoryUI : MonoBehaviour
         {
             playerStats.OnBankChanged += HandleBankChanged;
             playerStats.OnRunWalletChanged += HandleRunWalletChanged;
+            playerStats.OnKeysChanged += HandleKeysChanged;
         }
     }
 
@@ -793,6 +796,12 @@ public class InventoryUI : MonoBehaviour
     {
         if (walletSource == WalletSource.Run)
             SetWalletValues(gold, silver, copper);
+        SetKeyValue(playerStats != null ? playerStats.currentKeys : 0);
+    }
+
+    private void HandleKeysChanged(int keys)
+    {
+        SetKeyValue(keys);
     }
 
     public void RefreshWalletUI()
@@ -804,6 +813,7 @@ public class InventoryUI : MonoBehaviour
                 SetWalletValues(playerStats.bankGold, playerStats.bankSilver, playerStats.bankCopper);
             else
                 SetWalletValues(playerStats.runGold, playerStats.runSilver, playerStats.runCopper);
+            SetKeyValue(playerStats.currentKeys);
         }
     }
 
@@ -812,6 +822,11 @@ public class InventoryUI : MonoBehaviour
         if (goldValueText != null) goldValueText.text = gold.ToString();
         if (silverValueText != null) silverValueText.text = silver.ToString();
         if (copperValueText != null) copperValueText.text = copper.ToString();
+    }
+
+    public void SetKeyValue(int keys)
+    {
+        if (keyValueText != null) keyValueText.text = Mathf.Max(0, keys).ToString();
     }
 
     // ------- ATTRIBUTES UI --------

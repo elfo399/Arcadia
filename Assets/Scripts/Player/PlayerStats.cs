@@ -49,6 +49,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     [Header("Chiavi")]
     public int currentKeys = 0;
     public TextMeshProUGUI keyText;
+    public event Action<int> OnKeysChanged;
 
     [Header("Statistiche Persistenti")]
     public int playerLevel = 1;
@@ -121,6 +122,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         UpdateAllUI();
         NotifyBankChanged();
         NotifyRunWalletChanged();
+        NotifyKeysChanged();
     }
 
     void OnEnable()
@@ -204,7 +206,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public void AddKeys(int amount)
     {
         currentKeys += amount;
+        if (currentKeys < 0) currentKeys = 0;
         UpdateKeyUI();
+        NotifyKeysChanged();
     }
 
     public bool UseKey()
@@ -213,6 +217,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         {
             currentKeys--;
             UpdateKeyUI();
+            NotifyKeysChanged();
             return true;
         }
         return false;
@@ -820,6 +825,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private void NotifyRunWalletChanged()
     {
         OnRunWalletChanged?.Invoke(runGold, runSilver, runCopper);
+    }
+
+    private void NotifyKeysChanged()
+    {
+        OnKeysChanged?.Invoke(currentKeys);
     }
 
     private void ApplyLoadedQuestStateIfPossible()

@@ -208,7 +208,9 @@ public class PlayerCombat : MonoBehaviour
 
         lastWandHeavyCastTime[handIndex] = Time.time;
         float heavyClipLength = GetAnimationClipLength(heavyAnim);
-        StartRangedAction(ResolveActionWindup(heavyAnim, wandHeavyCastWindup, 0.58f), heavyClipLength, () =>
+        float magicCastTime = Mathf.Max(0f, equipped.castTime);
+        float heavyWindup = Mathf.Max(ResolveActionWindup(heavyAnim, wandHeavyCastWindup, 0.58f), magicCastTime);
+        StartRangedAction(heavyWindup, heavyClipLength, () =>
         {
             if (!stats.UseMana(Mathf.Max(0f, equipped.manaCost))) return;
             if (!stats.HasStamina(staminaCost)) return;
@@ -478,9 +480,12 @@ public class PlayerCombat : MonoBehaviour
         int finalMagicDamage = Mathf.Max(1, Mathf.RoundToInt(Mathf.Max(0, stats != null ? stats.GetBaseMagicDamage() : 0) + Mathf.Max(0, equippedMagic.magicDamage)));
         float speed = equippedMagic.projectileSpeed > 0f ? equippedMagic.projectileSpeed : fallbackProjectileSpeed;
         float lifetime = equippedMagic.projectileLifetime > 0f ? equippedMagic.projectileLifetime : fallbackProjectileLifetime;
-        SpawnProjectile(equippedMagic.projectilePrefab, spawnPos, fireDir, finalMagicDamage, speed, lifetime, equippedMagic.hitMask);
-
+        float castTime = Mathf.Max(0f, equippedMagic.castTime);
         lastMagicCastTime = Time.time;
+        StartRangedAction(castTime, 0f, () =>
+        {
+            SpawnProjectile(equippedMagic.projectilePrefab, spawnPos, fireDir, finalMagicDamage, speed, lifetime, equippedMagic.hitMask);
+        });
     }
 
     private (int damage, bool isCritical) ComputeAttackDamage(WeaponItem weapon, AttackType type)

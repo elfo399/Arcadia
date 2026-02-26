@@ -16,6 +16,7 @@ public class MagicItemData : ScriptableObject
 
     [Header("Cast")]
     [Min(0f)] public float manaCost = 12f;
+    [Min(0f)] public float castTime = 0.35f;
     [Min(0f)] public float castCooldown = 0.45f;
 
     [Header("Projectile")]
