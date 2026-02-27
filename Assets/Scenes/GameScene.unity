@@ -3301,6 +3301,7 @@ GameObject:
   - component: {fileID: 220392752}
   - component: {fileID: 220392755}
   - component: {fileID: 220392756}
+  - component: {fileID: 220392757}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -3533,6 +3534,14 @@ MonoBehaviour:
   lockRangedUntilAnimationEnds: 1
   rangedMinTotalLockTime: 0.55
   fallbackMeleeUnlockTime: 0.9
+  enableWeaponThrow: 1
+  throwMinLockTime: 0.35
+  throwHitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  throwSpawnForwardOffset: 0.55
+  throwSpawnHeightOffset: 1.05
+  throwArcUpBias: 0.08
 --- !u!114 &220392753
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3588,6 +3597,7 @@ MonoBehaviour:
   flaskCounterText: {fileID: 0}
   invulnerable: 0
   forceStartDataIgnoreSave: 1
+  minSaveIntervalSeconds: 0.75
 --- !u!114 &220392754
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3684,6 +3694,7 @@ MonoBehaviour:
     item: {fileID: 11400000, guid: 8dcc8513464141c40a0a38dc44690d46, type: 2}
     usable: {fileID: 0}
     quantity: 50
+  itemDatabase: {fileID: 0}
 --- !u!114 &220392755
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3726,6 +3737,23 @@ MonoBehaviour:
   interactLayer:
     serializedVersion: 2
     m_Bits: 128
+--- !u!114 &220392757
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 220392744}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 906e5c6b0230df54a843b0b8c0366146, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rightHandSocket: {fileID: 1792941682}
+  leftHandSocket: {fileID: 278690949}
+  autoResolveHumanoidHandBones: 1
+  currentRightVisualWeapon: {fileID: 0}
+  currentLeftVisualWeapon: {fileID: 0}
 --- !u!1 &220577163
 GameObject:
   m_ObjectHideFlags: 0
@@ -5122,6 +5150,11 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 254959496}
   m_CullTransparentMesh: 1
+--- !u!4 &278690949 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4020360767693765181, guid: 60770bdb4dc667c45bea53db0339dc05, type: 3}
+  m_PrefabInstance: {fileID: 1067541857}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &297938712
 GameObject:
   m_ObjectHideFlags: 0
@@ -26355,6 +26388,11 @@ RectTransform:
   m_AnchoredPosition: {x: 62.5, y: -105}
   m_SizeDelta: {x: 80, y: 80}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!4 &1792941682 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8024351493243979244, guid: 60770bdb4dc667c45bea53db0339dc05, type: 3}
+  m_PrefabInstance: {fileID: 1067541857}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1814522570
 GameObject:
   m_ObjectHideFlags: 0
