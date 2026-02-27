@@ -118,6 +118,28 @@ public class WeaponItem : ScriptableObject
     public Vector3 bowSpawnOffset = new Vector3(0f, 1.2f, 0.9f);
     public LayerMask bowHitMask = ~0;
 
+    [Header("Throw")]
+    public bool canBeThrown = false;
+    [Min(0)] public int throwStrengthRequirement = 0;
+    public GameObject throwProjectilePrefab;
+    [Min(0.1f)] public float throwSpeed = 20f;
+    [Min(0.1f)] public float throwLifetime = 2.5f;
+    [Min(0f)] public float throwStaminaCost = 18f;
+    [Range(0f, 1f)] public float throwBladeHitChance = 0.65f;
+    [Range(0.1f, 1f)] public float throwHandleDamageMultiplier = 0.5f;
+    [Range(0f, 1f)] public float throwBreakChance = 0.10f;
+
+    [Header("Dropped Pickup Physics")]
+    public Vector3 droppedPickupColliderCenter = new Vector3(0f, 0.05f, 0f);
+    public Vector3 droppedPickupColliderSize = new Vector3(0.7f, 0.12f, 0.22f);
+    [Min(0.01f)] public float droppedPickupMass = 2.2f;
+    [Min(0f)] public float droppedPickupLinearDrag = 0.06f;
+    [Min(0f)] public float droppedPickupAngularDrag = 0.45f;
+    [Min(0f)] public float droppedForwardImpulse = 0.9f;
+    [Min(0f)] public float droppedUpImpulse = 0.18f;
+    public Vector3 droppedInitialTorque = new Vector3(2.5f, 0.3f, 1.2f);
+    public Vector3 droppedModelLocalEuler = new Vector3(90f, 0f, 0f);
+
     public string GetRequirementsLabel()
     {
         bool hasStructured = strengthRequirement > 0 || dexterityRequirement > 0 || intelligenceRequirement > 0 || faithRequirement > 0;

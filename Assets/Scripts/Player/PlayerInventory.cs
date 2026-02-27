@@ -122,6 +122,98 @@ public class PlayerInventory : MonoBehaviour
         return equipped != null ? equipped : (hand == Hand.Right ? unarmedRight : unarmedLeft);
     }
 
+    public string GetCurrentWeaponInstanceId(Hand hand)
+    {
+        EnsureLoadoutSize();
+        if (hand == Hand.Right)
+        {
+            currentRightIndex = Mathf.Clamp(currentRightIndex, 0, rightInstanceIds.Length - 1);
+            return rightInstanceIds[currentRightIndex];
+        }
+
+        currentLeftIndex = Mathf.Clamp(currentLeftIndex, 0, leftInstanceIds.Length - 1);
+        return leftInstanceIds[currentLeftIndex];
+    }
+
+    public bool TryUnequipCurrentWeaponForThrow(Hand hand, out WeaponItem weapon, out string instanceId)
+    {
+        weapon = null;
+        instanceId = null;
+        EnsureLoadoutSize();
+
+        if (hand == Hand.Right)
+        {
+            currentRightIndex = Mathf.Clamp(currentRightIndex, 0, rightLoadout.Length - 1);
+            weapon = rightLoadout[currentRightIndex];
+            instanceId = rightInstanceIds[currentRightIndex];
+            if (weapon == null || string.IsNullOrWhiteSpace(instanceId)) return false;
+            rightLoadout[currentRightIndex] = null;
+            rightInstanceIds[currentRightIndex] = null;
+            SyncEquippedReferences();
+            return true;
+        }
+
+        currentLeftIndex = Mathf.Clamp(currentLeftIndex, 0, leftLoadout.Length - 1);
+        weapon = leftLoadout[currentLeftIndex];
+        instanceId = leftInstanceIds[currentLeftIndex];
+        if (weapon == null || string.IsNullOrWhiteSpace(instanceId)) return false;
+        leftLoadout[currentLeftIndex] = null;
+        leftInstanceIds[currentLeftIndex] = null;
+        SyncEquippedReferences();
+        return true;
+    }
+
+    public bool TryRemoveWeaponInstanceFromInventory(string instanceId, WeaponItem weapon)
+    {
+        if (string.IsNullOrWhiteSpace(instanceId) || weapon == null) return false;
+        EnsureLoadoutSize();
+        for (int i = items.Count - 1; i >= 0; i--)
+        {
+            var it = items[i];
+            if (it == null) continue;
+            if (it.weaponData == weapon && it.instanceId == instanceId)
+            {
+                items.RemoveAt(i);
+                ClearWeaponInstanceFromLoadouts(instanceId);
+                SyncEquippedReferences();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public bool HasWeaponInstanceInInventoryPublic(string instanceId, WeaponItem weapon)
+    {
+        return HasWeaponInstanceInInventory(instanceId, weapon);
+    }
+
+    public void AddWeaponInstance(WeaponItem weapon, string instanceId)
+    {
+        if (weapon == null || string.IsNullOrWhiteSpace(instanceId)) return;
+        if (HasWeaponInstanceInInventory(instanceId, weapon)) return;
+
+        var restored = new InventoryItem(weapon, 1);
+        restored.instanceId = instanceId;
+        items.Add(restored);
+    }
+
+    private void ClearWeaponInstanceFromLoadouts(string instanceId)
+    {
+        if (string.IsNullOrWhiteSpace(instanceId)) return;
+        for (int i = 0; i < rightLoadout.Length; i++)
+        {
+            if (rightInstanceIds[i] != instanceId) continue;
+            rightLoadout[i] = null;
+            rightInstanceIds[i] = null;
+        }
+        for (int i = 0; i < leftLoadout.Length; i++)
+        {
+            if (leftInstanceIds[i] != instanceId) continue;
+            leftLoadout[i] = null;
+            leftInstanceIds[i] = null;
+        }
+    }
+
     public WeaponItem GetCurrentRightWeapon()
     {
         EnsureLoadoutSize();

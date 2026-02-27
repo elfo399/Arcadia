@@ -35,6 +35,13 @@ public class PlayerCombat : MonoBehaviour
     [SerializeField] private bool lockRangedUntilAnimationEnds = true;
     [SerializeField] private float rangedMinTotalLockTime = 0.55f;
     [SerializeField] private float fallbackMeleeUnlockTime = 0.9f;
+    [Header("Weapon Throw")]
+    [SerializeField] private bool enableWeaponThrow = true;
+    [SerializeField] private float throwMinLockTime = 0.35f;
+    [SerializeField] private LayerMask throwHitMask = ~0;
+    [SerializeField] private float throwSpawnForwardOffset = 0.55f;
+    [SerializeField] private float throwSpawnHeightOffset = 1.05f;
+    [SerializeField] private float throwArcUpBias = 0.08f;
     private float lastMagicCastTime = -999f;
     private readonly float[] lastWandLightCastTime = { -999f, -999f };
     private readonly float[] lastWandHeavyCastTime = { -999f, -999f };
@@ -74,6 +81,9 @@ public class PlayerCombat : MonoBehaviour
         
         // Se stiamo già attaccando o siamo bloccati, esci
         if (!canAttack || isAttacking || rangedActionRoutine != null) return;
+
+        if (TryHandleWeaponThrowInput())
+            return;
 
         if (controller.Controls.Player.LightAttackRight.WasPerformedThisFrame())
             TryAttack(Hand.Right, AttackType.Light);
@@ -150,6 +160,72 @@ public class PlayerCombat : MonoBehaviour
         // 3. Esegui
         stats.SpendStamina(staminaCost);
         PerformAttack(weapon, hand, type);
+    }
+
+    private bool TryHandleWeaponThrowInput()
+    {
+        if (!enableWeaponThrow) return false;
+        if (controller == null || controller.Controls == null) return false;
+        if (controller.IsInventoryOpen || controller.IsRolling) return false;
+
+        var gp = Gamepad.current;
+        if (gp == null || !gp.buttonNorth.isPressed) return false; // Triangle hold
+
+        if (controller.Controls.Player.LightAttackRight.WasPerformedThisFrame())
+            return TryThrowWeaponFromHand(Hand.Right);
+        if (controller.Controls.Player.LightAttackLeft.WasPerformedThisFrame())
+            return TryThrowWeaponFromHand(Hand.Left);
+
+        return false;
+    }
+
+    private bool TryThrowWeaponFromHand(Hand hand)
+    {
+        if (inventory == null || stats == null) return false;
+
+        WeaponItem equipped = hand == Hand.Right ? inventory.GetCurrentRightWeapon() : inventory.GetCurrentLeftWeapon();
+        if (equipped == null) return false;
+        if (hand == Hand.Right && equipped == inventory.unarmedRight) return false;
+        if (hand == Hand.Left && equipped == inventory.unarmedLeft) return false;
+        if (!equipped.canBeThrown) return false;
+        if (equipped.throwStrengthRequirement > 0 && stats.strength < equipped.throwStrengthRequirement) return false;
+
+        float staminaCost = Mathf.Max(0f, equipped.throwStaminaCost);
+        if (!stats.HasStamina(staminaCost)) return false;
+
+        string instanceId = inventory.GetCurrentWeaponInstanceId(hand);
+        if (string.IsNullOrWhiteSpace(instanceId)) return false;
+        if (!inventory.HasWeaponInstanceInInventoryPublic(instanceId, equipped)) return false;
+
+        if (!inventory.TryUnequipCurrentWeaponForThrow(hand, out var thrownWeapon, out var thrownInstanceId))
+            return false;
+
+        if (!inventory.TryRemoveWeaponInstanceFromInventory(thrownInstanceId, thrownWeapon))
+        {
+            // rollback soft: rimetti l'arma nello slot se non è stato possibile rimuoverla dall'inventario
+            if (hand == Hand.Right)
+                inventory.SetRightAtSlot(inventory.currentRightIndex, thrownWeapon, thrownInstanceId);
+            else
+                inventory.SetLeftAtSlot(inventory.currentLeftIndex, thrownWeapon, thrownInstanceId);
+            return false;
+        }
+
+        stats.SpendStamina(staminaCost);
+
+        var computed = ComputeAttackDamage(thrownWeapon, AttackType.Light);
+        Vector3 fireDir = GetThrowDirection();
+        Vector3 spawnPos = transform.position
+                           + transform.forward * throwSpawnForwardOffset
+                           + transform.up * throwSpawnHeightOffset;
+        float speed = thrownWeapon.throwSpeed > 0f ? thrownWeapon.throwSpeed : fallbackProjectileSpeed;
+        float life = thrownWeapon.throwLifetime > 0f ? thrownWeapon.throwLifetime : fallbackProjectileLifetime;
+        SpawnThrownWeaponProjectile(thrownWeapon, thrownInstanceId, spawnPos, fireDir, computed.damage, speed, life, throwHitMask);
+
+        if (controller != null && controller.inventoryUI != null)
+            controller.inventoryUI.RefreshEquipmentCross();
+
+        StartRangedAction(0f, throwMinLockTime, null);
+        return true;
     }
 
     private void TryCastWithWand(WeaponItem wand, Hand hand, AttackType type)
@@ -397,6 +473,37 @@ public class PlayerCombat : MonoBehaviour
         projectile.Initialize(transform, fireDir, Mathf.Max(1, damage), finalSpeed, finalLifetime, hitMask, sourceLabel, isCritical);
     }
 
+    private void SpawnThrownWeaponProjectile(WeaponItem weapon, string instanceId, Vector3 spawnPos, Vector3 fireDir, int damage, float speed, float lifetime, LayerMask hitMask)
+    {
+        if (weapon == null || string.IsNullOrWhiteSpace(instanceId)) return;
+
+        GameObject prefab = weapon.throwProjectilePrefab;
+        if (prefab == null)
+        {
+            Debug.LogError($"[PlayerCombat] throwProjectilePrefab mancante su arma '{weapon.weaponName}'.");
+            return;
+        }
+
+        Quaternion rot = fireDir.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(fireDir) : transform.rotation;
+        GameObject go = Instantiate(prefab, spawnPos, rot);
+        var col = go.GetComponent<Collider>();
+        if (col != null)
+        {
+            // Evita nascita in overlap col terreno quando il collider del prefab è alto.
+            float lift = Mathf.Max(0.05f, col.bounds.extents.y * 0.4f);
+            go.transform.position += Vector3.up * lift;
+        }
+        var throwProj = go.GetComponent<WeaponThrowProjectile>();
+        if (throwProj == null)
+        {
+            Debug.LogError($"[PlayerCombat] Prefab '{prefab.name}' senza WeaponThrowProjectile.");
+            Destroy(go);
+            return;
+        }
+
+        throwProj.Initialize(transform, weapon, instanceId, fireDir, Mathf.Max(1, damage), speed, lifetime, hitMask);
+    }
+
     private Vector3 GetMagicFireDirection()
     {
         if (targetLockSystem == null)
@@ -412,6 +519,26 @@ public class PlayerCombat : MonoBehaviour
         }
 
         return transform.forward;
+    }
+
+    private Vector3 GetThrowDirection()
+    {
+        Vector3 baseDir = transform.forward;
+
+        if (targetLockSystem == null)
+            targetLockSystem = GetComponentInChildren<TargetLockSystem>(true) ?? GetComponentInParent<TargetLockSystem>();
+
+        if (targetLockSystem != null && targetLockSystem.isLockedOn && targetLockSystem.currentTarget != null)
+        {
+            Vector3 toTarget = targetLockSystem.currentTarget.position - transform.position;
+            toTarget.y = 0f; // throw più stabile, evita impennate verticali
+            if (toTarget.sqrMagnitude > 0.0001f)
+                baseDir = toTarget.normalized;
+        }
+
+        baseDir.y += throwArcUpBias;
+        if (baseDir.sqrMagnitude <= 0.0001f) return transform.forward;
+        return baseDir.normalized;
     }
 
     private static Vector3 GetLockTargetAimPoint(Transform target)
