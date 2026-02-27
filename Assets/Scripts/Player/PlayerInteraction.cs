@@ -7,32 +7,52 @@ public class PlayerInteraction : MonoBehaviour
     public float interactRange = 2f;
     public LayerMask interactLayer; // Importante: metti i lock/casse su un layer specifico o Default
 
-    private PlayerControls controls;
     private Transform cam;
+    private PlayerController playerController;
+    private bool isSubscribed;
     private System.Action<InputAction.CallbackContext> interactCallback;
 
     void Awake()
     {
-        controls = new PlayerControls();
         cam = Camera.main != null ? Camera.main.transform : null;
+        playerController = GetComponent<PlayerController>();
         interactCallback = _ => TryInteract();
     }
 
     void OnEnable()
     {
-        if (controls == null)
-            controls = new PlayerControls();
-        controls.Player.Enable();
-        controls.Player.Interact.performed += interactCallback;
+        TrySubscribeToSharedControls();
     }
 
     void OnDisable()
     {
-        if (controls != null)
-        {
-            controls.Player.Interact.performed -= interactCallback;
-            controls.Player.Disable();
-        }
+        UnsubscribeFromSharedControls();
+    }
+
+    void Update()
+    {
+        // Se l'ordine di inizializzazione fa arrivare PlayerController dopo, ci agganciamo qui.
+        if (!isSubscribed)
+            TrySubscribeToSharedControls();
+    }
+
+    private void TrySubscribeToSharedControls()
+    {
+        if (isSubscribed) return;
+        if (playerController == null) playerController = GetComponent<PlayerController>();
+        if (playerController == null || playerController.Controls == null) return;
+
+        playerController.Controls.Player.Interact.performed -= interactCallback;
+        playerController.Controls.Player.Interact.performed += interactCallback;
+        isSubscribed = true;
+    }
+
+    private void UnsubscribeFromSharedControls()
+    {
+        if (!isSubscribed) return;
+        if (playerController != null && playerController.Controls != null)
+            playerController.Controls.Player.Interact.performed -= interactCallback;
+        isSubscribed = false;
     }
 
     void TryInteract()

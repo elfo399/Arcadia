@@ -188,6 +188,7 @@ public class PlayerCombat : MonoBehaviour
         if (hand == Hand.Right && equipped == inventory.unarmedRight) return false;
         if (hand == Hand.Left && equipped == inventory.unarmedLeft) return false;
         if (!equipped.canBeThrown) return false;
+        if (equipped.throwProjectilePrefab == null) return false;
         if (equipped.throwStrengthRequirement > 0 && stats.strength < equipped.throwStrengthRequirement) return false;
 
         float staminaCost = Mathf.Max(0f, equipped.throwStaminaCost);

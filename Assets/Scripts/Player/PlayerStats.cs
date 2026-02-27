@@ -91,6 +91,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private PlayerInventory cachedPlayerInventory;
     [Header("Debug / Bootstrap")]
     [SerializeField] private bool forceStartDataIgnoreSave = false;
+    [Header("Save")]
+    [SerializeField, Min(0f)] private float minSaveIntervalSeconds = 0.75f;
+    private float lastSaveRealtime = -999f;
+    private bool saveQueued = false;
 
     void Awake()
     {
@@ -188,6 +192,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     void Update()
     {
         HandleStaminaRegen();
+        FlushQueuedSaveIfDue();
 
         if (flaskTimer > 0f)
             flaskTimer -= Time.deltaTime;
@@ -417,6 +422,55 @@ public class PlayerStats : MonoBehaviour, IDamageable
     // --- SALVATAGGIO E CARICAMENTO STATS ---
     public void SaveStats()
     {
+        RequestSave(immediate: false);
+    }
+
+    public void SaveStatsImmediate()
+    {
+        RequestSave(immediate: true);
+    }
+
+    private void RequestSave(bool immediate)
+    {
+        if (immediate)
+        {
+            saveQueued = false;
+            PerformSave();
+            return;
+        }
+
+        float now = Time.unscaledTime;
+        if (now >= lastSaveRealtime + Mathf.Max(0f, minSaveIntervalSeconds))
+        {
+            PerformSave();
+            return;
+        }
+
+        saveQueued = true;
+    }
+
+    private void FlushQueuedSaveIfDue()
+    {
+        if (!saveQueued) return;
+        float now = Time.unscaledTime;
+        if (now < lastSaveRealtime + Mathf.Max(0f, minSaveIntervalSeconds)) return;
+
+        saveQueued = false;
+        PerformSave();
+    }
+
+    private void PerformSave()
+    {
+        GameData data = BuildGameDataSnapshot();
+        SaveSystem.SaveData(data);
+        loadedDataCache = data;
+        loadedQuestStateApplied = true;
+        loadedInventoryStateApplied = true;
+        lastSaveRealtime = Time.unscaledTime;
+    }
+
+    private GameData BuildGameDataSnapshot()
+    {
         GameData data = new GameData
         {
             playerLevel = this.playerLevel,
@@ -432,8 +486,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             faith = this.faith,
             karma = this.karma,
             benedetto = this.benedetto,
-            malefico = this.malefico
-            ,
+            malefico = this.malefico,
             bankGold = this.bankGold,
             bankSilver = this.bankSilver,
             bankCopper = this.bankCopper
@@ -441,20 +494,13 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         var questManager = GetCachedQuestManager();
         if (questManager != null)
-        {
             data.quests = SerializeQuests(questManager.GetQuestsSnapshot());
-        }
+
         var playerInventory = GetCachedPlayerInventory();
         if (playerInventory != null)
-        {
             data.playerInventory = playerInventory.CreateSaveData();
-        }
-        // Aggiungi qui altre statistiche che vuoi salvare
 
-        SaveSystem.SaveData(data);
-        loadedDataCache = data;
-        loadedQuestStateApplied = true;
-        loadedInventoryStateApplied = true;
+        return data;
     }
 
     public void LoadStats()
@@ -789,12 +835,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     void OnApplicationQuit()
     {
-        SaveStats();
+        SaveStatsImmediate();
     }
 
     void Die()
     {
-        SaveStats();
+        SaveStatsImmediate();
         Debug.Log("SEI MORTO! Ritorno all'Hub...");
         SceneManager.LoadScene("HubScene");
     }

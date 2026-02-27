@@ -57,12 +57,17 @@ public class PlayerInventory : MonoBehaviour
 
     [Header("Item iniziali (per test)")]
     [SerializeField] private List<StartingItemEntry> startingLoadout = new();
+    [Header("Database")]
+    [SerializeField] private ItemDatabase itemDatabase;
 
     private readonly List<InventoryItem> items = new();
     public IReadOnlyList<InventoryItem> Items => items;
+    private ItemDatabase cachedLookupDatabase;
+    private (Dictionary<string, WeaponItem> weapons, Dictionary<string, MagicItemData> magics, Dictionary<string, ArmorItemData> armors, Dictionary<string, UsableItemData> usables, Dictionary<string, ItemData> items) cachedAssetLookups;
 
     void Awake()
     {
+        EnsureItemDatabaseAssigned();
         items.Clear();
         foreach (var entry in startingLoadout)
         {
@@ -757,6 +762,7 @@ public class PlayerInventory : MonoBehaviour
 
         EnsureLoadoutSize();
 
+        EnsureItemDatabaseAssigned();
         var lookups = BuildAssetLookups();
 
         bool hasSavedItems = data.items != null && data.items.Length > 0;
@@ -1042,27 +1048,39 @@ public class PlayerInventory : MonoBehaviour
         return result;
     }
 
-    private static (Dictionary<string, WeaponItem> weapons, Dictionary<string, MagicItemData> magics, Dictionary<string, ArmorItemData> armors, Dictionary<string, UsableItemData> usables, Dictionary<string, ItemData> items) BuildAssetLookups()
+    private void EnsureItemDatabaseAssigned()
     {
+        if (itemDatabase != null) return;
+        itemDatabase = Resources.Load<ItemDatabase>("ItemDatabase");
+        if (itemDatabase == null)
+        {
+            Debug.LogWarning("[PlayerInventory] ItemDatabase non assegnato. Assegna un ItemDatabase in Inspector (o mettilo in Resources/ItemDatabase.asset) per un restore save affidabile.");
+        }
+    }
+
+    private (Dictionary<string, WeaponItem> weapons, Dictionary<string, MagicItemData> magics, Dictionary<string, ArmorItemData> armors, Dictionary<string, UsableItemData> usables, Dictionary<string, ItemData> items) BuildAssetLookups()
+    {
+        if (itemDatabase != null && cachedLookupDatabase == itemDatabase && cachedAssetLookups.weapons != null)
+            return cachedAssetLookups;
+
         var weaponLookup = new Dictionary<string, WeaponItem>();
         var magicLookup = new Dictionary<string, MagicItemData>();
         var armorLookup = new Dictionary<string, ArmorItemData>();
         var usableLookup = new Dictionary<string, UsableItemData>();
         var itemLookup = new Dictionary<string, ItemData>();
 
-        RegisterWeapons(weaponLookup, Resources.LoadAll<WeaponItem>(""));
-        RegisterMagics(magicLookup, Resources.LoadAll<MagicItemData>(""));
-        RegisterArmors(armorLookup, Resources.LoadAll<ArmorItemData>(""));
-        RegisterUsables(usableLookup, Resources.LoadAll<UsableItemData>(""));
-        RegisterItems(itemLookup, Resources.LoadAll<ItemData>(""));
+        if (itemDatabase != null)
+        {
+            RegisterWeapons(weaponLookup, itemDatabase.BuildFlatWeaponList());
+            RegisterMagics(magicLookup, itemDatabase.magics);
+            RegisterArmors(armorLookup, itemDatabase.armors);
+            RegisterUsables(usableLookup, itemDatabase.usables);
+            RegisterItems(itemLookup, itemDatabase.items);
+        }
 
-        RegisterWeapons(weaponLookup, Resources.FindObjectsOfTypeAll<WeaponItem>());
-        RegisterMagics(magicLookup, Resources.FindObjectsOfTypeAll<MagicItemData>());
-        RegisterArmors(armorLookup, Resources.FindObjectsOfTypeAll<ArmorItemData>());
-        RegisterUsables(usableLookup, Resources.FindObjectsOfTypeAll<UsableItemData>());
-        RegisterItems(itemLookup, Resources.FindObjectsOfTypeAll<ItemData>());
-
-        return (weaponLookup, magicLookup, armorLookup, usableLookup, itemLookup);
+        cachedLookupDatabase = itemDatabase;
+        cachedAssetLookups = (weaponLookup, magicLookup, armorLookup, usableLookup, itemLookup);
+        return cachedAssetLookups;
     }
 
     private static void RegisterWeapons(Dictionary<string, WeaponItem> lookup, WeaponItem[] source)
@@ -1117,6 +1135,66 @@ public class PlayerInventory : MonoBehaviour
     {
         if (lookup == null || source == null) return;
         for (int i = 0; i < source.Length; i++)
+        {
+            var it = source[i];
+            if (it == null || string.IsNullOrWhiteSpace(it.name)) continue;
+            string key = it.name.Trim().ToLowerInvariant();
+            if (!lookup.ContainsKey(key)) lookup.Add(key, it);
+        }
+    }
+
+    private static void RegisterWeapons(Dictionary<string, WeaponItem> lookup, List<WeaponItem> source)
+    {
+        if (lookup == null || source == null) return;
+        for (int i = 0; i < source.Count; i++)
+        {
+            var w = source[i];
+            if (w == null || string.IsNullOrWhiteSpace(w.name)) continue;
+            string key = w.name.Trim().ToLowerInvariant();
+            if (!lookup.ContainsKey(key)) lookup.Add(key, w);
+        }
+    }
+
+    private static void RegisterUsables(Dictionary<string, UsableItemData> lookup, List<UsableItemData> source)
+    {
+        if (lookup == null || source == null) return;
+        for (int i = 0; i < source.Count; i++)
+        {
+            var u = source[i];
+            if (u == null || string.IsNullOrWhiteSpace(u.name)) continue;
+            string key = u.name.Trim().ToLowerInvariant();
+            if (!lookup.ContainsKey(key)) lookup.Add(key, u);
+        }
+    }
+
+    private static void RegisterMagics(Dictionary<string, MagicItemData> lookup, List<MagicItemData> source)
+    {
+        if (lookup == null || source == null) return;
+        for (int i = 0; i < source.Count; i++)
+        {
+            var m = source[i];
+            if (m == null || string.IsNullOrWhiteSpace(m.name)) continue;
+            string key = m.name.Trim().ToLowerInvariant();
+            if (!lookup.ContainsKey(key)) lookup.Add(key, m);
+        }
+    }
+
+    private static void RegisterArmors(Dictionary<string, ArmorItemData> lookup, List<ArmorItemData> source)
+    {
+        if (lookup == null || source == null) return;
+        for (int i = 0; i < source.Count; i++)
+        {
+            var a = source[i];
+            if (a == null || string.IsNullOrWhiteSpace(a.name)) continue;
+            string key = a.name.Trim().ToLowerInvariant();
+            if (!lookup.ContainsKey(key)) lookup.Add(key, a);
+        }
+    }
+
+    private static void RegisterItems(Dictionary<string, ItemData> lookup, List<ItemData> source)
+    {
+        if (lookup == null || source == null) return;
+        for (int i = 0; i < source.Count; i++)
         {
             var it = source[i];
             if (it == null || string.IsNullOrWhiteSpace(it.name)) continue;

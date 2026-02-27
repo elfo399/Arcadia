@@ -18,12 +18,6 @@ public class WeaponWorldPickup : MonoBehaviour, IInteractable
         TryPickup(player);
     }
 
-    private void OnTriggerEnter(Collider other)
-    {
-        if (other == null || !other.CompareTag("Player")) return;
-        TryPickup(other.gameObject);
-    }
-
     private void TryPickup(GameObject player)
     {
         if (weapon == null || string.IsNullOrWhiteSpace(instanceId) || player == null) return;
