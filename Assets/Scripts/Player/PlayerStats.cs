@@ -963,10 +963,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
             if (r == null) continue;
             result[i] = new SavedQuestRewardData
             {
-                type = r.type,
+                type = ResolveSavedQuestRewardType(r),
                 amount = r.amount,
-                itemName = r.itemName,
-                iconName = r.icon != null ? r.icon.name : string.Empty
+                itemName = ResolveSavedQuestRewardItemName(r)
             };
         }
 
@@ -977,8 +976,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         var result = new List<QuestManager.QuestData>();
         if (source == null || source.Length == 0) return result;
-        var iconLookup = BuildRewardIconLookup();
-
         for (int i = 0; i < source.Length; i++)
         {
             var q = source[i];
@@ -996,7 +993,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
                 loreDescription = q.loreDescription,
                 loreAuthor = q.loreAuthor,
                 objectives = DeserializeObjectives(q.objectives),
-                rewards = DeserializeRewards(q.rewards, iconLookup)
+                rewards = DeserializeRewards(q.rewards)
             });
         }
 
@@ -1023,7 +1020,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         return result;
     }
 
-    private static List<QuestManager.QuestRewardData> DeserializeRewards(SavedQuestRewardData[] source, Dictionary<string, Sprite> iconLookup)
+    private static List<QuestManager.QuestRewardData> DeserializeRewards(SavedQuestRewardData[] source)
     {
         var result = new List<QuestManager.QuestRewardData>();
         if (source == null || source.Length == 0) return result;
@@ -1032,100 +1029,59 @@ public class PlayerStats : MonoBehaviour, IDamageable
         {
             var r = source[i];
             if (r == null) continue;
-            Sprite resolvedIcon = ResolveRewardIcon(r, iconLookup);
             result.Add(new QuestManager.QuestRewardData
             {
                 type = r.type,
                 amount = r.amount,
                 itemName = r.itemName,
-                icon = resolvedIcon
+                rewardType = ParseSavedQuestRewardType(r.type)
             });
         }
 
         return result;
     }
 
-    private static Sprite ResolveRewardIcon(SavedQuestRewardData reward, Dictionary<string, Sprite> iconLookup)
+    private static QuestRewardType ParseSavedQuestRewardType(string raw)
     {
-        if (reward == null || iconLookup == null || iconLookup.Count == 0) return null;
+        if (string.IsNullOrWhiteSpace(raw))
+            return QuestRewardType.Item;
 
-        string iconKey = NormalizeLookupKey(reward.iconName);
-        if (!string.IsNullOrEmpty(iconKey) && iconLookup.TryGetValue(iconKey, out var iconByName))
-            return iconByName;
+        if (Enum.TryParse(raw.Trim(), true, out QuestRewardType parsed))
+            return parsed;
 
-        string itemKey = NormalizeLookupKey(reward.itemName);
-        if (!string.IsNullOrEmpty(itemKey) && iconLookup.TryGetValue(itemKey, out var iconByItemName))
-            return iconByItemName;
-
-        return null;
+        string lowered = raw.Trim().ToLowerInvariant();
+        if (lowered.Contains("weapon")) return QuestRewardType.Weapon;
+        if (lowered.Contains("usable") || lowered.Contains("consumable") || lowered.Contains("potion")) return QuestRewardType.Usable;
+        if (lowered.Contains("magic") || lowered.Contains("spell") || lowered.Contains("magia")) return QuestRewardType.Magic;
+        if (lowered.Contains("armor") || lowered.Contains("helmet") || lowered.Contains("chestplate") || lowered.Contains("leggings") || lowered.Contains("boots")) return QuestRewardType.Armor;
+        if (lowered.Contains("experience") || lowered == "xp" || lowered.Contains("exp") || lowered.Contains("esperienza")) return QuestRewardType.Experience;
+        return QuestRewardType.Item;
     }
 
-    private static Dictionary<string, Sprite> BuildRewardIconLookup()
+    private static string ResolveSavedQuestRewardType(QuestManager.QuestRewardData reward)
     {
-        var lookup = new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
-        RegisterWeaponIcons(lookup, Resources.LoadAll<WeaponItem>(""));
-        RegisterUsableIcons(lookup, Resources.LoadAll<UsableItemData>(""));
-        RegisterItemIcons(lookup, Resources.LoadAll<ItemData>(""));
-
-        // Fallback: include anche asset già caricati in memoria (scene/editor/runtime)
-        RegisterWeaponIcons(lookup, Resources.FindObjectsOfTypeAll<WeaponItem>());
-        RegisterUsableIcons(lookup, Resources.FindObjectsOfTypeAll<UsableItemData>());
-        RegisterItemIcons(lookup, Resources.FindObjectsOfTypeAll<ItemData>());
-
-        return lookup;
+        if (reward == null)
+            return QuestRewardType.Item.ToString();
+        return !string.IsNullOrWhiteSpace(reward.type) ? reward.type : reward.rewardType.ToString();
     }
 
-    private static void RegisterWeaponIcons(Dictionary<string, Sprite> lookup, WeaponItem[] items)
+    private static string ResolveSavedQuestRewardItemName(QuestManager.QuestRewardData reward)
     {
-        if (lookup == null || items == null) return;
-        for (int i = 0; i < items.Length; i++)
+        if (reward == null)
+            return string.Empty;
+        if (!string.IsNullOrWhiteSpace(reward.itemName))
+            return reward.itemName;
+
+        switch (reward.rewardType)
         {
-            var w = items[i];
-            if (w == null) continue;
-            RegisterIcon(lookup, w.icon, w.weaponName);
+            case QuestRewardType.Weapon: return reward.weaponAsset != null ? reward.weaponAsset.weaponName : string.Empty;
+            case QuestRewardType.Usable: return reward.usableAsset != null ? reward.usableAsset.itemName : string.Empty;
+            case QuestRewardType.Item: return reward.itemAsset != null ? reward.itemAsset.itemName : string.Empty;
+            case QuestRewardType.Magic: return reward.magicAsset != null ? reward.magicAsset.magicName : string.Empty;
+            case QuestRewardType.Armor: return reward.armorAsset != null ? reward.armorAsset.itemName : string.Empty;
+            default: return string.Empty;
         }
     }
-
-    private static void RegisterUsableIcons(Dictionary<string, Sprite> lookup, UsableItemData[] items)
-    {
-        if (lookup == null || items == null) return;
-        for (int i = 0; i < items.Length; i++)
-        {
-            var u = items[i];
-            if (u == null) continue;
-            RegisterIcon(lookup, u.icon, u.itemName);
-        }
-    }
-
-    private static void RegisterItemIcons(Dictionary<string, Sprite> lookup, ItemData[] items)
-    {
-        if (lookup == null || items == null) return;
-        for (int i = 0; i < items.Length; i++)
-        {
-            var it = items[i];
-            if (it == null) continue;
-            RegisterIcon(lookup, it.icon, it.itemName);
-        }
-    }
-
-    private static void RegisterIcon(Dictionary<string, Sprite> lookup, Sprite icon, string itemName)
-    {
-        if (lookup == null || icon == null) return;
-
-        string iconKey = NormalizeLookupKey(icon.name);
-        if (!string.IsNullOrEmpty(iconKey) && !lookup.ContainsKey(iconKey))
-            lookup.Add(iconKey, icon);
-
-        string itemKey = NormalizeLookupKey(itemName);
-        if (!string.IsNullOrEmpty(itemKey) && !lookup.ContainsKey(itemKey))
-            lookup.Add(itemKey, icon);
-    }
-
-    private static string NormalizeLookupKey(string value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
-    }
-
     private QuestManager GetCachedQuestManager()
     {
         if (cachedQuestManager != null) return cachedQuestManager;

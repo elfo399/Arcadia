@@ -9502,12 +9502,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 646413773}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1534586610}
+  m_Father: {fileID: 844206238}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &646413775
 MonoBehaviour:
@@ -12203,6 +12203,39 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 843154013}
   m_CullTransparentMesh: 1
+--- !u!1 &844206237
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 844206238}
+  m_Layer: 0
+  m_Name: Quest
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &844206238
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 844206237}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 646413774}
+  - {fileID: 1102352507}
+  m_Father: {fileID: 1534586610}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &844925265
 GameObject:
   m_ObjectHideFlags: 0
@@ -16312,6 +16345,112 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1093927833}
   m_CullTransparentMesh: 1
+--- !u!1 &1102352505
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1102352507}
+  - component: {fileID: 1102352506}
+  m_Layer: 0
+  m_Name: QuestUiManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1102352506
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1102352505}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1561deaecf21fcc42bbaed4a3607cf6e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  useQuestManager: 1
+  autoWireQuestUI: 1
+  questListContainer: {fileID: 1671610943}
+  questItemPrefab: {fileID: 475776902230230375, guid: 2b1e40ac8c72f834c9d80c5a44f46d6f, type: 3}
+  questActiveFilterButton: {fileID: 1351204927}
+  questCompletedFilterButton: {fileID: 1978771188}
+  questActiveCountText: {fileID: 1492001462}
+  questCompletedCountText: {fileID: 814020740}
+  questActiveFilterLabelText: {fileID: 1329168837}
+  questCompletedFilterLabelText: {fileID: 1058277232}
+  questFilterSelectedColor: {r: 1, g: 0.35, b: 0.35, a: 1}
+  startingQuests:
+  - questId: 1
+    title: Tony
+    location: Bitonto
+    completed: 0
+    questTypeLabel: Incarico
+    recommendedLabel: 100 Lvl
+    loreTitle: Gay
+    loreDescription: Gay Gay Gay
+    loreAuthor: Tony
+    objectives:
+    - title: Gay
+      description: bacia un gay
+      completed: 1
+    rewards:
+    - rewardType: 1
+      type: Weapon
+      amount: 1
+      itemName: 
+      weaponAsset: {fileID: 11400000, guid: e9bbdbd574ffe864d92aa518329e0d5c, type: 2}
+      usableAsset: {fileID: 0}
+      itemAsset: {fileID: 0}
+      magicAsset: {fileID: 0}
+      armorAsset: {fileID: 0}
+  questDetailTypeText: {fileID: 1472631598}
+  questDetailRecommendedText: {fileID: 1745919504}
+  questDetailTitleText: {fileID: 43397755}
+  questDetailLocationText: {fileID: 815400332}
+  questDetailLoreTitleText: {fileID: 1553759907}
+  questDetailLoreDescriptionText: {fileID: 662548123}
+  questDetailLoreAuthorText: {fileID: 1619059422}
+  questDetailLoreRoot: {fileID: 2054444227}
+  questObjectivesSectionRoot: {fileID: 1836074613}
+  questDetailPanelRoot: {fileID: 1268789751}
+  showQuestDetailOnlyOnSelection: 1
+  collapseQuestLoreWhenEmpty: 1
+  questObjectivesLiftWhenNoLore: -1
+  questObjectivesContainer: {fileID: 220638229}
+  questObjectivePrefab: {fileID: 7747928810618371753, guid: 397da7efdc80d8847acf411eec279085, type: 3}
+  questRewardsContainer: {fileID: 746800977}
+  questRewardPrefab: {fileID: 4132313452766036673, guid: 92c7398312fb65f4cb3f2adfcfa8cbe2, type: 3}
+  questClaimRewardButton: {fileID: 835641753}
+  questRewardInventoryCapacity: -1
+  questRewardMagicCapacity: -1
+  questDetailScrollRect: {fileID: 0}
+  smoothQuestMouseWheel: 1
+  questMouseWheelStepNormalized: 0.1
+  questMouseWheelSmoothSpeed: 14
+  questPadRightStickScrollSpeed: 0.65
+  questPadFocusBorderColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+  questPadFocusBorderThickness: {x: 3, y: 3}
+--- !u!4 &1102352507
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1102352505}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 844206238}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1110694669
 GameObject:
   m_ObjectHideFlags: 0
@@ -22455,7 +22594,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1038740300}
-  - {fileID: 646413774}
+  - {fileID: 844206238}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1537581346
@@ -25462,100 +25601,7 @@ MonoBehaviour:
   attributesSelectedColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   attributesNormalColor: {r: 1, g: 1, b: 1, a: 1}
   attributeRows: []
-  useQuestManager: 1
-  autoWireQuestUI: 1
-  questListContainer: {fileID: 1671610943}
-  questItemPrefab: {fileID: 475776902230230375, guid: 2b1e40ac8c72f834c9d80c5a44f46d6f, type: 3}
-  questActiveFilterButton: {fileID: 1351204927}
-  questCompletedFilterButton: {fileID: 1978771188}
-  questActiveCountText: {fileID: 1492001462}
-  questCompletedCountText: {fileID: 814020740}
-  questActiveFilterLabelText: {fileID: 1329168837}
-  questCompletedFilterLabelText: {fileID: 1058277232}
-  questFilterSelectedColor: {r: 1, g: 0.35, b: 0.35, a: 1}
-  startingQuests:
-  - questId: 1
-    title: Start
-    location: HUB
-    completed: 0
-    questTypeLabel: Main Quest
-    recommendedLabel: Recommended label
-    loreTitle: The Legend
-    loreDescription: DIO STRONZO
-    loreAuthor: -Jesus
-    objectives:
-    - title: Title obj
-      description: descObj
-      completed: 0
-    - title: Title objCompl
-      description: descObjCompl
-      completed: 1
-    - title: Title objCompl
-      description: descObjCompl
-      completed: 1
-    - title: Title objCompl
-      description: descObjCompl
-      completed: 1
-    - title: Title objCompl
-      description: descObjCompl
-      completed: 1
-    - title: Title objCompl
-      description: descObjCompl
-      completed: 1
-    rewards:
-    - icon: {fileID: 21300000, guid: 3e6d06a378fbe094dba40f61731113e6, type: 3}
-      type: Weaponj
-      amount: 1
-      itemName: Sword
-  - questId: 2
-    title: Speak
-    location: HUB
-    completed: 1
-    questTypeLabel: Main Quest
-    recommendedLabel: 
-    loreTitle: 
-    loreDescription: 
-    loreAuthor: 
-    objectives: []
-    rewards: []
-  - questId: 3
-    title: Open Start
-    location: HUB
-    completed: 1
-    questTypeLabel: Main Quest
-    recommendedLabel: 
-    loreTitle: 
-    loreDescription: 
-    loreAuthor: 
-    objectives: []
-    rewards: []
-  questDetailTypeText: {fileID: 1472631598}
-  questDetailRecommendedText: {fileID: 1745919504}
-  questDetailTitleText: {fileID: 43397755}
-  questDetailLocationText: {fileID: 815400332}
-  questDetailLoreTitleText: {fileID: 1553759907}
-  questDetailLoreDescriptionText: {fileID: 662548123}
-  questDetailLoreAuthorText: {fileID: 1619059422}
-  questDetailLoreRoot: {fileID: 2054444227}
-  questObjectivesSectionRoot: {fileID: 1836074613}
-  questDetailPanelRoot: {fileID: 1268789751}
-  showQuestDetailOnlyOnSelection: 1
-  collapseQuestLoreWhenEmpty: 1
-  questObjectivesLiftWhenNoLore: -1
-  questObjectivesContainer: {fileID: 220638229}
-  questObjectivePrefab: {fileID: 7747928810618371753, guid: 397da7efdc80d8847acf411eec279085, type: 3}
-  questRewardsContainer: {fileID: 746800977}
-  questRewardPrefab: {fileID: 4132313452766036673, guid: 92c7398312fb65f4cb3f2adfcfa8cbe2, type: 3}
-  questClaimRewardButton: {fileID: 0}
-  questRewardInventoryCapacity: -1
-  questRewardMagicCapacity: -1
-  questDetailScrollRect: {fileID: 0}
-  smoothQuestMouseWheel: 1
-  questMouseWheelStepNormalized: 0.1
-  questMouseWheelSmoothSpeed: 14
-  questPadRightStickScrollSpeed: 0.65
-  questPadFocusBorderColor: {r: 1, g: 0.85, b: 0.2, a: 1}
-  questPadFocusBorderThickness: {x: 3, y: 3}
+  questJournalUI: {fileID: 1102352506}
   dragCanvas: {fileID: 0}
   dragPreviewTemplate: {fileID: 0}
   gamepadAxisDetectThreshold: 0.35
