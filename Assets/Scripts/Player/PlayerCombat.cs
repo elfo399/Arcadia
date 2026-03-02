@@ -32,6 +32,8 @@ public class PlayerCombat : MonoBehaviour
     [SerializeField] private float bowLightShotWindup = 0.2f;
     [SerializeField] private float bowHeavyShotWindup = 0.3f;
     [SerializeField] private float rangedRecoveryTime = 0.12f;
+    [SerializeField] private float rangedSpawnBackOffset = 0.35f;
+    [SerializeField] private float castPointForwardOffsetScale = 0.15f;
     [SerializeField] private bool lockRangedUntilAnimationEnds = true;
     [SerializeField] private float rangedMinTotalLockTime = 0.55f;
     [SerializeField] private float fallbackMeleeUnlockTime = 0.9f;
@@ -253,7 +255,7 @@ public class PlayerCombat : MonoBehaviour
 
             var computed = ComputeAttackDamage(wand, AttackType.Light);
             int damage = computed.damage;
-            Vector3 spawnPos = GetSpawnPosition(magicCastPoint, wand.wandLightSpawnOffset);
+            Vector3 spawnPos = GetSpawnPosition(magicCastPoint, wand.wandLightSpawnOffset, fireDir);
             if (!TryPlayWeaponActionAnimation(wand, hand, AttackType.Light, out string lightAnim))
                 return;
 
@@ -277,7 +279,7 @@ public class PlayerCombat : MonoBehaviour
         if (Time.time < lastWandHeavyCastTime[handIndex] + heavyCooldown) return;
 
         int finalMagicDamage = Mathf.Max(1, Mathf.RoundToInt(Mathf.Max(0, stats.GetBaseMagicDamage()) + Mathf.Max(0, equipped.magicDamage)));
-        Vector3 heavySpawnPos = GetSpawnPosition(magicCastPoint, equipped.spawnOffset);
+        Vector3 heavySpawnPos = GetSpawnPosition(magicCastPoint, equipped.spawnOffset, fireDir);
         float heavySpeed = equipped.projectileSpeed > 0f ? equipped.projectileSpeed : fallbackProjectileSpeed;
         float heavyLifetime = equipped.projectileLifetime > 0f ? equipped.projectileLifetime : fallbackProjectileLifetime;
         if (!TryPlayWeaponActionAnimation(wand, hand, AttackType.Heavy, out string heavyAnim))
@@ -315,7 +317,7 @@ public class PlayerCombat : MonoBehaviour
         if (ammoCount <= 0) return;
 
         Vector3 fireDir = GetMagicFireDirection();
-        Vector3 spawnPos = GetSpawnPosition(magicCastPoint, bow.bowSpawnOffset);
+        Vector3 spawnPos = GetSpawnPosition(magicCastPoint, bow.bowSpawnOffset, fireDir);
         var computed = ComputeAttackDamage(bow, type);
         int damage = computed.damage;
         if (!TryPlayWeaponActionAnimation(bow, hand, type, out string bowAnim))
@@ -448,12 +450,26 @@ public class PlayerCombat : MonoBehaviour
         rangedActionRoutine = null;
     }
 
-    private Vector3 GetSpawnPosition(Transform castPoint, Vector3 localOffset)
+    private Vector3 GetSpawnPosition(Transform castPoint, Vector3 localOffset, Vector3 launchDirection)
     {
-        Vector3 verticalOffset = transform.up * magicCastPointHeightOffset;
+        Vector3 basePosition;
         if (castPoint != null)
-            return castPoint.position + verticalOffset;
-        return transform.position + transform.TransformDirection(localOffset) + verticalOffset;
+        {
+            // Il cast point e' gia' vicino alla mano/arco.
+            // Applica solo l'offset laterale/verticale pieno e riduci molto il forward
+            // per evitare che il proiettile nasca gia' oltre un bersaglio vicino.
+            Vector3 sideUpOffset =
+                castPoint.right * localOffset.x +
+                castPoint.up * localOffset.y;
+
+            float forwardOffset = localOffset.z * Mathf.Max(0f, castPointForwardOffsetScale);
+            basePosition = castPoint.position + sideUpOffset + castPoint.forward * forwardOffset;
+        }
+        else
+            basePosition = transform.position + transform.TransformDirection(localOffset);
+
+        Vector3 direction = launchDirection.sqrMagnitude > 0.0001f ? launchDirection.normalized : transform.forward;
+        return basePosition + transform.up * magicCastPointHeightOffset - direction * Mathf.Max(0f, rangedSpawnBackOffset);
     }
 
     private void SpawnProjectile(GameObject projectilePrefab, Vector3 spawnPos, Vector3 fireDir, int damage, float speed, float lifetime, LayerMask hitMask, string sourceLabel = "Projectile", bool isCritical = false)
@@ -605,9 +621,8 @@ public class PlayerCombat : MonoBehaviour
         float manaCost = Mathf.Max(0f, equippedMagic.manaCost);
         if (stats != null && !stats.UseMana(manaCost)) return;
 
-        Vector3 spawnPos = GetSpawnPosition(magicCastPoint, equippedMagic.spawnOffset);
-
         Vector3 fireDir = GetMagicFireDirection();
+        Vector3 spawnPos = GetSpawnPosition(magicCastPoint, equippedMagic.spawnOffset, fireDir);
         int finalMagicDamage = Mathf.Max(1, Mathf.RoundToInt(Mathf.Max(0, stats != null ? stats.GetBaseMagicDamage() : 0) + Mathf.Max(0, equippedMagic.magicDamage)));
         float speed = equippedMagic.projectileSpeed > 0f ? equippedMagic.projectileSpeed : fallbackProjectileSpeed;
         float lifetime = equippedMagic.projectileLifetime > 0f ? equippedMagic.projectileLifetime : fallbackProjectileLifetime;
