@@ -5,7 +5,7 @@ using UnityEngine.EventSystems;
 
 /// <summary>
 /// UI cell that supports mouse drag&drop and gamepad selection.
-/// Delegates logic to InventoryUI via callbacks.
+/// Delegates logic to a slot handler.
 /// </summary>
 public class InventorySlot : MonoBehaviour,
     IPointerDownHandler,
@@ -26,7 +26,7 @@ public class InventorySlot : MonoBehaviour,
     [SerializeField] private Vector2 focusBorderThickness = new Vector2(3f, 3f);
 
     private int slotIndex = -1;
-    private InventoryUI owner;
+    private IInventorySlotHandler owner;
     private Color defaultBackgroundColor = Color.white;
     private bool hasDefaultBackgroundColor = false;
 
@@ -39,7 +39,7 @@ public class InventorySlot : MonoBehaviour,
         Clear();
     }
 
-    public void Init(int index, InventoryUI inventory)
+    public void Init(int index, IInventorySlotHandler inventory)
     {
         slotIndex = index;
         owner = inventory;
@@ -84,8 +84,17 @@ public class InventorySlot : MonoBehaviour,
 
         if (itemIcon != null)
         {
+            if (iconImage.gameObject != null && !iconImage.gameObject.activeSelf)
+                iconImage.gameObject.SetActive(true);
+
+            iconImage.color = Color.white;
             iconImage.enabled = true;
             iconImage.sprite = itemIcon;
+            iconImage.type = Image.Type.Simple;
+            iconImage.preserveAspect = true;
+            iconImage.raycastTarget = false;
+            iconImage.canvasRenderer.SetAlpha(1f);
+            iconImage.transform.SetAsLastSibling();
         }
         else
         {
@@ -95,16 +104,19 @@ public class InventorySlot : MonoBehaviour,
 
         if (forceShowQuantity)
         {
+            quantityText.raycastTarget = false;
             quantityText.enabled = true;
             quantityText.text = Mathf.Max(0, quantity).ToString();
         }
         else if (quantity > 1)
         {
+            quantityText.raycastTarget = false;
             quantityText.enabled = true;
             quantityText.text = isEquipped ? $"{quantity} E" : quantity.ToString();
         }
         else if (isEquipped)
         {
+            quantityText.raycastTarget = false;
             quantityText.enabled = true;
             quantityText.text = "E";
         }
@@ -126,6 +138,7 @@ public class InventorySlot : MonoBehaviour,
             iconImage.enabled = false;
             iconImage.sprite = null;
         }
+
         if (quantityText != null)
         {
             quantityText.enabled = false;

@@ -119,8 +119,7 @@ public class PlayerCombat : MonoBehaviour
             return;
 
         stats.SetFlaskCountVisual(remainingAmount);
-        if (controller.inventoryUI != null)
-            controller.inventoryUI.RefreshEquipmentCross();
+        controller?.menuManager?.RefreshEquipmentUI();
     }
 
     void TryAttack(Hand hand, AttackType type)
@@ -222,8 +221,7 @@ public class PlayerCombat : MonoBehaviour
         float life = thrownWeapon.throwLifetime > 0f ? thrownWeapon.throwLifetime : fallbackProjectileLifetime;
         SpawnThrownWeaponProjectile(thrownWeapon, thrownInstanceId, spawnPos, fireDir, computed.damage, speed, life, throwHitMask);
 
-        if (controller != null && controller.inventoryUI != null)
-            controller.inventoryUI.RefreshEquipmentCross();
+        controller?.menuManager?.RefreshEquipmentUI();
 
         StartRangedAction(0f, throwMinLockTime, null);
         return true;
@@ -345,8 +343,7 @@ public class PlayerCombat : MonoBehaviour
                 computed.isCritical
             );
 
-            if (controller != null && controller.inventoryUI != null)
-                controller.inventoryUI.RefreshEquipmentCross();
+            controller?.menuManager?.RefreshEquipmentUI();
         });
     }
 

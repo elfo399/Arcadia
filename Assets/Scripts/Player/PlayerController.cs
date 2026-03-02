@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -39,9 +38,7 @@ public class PlayerController : MonoBehaviour
     public float fallingSpeedThreshold = -2.0f;
 
     [Header("UI")]
-    public GameObject inventoryPanel;
-    public GameObject playerHudPanel;
-    public InventoryUI inventoryUI;
+    public MenuManager menuManager;
 
     // Flags
     [HideInInspector] public bool canMove = true;
@@ -50,8 +47,7 @@ public class PlayerController : MonoBehaviour
     [HideInInspector] public bool isDodging = false; // Letto dal LockSystem
     [HideInInspector] public bool isFalling = false;
     
-    private bool isInventoryOpen = false;
-    public bool IsInventoryOpen => isInventoryOpen;
+    public bool IsInventoryOpen => menuManager != null && menuManager.IsMenuOpen;
 
     [SerializeField] private Animator animator;
     private CharacterController controller;
@@ -71,8 +67,6 @@ public class PlayerController : MonoBehaviour
     private float actionButtonDownTime = 0f;
     private bool actionButtonHeld = false;
     private float sprintThreshold = 0.25f;
-    private float lastInventoryPadMoveTime = -999f;
-    private float inventoryPadMoveCooldown = 0.20f;
     private bool controlsInitialized = false;
 
     public bool IsGrounded => controller != null && controller.isGrounded;
@@ -93,21 +87,21 @@ public class PlayerController : MonoBehaviour
         controller = GetComponent<CharacterController>();
         cam = Camera.main != null ? Camera.main.transform : null;
         EnsureControlsInitialized();
+        canMove = true;
+        isSprinting = false;
+        isDodging = false;
+        isFalling = false;
 
         if (animator == null) animator = GetComponentInChildren<Animator>();
         playerStats = GetComponent<PlayerStats>();
         playerInventory = GetComponent<PlayerInventory>();
         combat = GetComponent<PlayerCombat>();
-        
-        // Ensure inventory is closed on start
-        if(inventoryPanel != null) inventoryPanel.SetActive(false);
-        if (inventoryUI == null && inventoryPanel != null)
-        {
-            inventoryUI = inventoryPanel.GetComponentInChildren<InventoryUI>(true);
-            if (inventoryUI == null) inventoryUI = inventoryPanel.GetComponentInParent<InventoryUI>(true);
-        }
-        if (inventoryUI == null) inventoryUI = FindObjectOfType<InventoryUI>(true);
-        if (inventoryUI == null) Debug.LogWarning("[PlayerController] InventoryUI non trovato in scena.");
+
+        if (menuManager == null)
+            menuManager = FindObjectOfType<MenuManager>(true);
+        if (menuManager == null)
+            Debug.LogWarning("[PlayerController] MenuManager non trovato in scena.");
+
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
@@ -116,6 +110,7 @@ public class PlayerController : MonoBehaviour
     {
         EnsureControlsInitialized();
         if (Controls != null) Controls.Player.Enable();
+        canMove = menuManager == null || !menuManager.IsMenuOpen;
     }
 
     void OnDisable()
@@ -135,6 +130,15 @@ public class PlayerController : MonoBehaviour
         if (Controls == null || controller == null) return;
         if (cam == null && Camera.main != null) cam = Camera.main.transform;
 
+        if (IsInventoryOpen)
+        {
+            canMove = false;
+        }
+        else if (!isDodging)
+        {
+            canMove = true;
+        }
+
         if (controller.isGrounded)
         {
             lastGroundedTime = Time.time;
@@ -142,7 +146,7 @@ public class PlayerController : MonoBehaviour
             isFalling = false;
         }
 
-        if (!isInventoryOpen)
+        if (!IsInventoryOpen)
         {
             bool isAttacking = combat != null && combat.isAttacking;
             bool isRolling = IsRolling;
@@ -180,16 +184,8 @@ public class PlayerController : MonoBehaviour
             animator.SetFloat("Speed", 0f);
             animator.SetBool("IsSprinting", false);
 
-            // Navigazione tab con L1/R1 (gamepad)
-            if (inventoryUI != null)
-            {
-                if (Controls.Player.TabNext.WasPerformedThisFrame())
-                    inventoryUI.NextTab();
-                if (Controls.Player.TabPrev.WasPerformedThisFrame())
-                    inventoryUI.PreviousTab();
-
-                HandleInventoryPadNavigation();
-            }
+            if (menuManager != null)
+                menuManager.HandleMenuInput(Controls);
         }
 
         velocity.y += gravity * Time.deltaTime;
@@ -238,179 +234,8 @@ public class PlayerController : MonoBehaviour
             changed |= playerInventory.CycleMagic(1);
         }
 
-        if (changed && inventoryUI != null)
-        {
-            inventoryUI.RefreshEquipmentCross();
-        }
-    }
-
-    private void HandleInventoryPadNavigation()
-    {
-        if (inventoryUI == null) return;
-
-        // Cerchio / back: prima prova a tornare indietro nel menu corrente, altrimenti chiude l'inventario.
-        if (Controls.Player.SprintOrDodge.WasPerformedThisFrame())
-        {
-            bool consumed = inventoryUI.HandlePadBack();
-            if (!consumed)
-                ToggleInventory();
-            return;
-        }
-
-        bool rightPressed = (Keyboard.current != null && Keyboard.current.rightArrowKey.wasPressedThisFrame)
-            || (Gamepad.current != null && Gamepad.current.dpad.right.wasPressedThisFrame);
-        bool leftPressed = (Keyboard.current != null && Keyboard.current.leftArrowKey.wasPressedThisFrame)
-            || (Gamepad.current != null && Gamepad.current.dpad.left.wasPressedThisFrame);
-        bool downPressed = (Keyboard.current != null && Keyboard.current.downArrowKey.wasPressedThisFrame)
-            || (Gamepad.current != null && Gamepad.current.dpad.down.wasPressedThisFrame);
-        bool upPressed = (Keyboard.current != null && Keyboard.current.upArrowKey.wasPressedThisFrame)
-            || (Gamepad.current != null && Gamepad.current.dpad.up.wasPressedThisFrame);
-
-        bool inEquipmentCross = inventoryUI.IsEquipmentCrossModeActive();
-        bool inQuestTab = inventoryUI.IsQuestTabOpen();
-        bool inAttributesTab = inventoryUI.IsAttributesTabOpen();
-
-        if (inAttributesTab)
-        {
-            if (!inventoryUI.HasAttributePointsToSpend())
-                return;
-
-            inventoryUI.ForcePadFocusMode();
-
-            if (downPressed) inventoryUI.MoveAttributesPadFocusVertical(1);
-            if (upPressed) inventoryUI.MoveAttributesPadFocusVertical(-1);
-
-            Vector2 attrNav = Controls.Player.Move.ReadValue<Vector2>();
-            if (Time.time >= lastInventoryPadMoveTime + inventoryPadMoveCooldown)
-            {
-                if (attrNav.y > 0.5f)
-                {
-                    inventoryUI.MoveAttributesPadFocusVertical(-1);
-                    lastInventoryPadMoveTime = Time.time;
-                }
-                else if (attrNav.y < -0.5f)
-                {
-                    inventoryUI.MoveAttributesPadFocusVertical(1);
-                    lastInventoryPadMoveTime = Time.time;
-                }
-            }
-
-            if (Controls.Player.Jump.WasPerformedThisFrame())
-                inventoryUI.ConfirmAttributesPadSelection();
-
-            return;
-        }
-
-        if (inQuestTab)
-        {
-            // Triangolo: shortcut ai filtri
-            bool trianglePressed = Controls.Player.Interact.WasPerformedThisFrame()
-                || (Gamepad.current != null && Gamepad.current.buttonNorth.wasPressedThisFrame);
-            if (trianglePressed)
-            {
-                inventoryUI.ForcePadFocusMode();
-                inventoryUI.FocusQuestPadFilters();
-                lastInventoryPadMoveTime = Time.time;
-                return;
-            }
-
-            if (rightPressed) inventoryUI.MoveQuestPadFocusHorizontal(1);
-            if (leftPressed) inventoryUI.MoveQuestPadFocusHorizontal(-1);
-            if (downPressed) inventoryUI.MoveQuestPadFocusVertical(1);
-            if (upPressed) inventoryUI.MoveQuestPadFocusVertical(-1);
-
-            Vector2 questNav = Controls.Player.Move.ReadValue<Vector2>();
-            if (Time.time >= lastInventoryPadMoveTime + inventoryPadMoveCooldown)
-            {
-                if (questNav.x > 0.5f)
-                {
-                    inventoryUI.MoveQuestPadFocusHorizontal(1);
-                    lastInventoryPadMoveTime = Time.time;
-                }
-                else if (questNav.x < -0.5f)
-                {
-                    inventoryUI.MoveQuestPadFocusHorizontal(-1);
-                    lastInventoryPadMoveTime = Time.time;
-                }
-                else if (questNav.y > 0.5f)
-                {
-                    inventoryUI.MoveQuestPadFocusVertical(-1);
-                    lastInventoryPadMoveTime = Time.time;
-                }
-                else if (questNav.y < -0.5f)
-                {
-                    inventoryUI.MoveQuestPadFocusVertical(1);
-                    lastInventoryPadMoveTime = Time.time;
-                }
-            }
-
-            if (Controls.Player.Jump.WasPerformedThisFrame())
-                inventoryUI.ConfirmQuestPadSelection();
-
-            // Analogico destro: scroll dettaglio quest
-            if (Gamepad.current != null)
-            {
-                Vector2 rightStick = Gamepad.current.rightStick.ReadValue();
-                inventoryUI.ScrollQuestDetailByPad(rightStick.y, Time.unscaledDeltaTime);
-            }
-
-            return;
-        }
-
-        // DPad dedicated actions
-        if ((cycleRightEquipAction != null && cycleRightEquipAction.WasPerformedThisFrame()) || rightPressed)
-        {
-            if (inEquipmentCross) inventoryUI.NavigateEquipmentRight();
-            else inventoryUI.MovePadFocusHorizontal(1);
-        }
-        if ((cycleLeftEquipAction != null && cycleLeftEquipAction.WasPerformedThisFrame()) || leftPressed)
-        {
-            if (inEquipmentCross) inventoryUI.NavigateEquipmentLeft();
-            else inventoryUI.MovePadFocusHorizontal(-1);
-        }
-        if ((cycleUsableAction != null && cycleUsableAction.WasPerformedThisFrame()) || downPressed)
-        {
-            if (inEquipmentCross) inventoryUI.NavigateEquipmentDown();
-            else inventoryUI.MovePadFocusVertical(1);
-        }
-        if (upPressed)
-        {
-            if (inEquipmentCross) inventoryUI.NavigateEquipmentUp();
-            else inventoryUI.MovePadFocusVertical(-1);
-        }
-
-        // Stick/keyboard fallback (WASD or left stick) with repeat cooldown.
-        Vector2 nav = Controls.Player.Move.ReadValue<Vector2>();
-        if (!inEquipmentCross && Time.time >= lastInventoryPadMoveTime + inventoryPadMoveCooldown)
-        {
-            if (nav.x > 0.5f)
-            {
-                inventoryUI.MovePadFocusHorizontal(1);
-                lastInventoryPadMoveTime = Time.time;
-            }
-            else if (nav.x < -0.5f)
-            {
-                inventoryUI.MovePadFocusHorizontal(-1);
-                lastInventoryPadMoveTime = Time.time;
-            }
-            else if (nav.y > 0.5f)
-            {
-                inventoryUI.MovePadFocusVertical(-1);
-                lastInventoryPadMoveTime = Time.time;
-            }
-            else if (nav.y < -0.5f)
-            {
-                inventoryUI.MovePadFocusVertical(1);
-                lastInventoryPadMoveTime = Time.time;
-            }
-        }
-
-        // Confirm with X / Space (Jump action in your map).
-        if (Controls.Player.Jump.WasPerformedThisFrame())
-        {
-            if (inEquipmentCross) inventoryUI.ConfirmEquipmentSelection();
-            else inventoryUI.ConfirmPadSelection();
-        }
+        if (changed)
+            menuManager?.RefreshEquipmentUI();
     }
 
     void HandleMovement(Vector2 moveInput)
@@ -614,80 +439,16 @@ public class PlayerController : MonoBehaviour
 
     private void ToggleInventory()
     {
-        bool opening = !isInventoryOpen;
-
-        // Se stiamo chiudendo, salviamo l'ordine corrente degli item e resettiamo il filtro
-        if (!opening && isInventoryOpen && inventoryUI != null && playerInventory != null)
+        if (menuManager == null)
         {
-            playerInventory.ReplaceAllItems(inventoryUI.GetSourceItemsSnapshot());
-            inventoryUI.ResetFilterToAll();
-            inventoryUI.RefreshEquipmentCross(); // aggiorna anche la croce HUD esterna
+            Debug.LogWarning("[PlayerController] MenuManager non assegnato.");
+            return;
         }
 
-        isInventoryOpen = opening;
-
-        if (inventoryPanel != null)
-        {
-            inventoryPanel.SetActive(isInventoryOpen);
-            if (isInventoryOpen && inventoryUI != null)
-            {
-                // reset filtro a All ad ogni apertura
-                inventoryUI.ResetFilterToAll();
-                inventoryUI.SetActiveTab("Equipment");
-                // Popola la UI con gli item attuali del giocatore
-                if (playerInventory != null)
-                {
-                    var list = new List<InventoryItem>(playerInventory.Items);
-                    inventoryUI.SetSourceItems(list);
-                    // All'apertura: nessun filtro di default finché l'utente non clicca la croce
-                    inventoryUI.ResetFilterToAll();
-                    // Workaround: refresh al frame successivo
-                    StartCoroutine(RefreshInventoryNextFrame(list, false));
-                }
-
-                inventoryUI.FocusDefaultPadSlot();
-                lastInventoryPadMoveTime = Time.time;
-            }
-        }
-        else
-        {
-            Debug.LogWarning("[PlayerController] Inventory panel non assegnato.");
-        }
-        if (playerHudPanel != null) playerHudPanel.SetActive(!isInventoryOpen);
-
-        canMove = !isInventoryOpen;
+        bool menuOpen = menuManager.ToggleMenu(Controls, playerInventory);
+        canMove = !menuOpen;
         if (!canMove)
-        {
             StopMovementImmediate();
-        }
-
-        // Sledgehammer approach: Find ALL FreeLook cameras in the scene and disable their input.
-        CameraInputBlocker.SetAllCinemachineInput(!isInventoryOpen);
-
-        if (isInventoryOpen)
-        {
-            Controls.Player.Look.Disable();
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-        }
-        else
-        {
-            Controls.Player.Look.Enable();
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-        }
     }
 
-    private IEnumerator RefreshInventoryNextFrame(List<InventoryItem> snapshot, bool weaponsOnly = false)
-    {
-        yield return null; // aspetta un frame
-        if (inventoryUI != null)
-        {
-            inventoryUI.SetSourceItems(snapshot);
-            if (weaponsOnly)
-                inventoryUI.ShowWeaponsFilter();
-            else
-                inventoryUI.ResetFilterToAll();
-        }
-    }
 }

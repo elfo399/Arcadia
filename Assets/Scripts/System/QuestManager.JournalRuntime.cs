@@ -127,10 +127,10 @@ public partial class QuestManager
         return false;
     }
 
-    public List<InventoryUI.QuestEntryData> GetVisibleJournalQuestEntriesSnapshot()
+    public List<QuestEntryData> GetVisibleJournalQuestEntriesSnapshot()
     {
         var all = GetQuestEntriesSnapshot();
-        var result = new List<InventoryUI.QuestEntryData>();
+        var result = new List<QuestEntryData>();
         for (int i = 0; i < all.Count; i++)
         {
             var quest = all[i];
@@ -142,7 +142,7 @@ public partial class QuestManager
         return result;
     }
 
-    public InventoryUI.QuestEntryData GetSelectedVisibleJournalQuest()
+    public QuestEntryData GetSelectedVisibleJournalQuest()
     {
         if (string.IsNullOrWhiteSpace(selectedJournalQuestId))
             return null;
@@ -198,7 +198,7 @@ public partial class QuestManager
         return visible[index]?.questId;
     }
 
-    public bool MatchesCurrentJournalFilter(InventoryUI.QuestEntryData quest)
+    public bool MatchesCurrentJournalFilter(QuestEntryData quest)
     {
         if (quest == null)
             return false;
@@ -214,7 +214,7 @@ public partial class QuestManager
         }
     }
 
-    public bool IsQuestReadyToClaim(InventoryUI.QuestEntryData quest)
+    public bool IsQuestReadyToClaim(QuestEntryData quest)
     {
         if (quest == null)
             return false;
@@ -313,7 +313,7 @@ public partial class QuestManager
         ClampJournalPadIndices();
     }
 
-    private bool CanClaimQuestRewards(InventoryUI.QuestEntryData quest, PlayerInventory inventory, PlayerStats stats, int normalCapacity, int magicCapacity)
+    private bool CanClaimQuestRewards(QuestEntryData quest, PlayerInventory inventory, PlayerStats stats, int normalCapacity, int magicCapacity)
     {
         if (quest == null || inventory == null)
             return false;
@@ -373,7 +373,7 @@ public partial class QuestManager
         return normalOk && magicOk;
     }
 
-    private bool TryApplyQuestRewards(InventoryUI.QuestEntryData quest, PlayerInventory inventory, PlayerStats stats)
+    private bool TryApplyQuestRewards(QuestEntryData quest, PlayerInventory inventory, PlayerStats stats)
     {
         if (quest == null || inventory == null)
             return false;
@@ -604,7 +604,7 @@ public partial class QuestManager
         inventory.AddItem(new InventoryItem(magic, amount));
     }
 
-    private static bool TryResolveQuestRewardType(InventoryUI.QuestRewardEntryData reward, out QuestRewardKind kind)
+    private static bool TryResolveQuestRewardType(QuestRewardEntryData reward, out QuestRewardKind kind)
     {
         kind = QuestRewardKind.Item;
         if (reward == null)
@@ -634,7 +634,7 @@ public partial class QuestManager
         return false;
     }
 
-    private bool TryResolveWeaponReward(InventoryUI.QuestRewardEntryData reward, out WeaponItem weapon)
+    private bool TryResolveWeaponReward(QuestRewardEntryData reward, out WeaponItem weapon)
     {
         EnsureQuestRewardLookups();
         weapon = null;
@@ -646,7 +646,7 @@ public partial class QuestManager
         return reward != null && questRewardWeaponLookup != null && TryLookupByRewardName(reward, questRewardWeaponLookup, out weapon);
     }
 
-    private bool TryResolveUsableReward(InventoryUI.QuestRewardEntryData reward, out UsableItemData usable)
+    private bool TryResolveUsableReward(QuestRewardEntryData reward, out UsableItemData usable)
     {
         EnsureQuestRewardLookups();
         usable = null;
@@ -658,7 +658,7 @@ public partial class QuestManager
         return reward != null && questRewardUsableLookup != null && TryLookupByRewardName(reward, questRewardUsableLookup, out usable);
     }
 
-    private bool TryResolveItemReward(InventoryUI.QuestRewardEntryData reward, out ItemData item)
+    private bool TryResolveItemReward(QuestRewardEntryData reward, out ItemData item)
     {
         EnsureQuestRewardLookups();
         item = null;
@@ -670,7 +670,7 @@ public partial class QuestManager
         return reward != null && questRewardItemLookup != null && TryLookupByRewardName(reward, questRewardItemLookup, out item);
     }
 
-    private bool TryResolveMagicReward(InventoryUI.QuestRewardEntryData reward, out MagicItemData magic)
+    private bool TryResolveMagicReward(QuestRewardEntryData reward, out MagicItemData magic)
     {
         EnsureQuestRewardLookups();
         magic = null;
@@ -682,7 +682,7 @@ public partial class QuestManager
         return reward != null && questRewardMagicLookup != null && TryLookupByRewardName(reward, questRewardMagicLookup, out magic);
     }
 
-    private bool TryResolveArmorReward(InventoryUI.QuestRewardEntryData reward, out ArmorItemData armor)
+    private bool TryResolveArmorReward(QuestRewardEntryData reward, out ArmorItemData armor)
     {
         EnsureQuestRewardLookups();
         armor = null;
@@ -743,7 +743,7 @@ public partial class QuestManager
         }
     }
 
-    private static bool TryLookupByRewardName<T>(InventoryUI.QuestRewardEntryData reward, Dictionary<string, T> lookup, out T resolved) where T : Object
+    private static bool TryLookupByRewardName<T>(QuestRewardEntryData reward, Dictionary<string, T> lookup, out T resolved) where T : Object
     {
         resolved = null;
         if (reward == null || lookup == null)
@@ -758,3 +758,4 @@ public partial class QuestManager
         return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
     }
 }
+

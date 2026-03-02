@@ -768,6 +768,7 @@ public class PlayerInventory : MonoBehaviour
         bool hasSavedItems = data.items != null && data.items.Length > 0;
         if (hasSavedItems)
         {
+            var fallbackItems = new List<InventoryItem>(items);
             items.Clear();
             for (int i = 0; i < data.items.Length; i++)
             {
@@ -776,6 +777,12 @@ public class PlayerInventory : MonoBehaviour
 
                 var restored = DeserializeInventoryItem(saved, lookups);
                 if (restored != null) items.Add(restored);
+            }
+
+            if (items.Count == 0 && fallbackItems.Count > 0)
+            {
+                items.AddRange(fallbackItems);
+                Debug.LogWarning("[PlayerInventory] Save inventory presente ma non ripristinabile con i lookup correnti. Mantengo lo startingLoadout runtime.");
             }
         }
         // Fallback: se il save non contiene item, mantieni quelli iniziali (startingLoadout).

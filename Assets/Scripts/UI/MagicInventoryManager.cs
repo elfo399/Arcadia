@@ -1,0 +1,440 @@
+using System.Collections.Generic;
+using TMPro;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+
+public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
+{
+    [Header("Magic UI")]
+    [SerializeField] private InventorySlot slotPrefab;
+    [SerializeField] private Transform magicSlotParent;
+    [SerializeField] private int magicInitialSlotCount = 12;
+
+    [Header("Magic Detail")]
+    [SerializeField] private GameObject magicDetailRoot;
+    [SerializeField] private Image magicImage;
+    [SerializeField] private TextMeshProUGUI magicTitle;
+    [SerializeField] private TextMeshProUGUI magicDesc;
+    [SerializeField] private TextMeshProUGUI magicDamageText;
+    [SerializeField] private TextMeshProUGUI magicCriticalText;
+    [SerializeField] private TextMeshProUGUI magicScalingText;
+    [SerializeField] private TextMeshProUGUI magicRequirementsText;
+    [SerializeField] private Button equipMagicButton;
+
+    private readonly List<InventorySlot> slots = new();
+    private readonly List<InventoryItem> currentItems = new();
+    private PlayerInventory playerInventory;
+    private EquipmentManager equipmentManager;
+    private bool showPadFocus;
+    private int currentSelectedIndex = -1;
+    private int padFocusIndex = -1;
+
+    public void Initialize(PlayerInventory inventory, EquipmentManager equipment)
+    {
+        playerInventory = inventory != null ? inventory : playerInventory;
+        equipmentManager = equipment != null ? equipment : equipmentManager;
+
+        if (magicSlotParent == null)
+            AutoWireMagicReferences();
+
+        if (magicSlotParent == null)
+            return;
+
+        if (slotPrefab == null && slots.Count == 0)
+        {
+            slots.AddRange(magicSlotParent.GetComponentsInChildren<InventorySlot>(true));
+            for (int i = 0; i < slots.Count; i++)
+                slots[i].Init(i, this);
+        }
+
+        if (slotPrefab != null && magicInitialSlotCount > 0 && slots.Count == 0)
+            EnsureSlots(magicInitialSlotCount);
+
+        ClearSlots();
+        ClearDetail();
+        UpdateEquipButtonState();
+    }
+
+    public void Cleanup()
+    {
+    }
+
+    public int GetCapacity() => magicInitialSlotCount;
+
+    public void SetPlayerInventory(PlayerInventory inventory)
+    {
+        playerInventory = inventory;
+    }
+
+    public void SetPadFocusVisible(bool visible)
+    {
+        showPadFocus = visible;
+        ApplyPadFocusVisual(showPadFocus ? padFocusIndex : -1);
+    }
+
+    public void ShowMagicTab()
+    {
+        RefreshFromPlayer();
+        SetEquipButtonState(false, false);
+        FocusDefaultPadSlot();
+    }
+
+    public void PrepareMagicEquipSelectionView()
+    {
+        equipmentManager?.ShowMagicPanel();
+        RefreshFromPlayer();
+        FocusDefaultPadSlot();
+        UpdateEquipButtonState();
+    }
+
+    public void HandleSlotPointerDown(int index)
+    {
+        ApplyPadFocusVisual(index);
+        if (HasItem(index))
+            ShowItemDetailsByIndex(index);
+        else
+            ClearDetail();
+        UpdateEquipButtonState();
+    }
+
+    public void HandleSlotBeginDrag(int index, PointerEventData eventData) { }
+    public void HandleSlotDrag(PointerEventData eventData) { }
+    public void HandleSlotEndDrag() { }
+    public void HandleSlotDrop(int targetIndex) { }
+
+    public void HandleSlotSelected(int index)
+    {
+        HandleSlotPointerDown(index);
+    }
+
+    public void HandleSlotSubmit(int index)
+    {
+        if (!HasItem(index))
+            return;
+
+        ShowItemDetailsByIndex(index);
+    }
+
+    public void FocusDefaultPadSlot()
+    {
+        if (slots.Count == 0) return;
+
+        int fallback = 0;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (HasItem(i))
+            {
+                fallback = i;
+                break;
+            }
+        }
+
+        SetPadFocus(fallback);
+    }
+
+    public void MovePadFocusHorizontal(int direction)
+    {
+        if (slots.Count == 0) return;
+        int dir = direction >= 0 ? 1 : -1;
+        int start = padFocusIndex;
+        if (start < 0 || start >= slots.Count) start = 0;
+        SetPadFocus((start + dir + slots.Count) % slots.Count);
+    }
+
+    public void MovePadFocusVertical(int direction)
+    {
+        if (slots.Count == 0) return;
+        int dir = direction >= 0 ? 1 : -1;
+        int start = padFocusIndex;
+        if (start < 0 || start >= slots.Count) start = 0;
+        int next = (start + (dir * GetGridColumnCount())) % slots.Count;
+        if (next < 0) next += slots.Count;
+        SetPadFocus(next);
+    }
+
+    public void ConfirmPadSelection()
+    {
+        if (IsEquipButtonInteractable())
+        {
+            OnEquipMagicButtonClick();
+            return;
+        }
+
+        if (padFocusIndex < 0 || !HasItem(padFocusIndex))
+        {
+            FocusDefaultPadSlot();
+            return;
+        }
+
+        ShowItemDetailsByIndex(padFocusIndex);
+    }
+
+    public void OnEquipMagicButtonClick()
+    {
+        EnsurePlayerInventory();
+        if (equipmentManager == null)
+            equipmentManager = FindObjectOfType<EquipmentManager>(true);
+
+        int targetIndex = currentSelectedIndex;
+        if (!HasItem(targetIndex) && HasItem(padFocusIndex))
+            targetIndex = padFocusIndex;
+
+        if (!HasItem(targetIndex)) return;
+        if (playerInventory == null || equipmentManager == null) return;
+        if (equipmentManager.CurrentEquipTarget != EquipmentManager.EquipTarget.Top) return;
+
+        currentSelectedIndex = targetIndex;
+        var item = currentItems[targetIndex];
+        var magic = item != null ? item.magicData : null;
+        if (magic == null) return;
+
+        int slotIndex = equipmentManager.CurrentTopIndex;
+        playerInventory.SetMagicAtSlot(slotIndex, magic, item.instanceId);
+        if (playerInventory.GetCurrentMagic() != magic)
+            playerInventory.ForceSetMagicAtSlot(slotIndex, magic, item.instanceId);
+
+        equipmentManager?.RefreshEquipmentCross();
+        equipmentManager.CloseEquipGrid();
+    }
+
+    public void CloseEquipGridView()
+    {
+        currentSelectedIndex = -1;
+        padFocusIndex = -1;
+        ApplyPadFocusVisual(-1);
+        ClearDetail();
+        UpdateEquipButtonState();
+    }
+
+    private void RefreshFromPlayer()
+    {
+        EnsurePlayerInventory();
+        currentItems.Clear();
+        if (playerInventory != null)
+        {
+            foreach (var item in playerInventory.Items)
+            {
+                if (item != null && item.magicData != null)
+                    currentItems.Add(item);
+            }
+        }
+
+        EnsureSlots(Mathf.Max(magicInitialSlotCount, currentItems.Count, 1));
+        ClearSlots();
+
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (i < currentItems.Count && currentItems[i] != null)
+                slots[i].Setup(currentItems[i].magicData != null ? currentItems[i].magicData.icon : currentItems[i].icon, currentItems[i].amount, IsItemEquipped(currentItems[i]));
+            else
+                slots[i].Clear();
+
+            slots[i].gameObject.SetActive(i < Mathf.Max(magicInitialSlotCount, currentItems.Count, 1));
+        }
+
+        currentSelectedIndex = -1;
+        ApplyPadFocusVisual(-1);
+        ClearDetail();
+        UpdateEquipButtonState();
+    }
+
+    private void ClearSlots()
+    {
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (slots[i] != null)
+                slots[i].Clear();
+        }
+    }
+
+    private void EnsureSlots(int required)
+    {
+        if (magicSlotParent == null) return;
+
+        if (slotPrefab == null)
+        {
+            if (slots.Count < required && slots.Count > 0)
+            {
+                var template = slots[0];
+                while (slots.Count < required)
+                {
+                    var clone = Instantiate(template, magicSlotParent);
+                    clone.Init(slots.Count, this);
+                    clone.gameObject.SetActive(true);
+                    slots.Add(clone);
+                }
+            }
+            return;
+        }
+
+        while (slots.Count < required)
+        {
+            var slot = Instantiate(slotPrefab, magicSlotParent);
+            slot.Init(slots.Count, this);
+            slot.gameObject.SetActive(true);
+            slots.Add(slot);
+        }
+    }
+
+    private bool HasItem(int index) => index >= 0 && index < currentItems.Count && currentItems[index] != null;
+
+    private void SetPadFocus(int index)
+    {
+        if (index < 0 || index >= slots.Count) return;
+        padFocusIndex = index;
+        ApplyPadFocusVisual(index);
+        ShowItemDetailsByIndex(index);
+        if (EventSystem.current != null && slots[index] != null)
+            EventSystem.current.SetSelectedGameObject(slots[index].gameObject);
+    }
+
+    private void ApplyPadFocusVisual(int focusedIndex)
+    {
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (slots[i] != null)
+                slots[i].SetFocused(showPadFocus && i == focusedIndex);
+        }
+    }
+
+    private void ShowItemDetailsByIndex(int index)
+    {
+        if (!HasItem(index))
+        {
+            ClearDetail();
+            return;
+        }
+
+        currentSelectedIndex = index;
+        var magic = currentItems[index].magicData;
+        if (magic == null)
+        {
+            ClearDetail();
+            return;
+        }
+
+        if (magicDetailRoot != null) magicDetailRoot.SetActive(true);
+        if (magicImage != null) magicImage.sprite = magic.icon;
+        if (magicTitle != null) magicTitle.text = magic.magicName ?? string.Empty;
+        if (magicDesc != null) magicDesc.text = magic.description ?? string.Empty;
+        if (magicDamageText != null) magicDamageText.text = magic.magicDamage.ToString();
+        if (magicCriticalText != null) magicCriticalText.text = magic.criticalHit.ToString("0.##");
+        if (magicScalingText != null) magicScalingText.text = magic.scaling ?? string.Empty;
+        if (magicRequirementsText != null) magicRequirementsText.text = magic.requirements ?? string.Empty;
+        UpdateEquipButtonState();
+    }
+
+    private void ClearDetail()
+    {
+        currentSelectedIndex = -1;
+        if (magicDetailRoot != null) magicDetailRoot.SetActive(false);
+        if (magicImage != null) magicImage.sprite = null;
+        if (magicTitle != null) magicTitle.text = string.Empty;
+        if (magicDesc != null) magicDesc.text = string.Empty;
+        if (magicDamageText != null) magicDamageText.text = string.Empty;
+        if (magicCriticalText != null) magicCriticalText.text = string.Empty;
+        if (magicScalingText != null) magicScalingText.text = string.Empty;
+        if (magicRequirementsText != null) magicRequirementsText.text = string.Empty;
+    }
+
+    private void UpdateEquipButtonState()
+    {
+        bool showButton = equipmentManager != null && equipmentManager.CurrentEquipTarget == EquipmentManager.EquipTarget.Top;
+        SetEquipButtonState(showButton, showButton && currentSelectedIndex >= 0 && HasItem(currentSelectedIndex));
+    }
+
+    private void SetEquipButtonState(bool visible, bool interactable)
+    {
+        if (equipMagicButton == null) return;
+        equipMagicButton.gameObject.SetActive(visible);
+        equipMagicButton.interactable = visible && interactable;
+    }
+
+    private bool IsEquipButtonInteractable()
+    {
+        return equipMagicButton != null
+               && equipMagicButton.gameObject.activeInHierarchy
+               && equipMagicButton.interactable;
+    }
+
+    private bool IsItemEquipped(InventoryItem item)
+    {
+        if (item == null || string.IsNullOrEmpty(item.instanceId)) return false;
+        EnsurePlayerInventory();
+        return playerInventory != null && playerInventory.IsInstanceEquipped(item.instanceId);
+    }
+
+    private int GetGridColumnCount()
+    {
+        var grid = magicSlotParent != null ? magicSlotParent.GetComponent<GridLayoutGroup>() : null;
+        if (grid != null && grid.constraintCount > 0 && grid.constraint == GridLayoutGroup.Constraint.FixedColumnCount)
+            return Mathf.Max(1, grid.constraintCount);
+        return Mathf.Max(1, Mathf.CeilToInt(Mathf.Sqrt(Mathf.Max(1, slots.Count))));
+    }
+
+    private void EnsurePlayerInventory()
+    {
+        if (playerInventory == null)
+            playerInventory = FindObjectOfType<PlayerInventory>();
+    }
+
+    private void AutoWireMagicReferences()
+    {
+        GameObject magicRootObject = equipmentManager != null ? equipmentManager.MagicBackground : null;
+        if (magicRootObject == null)
+            magicRootObject = FindDeepChildByName(transform.root, "MagicBackground")?.gameObject;
+
+        var root = magicRootObject != null ? magicRootObject.transform : null;
+        if (root == null) return;
+
+        if (magicSlotParent == null)
+            magicSlotParent = FindDescendantByPath(root, "GridBackground/GridInv") ?? FindDeepChildByName(root, "GridInv");
+
+        if (magicDetailRoot == null)
+            magicDetailRoot = FindDeepChildByName(root, "DescMagic")?.gameObject;
+
+        var detailTf = magicDetailRoot != null ? magicDetailRoot.transform : null;
+        if (detailTf != null)
+        {
+            if (magicImage == null)
+            {
+                var imageTf = FindDeepChildByName(detailTf, "Image");
+                if (imageTf != null) magicImage = imageTf.GetComponent<Image>();
+            }
+
+            if (magicTitle == null) magicTitle = FindDeepTextByName(detailTf, "Title");
+            if (magicDesc == null) magicDesc = FindDeepTextByName(detailTf, "Desc");
+            if (magicDamageText == null) magicDamageText = FindDeepTextByName(detailTf, "Damage");
+            if (magicCriticalText == null) magicCriticalText = FindDeepTextByName(detailTf, "Critical");
+            if (magicScalingText == null) magicScalingText = FindDeepTextByName(detailTf, "Scaling");
+            if (magicRequirementsText == null) magicRequirementsText = FindDeepTextByName(detailTf, "Requirement");
+        }
+    }
+
+    private static Transform FindDescendantByPath(Transform root, string path)
+    {
+        return root != null && !string.IsNullOrWhiteSpace(path) ? root.Find(path) : null;
+    }
+
+    private static Transform FindDeepChildByName(Transform root, string childName)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(childName)) return null;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var child = root.GetChild(i);
+            if (child.name == childName)
+                return child;
+            var found = FindDeepChildByName(child, childName);
+            if (found != null)
+                return found;
+        }
+        return null;
+    }
+
+    private static TextMeshProUGUI FindDeepTextByName(Transform root, string childName)
+    {
+        var tf = FindDeepChildByName(root, childName);
+        return tf != null ? tf.GetComponent<TextMeshProUGUI>() : null;
+    }
+}

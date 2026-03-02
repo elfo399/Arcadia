@@ -6,7 +6,7 @@ public class QuestManagerRewardDrawer : QuestRewardDrawerBase
 {
 }
 
-[CustomPropertyDrawer(typeof(InventoryUI.QuestRewardEntryData))]
+[CustomPropertyDrawer(typeof(QuestRewardEntryData))]
 public class InventoryQuestRewardDrawer : QuestRewardDrawerBase
 {
 }
@@ -78,3 +78,4 @@ public class QuestRewardDrawerBase : PropertyDrawer
         }
     }
 }
+

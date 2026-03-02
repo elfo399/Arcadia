@@ -65,7 +65,7 @@ public partial class QuestManager : MonoBehaviour
 
         Instance = this;
         if (persistAcrossScenes)
-            DontDestroyOnLoad(gameObject);
+            MarkPersistentRoot();
 
         if (quests.Count == 0 && initialQuests != null && initialQuests.Count > 0)
             ReplaceAllQuests(initialQuests, false);
@@ -75,6 +75,15 @@ public partial class QuestManager : MonoBehaviour
     {
         if (autoNotifyOnStart)
             NotifyChanged();
+    }
+
+    private void MarkPersistentRoot()
+    {
+        Transform root = transform.root;
+        if (root == null)
+            return;
+
+        DontDestroyOnLoad(root.gameObject);
     }
 
     private void OnDestroy()
@@ -88,9 +97,9 @@ public partial class QuestManager : MonoBehaviour
         return CloneQuestList(quests);
     }
 
-    public List<InventoryUI.QuestEntryData> GetQuestEntriesSnapshot()
+    public List<QuestEntryData> GetQuestEntriesSnapshot()
     {
-        var result = new List<InventoryUI.QuestEntryData>();
+        var result = new List<QuestEntryData>();
         for (int i = 0; i < quests.Count; i++)
         {
             var quest = quests[i];
@@ -173,7 +182,7 @@ public partial class QuestManager : MonoBehaviour
             NotifyChanged();
     }
 
-    public void SeedFromInventoryEntriesIfEmpty(List<InventoryUI.QuestEntryData> sourceEntries, bool notify = true)
+    public void SeedFromInventoryEntriesIfEmpty(List<QuestEntryData> sourceEntries, bool notify = true)
     {
         if (quests.Count > 0 || sourceEntries == null || sourceEntries.Count == 0)
             return;
@@ -189,7 +198,7 @@ public partial class QuestManager : MonoBehaviour
         ReplaceAllQuests(mapped, notify);
     }
 
-    public void MergeMissingDetailsFromInventoryEntries(List<InventoryUI.QuestEntryData> sourceEntries, bool notify = true)
+    public void MergeMissingDetailsFromInventoryEntries(List<QuestEntryData> sourceEntries, bool notify = true)
     {
         if (sourceEntries == null || sourceEntries.Count == 0 || quests.Count == 0)
             return;
@@ -201,7 +210,7 @@ public partial class QuestManager : MonoBehaviour
             if (target == null) continue;
 
             string targetId = NormalizeQuestId(target.questId, target.title, target.location);
-            InventoryUI.QuestEntryData source = null;
+            QuestEntryData source = null;
             for (int j = 0; j < sourceEntries.Count; j++)
             {
                 var candidate = sourceEntries[j];
@@ -347,10 +356,10 @@ public partial class QuestManager : MonoBehaviour
         return safeTitle + "|" + safeLocation;
     }
 
-    private static InventoryUI.QuestEntryData MapToInventoryEntry(QuestData source)
+    private static QuestEntryData MapToInventoryEntry(QuestData source)
     {
         if (source == null) return null;
-        return new InventoryUI.QuestEntryData
+        return new QuestEntryData
         {
             questId = source.questId,
             title = source.title,
@@ -366,7 +375,7 @@ public partial class QuestManager : MonoBehaviour
         };
     }
 
-    private static QuestData MapFromInventoryEntry(InventoryUI.QuestEntryData source)
+    private static QuestData MapFromInventoryEntry(QuestEntryData source)
     {
         if (source == null) return null;
         return new QuestData
@@ -385,16 +394,16 @@ public partial class QuestManager : MonoBehaviour
         };
     }
 
-    private static List<InventoryUI.QuestObjectiveEntryData> MapObjectivesToInventory(List<QuestObjectiveData> source)
+    private static List<QuestObjectiveEntryData> MapObjectivesToInventory(List<QuestObjectiveData> source)
     {
-        var result = new List<InventoryUI.QuestObjectiveEntryData>();
+        var result = new List<QuestObjectiveEntryData>();
         if (source == null) return result;
 
         for (int i = 0; i < source.Count; i++)
         {
             var objective = source[i];
             if (objective == null) continue;
-            result.Add(new InventoryUI.QuestObjectiveEntryData
+            result.Add(new QuestObjectiveEntryData
             {
                 title = objective.title,
                 description = objective.description,
@@ -405,16 +414,16 @@ public partial class QuestManager : MonoBehaviour
         return result;
     }
 
-    private static List<InventoryUI.QuestRewardEntryData> MapRewardsToInventory(List<QuestRewardData> source)
+    private static List<QuestRewardEntryData> MapRewardsToInventory(List<QuestRewardData> source)
     {
-        var result = new List<InventoryUI.QuestRewardEntryData>();
+        var result = new List<QuestRewardEntryData>();
         if (source == null) return result;
 
         for (int i = 0; i < source.Count; i++)
         {
             var reward = source[i];
             if (reward == null) continue;
-            result.Add(new InventoryUI.QuestRewardEntryData
+            result.Add(new QuestRewardEntryData
             {
                 rewardType = reward.rewardType,
                 type = ResolveRewardTypeString(reward),
@@ -431,7 +440,7 @@ public partial class QuestManager : MonoBehaviour
         return result;
     }
 
-    private static List<QuestObjectiveData> MapObjectivesFromInventory(List<InventoryUI.QuestObjectiveEntryData> source)
+    private static List<QuestObjectiveData> MapObjectivesFromInventory(List<QuestObjectiveEntryData> source)
     {
         var result = new List<QuestObjectiveData>();
         if (source == null) return result;
@@ -451,7 +460,7 @@ public partial class QuestManager : MonoBehaviour
         return result;
     }
 
-    private static List<QuestRewardData> MapRewardsFromInventory(List<InventoryUI.QuestRewardEntryData> source)
+    private static List<QuestRewardData> MapRewardsFromInventory(List<QuestRewardEntryData> source)
     {
         var result = new List<QuestRewardData>();
         if (source == null) return result;
@@ -528,3 +537,4 @@ public partial class QuestManager : MonoBehaviour
         return true;
     }
 }
+

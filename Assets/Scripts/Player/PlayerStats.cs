@@ -101,7 +101,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (instance == null)
         {
             instance = this;
-            DontDestroyOnLoad(gameObject);
+            MarkPersistentRoot();
         }
         else if (instance != this)
         {
@@ -127,6 +127,15 @@ public class PlayerStats : MonoBehaviour, IDamageable
         NotifyBankChanged();
         NotifyRunWalletChanged();
         NotifyKeysChanged();
+    }
+
+    private void MarkPersistentRoot()
+    {
+        Transform root = transform.root;
+        if (root == null)
+            return;
+
+        DontDestroyOnLoad(root.gameObject);
     }
 
     void OnEnable()
