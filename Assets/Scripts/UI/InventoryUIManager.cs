@@ -72,6 +72,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     private Filter currentFilter = Filter.All;
     private Filter lastFilter = Filter.All;
     private PlayerStats playerStats;
+    private bool isInitialized;
 
     public void Initialize(PlayerInventory inventory, EquipmentManager equipment)
     {
@@ -98,9 +99,16 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (autoRefreshWallet)
             RefreshWalletUI();
 
+        if (isInitialized)
+        {
+            UpdateEquipButtonState();
+            return;
+        }
+
         ClearAllSlots();
         ClearDetailPanel();
         UpdateEquipButtonState();
+        isInitialized = true;
     }
 
     public void Cleanup()

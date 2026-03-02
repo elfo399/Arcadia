@@ -95,6 +95,7 @@ public class InventorySlot : MonoBehaviour,
             iconImage.raycastTarget = false;
             iconImage.canvasRenderer.SetAlpha(1f);
             iconImage.transform.SetAsLastSibling();
+
         }
         else
         {
@@ -137,6 +138,7 @@ public class InventorySlot : MonoBehaviour,
         {
             iconImage.enabled = false;
             iconImage.sprite = null;
+
         }
 
         if (quantityText != null)

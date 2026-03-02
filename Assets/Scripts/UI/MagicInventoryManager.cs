@@ -29,6 +29,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     private bool showPadFocus;
     private int currentSelectedIndex = -1;
     private int padFocusIndex = -1;
+    private bool isInitialized;
 
     public void Initialize(PlayerInventory inventory, EquipmentManager equipment)
     {
@@ -51,9 +52,16 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         if (slotPrefab != null && magicInitialSlotCount > 0 && slots.Count == 0)
             EnsureSlots(magicInitialSlotCount);
 
+        if (isInitialized)
+        {
+            UpdateEquipButtonState();
+            return;
+        }
+
         ClearSlots();
         ClearDetail();
         UpdateEquipButtonState();
+        isInitialized = true;
     }
 
     public void Cleanup()
