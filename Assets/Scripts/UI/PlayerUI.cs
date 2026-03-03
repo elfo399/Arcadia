@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 public class PlayerUI : MonoBehaviour
 {
@@ -18,6 +19,22 @@ public class PlayerUI : MonoBehaviour
     // Fill image for the mana bar
     public Image manaBarFill;
 
+    [Header("Bar Frames")]
+    public RectTransform healthBarFrame;
+    public RectTransform staminaBarFrame;
+    public RectTransform manaBarFrame;
+
+    [Header("Bar Sizing")]
+    [SerializeField] private float healthBaseWidth = 140f;
+    [SerializeField] private float staminaBaseWidth = 140f;
+    [SerializeField] private float manaBaseWidth = 120f;
+    [SerializeField] private float healthWidthPerPoint = 0.9f;
+    [SerializeField] private float staminaWidthPerPoint = 0.7f;
+    [SerializeField] private float manaWidthPerPoint = 0.9f;
+    [SerializeField] private float minBarWidth = 100f;
+    [SerializeField] private float maxBarWidth = 320f;
+    [SerializeField] private float fillHorizontalPadding = 4f;
+
     [Header("Flasks")]
     // Text element showing current flask count
     public TextMeshProUGUI flaskCountText;
@@ -34,6 +51,9 @@ public class PlayerUI : MonoBehaviour
     private float lastHealthFill = -1f;
     private float lastStaminaFill = -1f;
     private float lastManaFill = -1f;
+    private float lastHealthMax = -1f;
+    private float lastStaminaMax = -1f;
+    private float lastManaMax = -1f;
     private int lastFlaskCount = int.MinValue;
 
     // Update UI elements each frame
@@ -55,11 +75,46 @@ public class PlayerUI : MonoBehaviour
     {
         leftFrontSlot = ResolveFrontSlot(slotLeftIcon);
         rightFrontSlot = ResolveFrontSlot(slotRightIcon);
+        ResolveReferences();
+    }
+
+    void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded;
+        ResolveReferences();
+    }
+
+    void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        ResolveReferences();
+        leftFrontSlot = ResolveFrontSlot(slotLeftIcon);
+        rightFrontSlot = ResolveFrontSlot(slotRightIcon);
+    }
+
+    private void ResolveReferences()
+    {
+        playerStats = PlayerStats.instance != null ? PlayerStats.instance : FindObjectOfType<PlayerStats>(true);
+        playerInventory = FindObjectOfType<PlayerInventory>(true);
+        if (healthBarFrame == null && healthBarFill != null) healthBarFrame = healthBarFill.transform.parent as RectTransform;
+        if (staminaBarFrame == null && staminaBarFill != null) staminaBarFrame = staminaBarFill.transform.parent as RectTransform;
+        if (manaBarFrame == null && manaBarFill != null) manaBarFrame = manaBarFill.transform.parent as RectTransform;
     }
 
     // Refresh health, stamina, and mana bar fill amounts
     void UpdateBars()
     {
+        if (!Mathf.Approximately(playerStats.maxHealth, lastHealthMax))
+        {
+            ResizeBar(healthBarFrame, healthBaseWidth, healthWidthPerPoint, playerStats.maxHealth);
+            SyncFillToFrame(healthBarFill, healthBarFrame);
+            lastHealthMax = playerStats.maxHealth;
+        }
+
         if (healthBarFill != null)
         {
             float t = playerStats.currentHealth / playerStats.maxHealth;
@@ -69,6 +124,13 @@ public class PlayerUI : MonoBehaviour
                 healthBarFill.fillAmount = v;
                 lastHealthFill = v;
             }
+        }
+
+        if (!Mathf.Approximately(playerStats.maxStamina, lastStaminaMax))
+        {
+            ResizeBar(staminaBarFrame, staminaBaseWidth, staminaWidthPerPoint, playerStats.maxStamina);
+            SyncFillToFrame(staminaBarFill, staminaBarFrame);
+            lastStaminaMax = playerStats.maxStamina;
         }
 
         if (staminaBarFill != null)
@@ -82,6 +144,13 @@ public class PlayerUI : MonoBehaviour
             }
         }
 
+        if (!Mathf.Approximately(playerStats.maxMana, lastManaMax))
+        {
+            ResizeBar(manaBarFrame, manaBaseWidth, manaWidthPerPoint, playerStats.maxMana);
+            SyncFillToFrame(manaBarFill, manaBarFrame);
+            lastManaMax = playerStats.maxMana;
+        }
+
         if (manaBarFill != null)
         {
             float t = playerStats.currentMana / playerStats.maxMana;
@@ -92,6 +161,27 @@ public class PlayerUI : MonoBehaviour
                 lastManaFill = v;
             }
         }
+    }
+
+    private void ResizeBar(RectTransform frame, float baseWidth, float widthPerPoint, float maxValue)
+    {
+        if (frame == null)
+            return;
+
+        float width = baseWidth + maxValue * widthPerPoint;
+        width = Mathf.Clamp(width, minBarWidth, maxBarWidth);
+        frame.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
+    }
+
+    private void SyncFillToFrame(Image fill, RectTransform frame)
+    {
+        if (fill == null || frame == null)
+            return;
+
+        RectTransform fillRect = fill.rectTransform;
+        float targetWidth = Mathf.Max(0f, frame.rect.width - fillHorizontalPadding * 2f);
+        fillRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, targetWidth);
+        fillRect.anchoredPosition = new Vector2(fillHorizontalPadding, fillRect.anchoredPosition.y);
     }
 
     // Update the flask counter display

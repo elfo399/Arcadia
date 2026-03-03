@@ -32,12 +32,18 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private TextMeshProUGUI weaponWeightText;
     [SerializeField] private TextMeshProUGUI weaponScalingText;
     [SerializeField] private TextMeshProUGUI weaponRequirementsText;
+    [SerializeField] private TextMeshProUGUI weaponPhysicalDefenseText;
+    [SerializeField] private TextMeshProUGUI weaponMagicDefenseText;
 
     [Header("Detail Panel - Weapon")]
     [SerializeField] private GameObject weaponDetailRoot;
     [SerializeField] private Image weaponImage;
     [SerializeField] private TextMeshProUGUI weaponTitle;
     [SerializeField] private TextMeshProUGUI weaponDesc;
+
+    [Header("Detail Panel - Weapon Variant")]
+    [SerializeField] private GameObject weaponDescriptionRoot;
+    [SerializeField] private GameObject shieldDescriptionRoot;
 
     [Header("Detail Panel - Item")]
     [SerializeField] private GameObject itemDetailRoot;
@@ -552,6 +558,8 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
         if (weaponDetailRoot != null) weaponDetailRoot.SetActive(false);
         if (itemDetailRoot != null) itemDetailRoot.SetActive(false);
+        if (weaponDescriptionRoot != null) weaponDescriptionRoot.SetActive(false);
+        if (shieldDescriptionRoot != null) shieldDescriptionRoot.SetActive(false);
 
         if (detailIcon != null)
         {
@@ -568,6 +576,8 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (weaponWeightText != null) weaponWeightText.text = string.Empty;
         if (weaponScalingText != null) weaponScalingText.text = string.Empty;
         if (weaponRequirementsText != null) weaponRequirementsText.text = string.Empty;
+        if (weaponPhysicalDefenseText != null) weaponPhysicalDefenseText.text = string.Empty;
+        if (weaponMagicDefenseText != null) weaponMagicDefenseText.text = string.Empty;
         if (detailRoot != null) detailRoot.SetActive(false);
     }
 
@@ -602,6 +612,8 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (detailRoot != null) detailRoot.SetActive(true);
         if (weaponDetailRoot != null) weaponDetailRoot.SetActive(false);
         if (itemDetailRoot != null) itemDetailRoot.SetActive(false);
+        if (weaponDescriptionRoot != null) weaponDescriptionRoot.SetActive(false);
+        if (shieldDescriptionRoot != null) shieldDescriptionRoot.SetActive(false);
 
         Sprite icon = GetItemIcon(item);
         string title = item.title;
@@ -614,11 +626,15 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
         if (weapon != null)
         {
+            bool isShield = weapon.category == WeaponCategory.Shield;
+
             if (weapon.icon != null) icon = weapon.icon;
             if (!string.IsNullOrEmpty(weapon.weaponName)) title = weapon.weaponName;
             if (!string.IsNullOrEmpty(weapon.description)) description = weapon.description;
 
             if (weaponDetailRoot != null) weaponDetailRoot.SetActive(true);
+            if (weaponDescriptionRoot != null) weaponDescriptionRoot.SetActive(!isShield);
+            if (shieldDescriptionRoot != null) shieldDescriptionRoot.SetActive(isShield);
             if (weaponImage != null) weaponImage.sprite = icon;
             if (weaponTitle != null) weaponTitle.text = title ?? string.Empty;
             if (weaponDesc != null) weaponDesc.text = description ?? string.Empty;
@@ -627,6 +643,10 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             if (weaponWeightText != null) weaponWeightText.text = weapon.weight.ToString("0.##");
             if (weaponScalingText != null) weaponScalingText.text = weapon.GetScalingLabel();
             if (weaponRequirementsText != null) weaponRequirementsText.text = weapon.GetRequirementsLabel();
+            if (weaponPhysicalDefenseText != null)
+                weaponPhysicalDefenseText.text = isShield ? Mathf.RoundToInt(Mathf.Clamp01(weapon.physicalBlockPercent) * 100f).ToString() : string.Empty;
+            if (weaponMagicDefenseText != null)
+                weaponMagicDefenseText.text = isShield ? Mathf.RoundToInt(Mathf.Clamp01(weapon.magicBlockPercent) * 100f).ToString() : string.Empty;
             if (weaponStatsRoot != null) weaponStatsRoot.SetActive(true);
 
             if (detailIcon != null) { detailIcon.enabled = icon != null; detailIcon.sprite = icon; }

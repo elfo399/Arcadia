@@ -136,6 +136,7 @@ public class CoreGenerator : MonoBehaviour
     { 
         Instance = this;
         playerStats = FindObjectOfType<PlayerStats>();
+        ResolvePlayerTransform();
         if (playerStats == null) Debug.LogWarning("[CoreGenerator] PlayerStats non trovato! La generazione di stanze speciali (Curch/EvilCurch) non funzionerà.");
         
         InitializePrefabLookup();
@@ -149,12 +150,20 @@ public class CoreGenerator : MonoBehaviour
             MinimapManager.instance.UpdatePlayerPosition(playerTransform.position, xOffset); 
     }
 
+    void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
+    }
+
     #endregion
 
     #region --- Core Generation Logic ---
 
     public void Generate()
     {
+        ResolvePlayerTransform();
+
         if (startRoomPrefab == null || startRoomPrefab.roomData == null)
         {
             Debug.LogError("[CoreGenerator] StartRoomPrefab o RoomData mancante. Configura il prefab di start.");
@@ -641,6 +650,7 @@ public class CoreGenerator : MonoBehaviour
 
     void RespawnPlayerAtStart()
     {
+        ResolvePlayerTransform();
         if (playerTransform == null) return;
         
         Room startRoom = startRoomInstance ?? activeRoomObjects.FirstOrDefault(r => r != null && r.roomData != null && r.roomData.isStartRoom);
@@ -678,6 +688,7 @@ public class CoreGenerator : MonoBehaviour
 
     void TeleportPlayer(Vector3 targetPosition, Quaternion targetRotation)
     {
+        ResolvePlayerTransform();
         if (playerTransform == null) return;
 
         CharacterController controller = playerTransform.GetComponent<CharacterController>();
@@ -690,6 +701,37 @@ public class CoreGenerator : MonoBehaviour
         else
         {
             playerTransform.SetPositionAndRotation(targetPosition, targetRotation);
+        }
+    }
+
+    private void ResolvePlayerTransform()
+    {
+        // Priorita' assoluta al player persistente gia' registrato nel singleton.
+        if (PlayerStats.instance != null)
+        {
+            Transform persistentRoot = PlayerStats.instance.transform.root;
+            if (persistentRoot != null)
+            {
+                CharacterController persistentController = persistentRoot.GetComponentInChildren<CharacterController>(true);
+                if (persistentController != null)
+                {
+                    if (playerTransform == persistentController.transform)
+                        return;
+
+                    playerTransform = persistentController.transform;
+                    return;
+                }
+            }
+        }
+
+        if (playerTransform != null && playerTransform.GetComponent<CharacterController>() != null)
+            return;
+
+        PlayerController controller = FindObjectOfType<PlayerController>(true);
+        if (controller != null)
+        {
+            playerTransform = controller.transform;
+            return;
         }
     }
 
@@ -721,3 +763,5 @@ public class CoreGenerator : MonoBehaviour
 
     #endregion
 }
+
+

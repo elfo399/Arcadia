@@ -297,9 +297,27 @@ public class SimpleEnemyAI : MonoBehaviour
             return;
         }
 
-        damageable.TakeDamage(attackDamage);
+        if (damageable is PlayerStats playerStats)
+            playerStats.TakeDamage(attackDamage, WeaponItem.DamageType.Physical, transform.position, transform);
+        else
+            damageable.TakeDamage(attackDamage);
         if (debugLogs)
             Debug.Log($"[SimpleEnemyAI] {name} hit player for {attackDamage} damage.");
+    }
+
+    public void ApplyParryStagger(float duration)
+    {
+        float stagger = Mathf.Max(0.05f, duration);
+        if (agent != null && agent.enabled)
+            agent.isStopped = true;
+
+        hitAppliedInCurrentAttack = true;
+        attackCooldownTimer = Mathf.Max(attackCooldownTimer, stagger);
+        currentState = AiState.Recovery;
+        stateTimer = Mathf.Max(0f, recoveryDuration - stagger);
+
+        if (debugLogs)
+            Debug.Log($"[SimpleEnemyAI] {name} parried for {stagger:0.00}s.");
     }
 
     private bool HasLineOfSightToPlayer()

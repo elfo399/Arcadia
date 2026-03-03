@@ -87,6 +87,15 @@ public class WeaponItem : ScriptableObject
     // Stamina cost for heavy attacks
     public float heavyAttackStaminaCost = 20f;
 
+    [Header("Shield (Block / Parry)")]
+    public bool canBlock = false;
+    public bool canParry = false;
+    [Range(0f, 1f)] public float physicalBlockPercent = 0.75f;
+    [Range(0f, 1f)] public float magicBlockPercent = 0.40f;
+    [Min(0f)] public float stability = 25f;
+    [Min(0f)] public float parryWindowStart = 0.05f;
+    [Min(0f)] public float parryWindowDuration = 0.20f;
+
     [Header("Abilita (per il futuro)")]
     // Whether the weapon has a right-hand skill
     public bool hasRightSkill;
@@ -230,6 +239,12 @@ public class WeaponItem : ScriptableObject
 #if UNITY_EDITOR
     private void OnValidate()
     {
+        if (category == WeaponCategory.Shield)
+        {
+            rangeType = WeaponRangeType.Melee;
+            canBlock = true;
+        }
+
         bool hasStructured = strengthRequirement > 0 || dexterityRequirement > 0 || intelligenceRequirement > 0 || faithRequirement > 0;
         if (hasStructured)
             requirements = GetRequirementsLabel();

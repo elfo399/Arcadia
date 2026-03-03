@@ -67,11 +67,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public int benedetto = 0;
     public int malefico = 0;
 
-    [Header("UI Bars (Sistema DynamicBar)")]
-    public DynamicBar healthBar;
-    public DynamicBar staminaBar;
-    public DynamicBar manaBar;
-
     [Header("UI Flask Counter")]
     public TextMeshProUGUI flaskCounterText;
 
@@ -89,12 +84,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private float baseMaxMana;
     private QuestManager cachedQuestManager;
     private PlayerInventory cachedPlayerInventory;
+    private PlayerCombat cachedPlayerCombat;
     [Header("Debug / Bootstrap")]
     [SerializeField] private bool forceStartDataIgnoreSave = false;
     [Header("Save")]
     [SerializeField, Min(0f)] private float minSaveIntervalSeconds = 0.75f;
     private float lastSaveRealtime = -999f;
     private bool saveQueued = false;
+    private Coroutine delayedUiRefreshRoutine;
 
     void Awake()
     {
@@ -105,11 +102,13 @@ public class PlayerStats : MonoBehaviour, IDamageable
         }
         else if (instance != this)
         {
-            Destroy(gameObject);
+            GameObject duplicateRoot = transform.root != null ? transform.root.gameObject : gameObject;
+            Destroy(duplicateRoot);
             return; 
         }
 
         animator = GetComponentInChildren<Animator>();
+        cachedPlayerCombat = GetComponent<PlayerCombat>();
 
         baseMaxHealth = maxHealth;
         baseMaxStamina = maxStamina;
@@ -160,6 +159,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
         RecalculateDerivedStats(keepCurrentRatio: true);
         AssignUIElements();
         UpdateAllUI();
+        if (delayedUiRefreshRoutine != null)
+            StopCoroutine(delayedUiRefreshRoutine);
+        delayedUiRefreshRoutine = StartCoroutine(RefreshUiBindingsNextFrame());
         ApplyLoadedQuestStateIfPossible();
         ApplyLoadedInventoryStateIfPossible();
 
@@ -172,22 +174,24 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     void AssignUIElements()
     {
-        // Trova le barre UI tramite il loro tag o un componente specifico
-        // È consigliabile dare un tag univoco ai GameObject delle barre nel prefab della UI
-        var uiBars = FindObjectsOfType<DynamicBar>();
-        foreach (var bar in uiBars)
-        {
-            if (bar.CompareTag("HealthBar")) healthBar = bar;
-            else if (bar.CompareTag("StaminaBar")) staminaBar = bar;
-            else if (bar.CompareTag("ManaBar")) manaBar = bar;
-        }
+        keyText = null;
+        flaskCounterText = null;
 
-        // Trova i testi tramite tag
-        var textElements = FindObjectsOfType<TextMeshProUGUI>();
+        var textElements = FindObjectsOfType<TextMeshProUGUI>(true);
         foreach (var text in textElements)
         {
             if (text.CompareTag("KeyText")) keyText = text;
             else if (text.CompareTag("FlaskCounterText")) flaskCounterText = text;
+        }
+
+        foreach (var text in textElements)
+        {
+            if (keyText == null && string.Equals(text.gameObject.name, "KeyCount", System.StringComparison.OrdinalIgnoreCase))
+                keyText = text;
+            else if (flaskCounterText == null &&
+                     (string.Equals(text.gameObject.name, "FlaskCounter", System.StringComparison.OrdinalIgnoreCase) ||
+                      string.Equals(text.gameObject.name, "FlaskCount", System.StringComparison.OrdinalIgnoreCase)))
+                flaskCounterText = text;
         }
     }
 
@@ -248,15 +252,32 @@ public class PlayerStats : MonoBehaviour, IDamageable
         TakeDamage((float)amount);
     }
 
+    private System.Collections.IEnumerator RefreshUiBindingsNextFrame()
+    {
+        yield return null;
+        AssignUIElements();
+        UpdateAllUI();
+        delayedUiRefreshRoutine = null;
+    }
+
     public void TakeDamage(float amount)
+    {
+        TakeDamage(amount, WeaponItem.DamageType.Physical, null);
+    }
+
+    public void TakeDamage(float amount, WeaponItem.DamageType damageType, Vector3? sourcePosition, Transform attacker = null)
     {
         if (amount <= 0f) return;
         if (invulnerable) return;
 
+        if (cachedPlayerCombat == null)
+            cachedPlayerCombat = GetComponent<PlayerCombat>();
+        if (cachedPlayerCombat != null)
+            cachedPlayerCombat.TryDefendIncomingDamage(ref amount, damageType, sourcePosition, attacker);
+        if (amount <= 0f) return;
+
         currentHealth -= amount;
         if (currentHealth < 0) currentHealth = 0;
-
-        UpdateHealthBar();
 
         if (currentHealth <= 0) Die();
     }
@@ -266,7 +287,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (amount <= 0f) return;
         currentHealth += amount;
         currentHealth = Mathf.Min(currentHealth, maxHealth);
-        UpdateHealthBar();
     }
 
     public void SetInvulnerable(bool value)
@@ -322,7 +342,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
         currentHealth += flaskHealAmount;
         if (currentHealth > maxHealth) currentHealth = maxHealth;
 
-        UpdateHealthBar();
         UpdateFlaskUI();
 
         if (animator != null) animator.SetTrigger("DrinkPotion");
@@ -339,7 +358,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (currentStamina < 0) currentStamina = 0;
 
         lastStaminaUseTime = Time.time;
-        UpdateStaminaBar();
     }
 
     public bool HasStamina(float amount)
@@ -360,7 +378,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
         {
             currentStamina += staminaRegenRate * Time.deltaTime;
             if (currentStamina > maxStamina) currentStamina = maxStamina;
-            UpdateStaminaBar();
         }
     }
 
@@ -368,7 +385,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         if (currentMana < amount) return false;
         currentMana -= amount;
-        UpdateManaBar();
         return true;
     }
 
@@ -377,50 +393,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (amount <= 0f) return;
         currentMana += amount;
         currentMana = Mathf.Min(currentMana, maxMana);
-        UpdateManaBar();
     }
 
     // --- AGGIORNAMENTO GRAFICO ---
 
     void UpdateAllUI()
     {
-        UpdateAllBars();
         UpdateFlaskUI();
         UpdateKeyUI();
-    }
-    
-    void UpdateAllBars()
-    {
-        UpdateHealthBar();
-        UpdateStaminaBar();
-        UpdateManaBar();
-    }
-
-    void UpdateHealthBar()
-    {
-        if (healthBar != null)
-        {
-            healthBar.SetMax(maxHealth);
-            healthBar.SetCurrent(currentHealth);
-        }
-    }
-
-    void UpdateStaminaBar()
-    {
-        if (staminaBar != null)
-        {
-            staminaBar.SetMax(maxStamina);
-            staminaBar.SetCurrent(currentStamina);
-        }
-    }
-
-    void UpdateManaBar()
-    {
-        if (manaBar != null)
-        {
-            manaBar.SetMax(maxMana);
-            manaBar.SetCurrent(currentMana);
-        }
     }
 
     void UpdateFlaskUI()
@@ -1124,3 +1104,5 @@ public class PlayerStats : MonoBehaviour, IDamageable
         copper = Mathf.Max(0, copper);
     }
 }
+
+

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 public class MenuManager : MonoBehaviour
 {
@@ -43,6 +44,13 @@ public class MenuManager : MonoBehaviour
 
         if (inventoryPanel != null)
             inventoryPanel.SetActive(false);
+
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private void OnDestroy()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
     public MenuTabEntry[] GetTabs()
@@ -494,6 +502,38 @@ public class MenuManager : MonoBehaviour
         Cursor.visible = false;
     }
 
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        ResolveReferences();
+
+        // Il menu non deve attraversare il cambio scena in stato aperto.
+        isMenuOpen = false;
+        currentTabIndex = -1;
+        currentPlayerInventory = FindObjectOfType<PlayerInventory>(true);
+        ApplyPadFocusVisible(false);
+
+        if (inventoryPanel != null)
+            inventoryPanel.SetActive(false);
+        if (playerHudPanel != null)
+            playerHudPanel.SetActive(true);
+
+        CameraInputBlocker.SetAllCinemachineInput(true);
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
+        if (currentPlayerInventory != null)
+        {
+            inventoryUIManager?.SetPlayerInventory(currentPlayerInventory);
+            magicInventoryManager?.SetPlayerInventory(currentPlayerInventory);
+            equipmentManager?.SetPlayerInventory(currentPlayerInventory);
+            inventoryUIManager?.RefreshSourceItemsFromPlayer();
+            equipmentManager?.RefreshEquipmentCross();
+        }
+
+        attributesUIManager?.RefreshUI();
+        questJournalUI?.RefreshUI(false);
+    }
+
     private IEnumerator RefreshInventoryNextFrame(List<InventoryItem> snapshot, bool weaponsOnly = false)
     {
         yield return null;
@@ -582,6 +622,11 @@ public class MenuManager : MonoBehaviour
 
     private void ResolveReferences()
     {
+        if (inventoryPanel == null)
+            inventoryPanel = GameObject.Find("HUD_Inventory");
+        if (playerHudPanel == null)
+            playerHudPanel = GameObject.Find("HUD_Canvas");
+
         if (inventoryUIManager == null && inventoryPanel != null)
             inventoryUIManager = inventoryPanel.GetComponentInChildren<InventoryUIManager>(true);
         if (inventoryUIManager == null)

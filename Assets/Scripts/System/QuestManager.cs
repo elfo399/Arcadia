@@ -79,11 +79,10 @@ public partial class QuestManager : MonoBehaviour
 
     private void MarkPersistentRoot()
     {
-        Transform root = transform.root;
-        if (root == null)
-            return;
+        if (transform.parent != null)
+            transform.SetParent(null, true);
 
-        DontDestroyOnLoad(root.gameObject);
+        DontDestroyOnLoad(gameObject);
     }
 
     private void OnDestroy()

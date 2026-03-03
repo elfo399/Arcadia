@@ -18,6 +18,29 @@ public class PlayerCombat : MonoBehaviour
     [Header("Stato Combattimento")]
     public bool isAttacking = false;
     public bool canAttack = true;
+    [SerializeField] private float shieldBlockHoldThreshold = 0.18f;
+    [SerializeField, Range(30f, 180f)] private float blockFrontAngle = 140f;
+    [SerializeField] private float minimumBlockStaminaCost = 2f;
+    [SerializeField] private float blockStabilityScale = 0.01f;
+    [SerializeField] private float guardBreakDuration = 0.9f;
+    [SerializeField] private string blockingAnimatorParameter = "IsBlocking";
+    [SerializeField] private string parryAnimatorTrigger = "Parry";
+    [SerializeField] private float parryTotalLockTime = 0.45f;
+    [SerializeField] private float parryRecoveryTime = 0.12f;
+    [SerializeField] private float parryStaggerDuration = 1.1f;
+    private bool isBlockingRight;
+    private bool isBlockingLeft;
+    private bool pendingShieldRightAction;
+    private bool pendingShieldLeftAction;
+    private float pendingShieldRightStartTime = -999f;
+    private float pendingShieldLeftStartTime = -999f;
+    private bool isGuardBroken;
+    private bool hasBlockingAnimatorParameter;
+    private bool hasParryAnimatorTrigger;
+    private Coroutine guardBreakRoutine;
+    private Coroutine parryRoutine;
+    private bool isParryWindowOpen;
+    private bool isParrying;
 
     [Header("Magic Cast (Prototype)")]
     [SerializeField] private bool enableMagicCastPrototype = false;
@@ -62,13 +85,387 @@ public class PlayerCombat : MonoBehaviour
         targetLockSystem = GetComponentInChildren<TargetLockSystem>(true);
         if (targetLockSystem == null)
             targetLockSystem = GetComponentInParent<TargetLockSystem>();
+        CacheAnimatorParameters();
     }
 
     void Update()
     {
+        HandleBlockInput();
+        UpdateBlockingAnimator();
+        HandleParryInput();
         HandleAttackInput();
         HandleMagicInput();
         HandleFlaskInput();
+    }
+
+    public bool IsBlocking => isBlockingLeft || isBlockingRight;
+
+    private void HandleBlockInput()
+    {
+        isBlockingRight = false;
+        isBlockingLeft = false;
+
+        if (controller == null || controller.Controls == null) return;
+        if (controller.IsInventoryOpen || controller.IsRolling) return;
+        if (isGuardBroken) return;
+        if (isAttacking || rangedActionRoutine != null || isParrying) return;
+
+        UpdateShieldTapHoldState(Hand.Right);
+        UpdateShieldTapHoldState(Hand.Left);
+    }
+
+    private void UpdateShieldTapHoldState(Hand hand)
+    {
+        if (!UsesShieldTapHoldBehavior(hand))
+        {
+            ClearShieldPendingState(hand);
+            return;
+        }
+
+        InputAction action = hand == Hand.Right
+            ? controller.Controls.Player.LightAttackRight
+            : controller.Controls.Player.LightAttackLeft;
+
+        if (action == null)
+        {
+            ClearShieldPendingState(hand);
+            return;
+        }
+
+        bool pending = hand == Hand.Right ? pendingShieldRightAction : pendingShieldLeftAction;
+        float startTime = hand == Hand.Right ? pendingShieldRightStartTime : pendingShieldLeftStartTime;
+
+        if (!pending && action.WasPerformedThisFrame())
+        {
+            SetShieldPendingState(hand, true, Time.time);
+            pending = true;
+            startTime = Time.time;
+        }
+
+        if (!pending)
+            return;
+
+        if (action.WasReleasedThisFrame())
+        {
+            bool shortTap = Time.time < startTime + Mathf.Max(0f, shieldBlockHoldThreshold);
+            ClearShieldPendingState(hand);
+            if (shortTap && canAttack && !isAttacking && rangedActionRoutine == null)
+                TryAttack(hand, AttackType.Light);
+            return;
+        }
+
+        if (action.IsPressed() && Time.time >= startTime + Mathf.Max(0f, shieldBlockHoldThreshold))
+        {
+            if (hand == Hand.Right)
+                isBlockingRight = true;
+            else
+                isBlockingLeft = true;
+        }
+    }
+
+    private void SetShieldPendingState(Hand hand, bool pending, float startTime)
+    {
+        if (hand == Hand.Right)
+        {
+            pendingShieldRightAction = pending;
+            pendingShieldRightStartTime = startTime;
+        }
+        else
+        {
+            pendingShieldLeftAction = pending;
+            pendingShieldLeftStartTime = startTime;
+        }
+    }
+
+    private void ClearShieldPendingState(Hand hand)
+    {
+        SetShieldPendingState(hand, false, -999f);
+    }
+
+    private bool UsesShieldTapHoldBehavior(Hand hand)
+    {
+        if (inventory == null)
+            return false;
+
+        WeaponItem equipped = inventory.GetWeaponForHand(hand);
+        return equipped != null && equipped.category == WeaponCategory.Shield && equipped.canBlock;
+    }
+
+    private bool UsesShieldParryBehavior(Hand hand)
+    {
+        if (inventory == null)
+            return false;
+
+        WeaponItem equipped = inventory.GetWeaponForHand(hand);
+        return equipped != null && equipped.category == WeaponCategory.Shield && equipped.canParry;
+    }
+
+    private bool IsShieldBlockHeld(Hand hand)
+    {
+        if (inventory == null || controller == null || controller.Controls == null)
+            return false;
+
+        WeaponItem equipped = inventory.GetWeaponForHand(hand);
+        if (equipped == null || equipped.category != WeaponCategory.Shield || !equipped.canBlock)
+            return false;
+
+        if (hand == Hand.Right)
+            return controller.Controls.Player.LightAttackRight.IsPressed();
+
+        return controller.Controls.Player.LightAttackLeft.IsPressed();
+    }
+
+    public bool TryDefendIncomingDamage(ref float amount, WeaponItem.DamageType damageType = WeaponItem.DamageType.Physical, Vector3? sourcePosition = null, Transform attacker = null)
+    {
+        if (TryParryIncomingDamage(ref amount, sourcePosition, attacker))
+            return true;
+
+        return TryBlockIncomingDamage(ref amount, damageType, sourcePosition);
+    }
+
+    public bool TryBlockIncomingDamage(ref float amount, WeaponItem.DamageType damageType = WeaponItem.DamageType.Physical, Vector3? sourcePosition = null)
+    {
+        if (amount <= 0f || stats == null)
+            return false;
+
+        WeaponItem blockingShield = GetActiveBlockingShield();
+        if (blockingShield == null)
+            return false;
+        if (sourcePosition.HasValue && !IsWithinBlockAngle(sourcePosition.Value))
+            return false;
+
+        float stabilityFactor = 1f - Mathf.Clamp01(blockingShield.stability * Mathf.Max(0f, blockStabilityScale));
+        float staminaCost = Mathf.Max(minimumBlockStaminaCost, amount * Mathf.Max(0.1f, stabilityFactor));
+        if (!stats.HasStamina(staminaCost))
+        {
+            TriggerGuardBreak();
+            return false;
+        }
+
+        stats.SpendStamina(staminaCost);
+        float blockedPercent = damageType == WeaponItem.DamageType.Magic
+            ? Mathf.Clamp01(blockingShield.magicBlockPercent)
+            : Mathf.Clamp01(blockingShield.physicalBlockPercent);
+        amount *= (1f - blockedPercent);
+        if (stats.currentStamina <= 0.01f)
+            TriggerGuardBreak();
+        return true;
+    }
+
+    private bool TryParryIncomingDamage(ref float amount, Vector3? sourcePosition, Transform attacker)
+    {
+        if (!isParryWindowOpen)
+            return false;
+        if (attacker == null)
+            return false;
+        if (sourcePosition.HasValue && !IsWithinBlockAngle(sourcePosition.Value))
+            return false;
+
+        amount = 0f;
+        CompleteParry(attacker);
+        return true;
+    }
+
+    private bool IsWithinBlockAngle(Vector3 sourcePosition)
+    {
+        Vector3 toSource = sourcePosition - transform.position;
+        toSource.y = 0f;
+        if (toSource.sqrMagnitude <= 0.0001f)
+            return true;
+
+        float angle = Vector3.Angle(transform.forward, toSource.normalized);
+        return angle <= Mathf.Clamp(blockFrontAngle, 1f, 180f) * 0.5f;
+    }
+
+    private WeaponItem GetActiveBlockingShield()
+    {
+        WeaponItem best = null;
+
+        if (isBlockingLeft)
+        {
+            var left = inventory != null ? inventory.GetWeaponForHand(Hand.Left) : null;
+            if (left != null && left.category == WeaponCategory.Shield && left.canBlock)
+                best = left;
+        }
+
+        if (isBlockingRight)
+        {
+            var right = inventory != null ? inventory.GetWeaponForHand(Hand.Right) : null;
+            if (right != null && right.category == WeaponCategory.Shield && right.canBlock)
+            {
+                if (best == null || right.physicalBlockPercent > best.physicalBlockPercent)
+                    best = right;
+            }
+        }
+
+        return best;
+    }
+
+    private void TriggerGuardBreak()
+    {
+        if (isGuardBroken)
+            return;
+
+        isBlockingRight = false;
+        isBlockingLeft = false;
+        ClearShieldPendingState(Hand.Right);
+        ClearShieldPendingState(Hand.Left);
+        CancelParryState();
+        UpdateBlockingAnimator();
+
+        if (guardBreakRoutine != null)
+            StopCoroutine(guardBreakRoutine);
+        guardBreakRoutine = StartCoroutine(GuardBreakRoutine());
+    }
+
+    private IEnumerator GuardBreakRoutine()
+    {
+        isGuardBroken = true;
+        canAttack = false;
+        if (controller != null)
+        {
+            controller.canMove = false;
+            controller.StopMovementImmediate();
+        }
+
+        yield return new WaitForSeconds(Mathf.Max(0.05f, guardBreakDuration));
+
+        if (controller != null && !controller.IsInventoryOpen)
+            controller.canMove = true;
+        canAttack = true;
+        isGuardBroken = false;
+        guardBreakRoutine = null;
+    }
+
+    private void CacheAnimatorParameters()
+    {
+        hasBlockingAnimatorParameter = AnimatorHasParameter(blockingAnimatorParameter);
+        hasParryAnimatorTrigger = AnimatorHasParameter(parryAnimatorTrigger, AnimatorControllerParameterType.Trigger);
+    }
+
+    private bool AnimatorHasParameter(string parameterName, AnimatorControllerParameterType? expectedType = null)
+    {
+        if (animator == null || string.IsNullOrWhiteSpace(parameterName))
+            return false;
+
+        var parameters = animator.parameters;
+        if (parameters == null)
+            return false;
+
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            if (parameters[i].name != parameterName)
+                continue;
+            if (expectedType.HasValue && parameters[i].type != expectedType.Value)
+                continue;
+            if (!expectedType.HasValue && parameters[i].type != AnimatorControllerParameterType.Bool)
+                continue;
+            return true;
+        }
+
+        return false;
+    }
+
+    private void UpdateBlockingAnimator()
+    {
+        if (animator == null || !hasBlockingAnimatorParameter)
+            return;
+
+        animator.SetBool(blockingAnimatorParameter, IsBlocking && !isGuardBroken);
+    }
+
+    private void HandleParryInput()
+    {
+        if (controller == null || controller.Controls == null) return;
+        if (controller.IsInventoryOpen || controller.IsRolling) return;
+        if (isGuardBroken || isAttacking || rangedActionRoutine != null || isParrying) return;
+
+        if (UsesShieldParryBehavior(Hand.Right) && controller.Controls.Player.HeavyAttackRight.WasPerformedThisFrame())
+        {
+            StartParry(Hand.Right);
+            return;
+        }
+
+        if (UsesShieldParryBehavior(Hand.Left) && controller.Controls.Player.HeavyAttackLeft.WasPerformedThisFrame())
+        {
+            StartParry(Hand.Left);
+            return;
+        }
+    }
+
+    private void StartParry(Hand hand)
+    {
+        if (inventory == null)
+            return;
+
+        WeaponItem shield = inventory.GetWeaponForHand(hand);
+        if (shield == null || shield.category != WeaponCategory.Shield || !shield.canParry)
+            return;
+
+        if (parryRoutine != null)
+            StopCoroutine(parryRoutine);
+        parryRoutine = StartCoroutine(ParryRoutine(shield));
+    }
+
+    private IEnumerator ParryRoutine(WeaponItem shield)
+    {
+        isParrying = true;
+        isAttacking = true;
+        isParryWindowOpen = false;
+        isBlockingLeft = false;
+        isBlockingRight = false;
+        ClearShieldPendingState(Hand.Right);
+        ClearShieldPendingState(Hand.Left);
+        UpdateBlockingAnimator();
+
+        if (controller != null)
+            controller.StopMovementImmediate();
+        if (animator != null && hasParryAnimatorTrigger)
+            animator.SetTrigger(parryAnimatorTrigger);
+
+        float start = Mathf.Max(0f, shield.parryWindowStart);
+        float duration = Mathf.Max(0.01f, shield.parryWindowDuration);
+        float totalLock = Mathf.Max(parryTotalLockTime, start + duration + Mathf.Max(0f, parryRecoveryTime));
+
+        if (start > 0f)
+            yield return new WaitForSeconds(start);
+
+        isParryWindowOpen = true;
+        yield return new WaitForSeconds(duration);
+        isParryWindowOpen = false;
+
+        float remaining = Mathf.Max(0f, totalLock - (start + duration));
+        if (remaining > 0f)
+            yield return new WaitForSeconds(remaining);
+
+        isParrying = false;
+        isAttacking = false;
+        parryRoutine = null;
+    }
+
+    private void CancelParryState()
+    {
+        if (parryRoutine != null)
+            StopCoroutine(parryRoutine);
+
+        isParryWindowOpen = false;
+        isParrying = false;
+        parryRoutine = null;
+    }
+
+    private void CompleteParry(Transform attacker)
+    {
+        CancelParryState();
+        isAttacking = false;
+
+        if (attacker == null)
+            return;
+
+        var parryable = attacker.GetComponent<SimpleEnemyAI>();
+        if (parryable == null)
+            parryable = attacker.GetComponentInParent<SimpleEnemyAI>();
+        if (parryable != null)
+            parryable.ApplyParryStagger(parryStaggerDuration);
     }
 
     void HandleAttackInput()
@@ -87,16 +484,16 @@ public class PlayerCombat : MonoBehaviour
         if (TryHandleWeaponThrowInput())
             return;
 
-        if (controller.Controls.Player.LightAttackRight.WasPerformedThisFrame())
+        if (!UsesShieldTapHoldBehavior(Hand.Right) && controller.Controls.Player.LightAttackRight.WasPerformedThisFrame())
             TryAttack(Hand.Right, AttackType.Light);
 
-        if (controller.Controls.Player.LightAttackLeft.WasPerformedThisFrame())
+        if (!UsesShieldTapHoldBehavior(Hand.Left) && controller.Controls.Player.LightAttackLeft.WasPerformedThisFrame())
             TryAttack(Hand.Left, AttackType.Light);
 
-        if (controller.Controls.Player.HeavyAttackRight.WasPerformedThisFrame())
+        if (!UsesShieldParryBehavior(Hand.Right) && controller.Controls.Player.HeavyAttackRight.WasPerformedThisFrame())
             TryAttack(Hand.Right, AttackType.Heavy);
 
-        if (controller.Controls.Player.HeavyAttackLeft.WasPerformedThisFrame())
+        if (!UsesShieldParryBehavior(Hand.Left) && controller.Controls.Player.HeavyAttackLeft.WasPerformedThisFrame())
             TryAttack(Hand.Left, AttackType.Heavy);
     }
 

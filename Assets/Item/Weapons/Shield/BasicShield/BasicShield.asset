@@ -10,35 +10,42 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a544078287434a34b9eda1b7e6dec126, type: 3}
-  m_Name: Sword
+  m_Name: BasicShield
   m_EditorClassIdentifier: 
-  weaponName: Sword
-  icon: {fileID: 21300000, guid: 3e6d06a378fbe094dba40f61731113e6, type: 3}
-  modelPrefab: {fileID: 8947079371753237599, guid: a0b671feb5f43264d8662b6c052d3a17, type: 3}
+  weaponName: BasicShield
+  icon: {fileID: 21300000, guid: b94c1563eec74f949bef803ca9fc8480, type: 3}
+  modelPrefab: {fileID: 0}
   description: 
-  category: 0
+  category: 6
   rangeType: 0
   damageType: 0
-  physicalDamage: 25
+  physicalDamage: 10
   magicDamage: 0
   criticalHit: 1.1
   criticalChance: 0
   lightDamageMultiplier: 1
   heavyDamageMultiplier: 1.25
   weight: 3
-  scaling: STR C / DEX D
-  strengthScalingRank: 0
+  scaling: STR E
+  strengthScalingRank: 1
   dexterityScalingRank: 0
   intelligenceScalingRank: 0
   faithScalingRank: 0
-  strengthRequirement: 0
+  strengthRequirement: 10
   dexterityRequirement: 0
   intelligenceRequirement: 0
   faithRequirement: 0
-  requirements: STR 10 / DEX 8
+  requirements: STR 10
   animationProfile: {fileID: 11400000, guid: 83aa8dbcfcce8614f95a879fa83d9545, type: 2}
   lightAttackStaminaCost: 10
   heavyAttackStaminaCost: 20
+  canBlock: 1
+  canParry: 1
+  physicalBlockPercent: 0.75
+  magicBlockPercent: 0.4
+  stability: 25
+  parryWindowStart: 0.05
+  parryWindowDuration: 0.2
   hasRightSkill: 0
   hasLeftSkill: 0
   isSpecialWeapon: 0
@@ -52,7 +59,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   bowProjectilePrefab: {fileID: 0}
-  bowAmmoItem: {fileID: 11400000, guid: 8dcc8513464141c40a0a38dc44690d46, type: 2}
+  bowAmmoItem: {fileID: 0}
   bowShotCooldown: 0.2
   bowProjectileSpeed: 26
   bowProjectileLifetime: 3.5
@@ -60,20 +67,21 @@ MonoBehaviour:
   bowHitMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  canBeThrown: 1
+  canBeThrown: 0
   throwStrengthRequirement: 0
-  throwProjectilePrefab: {fileID: 8947079371753237599, guid: a0b671feb5f43264d8662b6c052d3a17, type: 3}
-  throwSpeed: 40.4
+  throwProjectilePrefab: {fileID: 0}
+  throwSpeed: 20
   throwLifetime: 2.5
   throwStaminaCost: 18
   throwBladeHitChance: 0.65
   throwHandleDamageMultiplier: 0.5
-  throwBreakChance: 0.01
+  throwBreakChance: 0.1
   droppedPickupColliderCenter: {x: 0, y: 0.05, z: 0}
   droppedPickupColliderSize: {x: 0.7, y: 0.12, z: 0.22}
-  droppedPickupMass: 1
-  droppedPickupLinearDrag: 0.2
-  droppedPickupAngularDrag: 0.25
-  droppedForwardImpulse: 1.8
-  droppedUpImpulse: 0.6
-  droppedInitialTorque: {x: 6, y: 0, z: 2}
+  droppedPickupMass: 2.2
+  droppedPickupLinearDrag: 0.06
+  droppedPickupAngularDrag: 0.45
+  droppedForwardImpulse: 0.9
+  droppedUpImpulse: 0.18
+  droppedInitialTorque: {x: 2.5, y: 0.3, z: 1.2}
+  droppedModelLocalEuler: {x: 90, y: 0, z: 0}

@@ -2,6 +2,7 @@ using UnityEngine;
 using Cinemachine;
 using UnityEngine.InputSystem;
 using System.Collections.Generic;
+using UnityEngine.SceneManagement;
 
 public class TargetLockSystem : MonoBehaviour
 {
@@ -50,10 +51,12 @@ public class TargetLockSystem : MonoBehaviour
         freeLookCamera.Priority = 10;
         lockOnCamera.Priority = 0;
         if (targetIcon != null) targetIcon.gameObject.SetActive(false);
+        SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
     void OnDestroy()
     {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
         if (playerController != null && playerController.Controls != null)
         {
             playerController.Controls.Player.LockOn.performed -= HandleLockOnInput;
@@ -84,6 +87,14 @@ public class TargetLockSystem : MonoBehaviour
             // --- NUOVO: CAMBIO BERSAGLIO ---
             HandleTargetSwitching();
         }
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        mainCam = Camera.main;
+        playerController = GetComponentInParent<PlayerController>();
+        targetIcon = FindTargetIcon();
+        StopLockOn();
     }
 
     // --- LOGICA SWITCHING ---
@@ -211,6 +222,18 @@ public class TargetLockSystem : MonoBehaviour
         
         // FIX ROTAZIONE (Mantenuto)
         if (playerModel != null) playerModel.localRotation = Quaternion.identity;
+    }
+
+    private RectTransform FindTargetIcon()
+    {
+        if (targetIcon != null)
+            return targetIcon;
+
+        GameObject iconObject = GameObject.Find("targetLock");
+        if (iconObject != null)
+            return iconObject.GetComponent<RectTransform>();
+
+        return null;
     }
 
     void HandleRotation()

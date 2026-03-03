@@ -10,6 +10,7 @@ public class DynamicBar : MonoBehaviour
     public Image fillImage;
 
     [Header("Settings")]
+    public bool resizeWithMax = false;
     // Minimum width of the bar frame
     public float baseWidth = 120f;
     // Additional width per maximum point
@@ -17,10 +18,36 @@ public class DynamicBar : MonoBehaviour
     // Padding applied horizontally to the fill
     public float horizontalPadding = 10f;
 
+    // Width authored in the scene/prefab, captured once and reused for fixed bars.
+    private float authoredBaseWidth = -1f;
+
     // Maximum value represented by the bar
     private float maxValue  = 1f;
     // Current value represented by the fill
     private float currentValue = 1f;
+
+    private void Awake()
+    {
+        CacheAuthoredWidth();
+    }
+
+    private void OnEnable()
+    {
+        CacheAuthoredWidth();
+    }
+
+    private void CacheAuthoredWidth()
+    {
+        if (frameRect == null)
+            frameRect = GetComponent<RectTransform>();
+
+        if (frameRect == null)
+            return;
+
+        float width = frameRect.rect.width;
+        if (width > 0f)
+            authoredBaseWidth = width;
+    }
 
     // Resize the frame and fill according to the new maximum
     public void SetMax(float max)
@@ -30,7 +57,14 @@ public class DynamicBar : MonoBehaviour
         if (frameRect == null)
             frameRect = GetComponent<RectTransform>();
 
-        float newWidth = baseWidth + maxValue * widthPerPoint;
+        if (authoredBaseWidth <= 0f)
+            CacheAuthoredWidth();
+
+        float fixedWidth = authoredBaseWidth > 0f ? authoredBaseWidth : baseWidth;
+        float newWidth = resizeWithMax
+            ? baseWidth + maxValue * widthPerPoint
+            : fixedWidth;
+
         frameRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, newWidth);
 
         if (fillImage != null)

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class CompassSystem : MonoBehaviour
 {
@@ -35,18 +36,35 @@ public class CompassSystem : MonoBehaviour
         }
     }
 
-    void Start()
+    void OnEnable()
     {
-        if (cameraTransform == null) cameraTransform = Camera.main.transform;
-        
-        // Imposta la larghezza interna se non settata
-        if (compassBarRect != null) compassWidth = compassBarRect.rect.width;
+        SceneManager.sceneLoaded += OnSceneLoaded;
+        ResolveReferences();
+        RebuildMarkers();
+    }
 
-        // Registriamo i 4 punti cardinali
-        // Nord = Forward (0,0,1)
-        // Sud = Back (0,0,-1)
-        // Est = Right (1,0,0)
-        // Ovest = Left (-1,0,0)
+    void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        ResolveReferences();
+        RebuildMarkers();
+    }
+
+    private void ResolveReferences()
+    {
+        if (cameraTransform == null || !cameraTransform)
+            cameraTransform = Camera.main != null ? Camera.main.transform : null;
+        
+        if (compassBarRect != null) compassWidth = compassBarRect.rect.width;
+    }
+
+    private void RebuildMarkers()
+    {
+        markers.Clear();
         AddMarker(iconNorth, Vector3.forward);
         AddMarker(iconSouth, Vector3.back);
         AddMarker(iconEast, Vector3.right);
@@ -61,8 +79,21 @@ public class CompassSystem : MonoBehaviour
 
     void Update()
     {
-        foreach (var marker in markers)
+        if (cameraTransform == null || !cameraTransform)
+            ResolveReferences();
+
+        if (cameraTransform == null)
+            return;
+
+        for (int i = markers.Count - 1; i >= 0; i--)
         {
+            var marker = markers[i];
+            if (marker == null || marker.uiElement == null || !marker.uiElement)
+            {
+                markers.RemoveAt(i);
+                continue;
+            }
+
             UpdateMarkerPosition(marker);
         }
     }

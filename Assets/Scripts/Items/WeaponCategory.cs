@@ -12,6 +12,8 @@ public enum WeaponCategory
     Axe,
     // Spear or polearm weapons
     Spear,
+    // Shields used for blocking/parry
+    Shield,
     // Ranged bow-like weapons
     Bow,
     // Magic wand/catalyst weapons
