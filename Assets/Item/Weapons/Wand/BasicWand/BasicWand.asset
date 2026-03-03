@@ -16,7 +16,7 @@ MonoBehaviour:
   icon: {fileID: 21300000, guid: 2535af4ce7557994d999818a1b7ff6c6, type: 3}
   modelPrefab: {fileID: 0}
   description: 
-  category: 7
+  category: 8
   rangeType: 1
   damageType: 1
   physicalDamage: 10
@@ -27,14 +27,25 @@ MonoBehaviour:
   heavyDamageMultiplier: 1.25
   weight: 3
   scaling: STR C / DEX D
-  strengthScaling: 0
-  dexterityScaling: 0
-  intelligenceScaling: 0
-  faithScaling: 0
+  strengthScalingRank: 0
+  dexterityScalingRank: 0
+  intelligenceScalingRank: 0
+  faithScalingRank: 0
+  strengthRequirement: 0
+  dexterityRequirement: 0
+  intelligenceRequirement: 0
+  faithRequirement: 0
   requirements: STR 10 / DEX 8
   animationProfile: {fileID: 11400000, guid: 90f958ba4079f4843b94b80aedb424b3, type: 2}
   lightAttackStaminaCost: 10
   heavyAttackStaminaCost: 20
+  canBlock: 0
+  canParry: 0
+  physicalBlockPercent: 0.75
+  magicBlockPercent: 0.4
+  stability: 25
+  parryWindowStart: 0.05
+  parryWindowDuration: 0.2
   hasRightSkill: 0
   hasLeftSkill: 0
   isSpecialWeapon: 0
@@ -56,3 +67,21 @@ MonoBehaviour:
   bowHitMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  canBeThrown: 0
+  throwStrengthRequirement: 0
+  throwProjectilePrefab: {fileID: 0}
+  throwSpeed: 20
+  throwLifetime: 2.5
+  throwStaminaCost: 18
+  throwBladeHitChance: 0.65
+  throwHandleDamageMultiplier: 0.5
+  throwBreakChance: 0.1
+  droppedPickupColliderCenter: {x: 0, y: 0.05, z: 0}
+  droppedPickupColliderSize: {x: 0.7, y: 0.12, z: 0.22}
+  droppedPickupMass: 2.2
+  droppedPickupLinearDrag: 0.06
+  droppedPickupAngularDrag: 0.45
+  droppedForwardImpulse: 0.9
+  droppedUpImpulse: 0.18
+  droppedInitialTorque: {x: 2.5, y: 0.3, z: 1.2}
+  droppedModelLocalEuler: {x: 90, y: 0, z: 0}
