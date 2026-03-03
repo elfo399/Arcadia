@@ -1,5 +1,4 @@
 using UnityEngine;
-using TMPro;
 using UnityEngine.SceneManagement;
 using System;
 using System.Collections.Generic;
@@ -48,7 +47,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     [Header("Chiavi")]
     public int currentKeys = 0;
-    public TextMeshProUGUI keyText;
     public event Action<int> OnKeysChanged;
 
     [Header("Statistiche Persistenti")]
@@ -66,9 +64,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public int karma = 0;
     public int benedetto = 0;
     public int malefico = 0;
-
-    [Header("UI Flask Counter")]
-    public TextMeshProUGUI flaskCounterText;
 
     [Header("Combat Flags")]
     [SerializeField] private bool invulnerable;
@@ -121,7 +116,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         LoadStats();
         RecalculateDerivedStats(keepCurrentRatio: true);
-        AssignUIElements();
         UpdateAllUI();
         NotifyBankChanged();
         NotifyRunWalletChanged();
@@ -157,7 +151,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         RecalculateDerivedStats(keepCurrentRatio: true);
-        AssignUIElements();
         UpdateAllUI();
         if (delayedUiRefreshRoutine != null)
             StopCoroutine(delayedUiRefreshRoutine);
@@ -169,29 +162,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (scene.name == "GameScene")
         {
             ResetRunWallet();
-        }
-    }
-
-    void AssignUIElements()
-    {
-        keyText = null;
-        flaskCounterText = null;
-
-        var textElements = FindObjectsOfType<TextMeshProUGUI>(true);
-        foreach (var text in textElements)
-        {
-            if (text.CompareTag("KeyText")) keyText = text;
-            else if (text.CompareTag("FlaskCounterText")) flaskCounterText = text;
-        }
-
-        foreach (var text in textElements)
-        {
-            if (keyText == null && string.Equals(text.gameObject.name, "KeyCount", System.StringComparison.OrdinalIgnoreCase))
-                keyText = text;
-            else if (flaskCounterText == null &&
-                     (string.Equals(text.gameObject.name, "FlaskCounter", System.StringComparison.OrdinalIgnoreCase) ||
-                      string.Equals(text.gameObject.name, "FlaskCount", System.StringComparison.OrdinalIgnoreCase)))
-                flaskCounterText = text;
         }
     }
 
@@ -225,7 +195,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         currentKeys += amount;
         if (currentKeys < 0) currentKeys = 0;
-        UpdateKeyUI();
         NotifyKeysChanged();
     }
 
@@ -234,16 +203,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (currentKeys > 0)
         {
             currentKeys--;
-            UpdateKeyUI();
             NotifyKeysChanged();
             return true;
         }
         return false;
-    }
-
-    void UpdateKeyUI()
-    {
-        if (keyText != null) keyText.text = "x" + currentKeys.ToString();
     }
 
     // --- DANNO & VITA (IDamageable) ---
@@ -255,7 +218,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private System.Collections.IEnumerator RefreshUiBindingsNextFrame()
     {
         yield return null;
-        AssignUIElements();
         UpdateAllUI();
         delayedUiRefreshRoutine = null;
     }
@@ -400,12 +362,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
     void UpdateAllUI()
     {
         UpdateFlaskUI();
-        UpdateKeyUI();
     }
 
     void UpdateFlaskUI()
     {
-        if (flaskCounterText != null) flaskCounterText.text = currentFlasks.ToString();
     }
 
     // --- SALVATAGGIO E CARICAMENTO STATS ---

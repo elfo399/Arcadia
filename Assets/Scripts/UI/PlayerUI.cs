@@ -31,6 +31,7 @@ public class PlayerUI : MonoBehaviour
     [SerializeField] private float healthWidthPerPoint = 0.9f;
     [SerializeField] private float staminaWidthPerPoint = 0.7f;
     [SerializeField] private float manaWidthPerPoint = 0.9f;
+    [SerializeField] private float barWidthScale = 0.82f;
     [SerializeField] private float minBarWidth = 100f;
     [SerializeField] private float maxBarWidth = 320f;
     [SerializeField] private float fillHorizontalPadding = 4f;
@@ -38,6 +39,7 @@ public class PlayerUI : MonoBehaviour
     [Header("Flasks")]
     // Text element showing current flask count
     public TextMeshProUGUI flaskCountText;
+    public TextMeshProUGUI keyCountText;
 
     [Header("Bottom Weapon Slots (D-Pad)")]
     // Icon shown for the left-hand weapon
@@ -55,6 +57,7 @@ public class PlayerUI : MonoBehaviour
     private float lastStaminaMax = -1f;
     private float lastManaMax = -1f;
     private int lastFlaskCount = int.MinValue;
+    private int lastKeyCount = int.MinValue;
 
     // Update UI elements each frame
     void Update()
@@ -100,9 +103,23 @@ public class PlayerUI : MonoBehaviour
     {
         playerStats = PlayerStats.instance != null ? PlayerStats.instance : FindObjectOfType<PlayerStats>(true);
         playerInventory = FindObjectOfType<PlayerInventory>(true);
-        if (healthBarFrame == null && healthBarFill != null) healthBarFrame = healthBarFill.transform.parent as RectTransform;
-        if (staminaBarFrame == null && staminaBarFill != null) staminaBarFrame = staminaBarFill.transform.parent as RectTransform;
-        if (manaBarFrame == null && manaBarFill != null) manaBarFrame = manaBarFill.transform.parent as RectTransform;
+        healthBarFrame = ResolveBarFrame(healthBarFill, healthBarFrame);
+        staminaBarFrame = ResolveBarFrame(staminaBarFill, staminaBarFrame);
+        manaBarFrame = ResolveBarFrame(manaBarFill, manaBarFrame);
+        if (flaskCountText == null) flaskCountText = FindTextByName("FlaskCount") ?? FindTextByName("FlaskCounter");
+        if (keyCountText == null) keyCountText = FindTextByName("KeyCount");
+    }
+
+    private RectTransform ResolveBarFrame(Image fill, RectTransform currentFrame)
+    {
+        if (fill == null)
+            return currentFrame;
+
+        RectTransform parentFrame = fill.transform.parent as RectTransform;
+        if (parentFrame != null)
+            return parentFrame;
+
+        return currentFrame;
     }
 
     // Refresh health, stamina, and mana bar fill amounts
@@ -169,6 +186,7 @@ public class PlayerUI : MonoBehaviour
             return;
 
         float width = baseWidth + maxValue * widthPerPoint;
+        width *= Mathf.Max(0.1f, barWidthScale);
         width = Mathf.Clamp(width, minBarWidth, maxBarWidth);
         frame.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
     }
@@ -179,9 +197,12 @@ public class PlayerUI : MonoBehaviour
             return;
 
         RectTransform fillRect = fill.rectTransform;
-        float targetWidth = Mathf.Max(0f, frame.rect.width - fillHorizontalPadding * 2f);
-        fillRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, targetWidth);
-        fillRect.anchoredPosition = new Vector2(fillHorizontalPadding, fillRect.anchoredPosition.y);
+        fillRect.anchorMin = new Vector2(0f, 0f);
+        fillRect.anchorMax = new Vector2(1f, 1f);
+        fillRect.pivot = new Vector2(0.5f, 0.5f);
+        fillRect.anchoredPosition = Vector2.zero;
+        fillRect.offsetMin = new Vector2(fillHorizontalPadding, 4f);
+        fillRect.offsetMax = new Vector2(-fillHorizontalPadding, -4f);
     }
 
     // Update the flask counter display
@@ -193,6 +214,15 @@ public class PlayerUI : MonoBehaviour
             {
                 flaskCountText.text = "x" + playerStats.currentFlasks.ToString();
                 lastFlaskCount = playerStats.currentFlasks;
+            }
+        }
+
+        if (keyCountText != null)
+        {
+            if (playerStats.currentKeys != lastKeyCount)
+            {
+                keyCountText.text = "x" + playerStats.currentKeys.ToString();
+                lastKeyCount = playerStats.currentKeys;
             }
         }
     }
@@ -238,5 +268,20 @@ public class PlayerUI : MonoBehaviour
         if (parentImage == null) return;
         parentImage.sprite = null;
         parentImage.enabled = false;
+    }
+
+    private TextMeshProUGUI FindTextByName(string objectName)
+    {
+        if (string.IsNullOrWhiteSpace(objectName))
+            return null;
+
+        var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            if (texts[i] != null && string.Equals(texts[i].gameObject.name, objectName, System.StringComparison.OrdinalIgnoreCase))
+                return texts[i];
+        }
+
+        return null;
     }
 }

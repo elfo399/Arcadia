@@ -3262,7 +3262,20 @@ MonoBehaviour:
   healthBarFill: {fileID: 732464909}
   staminaBarFill: {fileID: 2028700908}
   manaBarFill: {fileID: 645889671}
+  healthBarFrame: {fileID: 255889999}
+  staminaBarFrame: {fileID: 633163327}
+  manaBarFrame: {fileID: 1871742766}
+  healthBaseWidth: 140
+  staminaBaseWidth: 140
+  manaBaseWidth: 120
+  healthWidthPerPoint: 0.9
+  staminaWidthPerPoint: 0.7
+  manaWidthPerPoint: 0.9
+  minBarWidth: 100
+  maxBarWidth: 320
+  fillHorizontalPadding: 4
   flaskCountText: {fileID: 0}
+  keyCountText: {fileID: 0}
   slotLeftIcon: {fileID: 460563873}
   slotRightIcon: {fileID: 750231744}
 --- !u!1 &286758996
@@ -11352,7 +11365,6 @@ MonoBehaviour:
   bankSilver: 0
   bankCopper: 0
   currentKeys: 2
-  keyText: {fileID: 1395947852}
   playerLevel: 1
   levelExperience: 0
   experienceToNextLevel: 100
@@ -11367,7 +11379,6 @@ MonoBehaviour:
   karma: 0
   benedetto: 100
   malefico: 0
-  flaskCounterText: {fileID: 0}
   invulnerable: 0
   forceStartDataIgnoreSave: 1
   minSaveIntervalSeconds: 0.75
@@ -14890,10 +14901,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2eda2e7b8e472f24788d551fe6c63ae1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerStats: {fileID: 800217477}
-  healthBar: {fileID: 255890000}
-  staminaBar: {fileID: 633163328}
-  manaBar: {fileID: 1871742767}
 --- !u!1 &990765105
 GameObject:
   m_ObjectHideFlags: 0
