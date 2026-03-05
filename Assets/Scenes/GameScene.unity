@@ -3854,7 +3854,6 @@ MonoBehaviour:
   bankSilver: 0
   bankCopper: 0
   currentKeys: 2
-  keyText: {fileID: 1421805105}
   playerLevel: 1
   levelExperience: 0
   experienceToNextLevel: 100
@@ -3869,7 +3868,6 @@ MonoBehaviour:
   karma: 0
   benedetto: 100
   malefico: 0
-  flaskCounterText: {fileID: 0}
   invulnerable: 0
   forceStartDataIgnoreSave: 1
   minSaveIntervalSeconds: 0.75
@@ -9373,10 +9371,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2eda2e7b8e472f24788d551fe6c63ae1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerStats: {fileID: 220392753}
-  healthBar: {fileID: 935423593}
-  staminaBar: {fileID: 425995996}
-  manaBar: {fileID: 628399916}
 --- !u!1 &601735174
 GameObject:
   m_ObjectHideFlags: 0
@@ -9663,10 +9657,12 @@ MonoBehaviour:
   healthWidthPerPoint: 0.9
   staminaWidthPerPoint: 0.7
   manaWidthPerPoint: 0.9
+  barWidthScale: 0.82
   minBarWidth: 100
   maxBarWidth: 320
   fillHorizontalPadding: 4
   flaskCountText: {fileID: 0}
+  keyCountText: {fileID: 0}
   slotLeftIcon: {fileID: 2012942249}
   slotRightIcon: {fileID: 116377125}
 --- !u!1 &620138552
@@ -16580,10 +16576,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1909682934}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.5}
-  m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 10, y: 8}
-  m_SizeDelta: {x: 730, y: 16}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 4, y: -4}
+  m_SizeDelta: {x: -8, y: -8}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1036481158
 MonoBehaviour:
@@ -23425,10 +23421,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 311052677}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.5}
-  m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 10, y: 8}
-  m_SizeDelta: {x: 730, y: 16}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 4, y: -4}
+  m_SizeDelta: {x: -8, y: -8}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1460538703
 MonoBehaviour:
@@ -24186,10 +24182,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 116423804}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.5}
-  m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 10, y: 8}
-  m_SizeDelta: {x: 730, y: 16}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 4, y: -4}
+  m_SizeDelta: {x: -8, y: -8}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1506587607
 MonoBehaviour:
