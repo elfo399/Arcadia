@@ -1,23 +1,27 @@
 public enum WeaponCategory
 {
     // Default unarmed state
-    Unarmed,
+    Unarmed = 0,
     // Standard one-handed sword
-    StraightSword,
+    StraightSword = 1,
     // Heavy two-handed sword
-    Greatsword,
+    Greatsword = 2,
     // Lightweight dagger
-    Dagger,
+    Dagger = 3,
     // Axe weapons
-    Axe,
+    Axe = 4,
     // Spear or polearm weapons
-    Spear,
+    Spear = 5,
     // Shields used for blocking/parry
-    Shield,
+    Shield = 6,
     // Ranged bow-like weapons
-    Bow,
+    Bow = 7,
     // Magic wand/catalyst weapons
-    Wand,
+    Wand = 8,
     // Unique or boss weapons
-    Special
+    Special = 9,
+    // Chain-linked striking weapons
+    Flail = 10,
+    // Heavy blunt weapons
+    Hammer = 11
 }
