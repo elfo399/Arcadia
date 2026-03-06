@@ -1136,9 +1136,11 @@ MonoBehaviour:
   isLocked: 0
   roomCleared: 0
   activeEnemies: []
-  coinPrefab: {fileID: 8995147148237869290, guid: 1d2576cf8ee2bd344a2d1a5e3f558e62, type: 3}
-  minCoins: 2
-  maxCoins: 5
+  floorPortalPrefab: {fileID: 0}
+  preplacedFloorPortal: {fileID: 0}
+  portalSpawnOffset: {x: 0, y: 0, z: 0}
+  portalDistanceFromCenter: 10
+  playerSpawnPoint: {fileID: 0}
 --- !u!65 &6308808802036477624
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1870,7 +1872,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   spawnTable: {fileID: 11400000, guid: 64d5bdd16cdc6e544bf31cbaf590adc9, type: 2}
-  spawnChance: 99
 --- !u!1 &8833441535581490759
 GameObject:
   m_ObjectHideFlags: 0
