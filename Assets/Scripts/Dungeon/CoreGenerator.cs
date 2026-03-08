@@ -18,6 +18,9 @@ public class CoreGenerator : MonoBehaviour
     [Header("Scene Management")]
     public string hubSceneName = "HubScene";
 
+    [Header("Theme Selection")]
+    public DungeonFloorThemeTable floorThemeTable;
+
     [Header("Configurazione Seed")]
     public string gameSeedString = "";
     public bool useRandomSeed = true;
@@ -61,36 +64,36 @@ public class CoreGenerator : MonoBehaviour
 
     #region --- Prefabs ---
 
-    [Header("Prefabs Stanze Normali")]
+    [Header("Legacy Prefabs Stanze Normali")]
     public Room startRoomPrefab;
     public Room[] normal1x1Variants;
     public Room[] normal2x1Variants;
     public Room[] normal1x2Variants;
     public Room[] normal2x2Variants;
 
-    [Header("Prefabs Boss")]
+    [Header("Legacy Prefabs Boss")]
     public Room[] boss1x1Variants;
     public Room[] boss2x1Variants;
     public Room[] boss1x2Variants;
     public Room[] boss2x2Variants;
 
-    [Header("Prefabs Tesoro")]
+    [Header("Legacy Prefabs Tesoro")]
     public Room[] treasure1x1Variants;
     public Room[] treasure2x1Variants;
     public Room[] treasure1x2Variants;
     public Room[] treasure2x2Variants;
 
-    [Header("Prefabs Shop")]
+    [Header("Legacy Prefabs Shop")]
     public Room[] shop1x1Variants;
     public Room[] shop2x1Variants;
     public Room[] shop1x2Variants;
     public Room[] shop2x2Variants;
 
-    [Header("Prefabs Curch")]
+    [Header("Legacy Prefabs Curch")]
     public Room[] curch1x1Variants;
     public Room[] curch2x2Variants;
 
-    [Header("Prefabs Evil Curch")]
+    [Header("Legacy Prefabs Evil Curch")]
     public Room[] evilCurch1x1Variants;
     public Room[] evilCurch2x2Variants;
 
@@ -116,8 +119,10 @@ public class CoreGenerator : MonoBehaviour
     private Room startRoomInstance;
     private System.Random prng;
     private PlayerStats playerStats;
-    
-    // OTTIMIZZAZIONE: Dizionario per accesso rapido ai prefab, inizializzato una sola volta.
+    private DungeonThemeDefinition activeThemeDefinition;
+    private DungeonRoomSet activeRoomSet;
+
+    // Lookup ricostruito in base al tema attivo del piano.
     private Dictionary<string, Dictionary<Vector2Int, Room[]>> _prefabLookup;
 
     private readonly Vector2Int[] directions = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
@@ -139,7 +144,6 @@ public class CoreGenerator : MonoBehaviour
         ResolvePlayerTransform();
         if (playerStats == null) Debug.LogWarning("[CoreGenerator] PlayerStats non trovato! La generazione di stanze speciali (Curch/EvilCurch) non funzionerà.");
         
-        InitializePrefabLookup();
     }
     
     void Start() { Generate(); }
@@ -164,12 +168,6 @@ public class CoreGenerator : MonoBehaviour
     {
         ResolvePlayerTransform();
 
-        if (startRoomPrefab == null || startRoomPrefab.roomData == null)
-        {
-            Debug.LogError("[CoreGenerator] StartRoomPrefab o RoomData mancante. Configura il prefab di start.");
-            return;
-        }
-
         if (useRandomSeed)
         {
             gameSeedString = GenerateSeedString();
@@ -179,6 +177,15 @@ public class CoreGenerator : MonoBehaviour
         string floorSeedString = $"{gameSeedString}-{currentFloor}";
         currentMasterSeed = ComputeSeedHash(floorSeedString);
         if (showRngLogs) Debug.Log($"[CoreGenerator] Seed per piano {currentFloor}: '{floorSeedString}' -> Hash: {currentMasterSeed}");
+
+        ResolveActiveThemeForCurrentFloor();
+
+        Room effectiveStartRoomPrefab = GetStartRoomPrefab();
+        if (effectiveStartRoomPrefab == null || effectiveStartRoomPrefab.roomData == null)
+        {
+            Debug.LogError("[CoreGenerator] StartRoomPrefab o RoomData mancante. Configura il room set attivo o il fallback legacy.");
+            return;
+        }
 
         CleanupScene();
         startRoomInstance = null;
@@ -233,7 +240,7 @@ public class CoreGenerator : MonoBehaviour
         List<VirtualRoom> layout = new List<VirtualRoom>();
 
         // 1. START
-        AddRoomToLayout(layout, occupiedCells, Vector2Int.zero, new Vector2Int(1, 1), "Start", startRoomPrefab);
+        AddRoomToLayout(layout, occupiedCells, Vector2Int.zero, new Vector2Int(1, 1), "Start", GetStartRoomPrefab());
 
         // 2. CORPO CENTRALE
         List<VirtualRoom> expandableRooms = new List<VirtualRoom> { layout[0] };
@@ -529,7 +536,6 @@ public class CoreGenerator : MonoBehaviour
         return vr;
     }
     
-    // OTTIMIZZAZIONE: Usa un dizionario pre-calcolato per un accesso istantaneo ai prefab.
     Room GetRandomPrefab(string type, Vector2Int size)
     {
         if (_prefabLookup.TryGetValue(type, out var sizeMap) && sizeMap.TryGetValue(size, out var variants))
@@ -546,37 +552,124 @@ public class CoreGenerator : MonoBehaviour
 
     #region --- Costruzione Fisica e Inizializzazione ---
 
+    private void ResolveActiveThemeForCurrentFloor()
+    {
+        activeThemeDefinition = SelectThemeForFloor(currentFloor, currentMasterSeed);
+        activeRoomSet = activeThemeDefinition != null ? activeThemeDefinition.roomSet : null;
+        InitializePrefabLookup();
+
+        if (activeThemeDefinition != null && activeRoomSet != null)
+        {
+            string themeLabel = string.IsNullOrWhiteSpace(activeThemeDefinition.displayName)
+                ? activeThemeDefinition.name
+                : activeThemeDefinition.displayName;
+            Debug.Log($"[CoreGenerator] Piano {currentFloor}: tema selezionato '{themeLabel}' | RoomSet: '{activeRoomSet.name}'");
+        }
+        else
+        {
+            Debug.Log($"[CoreGenerator] Piano {currentFloor}: nessun tema valido trovato, uso i pool legacy del CoreGenerator.");
+        }
+    }
+
+    private DungeonThemeDefinition SelectThemeForFloor(int floor, int seed)
+    {
+        if (floorThemeTable == null)
+            return null;
+
+        DungeonFloorThemeTable.FloorThemeEntry entry = floorThemeTable.GetEntryForFloor(floor);
+        if (entry == null || entry.themes == null || entry.themes.Count == 0)
+            return null;
+
+        int totalWeight = 0;
+        for (int i = 0; i < entry.themes.Count; i++)
+        {
+            DungeonFloorThemeTable.ThemeChoice choice = entry.themes[i];
+            if (choice == null || choice.theme == null || choice.theme.roomSet == null)
+                continue;
+
+            totalWeight += Mathf.Max(1, choice.weight);
+        }
+
+        if (totalWeight <= 0)
+            return null;
+
+        var themePrng = new System.Random(seed ^ (floor * 486187739));
+        int roll = themePrng.Next(totalWeight);
+
+        for (int i = 0; i < entry.themes.Count; i++)
+        {
+            DungeonFloorThemeTable.ThemeChoice choice = entry.themes[i];
+            if (choice == null || choice.theme == null || choice.theme.roomSet == null)
+                continue;
+
+            roll -= Mathf.Max(1, choice.weight);
+            if (roll < 0)
+                return choice.theme;
+        }
+
+        return null;
+    }
+
+    private Room GetStartRoomPrefab()
+    {
+        if (activeRoomSet != null && activeRoomSet.startRoomPrefab != null)
+            return activeRoomSet.startRoomPrefab;
+
+        return startRoomPrefab;
+    }
+
+    private Room[] ResolveVariants(Room[] themedVariants, Room[] legacyVariants)
+    {
+        if (themedVariants != null && themedVariants.Length > 0)
+            return themedVariants;
+
+        return legacyVariants;
+    }
+
+    private Dictionary<Vector2Int, Room[]> BuildSizeMap(Room[] oneByOne, Room[] twoByOne, Room[] oneByTwo, Room[] twoByTwo)
+    {
+        return new Dictionary<Vector2Int, Room[]>
+        {
+            [new Vector2Int(1, 1)] = oneByOne,
+            [new Vector2Int(2, 1)] = twoByOne,
+            [new Vector2Int(1, 2)] = oneByTwo,
+            [new Vector2Int(2, 2)] = twoByTwo
+        };
+    }
+
     private void InitializePrefabLookup()
     {
         _prefabLookup = new Dictionary<string, Dictionary<Vector2Int, Room[]>>
         {
-            ["Normal"] = new Dictionary<Vector2Int, Room[]>
-            {
-                [new Vector2Int(1, 1)] = normal1x1Variants, [new Vector2Int(2, 1)] = normal2x1Variants,
-                [new Vector2Int(1, 2)] = normal1x2Variants, [new Vector2Int(2, 2)] = normal2x2Variants
-            },
-            ["Boss"] = new Dictionary<Vector2Int, Room[]>
-            {
-                [new Vector2Int(1, 1)] = boss1x1Variants, [new Vector2Int(2, 1)] = boss2x1Variants,
-                [new Vector2Int(1, 2)] = boss1x2Variants, [new Vector2Int(2, 2)] = boss2x2Variants
-            },
-            ["Shop"] = new Dictionary<Vector2Int, Room[]>
-            {
-                [new Vector2Int(1, 1)] = shop1x1Variants, [new Vector2Int(2, 1)] = shop2x1Variants,
-                [new Vector2Int(1, 2)] = shop1x2Variants, [new Vector2Int(2, 2)] = shop2x2Variants
-            },
-            ["Treasure"] = new Dictionary<Vector2Int, Room[]>
-            {
-                [new Vector2Int(1, 1)] = treasure1x1Variants, [new Vector2Int(2, 1)] = treasure2x1Variants,
-                [new Vector2Int(1, 2)] = treasure1x2Variants, [new Vector2Int(2, 2)] = treasure2x2Variants
-            },
+            ["Normal"] = BuildSizeMap(
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.normal1x1Variants : null, normal1x1Variants),
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.normal2x1Variants : null, normal2x1Variants),
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.normal1x2Variants : null, normal1x2Variants),
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.normal2x2Variants : null, normal2x2Variants)),
+            ["Boss"] = BuildSizeMap(
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.boss1x1Variants : null, boss1x1Variants),
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.boss2x1Variants : null, boss2x1Variants),
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.boss1x2Variants : null, boss1x2Variants),
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.boss2x2Variants : null, boss2x2Variants)),
+            ["Shop"] = BuildSizeMap(
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.shop1x1Variants : null, shop1x1Variants),
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.shop2x1Variants : null, shop2x1Variants),
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.shop1x2Variants : null, shop1x2Variants),
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.shop2x2Variants : null, shop2x2Variants)),
+            ["Treasure"] = BuildSizeMap(
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.treasure1x1Variants : null, treasure1x1Variants),
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.treasure2x1Variants : null, treasure2x1Variants),
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.treasure1x2Variants : null, treasure1x2Variants),
+                ResolveVariants(activeRoomSet != null ? activeRoomSet.treasure2x2Variants : null, treasure2x2Variants)),
             ["Curch"] = new Dictionary<Vector2Int, Room[]>
             {
-                [new Vector2Int(1, 1)] = curch1x1Variants, [new Vector2Int(2, 2)] = curch2x2Variants
+                [new Vector2Int(1, 1)] = ResolveVariants(activeRoomSet != null ? activeRoomSet.curch1x1Variants : null, curch1x1Variants),
+                [new Vector2Int(2, 2)] = ResolveVariants(activeRoomSet != null ? activeRoomSet.curch2x2Variants : null, curch2x2Variants)
             },
             ["EvilCurch"] = new Dictionary<Vector2Int, Room[]>
             {
-                [new Vector2Int(1, 1)] = evilCurch1x1Variants, [new Vector2Int(2, 2)] = evilCurch2x2Variants
+                [new Vector2Int(1, 1)] = ResolveVariants(activeRoomSet != null ? activeRoomSet.evilCurch1x1Variants : null, evilCurch1x1Variants),
+                [new Vector2Int(2, 2)] = ResolveVariants(activeRoomSet != null ? activeRoomSet.evilCurch2x2Variants : null, evilCurch2x2Variants)
             }
         };
     }
