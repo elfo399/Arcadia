@@ -13,7 +13,9 @@ MonoBehaviour:
   m_Name: FloorConf
   m_EditorClassIdentifier: 
   floors:
-  - floorNumber: 0
+  - floorNumber: 1
     themes:
-    - theme: {fileID: 0}
-      weight: 0
+    - theme: {fileID: 11400000, guid: ab64e6d915f064048a0dbd52c98cfedb, type: 2}
+      weight: 50
+    - theme: {fileID: 11400000, guid: e35c82f982b72e14dbb932fea1e5ce5b, type: 2}
+      weight: 50
