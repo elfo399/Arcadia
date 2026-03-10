@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a6cff3c97bf28f4cb0f2874d6370220, type: 3}
+  m_Name: CastelRoomSet
+  m_EditorClassIdentifier: 
+  startRoomPrefab: {fileID: 2275314461642173434, guid: b530619dd81717346a83387a7272a45a, type: 3}
+  normal1x1Variants:
+  - {fileID: 2275314461642173434, guid: b9bdb98288ff91e4f95ca89c5c2b5a25, type: 3}
+  normal2x1Variants:
+  - {fileID: 9073747019927318074, guid: 5b28e0c271b4eff4fb9571877912b146, type: 3}
+  normal1x2Variants:
+  - {fileID: 9073747019927318074, guid: 7d181d0dc9c36cf4193313e87018bc2a, type: 3}
+  normal2x2Variants:
+  - {fileID: 9073747019927318074, guid: a5bd8170196e33e4aac8fb2737ed0070, type: 3}
+  boss1x1Variants:
+  - {fileID: 2275314461642173434, guid: dc0eab0b360cf9b44bcf630648d6049e, type: 3}
+  boss2x1Variants:
+  - {fileID: 7698762379488882794, guid: 493ff8c8bb6b96d4d92f2d56d6dc413c, type: 3}
+  boss1x2Variants:
+  - {fileID: 9073747019927318074, guid: 3fb4215ff3794e248a07b50e33a0fd80, type: 3}
+  boss2x2Variants:
+  - {fileID: 9073747019927318074, guid: 33ddd51878d9eff4080dbf96c078ea9c, type: 3}
+  treasure1x1Variants:
+  - {fileID: 2275314461642173434, guid: b86f41741c63d734babaf65cb03e8bff, type: 3}
+  treasure2x1Variants:
+  - {fileID: 9073747019927318074, guid: c0bcf7b597eda7a4eaffafd598acb9be, type: 3}
+  treasure1x2Variants:
+  - {fileID: 9073747019927318074, guid: 61b74c74c12c77a4fb69c113a9f11d1a, type: 3}
+  treasure2x2Variants:
+  - {fileID: 9073747019927318074, guid: 182998a413b41304fb6c5178ec3af31c, type: 3}
+  shop1x1Variants:
+  - {fileID: 2275314461642173434, guid: 40d7c9e2aa54b7a49875afdbdc8ada82, type: 3}
+  shop2x1Variants:
+  - {fileID: 9073747019927318074, guid: 7437cc0bf7fbd05458380b4f3e02c8c5, type: 3}
+  shop1x2Variants:
+  - {fileID: 9073747019927318074, guid: 023538d139fd1bf469f8c1792dba805a, type: 3}
+  shop2x2Variants:
+  - {fileID: 9073747019927318074, guid: 48501cd66c1bd3a4684e947b85fd6a3c, type: 3}
+  curch1x1Variants:
+  - {fileID: 2275314461642173434, guid: 9ab9b1a56558d314cb0901cd44b89e41, type: 3}
+  curch2x2Variants:
+  - {fileID: 9073747019927318074, guid: 3604a29fe75a7c449840346e0fbf09b7, type: 3}
+  evilCurch1x1Variants:
+  - {fileID: 2275314461642173434, guid: 4c024fe02b55e494eb0e7b16ceb6e7a8, type: 3}
+  evilCurch2x2Variants:
+  - {fileID: 9073747019927318074, guid: cae273223bc6b2544953c3cdc2827e8e, type: 3}
