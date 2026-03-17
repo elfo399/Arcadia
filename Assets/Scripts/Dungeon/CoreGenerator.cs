@@ -62,43 +62,6 @@ public class CoreGenerator : MonoBehaviour
 
     #endregion
 
-    #region --- Prefabs ---
-
-    [Header("Legacy Prefabs Stanze Normali")]
-    public Room startRoomPrefab;
-    public Room[] normal1x1Variants;
-    public Room[] normal2x1Variants;
-    public Room[] normal1x2Variants;
-    public Room[] normal2x2Variants;
-
-    [Header("Legacy Prefabs Boss")]
-    public Room[] boss1x1Variants;
-    public Room[] boss2x1Variants;
-    public Room[] boss1x2Variants;
-    public Room[] boss2x2Variants;
-
-    [Header("Legacy Prefabs Tesoro")]
-    public Room[] treasure1x1Variants;
-    public Room[] treasure2x1Variants;
-    public Room[] treasure1x2Variants;
-    public Room[] treasure2x2Variants;
-
-    [Header("Legacy Prefabs Shop")]
-    public Room[] shop1x1Variants;
-    public Room[] shop2x1Variants;
-    public Room[] shop1x2Variants;
-    public Room[] shop2x2Variants;
-
-    [Header("Legacy Prefabs Curch")]
-    public Room[] curch1x1Variants;
-    public Room[] curch2x2Variants;
-
-    [Header("Legacy Prefabs Evil Curch")]
-    public Room[] evilCurch1x1Variants;
-    public Room[] evilCurch2x2Variants;
-
-    #endregion
-
     #region --- Strutture Dati Interne ---
 
     private class VirtualRoom
@@ -179,11 +142,18 @@ public class CoreGenerator : MonoBehaviour
         if (showRngLogs) Debug.Log($"[CoreGenerator] Seed per piano {currentFloor}: '{floorSeedString}' -> Hash: {currentMasterSeed}");
 
         ResolveActiveThemeForCurrentFloor();
+        if (!ValidateActiveThemeConfiguration(out string configError))
+        {
+            Debug.LogError($"[CoreGenerator] Configurazione tema non valida per il piano {currentFloor}: {configError}");
+            return;
+        }
+
+        InitializePrefabLookup();
 
         Room effectiveStartRoomPrefab = GetStartRoomPrefab();
         if (effectiveStartRoomPrefab == null || effectiveStartRoomPrefab.roomData == null)
         {
-            Debug.LogError("[CoreGenerator] StartRoomPrefab o RoomData mancante. Configura il room set attivo o il fallback legacy.");
+            Debug.LogError("[CoreGenerator] StartRoomPrefab o RoomData mancante nel room set attivo.");
             return;
         }
 
@@ -556,7 +526,6 @@ public class CoreGenerator : MonoBehaviour
     {
         activeThemeDefinition = SelectThemeForFloor(currentFloor, currentMasterSeed);
         activeRoomSet = activeThemeDefinition != null ? activeThemeDefinition.roomSet : null;
-        InitializePrefabLookup();
 
         if (activeThemeDefinition != null && activeRoomSet != null)
         {
@@ -569,6 +538,60 @@ public class CoreGenerator : MonoBehaviour
         {
             Debug.Log($"[CoreGenerator] Piano {currentFloor}: nessun tema valido trovato, uso i pool legacy del CoreGenerator.");
         }
+    }
+
+    private bool ValidateActiveThemeConfiguration(out string error)
+    {
+        if (floorThemeTable == null)
+        {
+            error = "DungeonFloorThemeTable non assegnata.";
+            return false;
+        }
+
+        if (activeThemeDefinition == null)
+        {
+            error = "nessun tema valido trovato per questo piano.";
+            return false;
+        }
+
+        if (activeRoomSet == null)
+        {
+            error = $"il tema '{activeThemeDefinition.name}' non ha un DungeonRoomSet assegnato.";
+            return false;
+        }
+
+        if (activeRoomSet.startRoomPrefab == null || activeRoomSet.startRoomPrefab.roomData == null)
+        {
+            error = $"il room set '{activeRoomSet.name}' non ha uno Start valido.";
+            return false;
+        }
+
+        if (!HasAnyVariant(activeRoomSet.normal1x1Variants, activeRoomSet.normal2x1Variants, activeRoomSet.normal1x2Variants, activeRoomSet.normal2x2Variants))
+        {
+            error = $"il room set '{activeRoomSet.name}' non ha varianti Normal.";
+            return false;
+        }
+
+        if (!HasAnyVariant(activeRoomSet.boss1x1Variants, activeRoomSet.boss2x1Variants, activeRoomSet.boss1x2Variants, activeRoomSet.boss2x2Variants))
+        {
+            error = $"il room set '{activeRoomSet.name}' non ha varianti Boss.";
+            return false;
+        }
+
+        if (!HasAnyVariant(activeRoomSet.shop1x1Variants, activeRoomSet.shop2x1Variants, activeRoomSet.shop1x2Variants, activeRoomSet.shop2x2Variants))
+        {
+            error = $"il room set '{activeRoomSet.name}' non ha varianti Shop.";
+            return false;
+        }
+
+        if (!HasAnyVariant(activeRoomSet.treasure1x1Variants, activeRoomSet.treasure2x1Variants, activeRoomSet.treasure1x2Variants, activeRoomSet.treasure2x2Variants))
+        {
+            error = $"il room set '{activeRoomSet.name}' non ha varianti Treasure.";
+            return false;
+        }
+
+        error = null;
+        return true;
     }
 
     private DungeonThemeDefinition SelectThemeForFloor(int floor, int seed)
@@ -612,18 +635,7 @@ public class CoreGenerator : MonoBehaviour
 
     private Room GetStartRoomPrefab()
     {
-        if (activeRoomSet != null && activeRoomSet.startRoomPrefab != null)
-            return activeRoomSet.startRoomPrefab;
-
-        return startRoomPrefab;
-    }
-
-    private Room[] ResolveVariants(Room[] themedVariants, Room[] legacyVariants)
-    {
-        if (themedVariants != null && themedVariants.Length > 0)
-            return themedVariants;
-
-        return legacyVariants;
+        return activeRoomSet != null ? activeRoomSet.startRoomPrefab : null;
     }
 
     private Dictionary<Vector2Int, Room[]> BuildSizeMap(Room[] oneByOne, Room[] twoByOne, Room[] oneByTwo, Room[] twoByTwo)
@@ -637,39 +649,60 @@ public class CoreGenerator : MonoBehaviour
         };
     }
 
+    private bool HasAnyVariant(params Room[][] groups)
+    {
+        if (groups == null)
+            return false;
+
+        for (int i = 0; i < groups.Length; i++)
+        {
+            Room[] variants = groups[i];
+            if (variants == null || variants.Length == 0)
+                continue;
+
+            for (int j = 0; j < variants.Length; j++)
+            {
+                if (variants[j] != null)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     private void InitializePrefabLookup()
     {
         _prefabLookup = new Dictionary<string, Dictionary<Vector2Int, Room[]>>
         {
             ["Normal"] = BuildSizeMap(
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.normal1x1Variants : null, normal1x1Variants),
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.normal2x1Variants : null, normal2x1Variants),
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.normal1x2Variants : null, normal1x2Variants),
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.normal2x2Variants : null, normal2x2Variants)),
+                activeRoomSet.normal1x1Variants,
+                activeRoomSet.normal2x1Variants,
+                activeRoomSet.normal1x2Variants,
+                activeRoomSet.normal2x2Variants),
             ["Boss"] = BuildSizeMap(
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.boss1x1Variants : null, boss1x1Variants),
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.boss2x1Variants : null, boss2x1Variants),
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.boss1x2Variants : null, boss1x2Variants),
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.boss2x2Variants : null, boss2x2Variants)),
+                activeRoomSet.boss1x1Variants,
+                activeRoomSet.boss2x1Variants,
+                activeRoomSet.boss1x2Variants,
+                activeRoomSet.boss2x2Variants),
             ["Shop"] = BuildSizeMap(
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.shop1x1Variants : null, shop1x1Variants),
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.shop2x1Variants : null, shop2x1Variants),
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.shop1x2Variants : null, shop1x2Variants),
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.shop2x2Variants : null, shop2x2Variants)),
+                activeRoomSet.shop1x1Variants,
+                activeRoomSet.shop2x1Variants,
+                activeRoomSet.shop1x2Variants,
+                activeRoomSet.shop2x2Variants),
             ["Treasure"] = BuildSizeMap(
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.treasure1x1Variants : null, treasure1x1Variants),
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.treasure2x1Variants : null, treasure2x1Variants),
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.treasure1x2Variants : null, treasure1x2Variants),
-                ResolveVariants(activeRoomSet != null ? activeRoomSet.treasure2x2Variants : null, treasure2x2Variants)),
+                activeRoomSet.treasure1x1Variants,
+                activeRoomSet.treasure2x1Variants,
+                activeRoomSet.treasure1x2Variants,
+                activeRoomSet.treasure2x2Variants),
             ["Curch"] = new Dictionary<Vector2Int, Room[]>
             {
-                [new Vector2Int(1, 1)] = ResolveVariants(activeRoomSet != null ? activeRoomSet.curch1x1Variants : null, curch1x1Variants),
-                [new Vector2Int(2, 2)] = ResolveVariants(activeRoomSet != null ? activeRoomSet.curch2x2Variants : null, curch2x2Variants)
+                [new Vector2Int(1, 1)] = activeRoomSet.curch1x1Variants,
+                [new Vector2Int(2, 2)] = activeRoomSet.curch2x2Variants
             },
             ["EvilCurch"] = new Dictionary<Vector2Int, Room[]>
             {
-                [new Vector2Int(1, 1)] = ResolveVariants(activeRoomSet != null ? activeRoomSet.evilCurch1x1Variants : null, evilCurch1x1Variants),
-                [new Vector2Int(2, 2)] = ResolveVariants(activeRoomSet != null ? activeRoomSet.evilCurch2x2Variants : null, evilCurch2x2Variants)
+                [new Vector2Int(1, 1)] = activeRoomSet.evilCurch1x1Variants,
+                [new Vector2Int(2, 2)] = activeRoomSet.evilCurch2x2Variants
             }
         };
     }
