@@ -486,10 +486,109 @@ public class PlayerInventory : MonoBehaviour
     public void AddItem(InventoryItem item) { if (item != null) items.Add(item); }
     public bool RemoveItem(InventoryItem item) { return items.Remove(item); }
     public void ClearItems() { items.Clear(); }
+    public void AddWeaponLoot(WeaponItem weapon, int amount = 1)
+    {
+        if (weapon == null || amount <= 0)
+            return;
+
+        for (int i = 0; i < amount; i++)
+            items.Add(new InventoryItem(weapon, 1));
+    }
+
+    public void AddArmorLoot(ArmorItemData armor, int amount = 1)
+    {
+        if (armor == null || amount <= 0)
+            return;
+
+        for (int i = 0; i < amount; i++)
+            items.Add(new InventoryItem(armor, 1));
+    }
+
+    public void AddMagicLoot(MagicItemData magic, int amount = 1)
+    {
+        if (magic == null || amount <= 0)
+            return;
+
+        InventoryItem existing = FindStackableMagicItem(magic);
+        if (existing != null)
+        {
+            existing.amount += amount;
+            return;
+        }
+
+        items.Add(new InventoryItem(magic, amount));
+    }
+
+    public void AddUsableLoot(UsableItemData usable, int amount = 1)
+    {
+        if (usable == null || amount <= 0)
+            return;
+
+        InventoryItem existing = FindStackableUsableItem(usable);
+        if (existing != null)
+        {
+            existing.amount += amount;
+            return;
+        }
+
+        items.Add(new InventoryItem(usable, amount));
+    }
+
+    public void AddGenericItemLoot(ItemData item, int amount = 1)
+    {
+        if (item == null || amount <= 0)
+            return;
+
+        InventoryItem existing = FindStackableGenericItem(item);
+        if (existing != null)
+        {
+            existing.amount += amount;
+            return;
+        }
+
+        items.Add(new InventoryItem(item, amount));
+    }
+
     public void ReplaceAllItems(List<InventoryItem> newItems)
     {
         items.Clear();
         if (newItems != null) items.AddRange(newItems);
+    }
+
+    private InventoryItem FindStackableGenericItem(ItemData item)
+    {
+        for (int i = 0; i < items.Count; i++)
+        {
+            InventoryItem existing = items[i];
+            if (existing != null && existing.itemData == item)
+                return existing;
+        }
+
+        return null;
+    }
+
+    private InventoryItem FindStackableUsableItem(UsableItemData usable)
+    {
+        for (int i = 0; i < items.Count; i++)
+        {
+            InventoryItem existing = items[i];
+            if (existing != null && existing.usableData == usable)
+                return existing;
+        }
+
+        return null;
+    }
+
+    private InventoryItem FindStackableMagicItem(MagicItemData magic)
+    {
+        for (int i = 0; i < items.Count; i++)
+        {
+            InventoryItem existing = items[i];
+            if (existing != null && existing.magicData == magic)
+                return existing;
+        }
+
+        return null;
     }
 
     // Equip helpers

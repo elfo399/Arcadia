@@ -509,28 +509,6 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 
     private bool TryMoveEquipmentFocusShortcut(Vector2 direction)
     {
-        if (direction.x <= -0.5f && equipCrossFocus == EquipCrossFocus.Left)
-        {
-            InventorySlot currentLeftSlot = leftEquipSlots[Mathf.Clamp(GetCurrentCrossIndex(EquipCrossFocus.Left), 0, leftEquipSlots.Length - 1)];
-            int armorIndex = FindClosestSlotIndexByVerticalDistance(currentLeftSlot, armorEquipSlots);
-            if (armorIndex >= 0)
-            {
-                SetEquipmentCrossFocus(EquipCrossFocus.Armor, armorIndex);
-                return true;
-            }
-        }
-
-        if (direction.x >= 0.5f && equipCrossFocus == EquipCrossFocus.Armor)
-        {
-            InventorySlot currentArmorSlot = armorEquipSlots[Mathf.Clamp(GetCurrentCrossIndex(EquipCrossFocus.Armor), 0, armorEquipSlots.Length - 1)];
-            int leftIndex = FindClosestSlotIndexByVerticalDistance(currentArmorSlot, leftEquipSlots);
-            if (leftIndex >= 0)
-            {
-                SetEquipmentCrossFocus(EquipCrossFocus.Left, leftIndex);
-                return true;
-            }
-        }
-
         if (equipCrossFocus == EquipCrossFocus.Armor)
         {
             if (direction.y >= 0.5f)

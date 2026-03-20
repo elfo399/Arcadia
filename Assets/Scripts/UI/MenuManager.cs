@@ -279,12 +279,12 @@ public class MenuManager : MonoBehaviour
             return;
         }
 
-        bool rightPressed = (Keyboard.current != null && Keyboard.current.rightArrowKey.wasPressedThisFrame)
-            || (Gamepad.current != null && Gamepad.current.dpad.right.wasPressedThisFrame);
-        bool leftPressed = (Keyboard.current != null && Keyboard.current.leftArrowKey.wasPressedThisFrame)
-            || (Gamepad.current != null && Gamepad.current.dpad.left.wasPressedThisFrame);
-        bool downPressed = (Keyboard.current != null && Keyboard.current.downArrowKey.wasPressedThisFrame)
-            || (Gamepad.current != null && Gamepad.current.dpad.down.wasPressedThisFrame);
+        // Left/Right/Down del pad arrivano gia' dalle InputAction dedicate
+        // (CycleRightEquip/CycleLeftEquip/CycleUsable). Evitiamo di leggerli
+        // anche direttamente dal D-Pad per non processare due volte la stessa pressione.
+        bool rightPressed = Keyboard.current != null && Keyboard.current.rightArrowKey.wasPressedThisFrame;
+        bool leftPressed = Keyboard.current != null && Keyboard.current.leftArrowKey.wasPressedThisFrame;
+        bool downPressed = Keyboard.current != null && Keyboard.current.downArrowKey.wasPressedThisFrame;
         bool upPressed = (Keyboard.current != null && Keyboard.current.upArrowKey.wasPressedThisFrame)
             || (Gamepad.current != null && Gamepad.current.dpad.up.wasPressedThisFrame);
 
