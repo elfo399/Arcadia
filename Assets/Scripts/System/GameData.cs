@@ -60,6 +60,7 @@ public class SavedPlayerInventoryData
     public SavedLoadoutSlotData[] leftLoadout;
     public SavedLoadoutSlotData[] magicLoadout;
     public SavedLoadoutSlotData[] usableLoadout;
+    public SavedLoadoutSlotData[] armorLoadout;
     public int currentRightIndex;
     public int currentLeftIndex;
     public int currentMagicIndex;

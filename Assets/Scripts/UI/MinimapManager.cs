@@ -40,19 +40,60 @@ public class MinimapManager : MonoBehaviour
 
     void Awake() 
     { 
-        if (instance == null) instance = this; 
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        instance = this;
+        ResolveReferences();
+    }
+
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
     void Start()
     {
-        if (SceneManager.GetActiveScene().name == "HubScene" && mapContainer != null)
+        UpdateMapVisibilityForScene(SceneManager.GetActiveScene().name);
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        ResolveReferences();
+        UpdateMapVisibilityForScene(scene.name);
+    }
+
+    private void ResolveReferences()
+    {
+        if (mapContainer == null)
         {
-            mapContainer.gameObject.SetActive(false);
+            Transform container = FindNamedTransform("MinimapContainer");
+            if (container != null)
+                mapContainer = container as RectTransform;
         }
+    }
+
+    private void UpdateMapVisibilityForScene(string sceneName)
+    {
+        if (mapContainer == null)
+            return;
+
+        mapContainer.gameObject.SetActive(sceneName != "HubScene");
     }
 
     public void ClearMap()
     {
+        if (mapContainer == null)
+            return;
+
         foreach (Transform child in mapContainer) Destroy(child.gameObject);
         _roomIconObjects.Clear();
         _visitedRoomAnchors.Clear();
@@ -63,7 +104,7 @@ public class MinimapManager : MonoBehaviour
 
     public void RegisterRoom(Vector2Int gridPos, RoomData data)
     {
-        if (data == null || _roomData.ContainsKey(gridPos)) return;
+        if (data == null || _roomData.ContainsKey(gridPos) || mapContainer == null || roomIconPrefab == null) return;
 
         GameObject newIconObj = Instantiate(roomIconPrefab, mapContainer);
         _roomData.Add(gridPos, data);
@@ -112,6 +153,9 @@ public class MinimapManager : MonoBehaviour
 
     public void UpdatePlayerPosition(Vector3 worldPos, float roomSize)
     {
+        if (mapContainer == null)
+            return;
+
         int gridX = Mathf.RoundToInt(worldPos.x / roomSize);
         int gridY = Mathf.RoundToInt(worldPos.z / roomSize);
         Vector2Int currentGridCell = new Vector2Int(gridX, gridY);
@@ -210,5 +254,21 @@ public class MinimapManager : MonoBehaviour
         if (verticalOverlap && verticalTouch) return true;
 
         return false;
+    }
+
+    private static Transform FindNamedTransform(string targetName)
+    {
+        if (string.IsNullOrWhiteSpace(targetName))
+            return null;
+
+        Transform[] allTransforms = Object.FindObjectsOfType<Transform>(true);
+        for (int i = 0; i < allTransforms.Length; i++)
+        {
+            Transform candidate = allTransforms[i];
+            if (candidate != null && candidate.name == targetName)
+                return candidate;
+        }
+
+        return null;
     }
 }

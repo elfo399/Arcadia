@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a544078287434a34b9eda1b7e6dec126, type: 3}
+  m_Name: Spear1H_Basic
+  m_EditorClassIdentifier: 
+  weaponName: Spear Basic
+  icon: {fileID: 0}
+  modelPrefab: {fileID: 2350366144217043346, guid: 3c76a38a053bf804492afa55572d235c, type: 3}
+  description: Spear1H_Basic
+  category: 5
+  rangeType: 0
+  damageType: 0
+  physicalDamage: 10
+  magicDamage: 0
+  criticalHit: 1.1
+  criticalChance: 0
+  lightDamageMultiplier: 1
+  heavyDamageMultiplier: 1.25
+  weight: 3
+  scaling: STR C / DEX D
+  strengthScalingRank: 0
+  dexterityScalingRank: 0
+  intelligenceScalingRank: 0
+  faithScalingRank: 0
+  strengthRequirement: 0
+  dexterityRequirement: 0
+  intelligenceRequirement: 0
+  faithRequirement: 0
+  requirements: STR 10 / DEX 8
+  animationProfile: {fileID: 0}
+  lightAttackStaminaCost: 10
+  heavyAttackStaminaCost: 20
+  canBlock: 0
+  canParry: 0
+  physicalBlockPercent: 0.75
+  magicBlockPercent: 0.4
+  stability: 25
+  parryWindowStart: 0.05
+  parryWindowDuration: 0.2
+  hasRightSkill: 0
+  hasLeftSkill: 0
+  isSpecialWeapon: 0
+  wandLightProjectilePrefab: {fileID: 0}
+  wandLightManaCost: 6
+  wandLightCooldown: 0.2
+  wandLightProjectileSpeed: 22
+  wandLightProjectileLifetime: 2.5
+  wandLightSpawnOffset: {x: 0, y: 1.2, z: 0.75}
+  wandHitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  bowProjectilePrefab: {fileID: 0}
+  bowAmmoItem: {fileID: 0}
+  bowShotCooldown: 0.2
+  bowProjectileSpeed: 26
+  bowProjectileLifetime: 3.5
+  bowSpawnOffset: {x: 0, y: 1.2, z: 0.9}
+  bowHitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  canBeThrown: 0
+  throwStrengthRequirement: 0
+  throwProjectilePrefab: {fileID: 0}
+  throwSpeed: 20
+  throwLifetime: 2.5
+  throwStaminaCost: 18
+  throwBladeHitChance: 0.65
+  throwHandleDamageMultiplier: 0.5
+  throwBreakChance: 0.1
+  droppedPickupColliderCenter: {x: 0, y: 0.05, z: 0}
+  droppedPickupColliderSize: {x: 0.7, y: 0.12, z: 0.22}
+  droppedPickupMass: 2.2
+  droppedPickupLinearDrag: 0.06
+  droppedPickupAngularDrag: 0.45
+  droppedForwardImpulse: 0.9
+  droppedUpImpulse: 0.18
+  droppedInitialTorque: {x: 2.5, y: 0.3, z: 1.2}
+  droppedModelLocalEuler: {x: 90, y: 0, z: 0}

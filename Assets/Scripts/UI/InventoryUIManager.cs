@@ -8,9 +8,9 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 {
     public enum WalletSource { Run, Bank }
 
-    private enum Filter { All, Weapons, Usables }
+    private enum Filter { All, Weapons, Armors, Usables }
 
-    [Header("UI References")]
+    [Header("Slot Grid")]
     [SerializeField] private InventorySlot slotPrefab;
     [SerializeField] private Transform slotParent;
     [SerializeField] private int initialSlotCount = 0;
@@ -19,38 +19,51 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Canvas dragCanvas;
     [SerializeField] private Image dragPreviewTemplate;
 
-    [Header("Detail Panel - Common")]
+    [Header("Detail Panel - Shared")]
+    [SerializeField] private GameObject detailRoot;
     [SerializeField] private Image detailIcon;
     [SerializeField] private TextMeshProUGUI detailTitle;
     [SerializeField] private TextMeshProUGUI detailDescription;
-    [SerializeField] private GameObject detailRoot;
+
+    [Header("Detail Panel - Weapon / Shield Display")]
+    [SerializeField] private GameObject weaponDetailRoot;
+    [SerializeField] private Image weaponImage;
+    [SerializeField] private TextMeshProUGUI weaponTitle;
+    [SerializeField] private TextMeshProUGUI weaponDesc;
 
     [Header("Detail Panel - Weapon Stats")]
+    [SerializeField] private GameObject weaponDescriptionRoot;
     [SerializeField] private GameObject weaponStatsRoot;
     [SerializeField] private TextMeshProUGUI weaponDamageText;
     [SerializeField] private TextMeshProUGUI weaponCriticalText;
     [SerializeField] private TextMeshProUGUI weaponWeightText;
     [SerializeField] private TextMeshProUGUI weaponScalingText;
     [SerializeField] private TextMeshProUGUI weaponRequirementsText;
+
+    [Header("Detail Panel - Shield Stats")]
+    [SerializeField] private GameObject shieldDescriptionRoot;
+    [SerializeField] private TextMeshProUGUI shieldDamageText;
+    [SerializeField] private TextMeshProUGUI shieldCriticalText;
+    [SerializeField] private TextMeshProUGUI shieldWeightText;
+    [SerializeField] private TextMeshProUGUI shieldScalingText;
+    [SerializeField] private TextMeshProUGUI shieldRequirementsText;
     [SerializeField] private TextMeshProUGUI weaponPhysicalDefenseText;
     [SerializeField] private TextMeshProUGUI weaponMagicDefenseText;
 
-    [Header("Detail Panel - Weapon")]
-    [SerializeField] private GameObject weaponDetailRoot;
-    [SerializeField] private Image weaponImage;
-    [SerializeField] private TextMeshProUGUI weaponTitle;
-    [SerializeField] private TextMeshProUGUI weaponDesc;
+    [Header("Detail Panel - Armor Variant")]
+    [SerializeField] private GameObject armorDescriptionRoot;
+    [SerializeField] private TextMeshProUGUI armorWeightText;
+    [SerializeField] private TextMeshProUGUI armorPhysicalDefenseText;
+    [SerializeField] private TextMeshProUGUI armorMagicDefenseText;
+    [SerializeField] private Button armorEquipButton;
 
-    [Header("Detail Panel - Weapon Variant")]
-    [SerializeField] private GameObject weaponDescriptionRoot;
-    [SerializeField] private GameObject shieldDescriptionRoot;
-
-    [Header("Detail Panel - Item")]
+    [Header("Detail Panel - Item / Usable")]
     [SerializeField] private GameObject itemDetailRoot;
     [SerializeField] private Image itemImage;
     [SerializeField] private TextMeshProUGUI itemTitle;
     [SerializeField] private TextMeshProUGUI itemDesc;
 
+    [Header("Action Buttons")]
     [SerializeField] private Button equipWeaponButton;
     [SerializeField] private Button equipUsableButton;
 
@@ -77,6 +90,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     private bool showPadFocus;
     private Filter currentFilter = Filter.All;
     private Filter lastFilter = Filter.All;
+    private ArmorItemData.ArmorSlot? activeArmorFilterSlot;
     private PlayerStats playerStats;
     private bool isInitialized;
 
@@ -84,6 +98,9 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     {
         equipmentManager = equipment != null ? equipment : equipmentManager;
         playerInventory = inventory != null ? inventory : playerInventory;
+
+        AutoWireArmorDetailReferences();
+        BindEquipButtons();
 
         if (slotParent == null)
             slotParent = transform;
@@ -147,8 +164,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     public void UpdateUI(List<InventoryItem> inventoryData)
     {
-        sourceItems = NormalizeSourceItems(inventoryData);
-        ApplyFilterInternal(currentFilter);
+        SetSourceItems(inventoryData);
     }
 
     public void SetSourceItems(List<InventoryItem> inventoryData)
@@ -183,18 +199,28 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     public void ShowWeaponsFilter()
     {
+        activeArmorFilterSlot = null;
         lastFilter = Filter.Weapons;
         ApplyFilterInternal(Filter.Weapons);
     }
 
     public void ShowUsablesFilter()
     {
+        activeArmorFilterSlot = null;
         lastFilter = Filter.Usables;
         ApplyFilterInternal(Filter.Usables);
     }
 
+    public void ShowArmorsFilter(ArmorItemData.ArmorSlot slot)
+    {
+        activeArmorFilterSlot = slot;
+        lastFilter = Filter.Armors;
+        ApplyFilterInternal(Filter.Armors);
+    }
+
     public void ShowAllFilter()
     {
+        activeArmorFilterSlot = null;
         lastFilter = Filter.All;
         ApplyFilterInternal(Filter.All);
     }
@@ -206,6 +232,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     public void ResetFilterToAll()
     {
+        activeArmorFilterSlot = null;
         lastFilter = Filter.All;
         ApplyFilterInternal(Filter.All);
         ResetEquipTarget();
@@ -213,22 +240,17 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     public void PrepareWeaponEquipSelectionView()
     {
-        EnsurePlayerInventory();
-        SwitchSlotContainer(inventorySlotParent != null ? inventorySlotParent : slotParent, inventoryInitialSlotCount);
-        equipmentManager?.ShowInventoryPanel();
-        RefreshSourceItemsFromPlayer();
-        ShowWeaponsFilter();
-        UpdateEquipButtonState();
+        PrepareEquipSelectionView(ShowWeaponsFilter);
     }
 
     public void PrepareUsableEquipSelectionView()
     {
-        EnsurePlayerInventory();
-        SwitchSlotContainer(inventorySlotParent != null ? inventorySlotParent : slotParent, inventoryInitialSlotCount);
-        equipmentManager?.ShowInventoryPanel();
-        RefreshSourceItemsFromPlayer();
-        ShowUsablesFilter();
-        UpdateEquipButtonState();
+        PrepareEquipSelectionView(ShowUsablesFilter);
+    }
+
+    public void PrepareArmorEquipSelectionView(ArmorItemData.ArmorSlot slot)
+    {
+        PrepareEquipSelectionView(() => ShowArmorsFilter(slot));
     }
 
     public void CloseEquipGridView()
@@ -385,6 +407,11 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             OnEquipUsableButtonClick();
             return;
         }
+        if (armorEquipButton != null && armorEquipButton.gameObject.activeInHierarchy && armorEquipButton.interactable)
+        {
+            OnEquipArmorButtonClick();
+            return;
+        }
         if (TryEquipFocusedPadItem())
             return;
 
@@ -404,11 +431,17 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         EnsurePlayerInventory();
         if (playerInventory == null) return;
 
+        var target = equipmentManager != null ? equipmentManager.CurrentEquipTarget : EquipmentManager.EquipTarget.None;
+        if (target == EquipmentManager.EquipTarget.Armor)
+        {
+            OnEquipArmorButtonClick();
+            return;
+        }
+
         var item = currentItems[currentSelectedIndex];
         if (item.weaponData == null) return;
 
         WeaponItem newWeapon = item.weaponData;
-        var target = equipmentManager != null ? equipmentManager.CurrentEquipTarget : EquipmentManager.EquipTarget.None;
         int targetSlot = equipmentManager != null ? equipmentManager.CurrentEquipSlot : 0;
 
         if (target == EquipmentManager.EquipTarget.Right)
@@ -418,6 +451,23 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         else
             return;
 
+        CompleteEquipAction();
+    }
+
+    public void OnEquipArmorButtonClick()
+    {
+        if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex)) return;
+        EnsurePlayerInventory();
+        if (playerInventory == null || equipmentManager == null) return;
+        if (equipmentManager.CurrentEquipTarget != EquipmentManager.EquipTarget.Armor) return;
+
+        var item = currentItems[currentSelectedIndex];
+        if (item == null || item.armorData == null) return;
+
+        ArmorItemData.ArmorSlot targetSlot = equipmentManager.CurrentArmorSlot;
+        if (item.armorData.slot != targetSlot) return;
+
+        playerInventory.SetArmorAtSlot(targetSlot, item.armorData, item.instanceId);
         CompleteEquipAction();
     }
 
@@ -489,6 +539,9 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         {
             case Filter.All: return !IsMagicInventoryItem(item);
             case Filter.Weapons: return item.weaponData != null;
+            case Filter.Armors:
+                if (item.armorData == null) return false;
+                return !activeArmorFilterSlot.HasValue || item.armorData.slot == activeArmorFilterSlot.Value;
             case Filter.Usables: return item.usableData != null;
             default: return true;
         }
@@ -556,10 +609,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     {
         currentSelectedIndex = -1;
 
-        if (weaponDetailRoot != null) weaponDetailRoot.SetActive(false);
-        if (itemDetailRoot != null) itemDetailRoot.SetActive(false);
-        if (weaponDescriptionRoot != null) weaponDescriptionRoot.SetActive(false);
-        if (shieldDescriptionRoot != null) shieldDescriptionRoot.SetActive(false);
+        HideDetailViews();
 
         if (detailIcon != null)
         {
@@ -569,16 +619,134 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
         if (detailTitle != null) detailTitle.text = string.Empty;
         if (detailDescription != null) detailDescription.text = string.Empty;
+        if (detailRoot != null) detailRoot.SetActive(false);
 
-        if (weaponStatsRoot != null) weaponStatsRoot.SetActive(false);
+        ClearWeaponStatTexts();
+        ClearShieldStatTexts();
+        ClearArmorStatTexts();
+    }
+
+    private void HideDetailViews()
+    {
+        if (weaponDetailRoot != null) weaponDetailRoot.SetActive(false);
+        if (itemDetailRoot != null) itemDetailRoot.SetActive(false);
+        if (weaponDescriptionRoot != null) weaponDescriptionRoot.SetActive(false);
+        if (shieldDescriptionRoot != null) shieldDescriptionRoot.SetActive(false);
+        if (armorDescriptionRoot != null) armorDescriptionRoot.SetActive(false);
+        SetWeaponStatsRootActive(false);
+    }
+
+    private void ClearWeaponStatTexts()
+    {
         if (weaponDamageText != null) weaponDamageText.text = string.Empty;
         if (weaponCriticalText != null) weaponCriticalText.text = string.Empty;
         if (weaponWeightText != null) weaponWeightText.text = string.Empty;
         if (weaponScalingText != null) weaponScalingText.text = string.Empty;
         if (weaponRequirementsText != null) weaponRequirementsText.text = string.Empty;
+    }
+
+    private void ClearShieldStatTexts()
+    {
+        if (shieldDamageText != null) shieldDamageText.text = string.Empty;
+        if (shieldCriticalText != null) shieldCriticalText.text = string.Empty;
+        if (shieldWeightText != null) shieldWeightText.text = string.Empty;
+        if (shieldScalingText != null) shieldScalingText.text = string.Empty;
+        if (shieldRequirementsText != null) shieldRequirementsText.text = string.Empty;
         if (weaponPhysicalDefenseText != null) weaponPhysicalDefenseText.text = string.Empty;
         if (weaponMagicDefenseText != null) weaponMagicDefenseText.text = string.Empty;
-        if (detailRoot != null) detailRoot.SetActive(false);
+    }
+
+    private void ClearArmorStatTexts()
+    {
+        if (armorWeightText != null) armorWeightText.text = string.Empty;
+        if (armorPhysicalDefenseText != null) armorPhysicalDefenseText.text = string.Empty;
+        if (armorMagicDefenseText != null) armorMagicDefenseText.text = string.Empty;
+    }
+
+    private void SetCommonDetailContent(Sprite icon, string title, string description)
+    {
+        if (detailIcon != null)
+        {
+            detailIcon.enabled = icon != null;
+            detailIcon.sprite = icon;
+        }
+
+        if (detailTitle != null) detailTitle.text = title ?? string.Empty;
+        if (detailDescription != null) detailDescription.text = description ?? string.Empty;
+    }
+
+    private void SetWeaponDetailContent(Sprite icon, string title, string description)
+    {
+        if (weaponImage != null) weaponImage.sprite = icon;
+        if (weaponTitle != null) weaponTitle.text = title ?? string.Empty;
+        if (weaponDesc != null) weaponDesc.text = description ?? string.Empty;
+    }
+
+    private void SetItemDetailContent(Sprite icon, string title, string description)
+    {
+        if (itemImage != null) itemImage.sprite = icon;
+        if (itemTitle != null) itemTitle.text = title ?? string.Empty;
+        if (itemDesc != null) itemDesc.text = description ?? string.Empty;
+    }
+
+    private void ShowWeaponDetail(WeaponItem weapon, Sprite icon, string title, string description)
+    {
+        bool isShield = weapon.category == WeaponCategory.Shield;
+
+        if (weaponDetailRoot != null) weaponDetailRoot.SetActive(true);
+        if (weaponDescriptionRoot != null) weaponDescriptionRoot.SetActive(!isShield);
+        if (shieldDescriptionRoot != null) shieldDescriptionRoot.SetActive(isShield);
+
+        SetWeaponDetailContent(icon, title, description);
+        SetCommonDetailContent(icon, title, description);
+
+        if (isShield)
+        {
+            if (shieldDamageText != null) shieldDamageText.text = weapon.physicalDamage.ToString();
+            if (shieldCriticalText != null) shieldCriticalText.text = weapon.criticalHit.ToString("0.##");
+            if (shieldWeightText != null) shieldWeightText.text = weapon.weight.ToString("0.##");
+            if (shieldScalingText != null) shieldScalingText.text = weapon.GetScalingLabel();
+            if (shieldRequirementsText != null) shieldRequirementsText.text = weapon.GetRequirementsLabel();
+            if (weaponPhysicalDefenseText != null)
+                weaponPhysicalDefenseText.text = Mathf.RoundToInt(Mathf.Clamp01(weapon.physicalBlockPercent) * 100f).ToString();
+            if (weaponMagicDefenseText != null)
+                weaponMagicDefenseText.text = Mathf.RoundToInt(Mathf.Clamp01(weapon.magicBlockPercent) * 100f).ToString();
+            SetWeaponStatsRootActive(false);
+            return;
+        }
+
+        if (weaponDamageText != null) weaponDamageText.text = weapon.physicalDamage.ToString();
+        if (weaponCriticalText != null) weaponCriticalText.text = weapon.criticalHit.ToString("0.##");
+        if (weaponWeightText != null) weaponWeightText.text = weapon.weight.ToString("0.##");
+        if (weaponScalingText != null) weaponScalingText.text = weapon.GetScalingLabel();
+        if (weaponRequirementsText != null) weaponRequirementsText.text = weapon.GetRequirementsLabel();
+        SetWeaponStatsRootActive(true);
+    }
+
+    private bool TryShowArmorDetail(ArmorItemData armor, Sprite icon, string title, string description)
+    {
+        if (armorDescriptionRoot == null)
+            return false;
+
+        if (weaponDetailRoot != null) weaponDetailRoot.SetActive(true);
+        if (armorDescriptionRoot != null) armorDescriptionRoot.SetActive(true);
+
+        SetWeaponDetailContent(icon, title, description);
+        SetCommonDetailContent(icon, title, description);
+
+        if (armorWeightText != null) armorWeightText.text = armor.weight.ToString("0.##");
+        if (armorPhysicalDefenseText != null) armorPhysicalDefenseText.text = armor.physicalDefense.ToString();
+        if (armorMagicDefenseText != null) armorMagicDefenseText.text = armor.magicDefense.ToString();
+
+        return true;
+    }
+
+    private void ShowGenericItemDetail(Sprite icon, string title, string description)
+    {
+        if (itemDetailRoot != null) itemDetailRoot.SetActive(true);
+
+        SetItemDetailContent(icon, title, description);
+        SetCommonDetailContent(icon, title, description);
     }
 
     private void ShowItemDetailsByIndex(int index)
@@ -610,10 +778,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         }
 
         if (detailRoot != null) detailRoot.SetActive(true);
-        if (weaponDetailRoot != null) weaponDetailRoot.SetActive(false);
-        if (itemDetailRoot != null) itemDetailRoot.SetActive(false);
-        if (weaponDescriptionRoot != null) weaponDescriptionRoot.SetActive(false);
-        if (shieldDescriptionRoot != null) shieldDescriptionRoot.SetActive(false);
+        HideDetailViews();
 
         Sprite icon = GetItemIcon(item);
         string title = item.title;
@@ -626,32 +791,11 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
         if (weapon != null)
         {
-            bool isShield = weapon.category == WeaponCategory.Shield;
-
             if (weapon.icon != null) icon = weapon.icon;
             if (!string.IsNullOrEmpty(weapon.weaponName)) title = weapon.weaponName;
             if (!string.IsNullOrEmpty(weapon.description)) description = weapon.description;
 
-            if (weaponDetailRoot != null) weaponDetailRoot.SetActive(true);
-            if (weaponDescriptionRoot != null) weaponDescriptionRoot.SetActive(!isShield);
-            if (shieldDescriptionRoot != null) shieldDescriptionRoot.SetActive(isShield);
-            if (weaponImage != null) weaponImage.sprite = icon;
-            if (weaponTitle != null) weaponTitle.text = title ?? string.Empty;
-            if (weaponDesc != null) weaponDesc.text = description ?? string.Empty;
-            if (weaponDamageText != null) weaponDamageText.text = weapon.physicalDamage.ToString();
-            if (weaponCriticalText != null) weaponCriticalText.text = weapon.criticalHit.ToString("0.##");
-            if (weaponWeightText != null) weaponWeightText.text = weapon.weight.ToString("0.##");
-            if (weaponScalingText != null) weaponScalingText.text = weapon.GetScalingLabel();
-            if (weaponRequirementsText != null) weaponRequirementsText.text = weapon.GetRequirementsLabel();
-            if (weaponPhysicalDefenseText != null)
-                weaponPhysicalDefenseText.text = isShield ? Mathf.RoundToInt(Mathf.Clamp01(weapon.physicalBlockPercent) * 100f).ToString() : string.Empty;
-            if (weaponMagicDefenseText != null)
-                weaponMagicDefenseText.text = isShield ? Mathf.RoundToInt(Mathf.Clamp01(weapon.magicBlockPercent) * 100f).ToString() : string.Empty;
-            if (weaponStatsRoot != null) weaponStatsRoot.SetActive(true);
-
-            if (detailIcon != null) { detailIcon.enabled = icon != null; detailIcon.sprite = icon; }
-            if (detailTitle != null) detailTitle.text = title ?? string.Empty;
-            if (detailDescription != null) detailDescription.text = description ?? string.Empty;
+            ShowWeaponDetail(weapon, icon, title, description);
             return;
         }
 
@@ -666,6 +810,13 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             if (armor.icon != null) icon = armor.icon;
             if (!string.IsNullOrEmpty(armor.itemName)) title = armor.itemName;
             if (!string.IsNullOrEmpty(armor.description)) description = armor.description;
+
+            if (TryShowArmorDetail(armor, icon, title, description))
+            {
+                equipmentManager?.RefreshEquipmentCross();
+                UpdateEquipButtonState();
+                return;
+            }
         }
         else if (itemData != null)
         {
@@ -674,27 +825,179 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             if (!string.IsNullOrEmpty(itemData.description)) description = itemData.description;
         }
 
-        if (itemDetailRoot != null) itemDetailRoot.SetActive(true);
-        if (itemImage != null) itemImage.sprite = icon;
-        if (itemTitle != null) itemTitle.text = title ?? string.Empty;
-        if (itemDesc != null) itemDesc.text = description ?? string.Empty;
-        if (weaponStatsRoot != null) weaponStatsRoot.SetActive(false);
-
-        if (detailIcon != null) { detailIcon.enabled = icon != null; detailIcon.sprite = icon; }
-        if (detailTitle != null) detailTitle.text = title ?? string.Empty;
-        if (detailDescription != null) detailDescription.text = description ?? string.Empty;
+        ShowGenericItemDetail(icon, title, description);
 
         equipmentManager?.RefreshEquipmentCross();
         UpdateEquipButtonState();
     }
 
+    private void AutoWireArmorDetailReferences()
+    {
+        Transform root = transform.root;
+        if (root == null)
+            return;
+
+        Transform inventoryRoot = FindDeepChildByName(root, "invBackground");
+        if (inventoryRoot == null)
+            return;
+
+        if (weaponDetailRoot == null)
+            weaponDetailRoot = FindDeepChildByName(inventoryRoot, "DescWeapon")?.gameObject;
+
+        Transform detailRootTransform = weaponDetailRoot != null ? weaponDetailRoot.transform : null;
+        if (detailRootTransform == null)
+            return;
+
+        if (weaponImage == null)
+        {
+            Transform imageTf = FindDeepChildByName(detailRootTransform, "Image");
+            if (imageTf != null) weaponImage = imageTf.GetComponent<Image>();
+        }
+
+        if (weaponTitle == null)
+            weaponTitle = FindDeepTextByName(detailRootTransform, "Title");
+
+        if (weaponDesc == null)
+            weaponDesc = FindDeepTextByName(detailRootTransform, "Desc_Custom")
+                ?? FindDeepTextByName(detailRootTransform, "Desc");
+
+        if (equipWeaponButton == null)
+        {
+            Transform equipButtonTf = FindDeepChildByName(detailRootTransform, "EquipBTN");
+            if (equipButtonTf != null) equipWeaponButton = equipButtonTf.GetComponent<Button>();
+        }
+
+        if (weaponDescriptionRoot == null)
+            weaponDescriptionRoot = FindDeepChildByName(detailRootTransform, "WeaponColumn")?.gameObject
+                ?? FindDeepChildByName(detailRootTransform, "WeaponCollumn")?.gameObject;
+
+        if (shieldDescriptionRoot == null)
+            shieldDescriptionRoot = FindDeepChildByName(detailRootTransform, "ShieldColumn")?.gameObject
+                ?? FindDeepChildByName(detailRootTransform, "ShieldCollumn")?.gameObject;
+
+        if (shieldDescriptionRoot != null)
+        {
+            if (shieldDamageText == null)
+                shieldDamageText = FindStatValueText(shieldDescriptionRoot.transform, "Damage");
+            if (shieldCriticalText == null)
+                shieldCriticalText = FindStatValueText(shieldDescriptionRoot.transform, "Critical");
+            if (shieldWeightText == null)
+                shieldWeightText = FindStatValueText(shieldDescriptionRoot.transform, "Weight");
+            if (shieldScalingText == null)
+                shieldScalingText = FindStatValueText(shieldDescriptionRoot.transform, "Scaling");
+            if (shieldRequirementsText == null)
+                shieldRequirementsText = FindStatValueText(shieldDescriptionRoot.transform, "Requirement");
+            if (weaponPhysicalDefenseText == null)
+                weaponPhysicalDefenseText = FindStatValueText(shieldDescriptionRoot.transform, "Def Phy");
+            if (weaponMagicDefenseText == null)
+                weaponMagicDefenseText = FindStatValueText(shieldDescriptionRoot.transform, "Def Mag");
+        }
+
+        if (armorDescriptionRoot == null)
+            armorDescriptionRoot = FindDeepChildByName(detailRootTransform, "ArmorColumn")?.gameObject
+                ?? FindDeepChildByName(detailRootTransform, "ArmorCollumn")?.gameObject;
+
+        if (armorDescriptionRoot == null)
+            return;
+
+        if (armorWeightText == null)
+            armorWeightText = FindStatValueText(armorDescriptionRoot.transform, "Weight");
+        if (armorPhysicalDefenseText == null)
+            armorPhysicalDefenseText = FindStatValueText(armorDescriptionRoot.transform, "Def Phy");
+        if (armorMagicDefenseText == null)
+            armorMagicDefenseText = FindStatValueText(armorDescriptionRoot.transform, "Def Mag");
+        if (armorEquipButton == null)
+        {
+            Transform equipButtonTf = FindDeepChildByName(armorDescriptionRoot.transform, "EquipBTN");
+            if (equipButtonTf != null) armorEquipButton = equipButtonTf.GetComponent<Button>();
+        }
+    }
+
+    private static TextMeshProUGUI FindStatValueText(Transform root, string statRootName)
+    {
+        Transform statRoot = FindDeepChildByName(root, statRootName);
+        if (statRoot == null)
+            return null;
+
+        var texts = statRoot.GetComponentsInChildren<TextMeshProUGUI>(true);
+        if (texts == null || texts.Length == 0)
+            return null;
+
+        return texts[texts.Length - 1];
+    }
+
+    private static Transform FindDeepChildByName(Transform root, string childName)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(childName))
+            return null;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (child.name == childName)
+                return child;
+
+            Transform nested = FindDeepChildByName(child, childName);
+            if (nested != null)
+                return nested;
+        }
+
+        return null;
+    }
+
+    private static TextMeshProUGUI FindDeepTextByName(Transform root, string childName)
+    {
+        Transform tf = FindDeepChildByName(root, childName);
+        return tf != null ? tf.GetComponent<TextMeshProUGUI>() : null;
+    }
+
     private List<InventoryItem> NormalizeSourceItems(List<InventoryItem> data)
     {
-        var result = new List<InventoryItem>();
-        if (data == null) return result;
-        foreach (var it in data)
-            result.Add(it);
-        return result;
+        return data != null ? new List<InventoryItem>(data) : new List<InventoryItem>();
+    }
+
+    private void PrepareEquipSelectionView(System.Action applyFilter)
+    {
+        EnsurePlayerInventory();
+        SwitchSlotContainer(inventorySlotParent != null ? inventorySlotParent : slotParent, inventoryInitialSlotCount);
+        equipmentManager?.ShowInventoryPanel();
+        RefreshSourceItemsFromPlayer();
+        applyFilter?.Invoke();
+        UpdateEquipButtonState();
+    }
+
+    private void SetWeaponStatsRootActive(bool active)
+    {
+        if (weaponStatsRoot == null)
+            return;
+
+        // In current scenes weaponStatsRoot is often the same object as weaponDetailRoot (DescWeapon).
+        // Avoid disabling the whole detail panel when switching to shield/armor variants.
+        if (weaponStatsRoot == weaponDetailRoot)
+            return;
+
+        weaponStatsRoot.SetActive(active);
+    }
+
+    private void BindEquipButtons()
+    {
+        if (equipWeaponButton != null)
+        {
+            equipWeaponButton.onClick.RemoveListener(OnEquipWeaponButtonClick);
+            equipWeaponButton.onClick.AddListener(OnEquipWeaponButtonClick);
+        }
+
+        if (equipUsableButton != null)
+        {
+            equipUsableButton.onClick.RemoveListener(OnEquipUsableButtonClick);
+            equipUsableButton.onClick.AddListener(OnEquipUsableButtonClick);
+        }
+
+        if (armorEquipButton != null)
+        {
+            armorEquipButton.onClick.RemoveListener(OnEquipArmorButtonClick);
+            armorEquipButton.onClick.AddListener(OnEquipArmorButtonClick);
+        }
     }
 
     private void SwitchSlotContainer(Transform newParent, int minSlotCount)
@@ -766,9 +1069,30 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
         if (equipWeaponButton != null)
         {
-            bool showW = (currentTarget == EquipmentManager.EquipTarget.Right || currentTarget == EquipmentManager.EquipTarget.Left) && currentFilter == Filter.Weapons;
+            bool showW =
+                (currentTarget == EquipmentManager.EquipTarget.Right || currentTarget == EquipmentManager.EquipTarget.Left)
+                && currentFilter == Filter.Weapons;
             equipWeaponButton.gameObject.SetActive(showW);
-            equipWeaponButton.interactable = showW && hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.weaponData != null;
+            bool canEquipWeapon = showW && hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.weaponData != null;
+            equipWeaponButton.interactable = canEquipWeapon;
+        }
+
+        if (armorEquipButton != null)
+        {
+            bool showA = currentTarget == EquipmentManager.EquipTarget.Armor && currentFilter == Filter.Armors;
+            armorEquipButton.gameObject.SetActive(showA);
+            bool canEquipArmor = showA && hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.armorData != null;
+            armorEquipButton.interactable = canEquipArmor;
+        }
+        else if (equipWeaponButton != null)
+        {
+            bool showFallbackArmor = currentTarget == EquipmentManager.EquipTarget.Armor && currentFilter == Filter.Armors;
+            if (showFallbackArmor)
+            {
+                equipWeaponButton.gameObject.SetActive(true);
+                bool canEquipArmor = hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.armorData != null;
+                equipWeaponButton.interactable = canEquipArmor;
+            }
         }
 
         if (equipUsableButton != null)
@@ -793,6 +1117,11 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         {
             equipUsableButton.gameObject.SetActive(false);
             equipUsableButton.interactable = false;
+        }
+        if (armorEquipButton != null)
+        {
+            armorEquipButton.gameObject.SetActive(false);
+            armorEquipButton.interactable = false;
         }
     }
 
@@ -955,6 +1284,10 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             case EquipmentManager.EquipTarget.Left:
                 if (focused.weaponData == null) return false;
                 OnEquipWeaponButtonClick();
+                return true;
+            case EquipmentManager.EquipTarget.Armor:
+                if (focused.armorData == null) return false;
+                OnEquipArmorButtonClick();
                 return true;
             case EquipmentManager.EquipTarget.Bottom:
                 if (focused.usableData == null) return false;
