@@ -6,7 +6,7 @@ using UnityEngine.EventSystems;
 public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 {
     public enum EquipTarget { None, Right, Left, Bottom, Top, Armor }
-    private enum EquipCrossFocus { Right, Left, Bottom, Top }
+    private enum EquipCrossFocus { Right, Left, Bottom, Top, Armor }
 
     [Header("Equipment Slot Prefab")]
     [SerializeField] private InventorySlot slotPrefab;
@@ -67,6 +67,7 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
     private bool showPadFocus;
     private EquipCrossFocus equipCrossFocus = EquipCrossFocus.Right;
     private int currentTopIndex;
+    private int currentArmorIndex;
 
     public EquipTarget CurrentEquipTarget { get; private set; } = EquipTarget.None;
     public int CurrentEquipSlot { get; private set; }
@@ -159,6 +160,7 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
         EnsurePlayerInventory();
         CurrentEquipTarget = EquipTarget.Armor;
         CurrentArmorSlot = slot;
+        currentArmorIndex = Mathf.Clamp((int)slot, 0, armorEquipSlots.Length - 1);
         inventoryUIManager?.PrepareArmorEquipSelectionView(slot);
     }
 
@@ -207,6 +209,9 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
                 break;
             case EquipCrossFocus.Top:
                 BeginEquipTop(GetCurrentCrossIndex(EquipCrossFocus.Top));
+                break;
+            case EquipCrossFocus.Armor:
+                BeginEquipArmor((ArmorItemData.ArmorSlot)Mathf.Clamp(GetCurrentCrossIndex(EquipCrossFocus.Armor), 0, armorEquipSlots.Length - 1));
                 break;
         }
     }
@@ -445,6 +450,8 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
                 if (playerInventory != null)
                     return Mathf.Clamp(playerInventory.currentMagicIndex, 0, 2);
                 return Mathf.Clamp(currentTopIndex, 0, 2);
+            case EquipCrossFocus.Armor:
+                return Mathf.Clamp(currentArmorIndex, 0, Mathf.Max(0, armorEquipSlots.Length - 1));
             default:
                 return 0;
         }
@@ -453,6 +460,9 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
     private void MoveEquipmentFocus(Vector2 direction)
     {
         BuildEquipSlotsIfNeeded();
+
+        if (TryMoveEquipmentFocusShortcut(direction))
+            return;
 
         InventorySlot currentSlot = GetCurrentCrossSlot();
         if (currentSlot == null)
@@ -497,6 +507,48 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
             SetEquipmentCrossFocus(best.focus, best.index);
     }
 
+    private bool TryMoveEquipmentFocusShortcut(Vector2 direction)
+    {
+        if (direction.x <= -0.5f && equipCrossFocus == EquipCrossFocus.Left)
+        {
+            InventorySlot currentLeftSlot = leftEquipSlots[Mathf.Clamp(GetCurrentCrossIndex(EquipCrossFocus.Left), 0, leftEquipSlots.Length - 1)];
+            int armorIndex = FindClosestSlotIndexByVerticalDistance(currentLeftSlot, armorEquipSlots);
+            if (armorIndex >= 0)
+            {
+                SetEquipmentCrossFocus(EquipCrossFocus.Armor, armorIndex);
+                return true;
+            }
+        }
+
+        if (direction.x >= 0.5f && equipCrossFocus == EquipCrossFocus.Armor)
+        {
+            InventorySlot currentArmorSlot = armorEquipSlots[Mathf.Clamp(GetCurrentCrossIndex(EquipCrossFocus.Armor), 0, armorEquipSlots.Length - 1)];
+            int leftIndex = FindClosestSlotIndexByVerticalDistance(currentArmorSlot, leftEquipSlots);
+            if (leftIndex >= 0)
+            {
+                SetEquipmentCrossFocus(EquipCrossFocus.Left, leftIndex);
+                return true;
+            }
+        }
+
+        if (equipCrossFocus == EquipCrossFocus.Armor)
+        {
+            if (direction.y >= 0.5f)
+            {
+                SetEquipmentCrossFocus(EquipCrossFocus.Armor, Mathf.Max(0, GetCurrentCrossIndex(EquipCrossFocus.Armor) - 1));
+                return true;
+            }
+
+            if (direction.y <= -0.5f)
+            {
+                SetEquipmentCrossFocus(EquipCrossFocus.Armor, Mathf.Min(armorEquipSlots.Length - 1, GetCurrentCrossIndex(EquipCrossFocus.Armor) + 1));
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private InventorySlot GetCurrentCrossSlot()
     {
         int idx = GetCurrentCrossIndex(equipCrossFocus);
@@ -506,6 +558,7 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
             case EquipCrossFocus.Left: return idx >= 0 && idx < leftEquipSlots.Length ? leftEquipSlots[idx] : null;
             case EquipCrossFocus.Bottom: return idx >= 0 && idx < bottomEquipSlots.Length ? bottomEquipSlots[idx] : null;
             case EquipCrossFocus.Top: return idx >= 0 && idx < topEquipSlots.Length ? topEquipSlots[idx] : null;
+            case EquipCrossFocus.Armor: return idx >= 0 && idx < armorEquipSlots.Length ? armorEquipSlots[idx] : null;
             default: return null;
         }
     }
@@ -520,6 +573,8 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
             yield return new CrossSlotRef(EquipCrossFocus.Bottom, i, bottomEquipSlots[i]);
         for (int i = 0; i < topEquipSlots.Length; i++)
             yield return new CrossSlotRef(EquipCrossFocus.Top, i, topEquipSlots[i]);
+        for (int i = 0; i < armorEquipSlots.Length; i++)
+            yield return new CrossSlotRef(EquipCrossFocus.Armor, i, armorEquipSlots[i]);
     }
 
     private Vector2 GetSlotCenter(InventorySlot slot)
@@ -532,6 +587,31 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
         rt.GetWorldCorners(corners);
         Vector3 center = (corners[0] + corners[2]) * 0.5f;
         return new Vector2(center.x, center.y);
+    }
+
+    private int FindClosestSlotIndexByVerticalDistance(InventorySlot referenceSlot, InventorySlot[] candidates)
+    {
+        if (referenceSlot == null || candidates == null || candidates.Length == 0)
+            return -1;
+
+        float referenceY = GetSlotCenter(referenceSlot).y;
+        int bestIndex = -1;
+        float bestDelta = float.PositiveInfinity;
+
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            if (candidates[i] == null)
+                continue;
+
+            float delta = Mathf.Abs(GetSlotCenter(candidates[i]).y - referenceY);
+            if (delta < bestDelta)
+            {
+                bestDelta = delta;
+                bestIndex = i;
+            }
+        }
+
+        return bestIndex;
     }
 
     private void SetEquipmentCrossFocus(EquipCrossFocus focus, int slotIndex)
@@ -557,11 +637,18 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
                     playerInventory.currentMagicIndex = Mathf.Clamp(slotIndex, 0, 2);
                     currentTopIndex = Mathf.Clamp(slotIndex, 0, 2);
                     break;
+                case EquipCrossFocus.Armor:
+                    currentArmorIndex = Mathf.Clamp(slotIndex, 0, armorEquipSlots.Length - 1);
+                    break;
             }
         }
         else if (focus == EquipCrossFocus.Top)
         {
             currentTopIndex = Mathf.Clamp(slotIndex, 0, 2);
+        }
+        else if (focus == EquipCrossFocus.Armor)
+        {
+            currentArmorIndex = Mathf.Clamp(slotIndex, 0, armorEquipSlots.Length - 1);
         }
 
         ApplyEquipmentCrossFocusVisual();
@@ -573,6 +660,7 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
         int leftIndex = GetCurrentCrossIndex(EquipCrossFocus.Left);
         int bottomIndex = GetCurrentCrossIndex(EquipCrossFocus.Bottom);
         int topIndex = GetCurrentCrossIndex(EquipCrossFocus.Top);
+        int armorIndex = GetCurrentCrossIndex(EquipCrossFocus.Armor);
 
         for (int i = 0; i < rightEquipSlots.Length; i++)
             if (rightEquipSlots[i] != null) rightEquipSlots[i].SetFocused(showPadFocus && equipCrossFocus == EquipCrossFocus.Right && i == rightIndex);
@@ -582,6 +670,8 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
             if (bottomEquipSlots[i] != null) bottomEquipSlots[i].SetFocused(showPadFocus && equipCrossFocus == EquipCrossFocus.Bottom && i == bottomIndex);
         for (int i = 0; i < topEquipSlots.Length; i++)
             if (topEquipSlots[i] != null) topEquipSlots[i].SetFocused(showPadFocus && equipCrossFocus == EquipCrossFocus.Top && i == topIndex);
+        for (int i = 0; i < armorEquipSlots.Length; i++)
+            if (armorEquipSlots[i] != null) armorEquipSlots[i].SetFocused(showPadFocus && equipCrossFocus == EquipCrossFocus.Armor && i == armorIndex);
     }
 
     private void EnsurePlayerInventory()
