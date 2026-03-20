@@ -68,6 +68,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
     [Header("Combat Flags")]
     [SerializeField] private bool invulnerable;
 
+    [Header("Armor Totals (Runtime)")]
+    [SerializeField] private int totalArmorPhysicalDefense;
+    [SerializeField] private int totalArmorMagicDefense;
+    [SerializeField] private float totalArmorWeight;
+
     private float lastStaminaUseTime;
     private float flaskTimer;
     private Animator animator;
@@ -87,6 +92,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private float lastSaveRealtime = -999f;
     private bool saveQueued = false;
     private Coroutine delayedUiRefreshRoutine;
+
+    public int TotalArmorPhysicalDefense => totalArmorPhysicalDefense;
+    public int TotalArmorMagicDefense => totalArmorMagicDefense;
+    public float TotalArmorWeight => totalArmorWeight;
 
     void Awake()
     {
@@ -116,6 +125,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         LoadStats();
         RecalculateDerivedStats(keepCurrentRatio: true);
+        RefreshArmorTotals();
         UpdateAllUI();
         NotifyBankChanged();
         NotifyRunWalletChanged();
@@ -151,6 +161,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         RecalculateDerivedStats(keepCurrentRatio: true);
+        RefreshArmorTotals();
         UpdateAllUI();
         if (delayedUiRefreshRoutine != null)
             StopCoroutine(delayedUiRefreshRoutine);
@@ -232,11 +243,21 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (amount <= 0f) return;
         if (invulnerable) return;
 
+        float incomingAmount = amount;
+
         if (cachedPlayerCombat == null)
             cachedPlayerCombat = GetComponent<PlayerCombat>();
         if (cachedPlayerCombat != null)
             cachedPlayerCombat.TryDefendIncomingDamage(ref amount, damageType, sourcePosition, attacker);
         if (amount <= 0f) return;
+
+        float preArmorAmount = amount;
+        RefreshArmorTotals();
+        int armorDefense = GetArmorDefenseForDamageType(damageType);
+        amount = ApplyArmorMitigation(amount, damageType);
+        if (amount <= 0f) return;
+
+        Debug.Log($"[PlayerStats] Damage taken -> incoming:{incomingAmount:0.##}, afterBlockParry:{preArmorAmount:0.##}, type:{damageType}, armorDef:{armorDefense}, armorPhy:{totalArmorPhysicalDefense}, armorMag:{totalArmorMagicDefense}, final:{amount:0.##}");
 
         currentHealth -= amount;
         if (currentHealth < 0) currentHealth = 0;
@@ -361,6 +382,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     void UpdateAllUI()
     {
+        RefreshArmorTotals();
         UpdateFlaskUI();
     }
 
@@ -674,6 +696,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
         var inventory = GetCachedPlayerInventory();
         if (inventory == null) return 0f;
 
+        RefreshArmorTotals();
+
         float load = 0f;
         var items = inventory.Items;
         if (items != null)
@@ -689,7 +713,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
                 if (it.weaponData != null)
                     unitWeight = Mathf.Max(0f, it.weaponData.weight);
                 else if (it.armorData != null)
+                {
+                    if (inventory.IsArmorInstanceEquipped(it.instanceId))
+                        continue;
                     unitWeight = Mathf.Max(0f, it.armorData.weight);
+                }
                 else if (it.usableData != null)
                     unitWeight = Mathf.Max(0f, it.usableData.weight);
                 else if (it.itemData != null)
@@ -699,7 +727,48 @@ public class PlayerStats : MonoBehaviour, IDamageable
             }
         }
 
+        load += totalArmorWeight;
         return load;
+    }
+
+    public void RefreshArmorTotals(bool logTotals = false, string reason = null)
+    {
+        int oldPhysical = totalArmorPhysicalDefense;
+        int oldMagic = totalArmorMagicDefense;
+        float oldWeight = totalArmorWeight;
+
+        var inventory = GetCachedPlayerInventory();
+        int physical = 0;
+        int magic = 0;
+        float weight = 0f;
+
+        if (inventory != null && inventory.armorLoadout != null)
+        {
+            for (int i = 0; i < inventory.armorLoadout.Length; i++)
+            {
+                ArmorItemData armor = inventory.armorLoadout[i];
+                if (armor == null)
+                    continue;
+
+                physical += Mathf.Max(0, armor.physicalDefense);
+                magic += Mathf.Max(0, armor.magicDefense);
+                weight += Mathf.Max(0f, armor.weight);
+            }
+        }
+
+        totalArmorPhysicalDefense = physical;
+        totalArmorMagicDefense = magic;
+        totalArmorWeight = weight;
+
+        if (logTotals)
+        {
+            string context = string.IsNullOrWhiteSpace(reason) ? "refresh" : reason;
+            bool changed = oldPhysical != totalArmorPhysicalDefense
+                || oldMagic != totalArmorMagicDefense
+                || !Mathf.Approximately(oldWeight, totalArmorWeight);
+
+            Debug.Log($"[PlayerStats] Armor totals ({context}) -> phyDef:{totalArmorPhysicalDefense}, magDef:{totalArmorMagicDefense}, weight:{totalArmorWeight:0.##}, changed:{changed}");
+        }
     }
 
     public float GetMaxEquipLoad()
@@ -724,6 +793,27 @@ public class PlayerStats : MonoBehaviour, IDamageable
         currentHealth = Mathf.Clamp(maxHealth * healthRatio, 0f, maxHealth);
         currentMana = Mathf.Clamp(maxMana * manaRatio, 0f, maxMana);
         currentStamina = Mathf.Clamp(maxStamina * staminaRatio, 0f, maxStamina);
+    }
+
+    private float ApplyArmorMitigation(float amount, WeaponItem.DamageType damageType)
+    {
+        if (amount <= 0f)
+            return 0f;
+
+        int defense = GetArmorDefenseForDamageType(damageType);
+
+        if (defense <= 0)
+            return amount;
+
+        float multiplier = 100f / (100f + Mathf.Max(0f, defense));
+        return Mathf.Max(0f, amount * multiplier);
+    }
+
+    private int GetArmorDefenseForDamageType(WeaponItem.DamageType damageType)
+    {
+        return damageType == WeaponItem.DamageType.Magic
+            ? totalArmorMagicDefense
+            : totalArmorPhysicalDefense;
     }
 
     // --- BANCA PERSISTENTE ---

@@ -300,6 +300,8 @@ public class AttributesUIManager : MonoBehaviour
     {
         if (playerStats == null) return;
 
+        playerStats.RefreshArmorTotals();
+
         int level = Mathf.Max(1, playerStats.playerLevel);
         float xpProgress = playerStats.GetLevelProgress01();
 
@@ -314,8 +316,8 @@ public class AttributesUIManager : MonoBehaviour
         int stamina = Mathf.RoundToInt(playerStats.maxStamina);
         int basePhyDamage = playerStats.GetBasePhysicalDamage();
         int magicDamage = playerStats.GetBaseMagicDamage();
-        int phyDef = Mathf.Max(0, playerStats.endurance + Mathf.RoundToInt(playerStats.vigor * 0.5f));
-        int magicDef = Mathf.Max(0, playerStats.intelligence + playerStats.faith);
+        int phyDef = Mathf.Max(0, playerStats.endurance + Mathf.RoundToInt(playerStats.vigor * 0.5f)) + playerStats.TotalArmorPhysicalDefense;
+        int magicDef = Mathf.Max(0, playerStats.intelligence + playerStats.faith) + playerStats.TotalArmorMagicDefense;
 
         float equipWeight = playerStats.GetCurrentEquipLoad();
         float maxLoad = playerStats.GetMaxEquipLoad();

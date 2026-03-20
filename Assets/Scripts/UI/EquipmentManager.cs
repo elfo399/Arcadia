@@ -1,10 +1,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
-public class EquipmentManager : MonoBehaviour
+public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 {
-    public enum EquipTarget { None, Right, Left, Bottom, Top }
+    public enum EquipTarget { None, Right, Left, Bottom, Top, Armor }
     private enum EquipCrossFocus { Right, Left, Bottom, Top }
 
     [Header("Equipment Slot Prefab")]
@@ -40,6 +41,13 @@ public class EquipmentManager : MonoBehaviour
     [SerializeField] private GameObject equipmentBackground;
     [SerializeField] private GameObject inventoryBackground;
     [SerializeField] private GameObject magicBackground;
+
+    [Header("Armor Slot Containers")]
+    [SerializeField] private Transform armorHelmetContainer;
+    [SerializeField] private Transform armorChestplateContainer;
+    [SerializeField] private Transform armorLeggingsContainer;
+    [SerializeField] private Transform armorBootsContainer;
+
     [Header("Dependencies")]
     [SerializeField] private InventoryUIManager inventoryUIManager;
     [SerializeField] private MagicInventoryManager magicInventoryManager;
@@ -53,6 +61,7 @@ public class EquipmentManager : MonoBehaviour
     private InventorySlot hudLeftSlot;
     private InventorySlot hudBottomSlot;
     private InventorySlot hudTopSlot;
+    private readonly InventorySlot[] armorEquipSlots = new InventorySlot[4];
     private bool equipSlotsBuilt;
     private bool hudSlotsBuilt;
     private bool showPadFocus;
@@ -61,6 +70,7 @@ public class EquipmentManager : MonoBehaviour
 
     public EquipTarget CurrentEquipTarget { get; private set; } = EquipTarget.None;
     public int CurrentEquipSlot { get; private set; }
+    public ArmorItemData.ArmorSlot CurrentArmorSlot { get; private set; } = ArmorItemData.ArmorSlot.Helmet;
     public int CurrentTopIndex => currentTopIndex;
     public GameObject MagicBackground => magicBackground;
 
@@ -143,6 +153,19 @@ public class EquipmentManager : MonoBehaviour
             playerInventory.currentMagicIndex = currentTopIndex;
         magicInventoryManager?.PrepareMagicEquipSelectionView();
     }
+
+    public void BeginEquipArmor(ArmorItemData.ArmorSlot slot)
+    {
+        EnsurePlayerInventory();
+        CurrentEquipTarget = EquipTarget.Armor;
+        CurrentArmorSlot = slot;
+        inventoryUIManager?.PrepareArmorEquipSelectionView(slot);
+    }
+
+    public void OnArmorHelmetClick() => BeginEquipArmor(ArmorItemData.ArmorSlot.Helmet);
+    public void OnArmorChestplateClick() => BeginEquipArmor(ArmorItemData.ArmorSlot.Chestplate);
+    public void OnArmorLeggingsClick() => BeginEquipArmor(ArmorItemData.ArmorSlot.Leggings);
+    public void OnArmorBootsClick() => BeginEquipArmor(ArmorItemData.ArmorSlot.Boots);
 
     public void CloseEquipGrid()
     {
@@ -243,6 +266,8 @@ public class EquipmentManager : MonoBehaviour
         var magicEquipped = playerInventory != null ? playerInventory.GetCurrentMagic() : null;
         UpdateHudVisual(hudTopSlot, magicEquipped != null ? magicEquipped.icon : null, 1);
 
+        UpdateEquipVisuals(armorEquipSlots, playerInventory != null ? playerInventory.armorLoadout : null);
+
         ApplyEquipmentCrossFocusVisual();
     }
 
@@ -285,6 +310,12 @@ public class EquipmentManager : MonoBehaviour
         topEquipSlots[1] = CreateEquipSlot(topEquipContainer2);
         topEquipSlots[2] = CreateEquipSlot(topEquipContainer3);
 
+        ResolveArmorContainersFromHierarchy();
+        armorEquipSlots[0] = CreateEquipSlot(armorHelmetContainer, 0, this, false);
+        armorEquipSlots[1] = CreateEquipSlot(armorChestplateContainer, 1, this, false);
+        armorEquipSlots[2] = CreateEquipSlot(armorLeggingsContainer, 2, this, false);
+        armorEquipSlots[3] = CreateEquipSlot(armorBootsContainer, 3, this, false);
+
         equipSlotsBuilt = true;
     }
 
@@ -305,20 +336,40 @@ public class EquipmentManager : MonoBehaviour
         hudSlotsBuilt = true;
     }
 
-    private InventorySlot CreateEquipSlot(Transform parent)
+    private InventorySlot CreateEquipSlot(Transform parent, int slotIndex = -1, IInventorySlotHandler owner = null, bool displayOnly = true)
     {
         if (slotPrefab == null || parent == null) return null;
 
         var existing = parent.GetComponentInChildren<InventorySlot>();
-        if (existing != null) return existing;
+        if (existing != null)
+        {
+            existing.Init(slotIndex, owner);
+            existing.SetDisplayOnly(displayOnly);
+            var existingImage = existing.GetComponent<Image>();
+            if (existingImage != null) existingImage.raycastTarget = !displayOnly;
+            return existing;
+        }
 
         var slot = Instantiate(slotPrefab, parent);
-        slot.Init(-1, null);
-        slot.SetDisplayOnly(true);
+        slot.Init(slotIndex, owner);
+        slot.SetDisplayOnly(displayOnly);
         slot.gameObject.SetActive(true);
         var img = slot.GetComponent<Image>();
-        if (img != null) img.raycastTarget = false;
+        if (img != null) img.raycastTarget = !displayOnly;
         return slot;
+    }
+
+    private void ResolveArmorContainersFromHierarchy()
+    {
+        armorHelmetContainer = ResolveArmorContainer(armorHelmetContainer, "helmet");
+        armorChestplateContainer = ResolveArmorContainer(armorChestplateContainer, "chestplate");
+        armorLeggingsContainer = ResolveArmorContainer(armorLeggingsContainer, "leggings");
+        armorBootsContainer = ResolveArmorContainer(armorBootsContainer, "boots");
+
+        LogMissingArmorContainer(armorHelmetContainer, "helmet");
+        LogMissingArmorContainer(armorChestplateContainer, "chestplate");
+        LogMissingArmorContainer(armorLeggingsContainer, "leggings");
+        LogMissingArmorContainer(armorBootsContainer, "boots");
     }
 
     private void SetBackLayerIcon(Image target)
@@ -364,6 +415,14 @@ public class EquipmentManager : MonoBehaviour
     }
 
     private void UpdateEquipVisuals(InventorySlot[] slots, MagicItemData[] loadout)
+    {
+        if (slots == null || loadout == null) return;
+        int len = Mathf.Min(slots.Length, loadout.Length);
+        for (int i = 0; i < len; i++)
+            UpdateEquipVisual(slots[i], loadout[i] != null ? loadout[i].icon : null, 1);
+    }
+
+    private void UpdateEquipVisuals(InventorySlot[] slots, ArmorItemData[] loadout)
     {
         if (slots == null || loadout == null) return;
         int len = Mathf.Min(slots.Length, loadout.Length);
@@ -529,6 +588,95 @@ public class EquipmentManager : MonoBehaviour
     {
         if (playerInventory == null)
             playerInventory = FindObjectOfType<PlayerInventory>();
+    }
+
+    private static Transform FindNamedChild(Transform root, string childName)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(childName))
+            return null;
+
+        foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (child != null && child.name == childName)
+                return child;
+        }
+
+        return null;
+    }
+
+    private Transform ResolveArmorContainer(Transform current, string childName)
+    {
+        if (current != null)
+            return current;
+
+        Transform found = FindNamedChild(transform, childName);
+        if (found != null)
+            return found;
+
+        if (equipmentBackground != null)
+        {
+            found = FindNamedChild(equipmentBackground.transform, childName);
+            if (found != null)
+                return found;
+        }
+
+        if (inventoryBackground != null)
+        {
+            found = FindNamedChild(inventoryBackground.transform, childName);
+            if (found != null)
+                return found;
+        }
+
+        return FindNamedTransformInScene(childName);
+    }
+
+    private static Transform FindNamedTransformInScene(string childName)
+    {
+        if (string.IsNullOrWhiteSpace(childName))
+            return null;
+
+        var allTransforms = Resources.FindObjectsOfTypeAll<Transform>();
+        for (int i = 0; i < allTransforms.Length; i++)
+        {
+            Transform candidate = allTransforms[i];
+            if (candidate == null || candidate.name != childName)
+                continue;
+            if (!candidate.gameObject.scene.IsValid())
+                continue;
+            return candidate;
+        }
+
+        return null;
+    }
+
+    private void LogMissingArmorContainer(Transform container, string slotName)
+    {
+        if (container != null)
+            return;
+
+        Debug.LogWarning($"[EquipmentManager] Armor container '{slotName}' non trovato. Assegna il riferimento in Inspector oppure usa esattamente il nome '{slotName}' nella UI.");
+    }
+
+    public void HandleSlotPointerDown(int index)
+    {
+        if (index < 0 || index >= armorEquipSlots.Length)
+            return;
+
+        BeginEquipArmor((ArmorItemData.ArmorSlot)index);
+    }
+
+    public void HandleSlotBeginDrag(int index, PointerEventData eventData) { }
+    public void HandleSlotDrag(PointerEventData eventData) { }
+    public void HandleSlotEndDrag() { }
+    public void HandleSlotDrop(int targetIndex) { }
+    public void HandleSlotSelected(int index) { }
+
+    public void HandleSlotSubmit(int index)
+    {
+        if (index < 0 || index >= armorEquipSlots.Length)
+            return;
+
+        BeginEquipArmor((ArmorItemData.ArmorSlot)index);
     }
 
     private readonly struct CrossSlotRef

@@ -29,10 +29,12 @@ public class PlayerInventory : MonoBehaviour
     public WeaponItem[] leftLoadout = new WeaponItem[3];
     public MagicItemData[] magicLoadout = new MagicItemData[3];
     public UsableItemData[] usableLoadout = new UsableItemData[3];
+    public ArmorItemData[] armorLoadout = new ArmorItemData[4];
     private string[] rightInstanceIds = new string[3];
     private string[] leftInstanceIds = new string[3];
     private string[] magicInstanceIds = new string[3];
     private string[] usableInstanceIds = new string[3];
+    private string[] armorInstanceIds = new string[4];
     public int currentRightIndex = 0;
     public int currentLeftIndex = 0;
     public int currentMagicIndex = 0;
@@ -115,10 +117,12 @@ public class PlayerInventory : MonoBehaviour
         if (leftLoadout == null || leftLoadout.Length != 3) leftLoadout = new WeaponItem[3];
         if (magicLoadout == null || magicLoadout.Length != 3) magicLoadout = new MagicItemData[3];
         if (usableLoadout == null || usableLoadout.Length != 3) usableLoadout = new UsableItemData[3];
+        if (armorLoadout == null || armorLoadout.Length != 4) armorLoadout = new ArmorItemData[4];
         if (rightInstanceIds == null || rightInstanceIds.Length != 3) rightInstanceIds = new string[3];
         if (leftInstanceIds == null || leftInstanceIds.Length != 3) leftInstanceIds = new string[3];
         if (magicInstanceIds == null || magicInstanceIds.Length != 3) magicInstanceIds = new string[3];
         if (usableInstanceIds == null || usableInstanceIds.Length != 3) usableInstanceIds = new string[3];
+        if (armorInstanceIds == null || armorInstanceIds.Length != 4) armorInstanceIds = new string[4];
     }
 
     public WeaponItem GetWeaponForHand(Hand hand)
@@ -245,6 +249,20 @@ public class PlayerInventory : MonoBehaviour
         EnsureLoadoutSize();
         currentMagicIndex = Mathf.Clamp(currentMagicIndex, 0, magicLoadout.Length - 1);
         return magicLoadout[currentMagicIndex];
+    }
+
+    public ArmorItemData GetEquippedArmor(ArmorItemData.ArmorSlot slot)
+    {
+        EnsureLoadoutSize();
+        int index = ArmorSlotToIndex(slot);
+        return index >= 0 && index < armorLoadout.Length ? armorLoadout[index] : null;
+    }
+
+    public string GetEquippedArmorInstanceId(ArmorItemData.ArmorSlot slot)
+    {
+        EnsureLoadoutSize();
+        int index = ArmorSlotToIndex(slot);
+        return index >= 0 && index < armorInstanceIds.Length ? armorInstanceIds[index] : null;
     }
 
     public bool TryPeekCurrentUsable(out UsableItemData usable, out int amount)
@@ -390,6 +408,27 @@ public class PlayerInventory : MonoBehaviour
         SyncEquippedReferences();
     }
 
+    public void SetArmorAtSlot(ArmorItemData.ArmorSlot slot, ArmorItemData armor, string instanceId)
+    {
+        EnsureLoadoutSize();
+        if (armor != null && armor.slot != slot)
+            return;
+
+        int slotIndex = ArmorSlotToIndex(slot);
+        if (slotIndex < 0 || slotIndex >= armorLoadout.Length)
+            return;
+
+        MoveArmorWithInventorySync(armor, instanceId, armorLoadout, armorInstanceIds, slotIndex);
+        SyncEquippedReferences();
+
+        PlayerStats stats = PlayerStats.instance != null ? PlayerStats.instance : GetComponent<PlayerStats>();
+        if (stats != null)
+        {
+            string armorName = armor != null ? armor.itemName : "None";
+            stats.RefreshArmorTotals(logTotals: true, reason: $"equip {slot} -> {armorName}");
+        }
+    }
+
     // Compatibilità: forza lo slot magia anche per magie derivate da altri tipi (es. weapon magic legacy).
     public void ForceSetMagicAtSlot(int slot, MagicItemData magic, string instanceId)
     {
@@ -432,7 +471,15 @@ public class PlayerInventory : MonoBehaviour
         return ContainsInstanceId(rightInstanceIds, instanceId)
                || ContainsInstanceId(leftInstanceIds, instanceId)
                || ContainsInstanceId(magicInstanceIds, instanceId)
-               || ContainsInstanceId(usableInstanceIds, instanceId);
+               || ContainsInstanceId(usableInstanceIds, instanceId)
+               || ContainsInstanceId(armorInstanceIds, instanceId);
+    }
+
+    public bool IsArmorInstanceEquipped(string instanceId)
+    {
+        if (string.IsNullOrEmpty(instanceId)) return false;
+        EnsureLoadoutSize();
+        return ContainsInstanceId(armorInstanceIds, instanceId);
     }
 
     // Inventory management
@@ -536,6 +583,36 @@ public class PlayerInventory : MonoBehaviour
         return previous;
     }
 
+    private ArmorItemData MoveArmorWithInventorySync(ArmorItemData armor, string instanceId, ArmorItemData[] targetLoadout, string[] targetIds, int targetSlot)
+    {
+        var previous = targetLoadout[targetSlot];
+        var prevId = targetIds[targetSlot];
+
+        if (armor == null)
+        {
+            targetLoadout[targetSlot] = null;
+            targetIds[targetSlot] = null;
+            return null;
+        }
+
+        if (RemoveFromLoadoutArmor(armor, instanceId, targetLoadout, targetIds, targetSlot))
+        {
+            targetLoadout[targetSlot] = armor;
+            targetIds[targetSlot] = instanceId;
+            return armor;
+        }
+
+        if (HasArmorInstanceInInventory(instanceId, armor))
+        {
+            targetLoadout[targetSlot] = armor;
+            targetIds[targetSlot] = instanceId;
+            return armor;
+        }
+
+        targetIds[targetSlot] = prevId;
+        return previous;
+    }
+
     private bool ContainsInstanceId(string[] ids, string instanceId)
     {
         if (ids == null || string.IsNullOrEmpty(instanceId)) return false;
@@ -605,6 +682,17 @@ public class PlayerInventory : MonoBehaviour
         return false;
     }
 
+    private bool HasArmorInstanceInInventory(string instanceId, ArmorItemData armor)
+    {
+        if (string.IsNullOrEmpty(instanceId) || armor == null) return false;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            if (it != null && it.armorData == armor && it.instanceId == instanceId) return true;
+        }
+        return false;
+    }
+
     private bool RemoveFromLoadouts(WeaponItem weapon, string instanceId, WeaponItem[] primary, string[] primaryIds, int targetSlot, WeaponItem[] secondary, string[] secondaryIds)
     {
         if (primary != null && primaryIds != null)
@@ -658,6 +746,22 @@ public class PlayerInventory : MonoBehaviour
         {
             if (i == targetSlot) continue;
             if (loadout[i] == magic && loadoutIds[i] == instanceId)
+            {
+                loadout[i] = null;
+                loadoutIds[i] = null;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private bool RemoveFromLoadoutArmor(ArmorItemData armor, string instanceId, ArmorItemData[] loadout, string[] loadoutIds, int targetSlot)
+    {
+        if (loadout == null || loadoutIds == null) return false;
+        for (int i = 0; i < loadout.Length; i++)
+        {
+            if (i == targetSlot) continue;
+            if (loadout[i] == armor && loadoutIds[i] == instanceId)
             {
                 loadout[i] = null;
                 loadoutIds[i] = null;
@@ -734,6 +838,10 @@ public class PlayerInventory : MonoBehaviour
         equippedLeftRuntime = left != null ? left : unarmedLeft;
         equippedMagicRuntime = magic;
         equippedUsableRuntime = usable;
+
+        PlayerStats stats = PlayerStats.instance != null ? PlayerStats.instance : GetComponent<PlayerStats>();
+        if (stats != null)
+            stats.RefreshArmorTotals();
     }
 
     public SavedPlayerInventoryData CreateSaveData()
@@ -747,6 +855,7 @@ public class PlayerInventory : MonoBehaviour
             leftLoadout = SerializeWeaponLoadout(leftLoadout, leftInstanceIds),
             magicLoadout = SerializeMagicLoadout(magicLoadout, magicInstanceIds),
             usableLoadout = SerializeUsableLoadout(usableLoadout, usableInstanceIds),
+            armorLoadout = SerializeArmorLoadout(armorLoadout, armorInstanceIds),
             currentRightIndex = currentRightIndex,
             currentLeftIndex = currentLeftIndex,
             currentMagicIndex = currentMagicIndex,
@@ -796,6 +905,8 @@ public class PlayerInventory : MonoBehaviour
             DeserializeMagicLoadout(data.magicLoadout, magicLoadout, magicInstanceIds, lookups.magics);
         if (HasAnyValidUsableSlot(data.usableLoadout, lookups.usables))
             DeserializeUsableLoadout(data.usableLoadout, usableLoadout, usableInstanceIds, lookups.usables);
+        if (HasAnyValidArmorSlot(data.armorLoadout, lookups.armors))
+            DeserializeArmorLoadout(data.armorLoadout, armorLoadout, armorInstanceIds, lookups.armors);
         EnsureLoadoutInstancesInInventory();
 
         currentRightIndex = Mathf.Clamp(data.currentRightIndex, 0, rightLoadout.Length - 1);
@@ -919,6 +1030,24 @@ public class PlayerInventory : MonoBehaviour
         return result;
     }
 
+    private SavedLoadoutSlotData[] SerializeArmorLoadout(ArmorItemData[] loadout, string[] ids)
+    {
+        if (loadout == null || ids == null || loadout.Length == 0) return System.Array.Empty<SavedLoadoutSlotData>();
+        var result = new SavedLoadoutSlotData[loadout.Length];
+
+        for (int i = 0; i < loadout.Length; i++)
+        {
+            var armor = loadout[i];
+            result[i] = new SavedLoadoutSlotData
+            {
+                assetName = armor != null ? armor.name : string.Empty,
+                instanceId = ids != null && i < ids.Length ? ids[i] : string.Empty
+            };
+        }
+
+        return result;
+    }
+
     private void DeserializeWeaponLoadout(SavedLoadoutSlotData[] source, WeaponItem[] targetLoadout, string[] targetIds, Dictionary<string, WeaponItem> weaponLookup)
     {
         for (int i = 0; i < targetLoadout.Length; i++)
@@ -972,6 +1101,25 @@ public class PlayerInventory : MonoBehaviour
             var slot = source[i];
             if (slot == null) continue;
             targetLoadout[i] = ResolveMagic(slot.assetName, magicLookup);
+            targetIds[i] = string.IsNullOrWhiteSpace(slot.instanceId) ? null : slot.instanceId;
+        }
+    }
+
+    private void DeserializeArmorLoadout(SavedLoadoutSlotData[] source, ArmorItemData[] targetLoadout, string[] targetIds, Dictionary<string, ArmorItemData> armorLookup)
+    {
+        for (int i = 0; i < targetLoadout.Length; i++)
+        {
+            targetLoadout[i] = null;
+            targetIds[i] = null;
+        }
+        if (source == null || armorLookup == null) return;
+
+        int len = Mathf.Min(source.Length, targetLoadout.Length);
+        for (int i = 0; i < len; i++)
+        {
+            var slot = source[i];
+            if (slot == null) continue;
+            targetLoadout[i] = ResolveArmor(slot.assetName, armorLookup);
             targetIds[i] = string.IsNullOrWhiteSpace(slot.instanceId) ? null : slot.instanceId;
         }
     }
@@ -1246,6 +1394,18 @@ public class PlayerInventory : MonoBehaviour
         return false;
     }
 
+    private static bool HasAnyValidArmorSlot(SavedLoadoutSlotData[] source, Dictionary<string, ArmorItemData> armorLookup)
+    {
+        if (source == null || source.Length == 0 || armorLookup == null) return false;
+        for (int i = 0; i < source.Length; i++)
+        {
+            var slot = source[i];
+            if (slot == null || string.IsNullOrWhiteSpace(slot.assetName)) continue;
+            if (ResolveArmor(slot.assetName, armorLookup) != null) return true;
+        }
+        return false;
+    }
+
     private void EnsureLoadoutInstancesInInventory()
     {
         EnsureLoadoutSize();
@@ -1254,6 +1414,7 @@ public class PlayerInventory : MonoBehaviour
         EnsureWeaponLoadoutInInventory(leftLoadout, leftInstanceIds);
         EnsureMagicLoadoutInInventory(magicLoadout, magicInstanceIds);
         EnsureUsableLoadoutInInventory(usableLoadout, usableInstanceIds);
+        EnsureArmorLoadoutInInventory(armorLoadout, armorInstanceIds);
     }
 
     private void EnsureWeaponLoadoutInInventory(WeaponItem[] loadout, string[] ids)
@@ -1304,6 +1465,35 @@ public class PlayerInventory : MonoBehaviour
             var restored = new InventoryItem(magic, 1);
             restored.instanceId = instanceId;
             items.Add(restored);
+        }
+    }
+
+    private void EnsureArmorLoadoutInInventory(ArmorItemData[] loadout, string[] ids)
+    {
+        if (loadout == null || ids == null) return;
+        int len = Mathf.Min(loadout.Length, ids.Length);
+        for (int i = 0; i < len; i++)
+        {
+            var armor = loadout[i];
+            string instanceId = ids[i];
+            if (armor == null || string.IsNullOrWhiteSpace(instanceId)) continue;
+            if (HasArmorInstanceInInventory(instanceId, armor)) continue;
+
+            var restored = new InventoryItem(armor, 1);
+            restored.instanceId = instanceId;
+            items.Add(restored);
+        }
+    }
+
+    private static int ArmorSlotToIndex(ArmorItemData.ArmorSlot slot)
+    {
+        switch (slot)
+        {
+            case ArmorItemData.ArmorSlot.Helmet: return 0;
+            case ArmorItemData.ArmorSlot.Chestplate: return 1;
+            case ArmorItemData.ArmorSlot.Leggings: return 2;
+            case ArmorItemData.ArmorSlot.Boots: return 3;
+            default: return -1;
         }
     }
 }
