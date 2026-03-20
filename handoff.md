@@ -42,6 +42,132 @@ Al momento risultano funzionanti le aree seguenti:
   - HUD bars
 - dungeon generator con scelta tema tramite ScriptableObject
 - armor che influisce sul danno ricevuto
+- chest treasure con loot table ScriptableObject e apertura via interazione
+
+## 2.1 Ultima commit letta
+
+Ultima commit letta:
+
+- `143563f` - `Create loot chest system and fix pad command invetory`
+
+Impatto reale della commit:
+
+- aggiunto sistema chest loot runtime
+- aggiunta loot table dedicata per treasure chest
+- aggiunto drawer custom per rendere pulito l'inspector della loot table
+- aggiunta integrazione con `PlayerInventory` per assegnare reward direttamente in inventario
+- aggiornati prefab treasure rooms di `Forest` e `DarkForest` con chest / loot setup
+- aggiornato prefab della chest animata
+- fix parziale ai salti input pad nel menu equipment/inventory
+
+## 2.2 Treasure chest system
+
+Script nuovi / toccati:
+
+- `Assets/Scripts/Items/TreasureChestLootTable.cs`
+- `Assets/Scripts/Editor/TreasureChestLootTableDrawer.cs`
+- `Assets/Scripts/Rooms/TreasureChest.cs`
+- `Assets/Scripts/Player/PlayerInventory.cs`
+
+Comportamento corretto attuale:
+
+- la chest e' un `IInteractable`
+- il player la apre con `Triangolo` tramite `PlayerInteraction`
+- la chest estrae sempre e solo **1 reward**
+- la quantita' e' sempre **1**
+- il reward viene aggiunto direttamente al `PlayerInventory`
+- per ora non c'e' spawn di `objectOnTheGround`
+
+### 2.2.1 Loot table chest
+
+`TreasureChestLootTable`:
+
+- contiene una lista di entry possibili
+- ogni entry ha:
+  - `dropChance`
+  - un solo asset reward assegnato
+
+Tipi reward supportati:
+
+- `ItemData`
+- `UsableItemData`
+- `MagicItemData`
+- `ArmorItemData`
+- `WeaponItem`
+
+Nota importante:
+
+- `dropChance` e' usato come **peso relativo di selezione**
+- non e' un multi-roll
+- la chest sceglie un solo elemento dalla lista
+
+Il drawer custom dell'inspector mostra soltanto:
+
+- `Drop %`
+- `Reward`
+
+Il tipo reward viene dedotto automaticamente dal tipo dell'asset assegnato.
+
+### 2.2.2 Setup chest in prefab
+
+Campi principali di `TreasureChest`:
+
+- `lootTable`
+- `prompt`
+- `consumeOnlyOnce`
+- `animator`
+- `openStateName`
+- `closedStateName`
+- `enableAnimatorOnlyWhenOpened`
+- `rewardDelaySeconds`
+- `closedVisual`
+- `openedVisual`
+
+Setup minimo per funzionare:
+
+- collider presente sulla chest oppure su un figlio rilevabile da `PlayerInteraction`
+- layer della chest incluso in `PlayerInteraction.interactLayer`
+- `lootTable` assegnata
+
+### 2.2.3 Animator chest - nota critica
+
+Per la chest animata il setup corretto del controller e':
+
+- stato default `Closed`
+- stato `Open`
+- la clip `Open` **non** deve essere in loop
+- la chest una volta aperta deve restare nello stato `Open`
+
+Nota pratica importante:
+
+- lo script prova a forzare prima `Open` come stato diretto
+- il trigger `Open` e' fallback
+- se l'animazione non parte, la prima cosa da controllare e' che l'`Animator` assegnato nel prefab sia quello corretto e che il controller contenga davvero gli stati `Closed` / `Open`
+
+### 2.2.4 PlayerInventory - helper loot
+
+In `PlayerInventory` sono stati aggiunti helper runtime per reward:
+
+- `AddWeaponLoot(...)`
+- `AddArmorLoot(...)`
+- `AddMagicLoot(...)`
+- `AddUsableLoot(...)`
+- `AddGenericItemLoot(...)`
+
+Regola attuale:
+
+- armi e armature entrano come entry separate
+- item / magic / usable vengono stackati se gia' presenti
+
+## 2.3 Note UI pad dopo ultima commit
+
+In `MenuManager` e `EquipmentManager` e' stato toccato il routing input del controller.
+
+Nota importante:
+
+- era presente un problema di doppia lettura del D-Pad
+- e' stato anche rimosso un forcing hardcoded verso `Armor`
+- se la navigazione equipment dovesse ancora risultare poco affidabile, il prossimo step corretto non e' aggiungere altre scorciatoie, ma fare una mappa di navigazione esplicita slot-per-slot
 
 ## 3. Regole architetturali da non rompere
 
