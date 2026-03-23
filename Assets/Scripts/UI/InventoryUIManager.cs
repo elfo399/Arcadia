@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
@@ -49,6 +50,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private TextMeshProUGUI shieldRequirementsText;
     [SerializeField] private TextMeshProUGUI weaponPhysicalDefenseText;
     [SerializeField] private TextMeshProUGUI weaponMagicDefenseText;
+    [SerializeField] private Button shieldEquipButton;
 
     [Header("Detail Panel - Armor Variant")]
     [SerializeField] private GameObject armorDescriptionRoot;
@@ -90,6 +92,10 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     private bool showPadFocus;
     private Filter currentFilter = Filter.All;
     private Filter lastFilter = Filter.All;
+    private bool equipSelectionMode;
+    private EquipmentManager.EquipTarget pendingEquipTarget = EquipmentManager.EquipTarget.None;
+    private int pendingEquipSlot;
+    private ArmorItemData.ArmorSlot pendingArmorSlot = ArmorItemData.ArmorSlot.Helmet;
     private ArmorItemData.ArmorSlot? activeArmorFilterSlot;
     private PlayerStats playerStats;
     private bool isInitialized;
@@ -99,6 +105,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         equipmentManager = equipment != null ? equipment : equipmentManager;
         playerInventory = inventory != null ? inventory : playerInventory;
 
+        EnsureEquipmentManager();
         AutoWireArmorDetailReferences();
         BindEquipButtons();
 
@@ -235,6 +242,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         activeArmorFilterSlot = null;
         lastFilter = Filter.All;
         ApplyFilterInternal(Filter.All);
+        ClearEquipSelectionContext();
         ResetEquipTarget();
     }
 
@@ -255,6 +263,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     public void CloseEquipGridView()
     {
+        ClearEquipSelectionContext();
         ResetFilterToAll();
         ClearDetailPanel();
         currentSelectedIndex = -1;
@@ -402,6 +411,11 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             OnEquipWeaponButtonClick();
             return;
         }
+        if (shieldEquipButton != null && shieldEquipButton.gameObject.activeInHierarchy && shieldEquipButton.interactable)
+        {
+            OnEquipWeaponButtonClick();
+            return;
+        }
         if (equipUsableButton != null && equipUsableButton.gameObject.activeInHierarchy && equipUsableButton.interactable)
         {
             OnEquipUsableButtonClick();
@@ -429,9 +443,10 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     {
         if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex)) return;
         EnsurePlayerInventory();
+        EnsureEquipmentManager();
         if (playerInventory == null) return;
 
-        var target = equipmentManager != null ? equipmentManager.CurrentEquipTarget : EquipmentManager.EquipTarget.None;
+        var target = GetEffectiveEquipTarget();
         if (target == EquipmentManager.EquipTarget.Armor)
         {
             OnEquipArmorButtonClick();
@@ -442,7 +457,24 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (item.weaponData == null) return;
 
         WeaponItem newWeapon = item.weaponData;
-        int targetSlot = equipmentManager != null ? equipmentManager.CurrentEquipSlot : 0;
+        int targetSlot = GetEffectiveEquipSlot();
+
+        if (target == EquipmentManager.EquipTarget.None)
+        {
+            if (newWeapon.category == WeaponCategory.Shield)
+            {
+                targetSlot = Mathf.Clamp(playerInventory.currentLeftIndex, 0, playerInventory.leftLoadout.Length - 1);
+                playerInventory.SetLeftAtSlot(targetSlot, newWeapon, item.instanceId);
+            }
+            else
+            {
+                targetSlot = Mathf.Clamp(playerInventory.currentRightIndex, 0, playerInventory.rightLoadout.Length - 1);
+                playerInventory.SetRightAtSlot(targetSlot, newWeapon, item.instanceId);
+            }
+
+            CompletePostDirectEquipAction();
+            return;
+        }
 
         if (target == EquipmentManager.EquipTarget.Right)
             playerInventory.SetRightAtSlot(targetSlot, newWeapon, item.instanceId);
@@ -458,29 +490,46 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     {
         if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex)) return;
         EnsurePlayerInventory();
-        if (playerInventory == null || equipmentManager == null) return;
-        if (equipmentManager.CurrentEquipTarget != EquipmentManager.EquipTarget.Armor) return;
+        EnsureEquipmentManager();
+        if (playerInventory == null) return;
 
         var item = currentItems[currentSelectedIndex];
         if (item == null || item.armorData == null) return;
 
-        ArmorItemData.ArmorSlot targetSlot = equipmentManager.CurrentArmorSlot;
+        var target = GetEffectiveEquipTarget();
+        ArmorItemData.ArmorSlot targetSlot = target == EquipmentManager.EquipTarget.Armor && equipmentManager != null
+            ? GetEffectiveArmorSlot()
+            : item.armorData.slot;
+
+        if (target != EquipmentManager.EquipTarget.None && target != EquipmentManager.EquipTarget.Armor) return;
         if (item.armorData.slot != targetSlot) return;
 
         playerInventory.SetArmorAtSlot(targetSlot, item.armorData, item.instanceId);
-        CompleteEquipAction();
+        if (target == EquipmentManager.EquipTarget.None)
+            CompletePostDirectEquipAction();
+        else
+            CompleteEquipAction();
     }
 
     public void OnEquipUsableButtonClick()
     {
         if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex)) return;
         EnsurePlayerInventory();
+        EnsureEquipmentManager();
         if (playerInventory == null) return;
 
         var item = currentItems[currentSelectedIndex];
         if (item.usableData == null) return;
-        var target = equipmentManager != null ? equipmentManager.CurrentEquipTarget : EquipmentManager.EquipTarget.None;
-        int targetSlot = equipmentManager != null ? equipmentManager.CurrentEquipSlot : 0;
+        var target = GetEffectiveEquipTarget();
+        int targetSlot = GetEffectiveEquipSlot();
+
+        if (target == EquipmentManager.EquipTarget.None)
+        {
+            targetSlot = Mathf.Clamp(playerInventory.currentUsableIndex, 0, playerInventory.usableLoadout.Length - 1);
+            playerInventory.SetUsableAtSlot(targetSlot, item.usableData, item.instanceId);
+            CompletePostDirectEquipAction();
+            return;
+        }
 
         if (target == EquipmentManager.EquipTarget.Bottom)
             playerInventory.SetUsableAtSlot(targetSlot, item.usableData, item.instanceId);
@@ -556,6 +605,12 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     {
         if (playerInventory == null)
             playerInventory = FindObjectOfType<PlayerInventory>();
+    }
+
+    private void EnsureEquipmentManager()
+    {
+        if (equipmentManager == null)
+            equipmentManager = FindObjectOfType<EquipmentManager>(true);
     }
 
     private bool IsValidIndex(int index) => index >= 0 && index < slots.Count;
@@ -796,6 +851,8 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             if (!string.IsNullOrEmpty(weapon.description)) description = weapon.description;
 
             ShowWeaponDetail(weapon, icon, title, description);
+            equipmentManager?.RefreshEquipmentCross();
+            UpdateEquipButtonState();
             return;
         }
 
@@ -891,6 +948,11 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
                 weaponPhysicalDefenseText = FindStatValueText(shieldDescriptionRoot.transform, "Def Phy");
             if (weaponMagicDefenseText == null)
                 weaponMagicDefenseText = FindStatValueText(shieldDescriptionRoot.transform, "Def Mag");
+            if (shieldEquipButton == null)
+            {
+                Transform equipButtonTf = FindDeepChildByName(shieldDescriptionRoot.transform, "EquipBTN");
+                if (equipButtonTf != null) shieldEquipButton = equipButtonTf.GetComponent<Button>();
+            }
         }
 
         if (armorDescriptionRoot == null)
@@ -959,6 +1021,8 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     private void PrepareEquipSelectionView(System.Action applyFilter)
     {
         EnsurePlayerInventory();
+        EnsureEquipmentManager();
+        CacheEquipSelectionContext();
         SwitchSlotContainer(inventorySlotParent != null ? inventorySlotParent : slotParent, inventoryInitialSlotCount);
         equipmentManager?.ShowInventoryPanel();
         RefreshSourceItemsFromPlayer();
@@ -983,21 +1047,41 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     {
         if (equipWeaponButton != null)
         {
+            DisablePersistentButtonListeners(equipWeaponButton);
             equipWeaponButton.onClick.RemoveListener(OnEquipWeaponButtonClick);
             equipWeaponButton.onClick.AddListener(OnEquipWeaponButtonClick);
         }
 
+        if (shieldEquipButton != null)
+        {
+            DisablePersistentButtonListeners(shieldEquipButton);
+            shieldEquipButton.onClick.RemoveListener(OnEquipWeaponButtonClick);
+            shieldEquipButton.onClick.AddListener(OnEquipWeaponButtonClick);
+        }
+
         if (equipUsableButton != null)
         {
+            DisablePersistentButtonListeners(equipUsableButton);
             equipUsableButton.onClick.RemoveListener(OnEquipUsableButtonClick);
             equipUsableButton.onClick.AddListener(OnEquipUsableButtonClick);
         }
 
         if (armorEquipButton != null)
         {
+            DisablePersistentButtonListeners(armorEquipButton);
             armorEquipButton.onClick.RemoveListener(OnEquipArmorButtonClick);
             armorEquipButton.onClick.AddListener(OnEquipArmorButtonClick);
         }
+    }
+
+    private static void DisablePersistentButtonListeners(Button button)
+    {
+        if (button == null)
+            return;
+
+        int persistentCount = button.onClick.GetPersistentEventCount();
+        for (int i = 0; i < persistentCount; i++)
+            button.onClick.SetPersistentListenerState(i, UnityEventCallState.Off);
     }
 
     private void SwitchSlotContainer(Transform newParent, int minSlotCount)
@@ -1064,42 +1148,58 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private void UpdateEquipButtonState()
     {
-        var currentTarget = equipmentManager != null ? equipmentManager.CurrentEquipTarget : EquipmentManager.EquipTarget.None;
+        EnsureEquipmentManager();
+        var currentTarget = GetEffectiveEquipTarget();
         bool hasSelection = currentSelectedIndex >= 0 && HasItem(currentSelectedIndex);
+        bool selectedWeapon = hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.weaponData != null;
+        bool selectedShield = selectedWeapon && currentItems[currentSelectedIndex].weaponData.category == WeaponCategory.Shield;
+        bool selectedArmor = hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.armorData != null;
+        bool selectedUsable = hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.usableData != null;
+        bool allowDirectEquip = currentTarget == EquipmentManager.EquipTarget.None;
 
         if (equipWeaponButton != null)
         {
             bool showW =
-                (currentTarget == EquipmentManager.EquipTarget.Right || currentTarget == EquipmentManager.EquipTarget.Left)
-                && currentFilter == Filter.Weapons;
+                (allowDirectEquip || currentTarget == EquipmentManager.EquipTarget.Right || currentTarget == EquipmentManager.EquipTarget.Left)
+                && selectedWeapon
+                && !selectedShield;
             equipWeaponButton.gameObject.SetActive(showW);
-            bool canEquipWeapon = showW && hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.weaponData != null;
+            bool canEquipWeapon = showW && selectedWeapon;
             equipWeaponButton.interactable = canEquipWeapon;
+        }
+
+        if (shieldEquipButton != null)
+        {
+            bool showS =
+                (allowDirectEquip || currentTarget == EquipmentManager.EquipTarget.Right || currentTarget == EquipmentManager.EquipTarget.Left)
+                && selectedShield;
+            shieldEquipButton.gameObject.SetActive(showS);
+            shieldEquipButton.interactable = showS;
         }
 
         if (armorEquipButton != null)
         {
-            bool showA = currentTarget == EquipmentManager.EquipTarget.Armor && currentFilter == Filter.Armors;
+            bool showA = (allowDirectEquip || currentTarget == EquipmentManager.EquipTarget.Armor) && selectedArmor;
             armorEquipButton.gameObject.SetActive(showA);
-            bool canEquipArmor = showA && hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.armorData != null;
+            bool canEquipArmor = showA && selectedArmor;
             armorEquipButton.interactable = canEquipArmor;
         }
         else if (equipWeaponButton != null)
         {
-            bool showFallbackArmor = currentTarget == EquipmentManager.EquipTarget.Armor && currentFilter == Filter.Armors;
+            bool showFallbackArmor = (allowDirectEquip || currentTarget == EquipmentManager.EquipTarget.Armor) && selectedArmor;
             if (showFallbackArmor)
             {
                 equipWeaponButton.gameObject.SetActive(true);
-                bool canEquipArmor = hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.armorData != null;
+                bool canEquipArmor = selectedArmor;
                 equipWeaponButton.interactable = canEquipArmor;
             }
         }
 
         if (equipUsableButton != null)
         {
-            bool showU = currentTarget == EquipmentManager.EquipTarget.Bottom && currentFilter == Filter.Usables;
+            bool showU = (allowDirectEquip || currentTarget == EquipmentManager.EquipTarget.Bottom) && selectedUsable;
             equipUsableButton.gameObject.SetActive(showU);
-            equipUsableButton.interactable = showU && hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.usableData != null;
+            equipUsableButton.interactable = showU && selectedUsable;
         }
 
     }
@@ -1112,6 +1212,11 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         {
             equipWeaponButton.gameObject.SetActive(false);
             equipWeaponButton.interactable = false;
+        }
+        if (shieldEquipButton != null)
+        {
+            shieldEquipButton.gameObject.SetActive(false);
+            shieldEquipButton.interactable = false;
         }
         if (equipUsableButton != null)
         {
@@ -1270,7 +1375,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private bool TryEquipFocusedPadItem()
     {
-        var target = equipmentManager != null ? equipmentManager.CurrentEquipTarget : EquipmentManager.EquipTarget.None;
+        var target = GetEffectiveEquipTarget();
         if (target == EquipmentManager.EquipTarget.None) return false;
         if (padFocusIndex < 0 || !HasItem(padFocusIndex)) return false;
 
@@ -1300,14 +1405,115 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private void CompleteEquipAction()
     {
+        EnsureEquipmentManager();
         RefreshSlot(currentSelectedIndex);
         RefreshDetailSelection();
         equipmentManager?.RefreshEquipmentCross();
         ResetEquipTarget();
         if (equipmentManager != null)
+        {
             equipmentManager.CloseEquipGrid();
+            equipmentManager.FocusEquipmentCrossDefault();
+        }
         else
+        {
             CloseEquipGridView();
+        }
+
+        ForceShowEquipmentView();
+    }
+
+    private void CompleteDirectEquipAction()
+    {
+        RefreshSlot(currentSelectedIndex);
+        RefreshDetailSelection();
+        equipmentManager?.RefreshEquipmentCross();
+    }
+
+    private EquipmentManager.EquipTarget GetEffectiveEquipTarget()
+    {
+        EquipmentManager.EquipTarget currentTarget = equipmentManager != null ? equipmentManager.CurrentEquipTarget : EquipmentManager.EquipTarget.None;
+        if (currentTarget != EquipmentManager.EquipTarget.None)
+            return currentTarget;
+
+        return equipSelectionMode ? pendingEquipTarget : EquipmentManager.EquipTarget.None;
+    }
+
+    private int GetEffectiveEquipSlot()
+    {
+        if (equipmentManager != null && equipmentManager.CurrentEquipTarget != EquipmentManager.EquipTarget.None)
+            return equipmentManager.CurrentEquipSlot;
+
+        return pendingEquipSlot;
+    }
+
+    private ArmorItemData.ArmorSlot GetEffectiveArmorSlot()
+    {
+        if (equipmentManager != null && equipmentManager.CurrentEquipTarget == EquipmentManager.EquipTarget.Armor)
+            return equipmentManager.CurrentArmorSlot;
+
+        return pendingArmorSlot;
+    }
+
+    private void CacheEquipSelectionContext()
+    {
+        if (equipmentManager == null)
+            return;
+
+        pendingEquipTarget = equipmentManager.CurrentEquipTarget;
+        pendingEquipSlot = equipmentManager.CurrentEquipSlot;
+        pendingArmorSlot = equipmentManager.CurrentArmorSlot;
+        equipSelectionMode = pendingEquipTarget != EquipmentManager.EquipTarget.None;
+    }
+
+    private void ClearEquipSelectionContext()
+    {
+        equipSelectionMode = false;
+        pendingEquipTarget = EquipmentManager.EquipTarget.None;
+        pendingEquipSlot = 0;
+        pendingArmorSlot = ArmorItemData.ArmorSlot.Helmet;
+    }
+
+    private void CompletePostDirectEquipAction()
+    {
+        bool shouldReturnToEquipment = equipSelectionMode
+                                       || GetEffectiveEquipTarget() != EquipmentManager.EquipTarget.None
+                                       || IsEquipmentTabActive();
+
+        if (shouldReturnToEquipment)
+            CompleteEquipAction();
+        else
+            CompleteDirectEquipAction();
+    }
+
+    private bool IsEquipmentTabActive()
+    {
+        EnsureEquipmentManager();
+        if (equipmentManager != null && equipmentManager.IsEquipmentCrossModeActive())
+            return true;
+
+        MenuManager menuManager = FindObjectOfType<MenuManager>(true);
+        return menuManager != null
+               && string.Equals(menuManager.CurrentTabKey, "Equipment", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ForceShowEquipmentView()
+    {
+        Transform root = transform.root;
+        if (root == null)
+            return;
+
+        Transform inventoryRoot = FindDeepChildByName(root, "invBackground");
+        if (inventoryRoot != null)
+            inventoryRoot.gameObject.SetActive(false);
+
+        Transform equipmentRoot = FindDeepChildByName(root, "EquipmentBackground");
+        if (equipmentRoot != null)
+            equipmentRoot.gameObject.SetActive(true);
+
+        Transform magicRoot = FindDeepChildByName(root, "MagicBackground");
+        if (magicRoot != null)
+            magicRoot.gameObject.SetActive(false);
     }
 
 }

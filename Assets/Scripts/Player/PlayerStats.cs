@@ -73,6 +73,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
     [SerializeField] private int totalArmorMagicDefense;
     [SerializeField] private float totalArmorWeight;
 
+    [Header("Equip Load")]
+    [Range(0f, 1f)] [SerializeField] private float unequippedInventoryWeightMultiplier = 0.2f;
+
     private float lastStaminaUseTime;
     private float flaskTimer;
     private Animator animator;
@@ -708,22 +711,15 @@ public class PlayerStats : MonoBehaviour, IDamageable
                 if (it == null) continue;
 
                 int qty = Mathf.Max(1, it.amount);
-                float unitWeight = 0f;
+                float unitWeight = GetInventoryEntryUnitWeight(it);
+                if (unitWeight <= 0f)
+                    continue;
 
-                if (it.weaponData != null)
-                    unitWeight = Mathf.Max(0f, it.weaponData.weight);
-                else if (it.armorData != null)
-                {
-                    if (inventory.IsArmorInstanceEquipped(it.instanceId))
-                        continue;
-                    unitWeight = Mathf.Max(0f, it.armorData.weight);
-                }
-                else if (it.usableData != null)
-                    unitWeight = Mathf.Max(0f, it.usableData.weight);
-                else if (it.itemData != null)
-                    unitWeight = Mathf.Max(0f, it.itemData.weight);
+                int equippedUnits = GetEquippedUnitsForLoad(it, inventory, qty);
+                int unequippedUnits = Mathf.Max(0, qty - equippedUnits);
 
-                load += unitWeight * qty;
+                load += unitWeight * equippedUnits;
+                load += unitWeight * unequippedInventoryWeightMultiplier * unequippedUnits;
             }
         }
 
@@ -769,6 +765,40 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
             Debug.Log($"[PlayerStats] Armor totals ({context}) -> phyDef:{totalArmorPhysicalDefense}, magDef:{totalArmorMagicDefense}, weight:{totalArmorWeight:0.##}, changed:{changed}");
         }
+    }
+
+    private float GetInventoryEntryUnitWeight(InventoryItem item)
+    {
+        if (item == null)
+            return 0f;
+
+        if (item.weaponData != null)
+            return Mathf.Max(0f, item.weaponData.weight);
+
+        if (item.armorData != null)
+            return Mathf.Max(0f, item.armorData.weight);
+
+        if (item.usableData != null)
+            return Mathf.Max(0f, item.usableData.weight);
+
+        if (item.itemData != null)
+            return Mathf.Max(0f, item.itemData.weight);
+
+        return 0f;
+    }
+
+    private int GetEquippedUnitsForLoad(InventoryItem item, PlayerInventory inventory, int quantity)
+    {
+        if (item == null || inventory == null || quantity <= 0)
+            return 0;
+
+        if (item.armorData != null)
+            return inventory.IsArmorInstanceEquipped(item.instanceId) ? 1 : 0;
+
+        if (item.weaponData != null || item.usableData != null || item.magicData != null)
+            return inventory.IsInstanceEquipped(item.instanceId) ? 1 : 0;
+
+        return 0;
     }
 
     public float GetMaxEquipLoad()

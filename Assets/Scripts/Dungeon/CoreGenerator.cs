@@ -215,6 +215,8 @@ public class CoreGenerator : MonoBehaviour
         // 2. CORPO CENTRALE
         List<VirtualRoom> expandableRooms = new List<VirtualRoom> { layout[0] };
         int normalCount = 0;
+        int consecutiveFailedNormalPlacements = 0;
+        int maxNormalPlacementFailures = Mathf.Max(50, totalNormalRooms * 8);
         while (normalCount < totalNormalRooms && expandableRooms.Count > 0)
         {
             VirtualRoom origin = expandableRooms[prng.Next(expandableRooms.Count)];
@@ -222,6 +224,7 @@ public class CoreGenerator : MonoBehaviour
             Vector2Int potentialAnchor = origin.anchorPos + dir;
 
             List<Vector2Int> sizesToTry = GetSizesToTry(normalBigRoomChance, "Normal");
+            bool placed = false;
 
             foreach (var size in sizesToTry)
             {
@@ -230,14 +233,27 @@ public class CoreGenerator : MonoBehaviour
                     Room prefab = GetRandomPrefab("Normal", size);
                     if (prefab != null)
                     {
+                        LogRoomPlacement("Normal", size, potentialAnchor);
                         VirtualRoom newRoom = AddRoomToLayout(layout, occupiedCells, potentialAnchor, size, "Normal", prefab);
                         expandableRooms.Add(newRoom);
                         normalCount++;
+                        consecutiveFailedNormalPlacements = 0;
+                        placed = true;
                         break; 
                     }
                 }
             }
+
+            if (!placed)
+            {
+                consecutiveFailedNormalPlacements++;
+                if (consecutiveFailedNormalPlacements >= maxNormalPlacementFailures)
+                    return null;
+            }
         }
+
+        if (normalCount < totalNormalRooms)
+            return null;
 
         // --- FASE DI PIAZZAMENTO STANZE SPECIALI ---
 
@@ -368,11 +384,13 @@ public class CoreGenerator : MonoBehaviour
             if (minDistance > 0 && GetManhattanDist(Vector2Int.zero, roomToReplace.anchorPos) < minDistance) continue;
             if (avoidBossTouchingSpecials && type == "Boss" && IsTouchingRestrictedRoom(roomToReplace.anchorPos, roomToReplace.size, cellToRoomMap, roomToReplace)) continue;
             if (IsTouchingAnySpecialRoom(roomToReplace.anchorPos, roomToReplace.size, cellToRoomMap, roomToReplace)) continue;
+            if (!sizesToTry.Contains(roomToReplace.size)) continue;
             
             Room prefab = GetRandomPrefab(type, roomToReplace.size);
             if (prefab != null)
             {
                 TemporarilyRemoveRoom(roomToReplace, layout, occupied, cellToRoomMap);
+                LogRoomPlacement(type, roomToReplace.size, roomToReplace.anchorPos);
                 AddRoomToLayout(layout, occupied, roomToReplace.anchorPos, roomToReplace.size, type, prefab, cellToRoomMap);
                 replacementCandidates.Remove(roomToReplace);
                 return true; 
@@ -395,6 +413,7 @@ public class CoreGenerator : MonoBehaviour
                     Room prefab = GetRandomPrefab(type, size);
                     if (prefab != null)
                     {
+                        LogRoomPlacement(type, size, spot);
                         AddRoomToLayout(layout, occupied, spot, size, type, prefab, cellToRoomMap);
                         freeSockets.Remove(spot);
                         return true;
@@ -448,21 +467,50 @@ public class CoreGenerator : MonoBehaviour
     List<Vector2Int> GetSizesToTry(int chancePercent, string roomType)
     {
         var sizes = new List<Vector2Int>();
-        bool tryBig = prng.Next(0, 100) < chancePercent;
-
-        if (showRngLogs)
-        {
-            string color = tryBig ? "green" : "grey";
-            string resultText = tryBig ? "GRANDE" : "Piccola";
-            Debug.Log($"[RNG] Stanza <b>{roomType}</b>: Roll < {chancePercent}% -> <color={color}>{resultText}</color>");
-        }
+        bool forceBigOnly = chancePercent >= 100;
+        bool tryBig = forceBigOnly || prng.Next(0, 100) < chancePercent;
 
         if (tryBig)
         {
             sizes.AddRange(bigSizes.OrderBy(x => prng.Next()));
         }
-        sizes.Add(new Vector2Int(1, 1)); // Aggiunge sempre 1x1 come fallback
+
+        if (!forceBigOnly)
+            sizes.Add(new Vector2Int(1, 1)); // Fallback solo se non sto forzando big al 100%
+
         return sizes;
+    }
+
+    private void LogRoomPlacement(string roomType, Vector2Int size, Vector2Int anchor)
+    {
+        if (!showRngLogs)
+            return;
+
+        string label;
+        string color;
+
+        if (size == new Vector2Int(2, 2))
+        {
+            label = "GRANDE";
+            color = "green";
+        }
+        else if (size == new Vector2Int(2, 1))
+        {
+            label = "LONG";
+            color = "orange";
+        }
+        else if (size == new Vector2Int(1, 2))
+        {
+            label = "TALL";
+            color = "yellow";
+        }
+        else
+        {
+            label = "Piccola";
+            color = "grey";
+        }
+
+        Debug.Log($"[RNG] Piazzo stanza <b>{roomType}</b> -> <color={color}>{label}</color> ({size.x}x{size.y}) @ {anchor}");
     }
     
     bool CanFit(Vector2Int anchor, Vector2Int size, HashSet<Vector2Int> occupied, bool strictOneDoor)
