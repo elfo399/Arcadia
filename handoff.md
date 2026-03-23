@@ -2698,3 +2698,431 @@ Oggetti che invece devono riallinearsi alla scena e non essere considerati fonte
 - `MinimapManager`
 - `CompassSystem`
 - riferimenti UI in generale
+
+## 32. File di supporto e classi minori
+
+Questi file non sono il centro del refactor, ma fanno parte del progetto e possono servire per debugging o extension.
+
+### 32.1 `PlayerAnimationEvents`
+
+File:
+
+- `Assets/Scripts/Player/PlayerAnimationEvents.cs`
+
+Responsabilita':
+
+- ponte tra animation events e gameplay combat
+- abilita/disabilita hitbox mano destra/sinistra
+- chiama `combat.EndAttack()`
+- prepara il danno del colpo per `WeaponDamage`
+
+Campi:
+
+- `rightHandDamage`
+- `leftHandDamage`
+
+### 32.2 `WeaponDamage`
+
+File:
+
+- `Assets/Scripts/Combat/WeaponDamage.cs`
+
+Responsabilita':
+
+- hitbox melee attiva durante le finestre degli animation events
+- legge il danno preparato oppure refresh dall'arma equipaggiata
+- applica danno a `IDamageable`
+- evita multi-hit sullo stesso target nello stesso swing con `hitTargets`
+
+Campi chiave:
+
+- `hand`
+- `fallbackDamage`
+- `damage`
+- `logDamage`
+- `damageCollider`
+- `currentWeapon`
+- `lastHitWasCritical`
+- `lastAttackType`
+
+### 32.3 `RandomProp`
+
+File:
+
+- `Assets/Scripts/Rooms/RandomProp.cs`
+
+Responsabilita':
+
+- placeholder/spawner deterministico di prop di stanza
+- usa seed locale basato su:
+  - `CoreGenerator.currentMasterSeed`
+  - posizione
+- puo' randomizzare rotazione
+- puo' anche spawnare nemici e registrarli nella `Room`
+
+Campi:
+
+- `props`
+- `spawnChance`
+- `randomRotation`
+
+### 32.4 `EnemySetup`
+
+File:
+
+- `Assets/Scripts/Enemy/EnemySetup.cs`
+
+Responsabilita':
+
+- crea/risolve `HeadPoint`
+- crea `LockOnPoint`
+- costruisce la health bar world-space enemy se manca
+
+Campi:
+
+- `defaultHeightOffset`
+- `healthBarScale`
+- `customHealthBarPrefab`
+
+### 32.5 `EnemyHealthBar`
+
+File:
+
+- `Assets/Scripts/Enemy/EnemyHealthBar.cs`
+
+Nota:
+
+- wrapper/bar script usato da `EnemyHealth` e `EnemySetup`
+- sistema separato dalla HUD del player
+
+### 32.6 `InventoryItem`
+
+File:
+
+- `Assets/Scripts/UI/InventoryItem.cs`
+
+Nota:
+
+- e' il contenitore runtime usato da `PlayerInventory` / `InventoryUIManager`
+- puo' rappresentare:
+  - weapon
+  - magic
+  - armor
+  - usable
+  - item
+- conserva anche `instanceId` quando necessario
+
+### 32.7 `InventorySlot`
+
+File:
+
+- `Assets/Scripts/UI/InventorySlot.cs`
+
+Responsabilita':
+
+- singolo slot UI riusato in:
+  - inventory
+  - equipment
+  - magic
+  - HUD front slots
+- setup sprite / quantity
+- focus visual
+- pointer / submit / drag callbacks tramite `IInventorySlotHandler`
+
+### 32.8 `IInventorySlotHandler`
+
+File:
+
+- `Assets/Scripts/UI/IInventorySlotHandler.cs`
+
+Interfaccia usata da:
+
+- `InventoryUIManager`
+- `MagicInventoryManager`
+- `EquipmentManager`
+
+### 32.9 `MenuTabEntry`
+
+File:
+
+- `Assets/Scripts/UI/MenuTabEntry.cs`
+
+Usato da:
+
+- `MenuManager`
+
+Ruolo:
+
+- definisce:
+  - `key`
+  - `label`
+  - `background`
+
+### 32.10 Quest row UI helpers
+
+File:
+
+- `Assets/Scripts/UI/QuestItemUI.cs`
+- `Assets/Scripts/UI/QuestObjectiveItemUI.cs`
+- `Assets/Scripts/UI/QuestRewardItemUI.cs`
+
+Ruolo:
+
+- componenti UI per row di:
+  - quest list
+  - objective list
+  - reward list
+
+### 32.11 `WeaponAnimationProfile`
+
+File:
+
+- `Assets/Scripts/Items/WeaponAnimationProfile.cs`
+
+Contiene:
+
+- anim name per:
+  - right hand light/heavy
+  - left hand light/heavy
+  - air attack opzionali
+
+### 32.12 `IDamageable`
+
+File:
+
+- `Assets/Scripts/Interface/IDamageable.cs`
+
+Usato da:
+
+- `EnemyHealth`
+- `PlayerStats`
+- projectile e melee hitbox
+
+### 32.13 `IInteractable`
+
+File:
+
+- `Assets/Scripts/Interface/IInteractable.cs`
+
+Usato da:
+
+- `InteractableDoor`
+- `WeaponWorldPickup`
+- altri interactable futuri
+
+## 33. Editor scripts presenti
+
+Questa parte e' utile se riapri il progetto e ti chiedi perche' certi inspector appaiono custom.
+
+### 33.1 `WeaponItemEditor`
+
+File:
+
+- `Assets/Scripts/Editor/WeaponItemEditor.cs`
+
+Responsabilita':
+
+- inspector custom per `WeaponItem`
+- mostra campi condizionali in base a `WeaponCategory`
+- shield:
+  - block/parry
+- wand:
+  - projectile/mana/cooldown
+- bow:
+  - projectile/ammo/cooldown
+
+### 33.2 `QuestRewardDrawer`
+
+File:
+
+- `Assets/Scripts/Editor/QuestRewardDrawer.cs`
+
+Responsabilita':
+
+- property drawer per:
+  - `QuestManager.QuestRewardData`
+  - `QuestRewardEntryData`
+- mostra un singolo campo asset dinamico in base a `QuestRewardType`
+
+### 33.3 `TreasureChestLootTableDrawer`
+
+File:
+
+- `Assets/Scripts/Editor/TreasureChestLootTableDrawer.cs`
+
+Responsabilita':
+
+- property drawer per `TreasureChestLootTable.LootEntry`
+- supporta reward asset multipli:
+  - weapon
+  - armor
+  - magic
+  - usable
+  - item
+
+Nota:
+
+- nel set di file letto non e' emersa la classe runtime `TreasureChestLootTable`, quindi se questo drawer non viene usato da nessun asset attuale puo' essere residuo o parte di un sistema non ancora collegato
+
+## 34. File legacy / residui / da verificare
+
+### 34.1 `SimpleDungeonGenerator`
+
+Gia' detto sopra ma va ribadito:
+
+- e' il vecchio generator
+- non e' il sistema attuale
+- non continuare a lavorare li'
+
+### 34.2 `DynamicBar`
+
+File:
+
+- `Assets/Scripts/UI/DynamicBar.cs`
+
+Ruolo:
+
+- utility generic bar
+- puo' ridimensionare una frame in base a `maxValue`
+
+Nota:
+
+- presente ma non e' la soluzione corrente del player HUD
+
+### 34.3 `SceneLoader`
+
+Anche se usato, e' estremamente semplice e generico.
+Se il flow futuro sara' hub -> dungeon -> multi-floor -> boss -> ritorno hub, il punto centrale resta `CoreGenerator` + `FloorPortal`, non `SceneLoader`.
+
+### 34.4 `TreasureChestLootTableDrawer`
+
+Da ricontrollare in futuro:
+
+- se il relativo sistema runtime esiste davvero
+- se no, e' candidato a cleanup
+
+## 35. Problemi noti / gotcha pratici
+
+Questa sezione serve per evitare trappole quando riprendi.
+
+### 35.1 Nomi UI scritti in modo inconsistente
+
+Esempi:
+
+- `WeaponCollumn`
+- `ShieldCollumn`
+- `ArmorCollumn`
+
+Sono typo storici ma ormai fanno parte del setup reale.
+Il codice ha fallback sia `Column` sia `Collumn` in alcuni punti, ma non ovunque conviene rinominare a mano.
+
+### 35.2 `leggings` da verificare in scena
+
+Nella grep scene rapida risultavano:
+
+- `helmet`
+- `chestplate`
+- `boots`
+
+ma non e' emerso chiaramente `leggings`.
+
+Quindi:
+
+- controllare `HubScene` e `GameScene`
+- verificare che l'oggetto `leggings` sia:
+  - salvato
+  - nominato esattamente cosi'
+  - assegnato o risolvibile
+
+### 35.3 `QuestUiManager` come nome GameObject
+
+Il GameObject in scena puo' ancora chiamarsi `QuestUiManager`, ma la classe vera e' `QuestJournalUI`.
+Non confondere:
+
+- nome oggetto in hierarchy
+- nome classe C#
+
+### 35.4 `CoreGenerator` log fuorviante sui legacy pools
+
+Gia' segnalato:
+
+- se compare il log "uso i pool legacy", non assumerlo vero
+- controllare la config tema, non il fallback
+
+### 35.5 `StatBarManager` non e' da usare
+
+Se vedi il file e pensi che controlli le barre:
+
+- no
+- si auto-disabilita
+- le barre reali sono gestite da `PlayerUI`
+
+## 36. Checklist finale prima di cambiare PC / prima build
+
+### 36.1 Prima di spostarti su un altro PC
+
+1. assicurati che:
+   - scene siano salvate
+   - prefab siano salvati
+   - asset ScriptableObject recenti siano salvati
+2. porta con te:
+   - l'intero progetto
+   - questo file `handoff.md`
+3. se usi git:
+   - commit o stash pulito
+
+### 36.2 Quando apri il progetto sull'altro PC
+
+1. aspetta il reimport completo Unity
+2. apri `HubScene`
+3. apri `GameScene`
+4. controlla console per missing refs
+5. controlla:
+   - `CoreGenerator`
+   - `MenuManager`
+   - `InventoryUIManager`
+   - `EquipmentManager`
+   - `PlayerUI`
+   - `MinimapManager`
+
+### 36.3 Smoke test minimo
+
+1. apri menu
+2. equip weapon
+3. equip shield
+4. equip armor
+5. equip magic
+6. muoviti hub
+7. entra dungeon
+8. verifica spawn in start
+9. verifica camera lock
+10. verifica minimap
+11. verifica compass
+12. fatti colpire con e senza armor
+
+## 37. Stato del documento
+
+Questo file ora copre:
+
+- architettura generale
+- manager UI
+- player systems
+- combat
+- inventory/loadout/save
+- dungeon generator
+- room flow
+- enemy system
+- items/database/pickup
+- quest/journal
+- auto-wire names
+- scene hierarchy aspettata
+- editor scripts
+- file legacy/residui
+- gotcha pratici
+
+Se in futuro si aggiungono sistemi grossi nuovi, aggiornare questo file nelle sezioni:
+
+- architettura
+- setup Unity
+- gotcha
+- smoke tests
