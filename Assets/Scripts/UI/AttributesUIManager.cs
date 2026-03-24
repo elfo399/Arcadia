@@ -38,6 +38,7 @@ public class AttributesUIManager : MonoBehaviour
     [SerializeField] private MenuManager menuManager;
 
     private PlayerStats playerStats;
+    private PlayerController playerController;
     private string selectedAttributeKey;
     private bool attributesUiInitialized;
     private int attributesPadIndex;
@@ -104,6 +105,7 @@ public class AttributesUIManager : MonoBehaviour
     {
         Initialize();
         CachePlayerStats();
+        CachePlayerController();
         if (playerStats == null) return;
 
         SetReadOnlyScrollbar(attributesXpScrollbar);
@@ -187,6 +189,12 @@ public class AttributesUIManager : MonoBehaviour
     {
         if (playerStats != null) return;
         playerStats = PlayerStats.instance != null ? PlayerStats.instance : FindObjectOfType<PlayerStats>();
+    }
+
+    private void CachePlayerController()
+    {
+        if (playerController != null) return;
+        playerController = FindObjectOfType<PlayerController>(true);
     }
 
     private void AutoWireAttributesUIReferences()
@@ -322,6 +330,7 @@ public class AttributesUIManager : MonoBehaviour
         float equipWeight = playerStats.GetCurrentEquipLoad();
         float maxLoad = playerStats.GetMaxEquipLoad();
         float loadRatio = Mathf.Clamp01(maxLoad > 0f ? equipWeight / maxLoad : 0f);
+        string loadTierLabel = playerController != null ? playerController.GetEquipLoadTierLabel() : ResolveLoadTierLabelFallback(loadRatio);
 
         if (attributesHpValueText != null) attributesHpValueText.text = hp.ToString();
         if (attributesManaValueText != null) attributesManaValueText.text = mana.ToString();
@@ -330,8 +339,15 @@ public class AttributesUIManager : MonoBehaviour
         if (attributesMagicDamageValueText != null) attributesMagicDamageValueText.text = magicDamage.ToString();
         if (attributesPhyDefValueText != null) attributesPhyDefValueText.text = phyDef.ToString();
         if (attributesMagicDefValueText != null) attributesMagicDefValueText.text = magicDef.ToString();
-        if (attributesLoadValueText != null) attributesLoadValueText.text = equipWeight.ToString("0.0") + " / " + maxLoad.ToString("0.0");
+        if (attributesLoadValueText != null) attributesLoadValueText.text = equipWeight.ToString("0.0") + " / " + maxLoad.ToString("0.0") + " (" + loadTierLabel + ")";
         ApplyReadOnlyProgressToScrollbar(attributesLoadScrollbar, loadRatio);
+    }
+
+    private static string ResolveLoadTierLabelFallback(float loadRatio)
+    {
+        if (loadRatio < 0.20f) return "Fast";
+        if (loadRatio > 0.80f) return "Slow";
+        return "Normal";
     }
 
     private static void SetReadOnlyScrollbar(Scrollbar bar)

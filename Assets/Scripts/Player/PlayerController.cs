@@ -6,6 +6,13 @@ using UnityEngine.SceneManagement;
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
+    public enum EquipLoadTier
+    {
+        Fast,
+        Normal,
+        Slow
+    }
+
     [Header("Movement")]
     public float moveSpeed = 5f;
     public float sprintMultiplier = 1.5f;
@@ -282,19 +289,51 @@ public class PlayerController : MonoBehaviour
 
     private float GetEquipLoadSpeedMultiplier()
     {
+        switch (GetEquipLoadTier())
+        {
+            case EquipLoadTier.Fast:
+                return Mathf.Max(0.1f, lightLoadSpeedMultiplier);
+            case EquipLoadTier.Slow:
+                return Mathf.Max(0.1f, heavyLoadSpeedMultiplier);
+            default:
+                return 1f;
+        }
+    }
+
+    public float GetEquipLoadRatio()
+    {
         if (playerStats == null)
             playerStats = GetComponent<PlayerStats>();
-        if (playerStats == null) return 1f;
+        if (playerStats == null)
+            return 0f;
 
         float maxLoad = Mathf.Max(0.001f, playerStats.GetMaxEquipLoad());
         float currentLoad = Mathf.Max(0f, playerStats.GetCurrentEquipLoad());
-        float loadRatio = currentLoad / maxLoad;
+        return currentLoad / maxLoad;
+    }
+
+    public EquipLoadTier GetEquipLoadTier()
+    {
+        float loadRatio = GetEquipLoadRatio();
 
         if (loadRatio < lightLoadThreshold)
-            return Mathf.Max(0.1f, lightLoadSpeedMultiplier);
+            return EquipLoadTier.Fast;
         if (loadRatio > heavyLoadThreshold)
-            return Mathf.Max(0.1f, heavyLoadSpeedMultiplier);
-        return 1f;
+            return EquipLoadTier.Slow;
+        return EquipLoadTier.Normal;
+    }
+
+    public string GetEquipLoadTierLabel()
+    {
+        switch (GetEquipLoadTier())
+        {
+            case EquipLoadTier.Fast:
+                return "Fast";
+            case EquipLoadTier.Slow:
+                return "Slow";
+            default:
+                return "Normal";
+        }
     }
 
     void HandleSprintAndDodgeInput(Vector2 moveInput)

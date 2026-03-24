@@ -26,6 +26,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
     [SerializeField] private float healthPerVigor = 5f;
     [SerializeField] private float manaPerMind = 3f;
     [SerializeField] private float staminaPerEndurance = 4f;
+    [SerializeField] private float baseEquipLoad = 40f;
+    [SerializeField] private float equipLoadPerEndurance = 2f;
 
     [Header("Flasks")]
     public int maxFlasks = 3;
@@ -803,7 +805,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public float GetMaxEquipLoad()
     {
-        return Mathf.Max(1f, endurance * 2f);
+        float scaledLoad = baseEquipLoad + Mathf.Max(0, endurance - 1) * equipLoadPerEndurance;
+        return Mathf.Max(1f, scaledLoad);
     }
 
     public void RecalculateDerivedStats(bool keepCurrentRatio)
