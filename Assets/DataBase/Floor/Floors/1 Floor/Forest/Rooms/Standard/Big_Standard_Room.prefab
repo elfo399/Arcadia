@@ -1689,7 +1689,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   spawnTable: {fileID: 11400000, guid: 64d5bdd16cdc6e544bf31cbaf590adc9, type: 2}
-  spawnChance: 99
 --- !u!1 &3596602838662624233
 GameObject:
   m_ObjectHideFlags: 0
@@ -1945,7 +1944,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   spawnTable: {fileID: 11400000, guid: 64d5bdd16cdc6e544bf31cbaf590adc9, type: 2}
-  spawnChance: 99
 --- !u!1 &3935008918324900738
 GameObject:
   m_ObjectHideFlags: 0
@@ -2025,7 +2023,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   spawnTable: {fileID: 11400000, guid: 64d5bdd16cdc6e544bf31cbaf590adc9, type: 2}
-  spawnChance: 99
 --- !u!1 &4384561209117864248
 GameObject:
   m_ObjectHideFlags: 0
@@ -2220,6 +2217,7 @@ Transform:
   - {fileID: 4381140875980561754}
   - {fileID: 8627835251801717239}
   - {fileID: 5253543643659432859}
+  - {fileID: 2303227534390292909}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &9073747019927318074
@@ -2296,9 +2294,11 @@ MonoBehaviour:
   isLocked: 0
   roomCleared: 0
   activeEnemies: []
-  coinPrefab: {fileID: 0}
-  minCoins: 2
-  maxCoins: 5
+  floorPortalPrefab: {fileID: 0}
+  preplacedFloorPortal: {fileID: 0}
+  portalSpawnOffset: {x: 0, y: 0, z: 0}
+  portalDistanceFromCenter: 10
+  playerSpawnPoint: {fileID: 0}
 --- !u!65 &-783672155943941513
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -3580,6 +3580,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &7027627772344724397
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2303227534390292909}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2303227534390292909
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7027627772344724397}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2465098802145948511}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7166205522964631405
 GameObject:
   m_ObjectHideFlags: 0
@@ -4394,4 +4425,3 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   spawnTable: {fileID: 11400000, guid: 64d5bdd16cdc6e544bf31cbaf590adc9, type: 2}
-  spawnChance: 99
