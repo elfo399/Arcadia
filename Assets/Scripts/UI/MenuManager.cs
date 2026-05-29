@@ -15,6 +15,17 @@ public class MenuManager : MonoBehaviour
     [SerializeField] private AttributesUIManager attributesUIManager;
     [SerializeField] private QuestJournalUI questJournalUI;
 
+    [Header("Book Animation")]
+    [SerializeField] private Animator menuAnimator;
+    [SerializeField] private string menuOpenStateName = "BookOpen";
+    [SerializeField] private string menuCloseStateName = "CloseBook";
+    [SerializeField] private string menuFlipRightStateName = "FlipRightPage";
+    [SerializeField] private string menuFlipLeftStateName = "FlipLeftPage";
+    [SerializeField] [Min(0f)] private float menuOpenStartDelay = 0.5f;
+    [SerializeField] [Min(0f)] private float menuCloseEndDelay = 0.5f;
+    [SerializeField] [Min(0f)] private float menuPageFlipFallbackDuration = 0.25f;
+    [SerializeField] [Min(0f)] private float menuCloseFallbackDuration = 0.25f;
+
     [Header("Tabs")]
     [SerializeField] private MenuTabEntry[] tabs;
     [SerializeField] private Color activeColor = Color.white;
@@ -32,15 +43,31 @@ public class MenuManager : MonoBehaviour
     private float padFocusLockUntil;
     private float lastNavigationMoveTime = -999f;
     private PlayerInventory currentPlayerInventory;
+    private Coroutine openMenuRoutine;
+    private Coroutine closeMenuRoutine;
+    private Coroutine pageFlipRoutine;
+    private bool isMenuOpening;
+    private bool isMenuClosing;
+    private bool isMenuPageFlipping;
+
+    private const string AnimatorBaseLayerPrefix = "Base Layer.";
 
     public bool IsMenuOpen => isMenuOpen;
     public bool IsPadFocusVisible => showPadFocus;
     public string CurrentTabKey => IsValidTabIndex(currentTabIndex) ? tabs[currentTabIndex].key : string.Empty;
+    private bool IsMenuTransitioning => isMenuOpening || isMenuClosing || isMenuPageFlipping;
 
     private void Awake()
     {
         ResolveReferences();
         ApplyPadFocusVisible(false);
+        StopPendingOpenMenuRoutine();
+        StopPendingCloseMenuRoutine();
+        StopPendingPageFlipRoutine();
+        isMenuOpening = false;
+        isMenuClosing = false;
+        isMenuPageFlipping = false;
+        ResetMenuAnimatorPlayback();
 
         if (inventoryPanel != null)
             inventoryPanel.SetActive(false);
@@ -72,6 +99,9 @@ public class MenuManager : MonoBehaviour
 
     public bool ToggleMenu(PlayerControls controls, PlayerInventory playerInventory)
     {
+        if (IsMenuTransitioning)
+            return isMenuOpen;
+
         if (isMenuOpen)
             CloseMenu(controls, playerInventory);
         else
@@ -217,7 +247,7 @@ public class MenuManager : MonoBehaviour
 
     public void NextTab()
     {
-        if (tabs == null || tabs.Length == 0) return;
+        if (IsMenuTransitioning || tabs == null || tabs.Length == 0) return;
 
         int startIndex = IsValidTabIndex(currentTabIndex) ? currentTabIndex : FindFirstValidTabIndex();
         if (!IsValidTabIndex(startIndex)) return;
@@ -227,13 +257,14 @@ public class MenuManager : MonoBehaviour
             int next = (startIndex + offset) % tabs.Length;
             if (!IsValidTabIndex(next)) continue;
             ShowTab(tabs[next].key);
+            StartPageFlipAnimation(menuFlipRightStateName);
             return;
         }
     }
 
     public void PreviousTab()
     {
-        if (tabs == null || tabs.Length == 0) return;
+        if (IsMenuTransitioning || tabs == null || tabs.Length == 0) return;
 
         int startIndex = IsValidTabIndex(currentTabIndex) ? currentTabIndex : FindFirstValidTabIndex();
         if (!IsValidTabIndex(startIndex)) return;
@@ -243,13 +274,14 @@ public class MenuManager : MonoBehaviour
             int prev = (startIndex - offset + tabs.Length) % tabs.Length;
             if (!IsValidTabIndex(prev)) continue;
             ShowTab(tabs[prev].key);
+            StartPageFlipAnimation(menuFlipLeftStateName);
             return;
         }
     }
 
     public void HandleMenuInput(PlayerControls controls)
     {
-        if (!isMenuOpen || controls == null)
+        if (!isMenuOpen || IsMenuTransitioning || controls == null)
             return;
 
         ResolveReferences();
@@ -436,11 +468,20 @@ public class MenuManager : MonoBehaviour
     private void OpenMenu(PlayerControls controls, PlayerInventory playerInventory)
     {
         ResolveReferences();
+        StopPendingCloseMenuRoutine();
+        StopPendingOpenMenuRoutine();
+        StopPendingPageFlipRoutine();
+        isMenuOpening = false;
+        isMenuClosing = false;
+        isMenuPageFlipping = false;
         currentPlayerInventory = playerInventory;
         isMenuOpen = true;
 
         if (inventoryPanel != null)
+        {
             inventoryPanel.SetActive(true);
+            StartOpenMenuAnimation();
+        }
         if (playerHudPanel != null)
             playerHudPanel.SetActive(false);
 
@@ -472,6 +513,15 @@ public class MenuManager : MonoBehaviour
     private void CloseMenu(PlayerControls controls, PlayerInventory playerInventory)
     {
         ResolveReferences();
+        if (IsMenuTransitioning)
+            return;
+
+        StopPendingOpenMenuRoutine();
+        StopPendingPageFlipRoutine();
+        isMenuOpening = false;
+        isMenuPageFlipping = false;
+        ResetMenuAnimatorPlayback();
+
         PlayerInventory inventoryToUse = playerInventory != null ? playerInventory : currentPlayerInventory;
 
         if (inventoryToUse != null)
@@ -487,24 +537,21 @@ public class MenuManager : MonoBehaviour
             equipmentManager.RefreshEquipmentCross();
         }
 
-        isMenuOpen = false;
         ApplyPadFocusVisible(false);
-
-        if (inventoryPanel != null)
-            inventoryPanel.SetActive(false);
-        if (playerHudPanel != null)
-            playerHudPanel.SetActive(true);
-
-        CameraInputBlocker.SetAllCinemachineInput(true);
-        if (controls != null)
-            controls.Player.Look.Enable();
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        if (!StartCloseMenuAnimation(controls))
+            CompleteMenuClose(controls);
     }
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         ResolveReferences();
+        StopPendingOpenMenuRoutine();
+        StopPendingCloseMenuRoutine();
+        StopPendingPageFlipRoutine();
+        isMenuOpening = false;
+        isMenuClosing = false;
+        isMenuPageFlipping = false;
+        ResetMenuAnimatorPlayback();
 
         // Il menu non deve attraversare il cambio scena in stato aperto.
         isMenuOpen = false;
@@ -626,6 +673,12 @@ public class MenuManager : MonoBehaviour
             inventoryPanel = GameObject.Find("HUD_Inventory");
         if (playerHudPanel == null)
             playerHudPanel = GameObject.Find("HUD_Canvas");
+        if (menuAnimator == null && inventoryPanel != null)
+        {
+            menuAnimator = inventoryPanel.GetComponent<Animator>();
+            if (menuAnimator == null)
+                menuAnimator = inventoryPanel.GetComponentInChildren<Animator>(true);
+        }
 
         if (inventoryUIManager == null && inventoryPanel != null)
             inventoryUIManager = inventoryPanel.GetComponentInChildren<InventoryUIManager>(true);
@@ -712,5 +765,253 @@ public class MenuManager : MonoBehaviour
                && index < tabs.Length
                && tabs[index] != null
                && !string.IsNullOrWhiteSpace(tabs[index].key);
+    }
+
+    private bool StartCloseMenuAnimation(PlayerControls controls)
+    {
+        if (inventoryPanel == null || !inventoryPanel.activeInHierarchy)
+            return false;
+
+        if (!PlayMenuAnimationState(menuCloseStateName))
+            return false;
+
+        float closeAnimationDuration = GetMenuAnimationDuration(menuCloseStateName, menuCloseFallbackDuration);
+        if (closeAnimationDuration <= 0f)
+            return false;
+
+        isMenuClosing = true;
+        closeMenuRoutine = StartCoroutine(CloseMenuAfterAnimation(controls, closeAnimationDuration, Mathf.Max(0f, menuCloseEndDelay)));
+        return true;
+    }
+
+    private void StartPageFlipAnimation(string stateName)
+    {
+        StopPendingPageFlipRoutine();
+
+        if (string.IsNullOrWhiteSpace(stateName))
+        {
+            isMenuPageFlipping = false;
+            return;
+        }
+
+        if (!PlayMenuAnimationState(stateName))
+        {
+            isMenuPageFlipping = false;
+            return;
+        }
+
+        float flipDuration = GetMenuAnimationDuration(stateName, menuPageFlipFallbackDuration);
+        if (flipDuration <= 0f)
+        {
+            isMenuPageFlipping = false;
+            return;
+        }
+
+        isMenuPageFlipping = true;
+        pageFlipRoutine = StartCoroutine(CompletePageFlipAfterDelay(flipDuration));
+    }
+
+    private void StartOpenMenuAnimation()
+    {
+        StopPendingOpenMenuRoutine();
+        ResetMenuAnimatorPlayback();
+
+        if (!PlayMenuAnimationState(menuOpenStateName))
+        {
+            isMenuOpening = false;
+            return;
+        }
+
+        float delay = Mathf.Max(0f, menuOpenStartDelay);
+        float openAnimationDuration = Mathf.Max(0f, GetMenuAnimationDuration(menuOpenStateName, 0f));
+        if (delay <= 0f && openAnimationDuration <= 0f)
+        {
+            isMenuOpening = false;
+            return;
+        }
+
+        isMenuOpening = true;
+        openMenuRoutine = StartCoroutine(RunOpenMenuAnimation(delay, openAnimationDuration));
+    }
+
+    private IEnumerator RunOpenMenuAnimation(float delay, float openAnimationDuration)
+    {
+        if (delay > 0f)
+        {
+            SetMenuAnimatorPlaybackSpeed(0f);
+            yield return new WaitForSecondsRealtime(delay);
+        }
+
+        if (!isMenuOpen || isMenuClosing)
+        {
+            openMenuRoutine = null;
+            isMenuOpening = false;
+            yield break;
+        }
+
+        SetMenuAnimatorPlaybackSpeed(1f);
+
+        if (openAnimationDuration > 0f)
+            yield return new WaitForSecondsRealtime(openAnimationDuration);
+
+        openMenuRoutine = null;
+        if (!isMenuOpen || isMenuClosing)
+        {
+            isMenuOpening = false;
+            yield break;
+        }
+
+        isMenuOpening = false;
+    }
+
+    private IEnumerator CompletePageFlipAfterDelay(float flipDuration)
+    {
+        yield return new WaitForSecondsRealtime(flipDuration);
+        pageFlipRoutine = null;
+        isMenuPageFlipping = false;
+    }
+
+    private IEnumerator CloseMenuAfterAnimation(PlayerControls controls, float closeAnimationDuration, float endDelay)
+    {
+        yield return new WaitForSecondsRealtime(closeAnimationDuration + endDelay);
+        closeMenuRoutine = null;
+        CompleteMenuClose(controls);
+    }
+
+    private void CompleteMenuClose(PlayerControls controls)
+    {
+        StopPendingOpenMenuRoutine();
+        StopPendingCloseMenuRoutine();
+        StopPendingPageFlipRoutine();
+        isMenuOpening = false;
+        isMenuClosing = false;
+        isMenuPageFlipping = false;
+        isMenuOpen = false;
+        ResetMenuAnimatorPlayback();
+        ApplyPadFocusVisible(false);
+
+        if (inventoryPanel != null)
+            inventoryPanel.SetActive(false);
+        if (playerHudPanel != null)
+            playerHudPanel.SetActive(true);
+
+        CameraInputBlocker.SetAllCinemachineInput(true);
+        if (controls != null)
+            controls.Player.Look.Enable();
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
+
+    private void StopPendingCloseMenuRoutine()
+    {
+        if (closeMenuRoutine == null)
+            return;
+
+        StopCoroutine(closeMenuRoutine);
+        closeMenuRoutine = null;
+    }
+
+    private void StopPendingPageFlipRoutine()
+    {
+        if (pageFlipRoutine == null)
+            return;
+
+        StopCoroutine(pageFlipRoutine);
+        pageFlipRoutine = null;
+    }
+
+    private void StopPendingOpenMenuRoutine()
+    {
+        if (openMenuRoutine == null)
+            return;
+
+        StopCoroutine(openMenuRoutine);
+        openMenuRoutine = null;
+    }
+
+    private bool PlayMenuAnimationState(string stateName)
+    {
+        if (menuAnimator == null || menuAnimator.runtimeAnimatorController == null || string.IsNullOrWhiteSpace(stateName))
+            return false;
+
+        string[] candidates = BuildAnimatorStateCandidates(stateName);
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            string candidate = candidates[i];
+            if (string.IsNullOrWhiteSpace(candidate))
+                continue;
+
+            int stateHash = Animator.StringToHash(GetAnimatorStatePath(candidate));
+            if (!menuAnimator.HasState(0, stateHash))
+                continue;
+
+            menuAnimator.Play(stateHash, 0, 0f);
+            menuAnimator.Update(0f);
+            return true;
+        }
+
+        return false;
+    }
+
+    private float GetMenuAnimationDuration(string clipName, float fallbackDuration)
+    {
+        if (menuAnimator == null || menuAnimator.runtimeAnimatorController == null || string.IsNullOrWhiteSpace(clipName))
+            return Mathf.Max(0f, fallbackDuration);
+
+        var clips = menuAnimator.runtimeAnimatorController.animationClips;
+        string[] candidates = BuildAnimatorStateCandidates(clipName);
+        for (int i = 0; i < clips.Length; i++)
+        {
+            AnimationClip clip = clips[i];
+            if (clip == null)
+                continue;
+
+            for (int j = 0; j < candidates.Length; j++)
+            {
+                if (clip.name == candidates[j])
+                    return clip.length;
+            }
+        }
+
+        return Mathf.Max(0f, fallbackDuration);
+    }
+
+    private static string GetAnimatorStatePath(string stateName)
+    {
+        if (string.IsNullOrWhiteSpace(stateName))
+            return string.Empty;
+
+        return stateName.Contains(".") ? stateName : AnimatorBaseLayerPrefix + stateName;
+    }
+
+    private void ResetMenuAnimatorPlayback()
+    {
+        SetMenuAnimatorPlaybackSpeed(1f);
+    }
+
+    private void SetMenuAnimatorPlaybackSpeed(float speed)
+    {
+        if (menuAnimator != null)
+            menuAnimator.speed = speed;
+    }
+
+    private static string[] BuildAnimatorStateCandidates(string primaryName)
+    {
+        if (string.IsNullOrWhiteSpace(primaryName))
+            return System.Array.Empty<string>();
+
+        if (string.Equals(primaryName, "BookClose", System.StringComparison.Ordinal))
+            return new[] { "BookClose", "CloseBook" };
+
+        if (string.Equals(primaryName, "CloseBook", System.StringComparison.Ordinal))
+            return new[] { "CloseBook", "BookClose" };
+
+        if (string.Equals(primaryName, "BookOpen", System.StringComparison.Ordinal))
+            return new[] { "BookOpen", "OpenBook" };
+
+        if (string.Equals(primaryName, "OpenBook", System.StringComparison.Ordinal))
+            return new[] { "OpenBook", "BookOpen" };
+
+        return new[] { primaryName };
     }
 }

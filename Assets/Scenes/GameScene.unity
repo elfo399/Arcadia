@@ -10941,6 +10941,15 @@ MonoBehaviour:
   equipmentManager: {fileID: 1588103660}
   attributesUIManager: {fileID: 1354719865}
   questJournalUI: {fileID: 1102352506}
+  menuAnimator: {fileID: 0}
+  menuOpenStateName: BookOpen
+  menuCloseStateName: BookClose
+  menuFlipRightStateName: FlipRightPage
+  menuFlipLeftStateName: FlipLeftPage
+  menuOpenStartDelay: 0.25
+  menuCloseEndDelay: 0.25
+  menuPageFlipFallbackDuration: 0.25
+  menuCloseFallbackDuration: 0.25
   tabs:
   - key: Equipment
     label: {fileID: 1292260251}
