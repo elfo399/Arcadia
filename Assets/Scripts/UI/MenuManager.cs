@@ -30,6 +30,11 @@ public class MenuManager : MonoBehaviour
     [SerializeField] [Min(0f)] private float menuCloseFallbackDuration = 0.25f;
     [SerializeField] [Min(1f)] private float multiPageFlipSpeedMultiplier = 1.25f;
 
+    [Header("Content Animation")]
+    [SerializeField] private Animator menuContentAnimator;
+    [SerializeField] private string menuContentAppearStateName = "";
+    [SerializeField] [Min(0f)] private float menuContentAppearFallbackDuration = 0.25f;
+
     [Header("Tabs")]
     [SerializeField] private MenuTabEntry[] tabs;
     [SerializeField] private Image tabBackgroundImage;
@@ -931,7 +936,7 @@ public class MenuManager : MonoBehaviour
 
         float delay = Mathf.Max(0f, menuOpenStartDelay);
         float openAnimationDuration = Mathf.Max(0f, GetMenuAnimationDuration(menuOpenStateName, 0f));
-        if (delay <= 0f && openAnimationDuration <= 0f && !HasPostOpenAnimation())
+        if (delay <= 0f && openAnimationDuration <= 0f && !HasPostOpenAnimation() && !HasContentAppearAnimation())
         {
             isMenuOpening = false;
             return;
@@ -972,6 +977,10 @@ public class MenuManager : MonoBehaviour
         if (postOpenAnimationDuration > 0f)
             yield return new WaitForSecondsRealtime(postOpenAnimationDuration);
 
+        float contentAppearAnimationDuration = PlayContentAppearAnimation();
+        if (contentAppearAnimationDuration > 0f)
+            yield return new WaitForSecondsRealtime(contentAppearAnimationDuration);
+
         openMenuRoutine = null;
         if (!isMenuOpen || isMenuClosing)
         {
@@ -988,6 +997,11 @@ public class MenuManager : MonoBehaviour
         return !string.IsNullOrWhiteSpace(menuPostOpenStateName);
     }
 
+    private bool HasContentAppearAnimation()
+    {
+        return !string.IsNullOrWhiteSpace(menuContentAppearStateName);
+    }
+
     private float PlayPostOpenAnimation()
     {
         if (!HasPostOpenAnimation())
@@ -997,6 +1011,17 @@ public class MenuManager : MonoBehaviour
             return 0f;
 
         return GetMenuAnimationDuration(menuPostOpenStateName, menuPostOpenFallbackDuration);
+    }
+
+    private float PlayContentAppearAnimation()
+    {
+        if (!HasContentAppearAnimation())
+            return 0f;
+
+        if (!PlayAnimatorState(menuContentAnimator, menuContentAppearStateName))
+            return 0f;
+
+        return GetAnimatorAnimationDuration(menuContentAnimator, menuContentAppearStateName, menuContentAppearFallbackDuration);
     }
 
     private IEnumerator CompletePageFlipAfterDelay(string stateName, float flipDuration, int flipCount)
@@ -1096,12 +1121,18 @@ public class MenuManager : MonoBehaviour
 
     private bool PlayMenuAnimationState(string stateName)
     {
-        if (menuAnimator == null || menuAnimator.runtimeAnimatorController == null || string.IsNullOrWhiteSpace(stateName))
-            return false;
-
-        menuAnimator.enabled = true;
         if (tabBackgroundImage != null)
             tabBackgroundImage.enabled = true;
+
+        return PlayAnimatorState(menuAnimator, stateName);
+    }
+
+    private bool PlayAnimatorState(Animator animator, string stateName)
+    {
+        if (animator == null || animator.runtimeAnimatorController == null || string.IsNullOrWhiteSpace(stateName))
+            return false;
+
+        animator.enabled = true;
 
         string[] candidates = BuildAnimatorStateCandidates(stateName);
         for (int i = 0; i < candidates.Length; i++)
@@ -1111,11 +1142,11 @@ public class MenuManager : MonoBehaviour
                 continue;
 
             int stateHash = Animator.StringToHash(GetAnimatorStatePath(candidate));
-            if (!menuAnimator.HasState(0, stateHash))
+            if (!animator.HasState(0, stateHash))
                 continue;
 
-            menuAnimator.Play(stateHash, 0, 0f);
-            menuAnimator.Update(0f);
+            animator.Play(stateHash, 0, 0f);
+            animator.Update(0f);
             return true;
         }
 
@@ -1124,10 +1155,15 @@ public class MenuManager : MonoBehaviour
 
     private float GetMenuAnimationDuration(string clipName, float fallbackDuration)
     {
-        if (menuAnimator == null || menuAnimator.runtimeAnimatorController == null || string.IsNullOrWhiteSpace(clipName))
+        return GetAnimatorAnimationDuration(menuAnimator, clipName, fallbackDuration);
+    }
+
+    private float GetAnimatorAnimationDuration(Animator animator, string clipName, float fallbackDuration)
+    {
+        if (animator == null || animator.runtimeAnimatorController == null || string.IsNullOrWhiteSpace(clipName))
             return Mathf.Max(0f, fallbackDuration);
 
-        var clips = menuAnimator.runtimeAnimatorController.animationClips;
+        var clips = animator.runtimeAnimatorController.animationClips;
         string[] candidates = BuildAnimatorStateCandidates(clipName);
         for (int i = 0; i < clips.Length; i++)
         {
