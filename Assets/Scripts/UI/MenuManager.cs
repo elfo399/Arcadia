@@ -28,6 +28,7 @@ public class MenuManager : MonoBehaviour
     [SerializeField] [Min(0f)] private float menuCloseEndDelay = 0.5f;
     [SerializeField] [Min(0f)] private float menuPageFlipFallbackDuration = 0.25f;
     [SerializeField] [Min(0f)] private float menuCloseFallbackDuration = 0.25f;
+    [SerializeField] [Min(1f)] private float multiPageFlipSpeedMultiplier = 1.25f;
 
     [Header("Tabs")]
     [SerializeField] private MenuTabEntry[] tabs;
@@ -130,7 +131,31 @@ public class MenuManager : MonoBehaviour
         if (!IsValidTabIndex(targetIndex))
             return;
 
-        ShowTabAtIndex(targetIndex);
+        RequestShowTabAtIndex(targetIndex);
+    }
+
+    public void ShowTabByIndex(int targetIndex)
+    {
+        ResolveReferences();
+
+        if (!IsValidTabIndex(targetIndex))
+            return;
+
+        RequestShowTabAtIndex(targetIndex);
+    }
+
+    private void RequestShowTabAtIndex(int targetIndex)
+    {
+        if (!IsValidTabIndex(targetIndex) || isMenuClosing || isMenuPageFlipping)
+            return;
+
+        if (targetIndex == currentTabIndex || !isMenuOpen || isMenuOpening || !IsValidTabIndex(currentTabIndex))
+        {
+            ShowTabAtIndex(targetIndex);
+            return;
+        }
+
+        ChangeTabAfterPageFlip(targetIndex);
     }
 
     private void ShowTabAtIndex(int targetIndex)
@@ -277,7 +302,7 @@ public class MenuManager : MonoBehaviour
         {
             int next = (startIndex + offset) % tabs.Length;
             if (!IsValidTabIndex(next)) continue;
-            ChangeTabAfterPageFlip(next, menuFlipRightStateName);
+            ChangeTabAfterPageFlip(next, menuFlipRightStateName, offset);
             return;
         }
     }
@@ -293,17 +318,33 @@ public class MenuManager : MonoBehaviour
         {
             int prev = (startIndex - offset + tabs.Length) % tabs.Length;
             if (!IsValidTabIndex(prev)) continue;
-            ChangeTabAfterPageFlip(prev, menuFlipLeftStateName);
+            ChangeTabAfterPageFlip(prev, menuFlipLeftStateName, offset);
             return;
         }
     }
 
-    private void ChangeTabAfterPageFlip(int targetIndex, string animationStateName)
+    private void ChangeTabAfterPageFlip(int targetIndex)
     {
         if (!IsValidTabIndex(targetIndex))
             return;
 
-        if (StartPageFlipAnimation(animationStateName, targetIndex))
+        if (!IsValidTabIndex(currentTabIndex) || targetIndex == currentTabIndex)
+        {
+            ShowTabAtIndex(targetIndex);
+            return;
+        }
+
+        int signedDistance = targetIndex - currentTabIndex;
+        string animationStateName = signedDistance > 0 ? menuFlipRightStateName : menuFlipLeftStateName;
+        ChangeTabAfterPageFlip(targetIndex, animationStateName, Mathf.Abs(signedDistance));
+    }
+
+    private void ChangeTabAfterPageFlip(int targetIndex, string animationStateName, int flipCount = 1)
+    {
+        if (!IsValidTabIndex(targetIndex))
+            return;
+
+        if (StartPageFlipAnimation(animationStateName, targetIndex, flipCount))
             return;
 
         ShowTabAtIndex(targetIndex);
@@ -841,10 +882,11 @@ public class MenuManager : MonoBehaviour
         return true;
     }
 
-    private bool StartPageFlipAnimation(string stateName, int targetTabIndex)
+    private bool StartPageFlipAnimation(string stateName, int targetTabIndex, int flipCount)
     {
         StopPendingPageFlipRoutine();
         pendingTabIndex = -1;
+        flipCount = Mathf.Max(1, flipCount);
 
         if (string.IsNullOrWhiteSpace(stateName))
         {
@@ -852,22 +894,27 @@ public class MenuManager : MonoBehaviour
             return false;
         }
 
+        float playbackSpeed = GetPageFlipPlaybackSpeed(flipCount);
+        SetMenuAnimatorPlaybackSpeed(playbackSpeed);
+
         if (!PlayMenuAnimationState(stateName))
         {
+            ResetMenuAnimatorPlayback();
             isMenuPageFlipping = false;
             return false;
         }
 
-        float flipDuration = GetMenuAnimationDuration(stateName, menuPageFlipFallbackDuration);
+        float flipDuration = GetMenuAnimationDuration(stateName, menuPageFlipFallbackDuration) / playbackSpeed;
         if (flipDuration <= 0f)
         {
+            ResetMenuAnimatorPlayback();
             isMenuPageFlipping = false;
             return false;
         }
 
         pendingTabIndex = targetTabIndex;
         isMenuPageFlipping = true;
-        pageFlipRoutine = StartCoroutine(CompletePageFlipAfterDelay(flipDuration));
+        pageFlipRoutine = StartCoroutine(CompletePageFlipAfterDelay(stateName, flipDuration, flipCount));
         return true;
     }
 
@@ -952,10 +999,30 @@ public class MenuManager : MonoBehaviour
         return GetMenuAnimationDuration(menuPostOpenStateName, menuPostOpenFallbackDuration);
     }
 
-    private IEnumerator CompletePageFlipAfterDelay(float flipDuration)
+    private IEnumerator CompletePageFlipAfterDelay(string stateName, float flipDuration, int flipCount)
     {
-        yield return new WaitForSecondsRealtime(flipDuration);
+        for (int playedFlips = 1; playedFlips <= flipCount; playedFlips++)
+        {
+            yield return new WaitForSecondsRealtime(flipDuration);
 
+            if (playedFlips >= flipCount)
+                break;
+
+            if (!isMenuOpen || isMenuClosing)
+            {
+                ApplyCurrentTabBackgroundSprite();
+                pendingTabIndex = -1;
+                pageFlipRoutine = null;
+                isMenuPageFlipping = false;
+                ResetMenuAnimatorPlayback();
+                yield break;
+            }
+
+            if (!PlayMenuAnimationState(stateName))
+                break;
+        }
+
+        ResetMenuAnimatorPlayback();
         DisableMenuAnimator();
         if (IsValidTabIndex(pendingTabIndex))
             ShowTabAtIndex(pendingTabIndex);
@@ -1015,6 +1082,7 @@ public class MenuManager : MonoBehaviour
         StopCoroutine(pageFlipRoutine);
         pageFlipRoutine = null;
         pendingTabIndex = -1;
+        ResetMenuAnimatorPlayback();
     }
 
     private void StopPendingOpenMenuRoutine()
@@ -1112,6 +1180,11 @@ public class MenuManager : MonoBehaviour
     {
         if (menuAnimator != null)
             menuAnimator.speed = speed;
+    }
+
+    private float GetPageFlipPlaybackSpeed(int flipCount)
+    {
+        return flipCount > 1 ? Mathf.Max(1f, multiPageFlipSpeedMultiplier) : 1f;
     }
 
     private static string[] BuildAnimatorStateCandidates(string primaryName)

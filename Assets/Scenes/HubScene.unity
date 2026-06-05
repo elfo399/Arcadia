@@ -8704,6 +8704,7 @@ GameObject:
   - component: {fileID: 656903551}
   - component: {fileID: 656903550}
   - component: {fileID: 656903549}
+  - component: {fileID: 656903554}
   m_Layer: 0
   m_Name: Menu
   m_TagString: Untagged
@@ -8745,14 +8746,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.13333334, g: 0.10980392, b: 0.0627451, a: 0.9019608}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 21300000, guid: 1a6bf35bd1cf29144a45a0b9bbcb5b87, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -8833,6 +8834,27 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!95 &656903554
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 656903547}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 854021e55ff4b6341882f14e4d6bcfbe, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage:
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &659920638
 GameObject:
   m_ObjectHideFlags: 0
@@ -28887,28 +28909,41 @@ MonoBehaviour:
   equipmentManager: {fileID: 339103045}
   attributesUIManager: {fileID: 1986539571}
   questJournalUI: {fileID: 496487926}
+  menuAnimator: {fileID: 656903554}
+  menuOpenStateName: BookOpen
+  menuPostOpenStateName: AppearTabs
+  menuCloseStateName: CloseBook
+  menuFlipRightStateName: FlipRightPage
+  menuFlipLeftStateName: FlipLeftPage
+  menuOpenStartDelay: 0.25
+  menuPostOpenFallbackDuration: 0.25
+  menuCloseEndDelay: 0.25
+  menuPageFlipFallbackDuration: 0.25
+  menuCloseFallbackDuration: 0.25
+  multiPageFlipSpeedMultiplier: 1.25
   tabs:
   - key: Equipment
-    label: {fileID: 1551690257}
+    backgroundSprite: {fileID: 21300000, guid: b939c06cd1ad30842b592428a283692a, type: 3}
     background: {fileID: 832158010}
   - key: Inventory
-    label: {fileID: 1458421529}
+    backgroundSprite: {fileID: 21300000, guid: 0d3d15d659f7e8a4082beaafbece4af9, type: 3}
     background: {fileID: 609876960}
   - key: Magic
-    label: {fileID: 1056614891}
+    backgroundSprite: {fileID: 21300000, guid: fa95365ab6e5bfa4ea514768a43342d8, type: 3}
     background: {fileID: 1604547749}
   - key: Attributes
-    label: {fileID: 916467842}
+    backgroundSprite: {fileID: 21300000, guid: 5f8910e0013b88343a8c6aee7cc4cd88, type: 3}
     background: {fileID: 856384545}
   - key: Journal
-    label: {fileID: 149285085}
+    backgroundSprite: {fileID: 21300000, guid: 53da38eab9e5bfd4f84095c36d3ca0ed, type: 3}
     background: {fileID: 1894305170}
   - key: Setting
-    label: {fileID: 1815465419}
+    backgroundSprite: {fileID: 21300000, guid: bf0eee74b061b1540a68772384526b8f, type: 3}
     background: {fileID: 567094872}
-  activeColor: {r: 1, g: 0, b: 0, a: 1}
-  inactiveColor: {r: 1, g: 1, b: 1, a: 1}
+  tabBackgroundImage: {fileID: 656903549}
   defaultOpenTabKey: Equipment
+  openPauseMenuByDefault: 1
+  pauseMenuTabKey: Pause
   padFocusLockDuration: 0.35
   gamepadAxisDetectThreshold: 0.35
   navigationRepeatCooldown: 0.2
