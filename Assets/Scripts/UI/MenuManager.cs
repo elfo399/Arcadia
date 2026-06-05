@@ -20,11 +20,13 @@ public class MenuManager : MonoBehaviour
     [SerializeField] private Animator menuAnimator;
     [SerializeField] private string menuOpenStateName = "BookOpen";
     [SerializeField] private string menuPostOpenStateName = "";
+    [SerializeField] private string menuPreCloseStateName = "DisappearTabs";
     [SerializeField] private string menuCloseStateName = "CloseBook";
     [SerializeField] private string menuFlipRightStateName = "FlipRightPage";
     [SerializeField] private string menuFlipLeftStateName = "FlipLeftPage";
     [SerializeField] [Min(0f)] private float menuOpenStartDelay = 0.5f;
     [SerializeField] [Min(0f)] private float menuPostOpenFallbackDuration = 0.25f;
+    [SerializeField] [Min(0f)] private float menuPreCloseFallbackDuration = 0.25f;
     [SerializeField] [Min(0f)] private float menuCloseEndDelay = 0.5f;
     [SerializeField] [Min(0f)] private float menuPageFlipFallbackDuration = 0.25f;
     [SerializeField] [Min(0f)] private float menuCloseFallbackDuration = 0.25f;
@@ -60,6 +62,7 @@ public class MenuManager : MonoBehaviour
     private bool isMenuClosing;
     private bool isMenuPageFlipping;
     private int pendingTabIndex = -1;
+    private int openingTabIndex = -1;
 
     private const string AnimatorBaseLayerPrefix = "Base Layer.";
 
@@ -130,9 +133,7 @@ public class MenuManager : MonoBehaviour
             return;
         }
 
-        int targetIndex = FindTabIndex(tabKey);
-        if (!IsValidTabIndex(targetIndex))
-            targetIndex = FindFirstValidTabIndex();
+        int targetIndex = ResolveTabIndexOrFallback(tabKey);
         if (!IsValidTabIndex(targetIndex))
             return;
 
@@ -556,9 +557,14 @@ public class MenuManager : MonoBehaviour
         currentPlayerInventory = playerInventory;
         isMenuOpen = true;
 
+        openingTabIndex = ResolveTabIndexOrFallback(GetDefaultOpenTabKey());
+        currentTabIndex = -1;
+        HideContentAppearAnimation();
+
         if (inventoryPanel != null)
         {
             inventoryPanel.SetActive(true);
+            HideAllTabBackgrounds();
             StartOpenMenuAnimation();
         }
         if (playerHudPanel != null)
@@ -578,7 +584,6 @@ public class MenuManager : MonoBehaviour
             StartCoroutine(RefreshInventoryNextFrame(list, false));
         }
 
-        ShowTab(GetDefaultOpenTabKey());
         inventoryUIManager.FocusDefaultPadSlot();
         lastNavigationMoveTime = Time.time;
 
@@ -617,6 +622,8 @@ public class MenuManager : MonoBehaviour
         }
 
         ApplyPadFocusVisible(false);
+        HideAllTabBackgrounds();
+        HideContentAppearAnimation();
         if (!StartCloseMenuAnimation(controls))
             CompleteMenuClose(controls);
     }
@@ -635,6 +642,7 @@ public class MenuManager : MonoBehaviour
         // Il menu non deve attraversare il cambio scena in stato aperto.
         isMenuOpen = false;
         currentTabIndex = -1;
+        openingTabIndex = -1;
         currentPlayerInventory = FindObjectOfType<PlayerInventory>(true);
         ApplyPadFocusVisible(false);
 
@@ -853,6 +861,52 @@ public class MenuManager : MonoBehaviour
         return -1;
     }
 
+    private int ResolveTabIndexOrFallback(string tabKey)
+    {
+        int targetIndex = FindTabIndex(tabKey);
+        if (!IsValidTabIndex(targetIndex))
+            targetIndex = FindFirstValidTabIndex();
+
+        return targetIndex;
+    }
+
+    private void HideAllTabBackgrounds()
+    {
+        if (tabs == null)
+            return;
+
+        for (int i = 0; i < tabs.Length; i++)
+        {
+            if (tabs[i] == null || tabs[i].background == null)
+                continue;
+
+            ResetTabContentCanvasGroup(tabs[i].background);
+            tabs[i].background.SetActive(false);
+        }
+    }
+
+    private void ResetTabContentCanvasGroup(GameObject tabBackground)
+    {
+        CanvasGroup contentGroup = tabBackground != null ? tabBackground.GetComponent<CanvasGroup>() : null;
+        if (contentGroup == null)
+            return;
+
+        contentGroup.alpha = 1f;
+        contentGroup.interactable = true;
+        contentGroup.blocksRaycasts = true;
+    }
+
+    private void ApplyOpeningTab()
+    {
+        if (!IsValidTabIndex(openingTabIndex))
+            openingTabIndex = ResolveTabIndexOrFallback(GetDefaultOpenTabKey());
+
+        if (IsValidTabIndex(openingTabIndex))
+            ShowTabAtIndex(openingTabIndex);
+
+        openingTabIndex = -1;
+    }
+
     private bool IsValidTabIndex(int index)
     {
         return tabs != null
@@ -875,15 +929,8 @@ public class MenuManager : MonoBehaviour
         if (inventoryPanel == null || !inventoryPanel.activeInHierarchy)
             return false;
 
-        if (!PlayMenuAnimationState(menuCloseStateName))
-            return false;
-
-        float closeAnimationDuration = GetMenuAnimationDuration(menuCloseStateName, menuCloseFallbackDuration);
-        if (closeAnimationDuration <= 0f)
-            return false;
-
         isMenuClosing = true;
-        closeMenuRoutine = StartCoroutine(CloseMenuAfterAnimation(controls, closeAnimationDuration, Mathf.Max(0f, menuCloseEndDelay)));
+        closeMenuRoutine = StartCoroutine(RunCloseMenuAnimation(controls));
         return true;
     }
 
@@ -917,6 +964,8 @@ public class MenuManager : MonoBehaviour
             return false;
         }
 
+        HideAllTabBackgrounds();
+        HideContentAppearAnimation();
         pendingTabIndex = targetTabIndex;
         isMenuPageFlipping = true;
         pageFlipRoutine = StartCoroutine(CompletePageFlipAfterDelay(stateName, flipDuration, flipCount));
@@ -930,6 +979,7 @@ public class MenuManager : MonoBehaviour
 
         if (!PlayMenuAnimationState(menuOpenStateName))
         {
+            ApplyOpeningTab();
             isMenuOpening = false;
             return;
         }
@@ -938,6 +988,8 @@ public class MenuManager : MonoBehaviour
         float openAnimationDuration = Mathf.Max(0f, GetMenuAnimationDuration(menuOpenStateName, 0f));
         if (delay <= 0f && openAnimationDuration <= 0f && !HasPostOpenAnimation() && !HasContentAppearAnimation())
         {
+            ApplyOpeningTab();
+            HoldMenuAnimatorOnCurrentTabSprite();
             isMenuOpening = false;
             return;
         }
@@ -977,9 +1029,22 @@ public class MenuManager : MonoBehaviour
         if (postOpenAnimationDuration > 0f)
             yield return new WaitForSecondsRealtime(postOpenAnimationDuration);
 
+        ApplyOpeningTab();
+        CanvasGroup openingContentGroup = PrepareCurrentTabContentForAppear();
+        HoldMenuAnimatorOnCurrentTabSprite();
+
         float contentAppearAnimationDuration = PlayContentAppearAnimation();
         if (contentAppearAnimationDuration > 0f)
+        {
+            RevealTabContent(openingContentGroup);
             yield return new WaitForSecondsRealtime(contentAppearAnimationDuration);
+            HideContentAppearAnimation();
+        }
+        else
+        {
+            HideContentAppearAnimation();
+            yield return FadeCurrentTabContentIn(menuContentAppearFallbackDuration);
+        }
 
         openMenuRoutine = null;
         if (!isMenuOpen || isMenuClosing)
@@ -988,13 +1053,17 @@ public class MenuManager : MonoBehaviour
             yield break;
         }
 
-        HoldMenuAnimatorOnCurrentTabSprite();
         isMenuOpening = false;
     }
 
     private bool HasPostOpenAnimation()
     {
         return !string.IsNullOrWhiteSpace(menuPostOpenStateName);
+    }
+
+    private bool HasPreCloseAnimation()
+    {
+        return !string.IsNullOrWhiteSpace(menuPreCloseStateName);
     }
 
     private bool HasContentAppearAnimation()
@@ -1013,15 +1082,127 @@ public class MenuManager : MonoBehaviour
         return GetMenuAnimationDuration(menuPostOpenStateName, menuPostOpenFallbackDuration);
     }
 
+    private float PlayPreCloseAnimation()
+    {
+        if (!HasPreCloseAnimation())
+            return 0f;
+
+        if (!PlayMenuAnimationState(menuPreCloseStateName))
+            return 0f;
+
+        return GetMenuAnimationDuration(menuPreCloseStateName, menuPreCloseFallbackDuration);
+    }
+
     private float PlayContentAppearAnimation()
     {
         if (!HasContentAppearAnimation())
             return 0f;
 
+        PrepareContentAppearAnimationObject();
+
         if (!PlayAnimatorState(menuContentAnimator, menuContentAppearStateName))
+        {
+            HideContentAppearAnimation();
             return 0f;
+        }
 
         return GetAnimatorAnimationDuration(menuContentAnimator, menuContentAppearStateName, menuContentAppearFallbackDuration);
+    }
+
+    private void PrepareContentAppearAnimationObject()
+    {
+        if (menuContentAnimator == null)
+            return;
+
+        if (!menuContentAnimator.gameObject.activeSelf)
+            menuContentAnimator.gameObject.SetActive(true);
+
+        menuContentAnimator.transform.SetAsLastSibling();
+
+        Image contentAppearImage = menuContentAnimator.GetComponent<Image>();
+        if (contentAppearImage == null)
+            return;
+
+        contentAppearImage.enabled = true;
+        contentAppearImage.raycastTarget = false;
+
+        Color color = contentAppearImage.color;
+        color.a = 1f;
+        contentAppearImage.color = color;
+    }
+
+    private void HideContentAppearAnimation()
+    {
+        if (menuContentAnimator == null)
+            return;
+
+        Image contentAppearImage = menuContentAnimator.GetComponent<Image>();
+        if (contentAppearImage != null)
+            contentAppearImage.enabled = false;
+
+        menuContentAnimator.enabled = false;
+    }
+
+    private CanvasGroup PrepareCurrentTabContentForAppear()
+    {
+        CanvasGroup contentGroup = GetCurrentTabContentCanvasGroup();
+        if (contentGroup == null)
+            return null;
+
+        contentGroup.alpha = 0f;
+        contentGroup.interactable = false;
+        contentGroup.blocksRaycasts = false;
+        return contentGroup;
+    }
+
+    private static void RevealTabContent(CanvasGroup contentGroup)
+    {
+        if (contentGroup == null)
+            return;
+
+        contentGroup.alpha = 1f;
+        contentGroup.interactable = true;
+        contentGroup.blocksRaycasts = true;
+    }
+
+    private IEnumerator FadeCurrentTabContentIn(float duration)
+    {
+        CanvasGroup contentGroup = PrepareCurrentTabContentForAppear();
+        if (contentGroup == null)
+            yield break;
+
+        duration = Mathf.Max(0f, duration);
+
+        if (duration <= 0f)
+        {
+            RevealTabContent(contentGroup);
+            yield break;
+        }
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            if (!isMenuOpen || isMenuClosing)
+                yield break;
+
+            elapsed += Time.unscaledDeltaTime;
+            contentGroup.alpha = Mathf.Clamp01(elapsed / duration);
+            yield return null;
+        }
+
+        RevealTabContent(contentGroup);
+    }
+
+    private CanvasGroup GetCurrentTabContentCanvasGroup()
+    {
+        if (!IsValidTabIndex(currentTabIndex) || tabs[currentTabIndex].background == null)
+            return null;
+
+        CanvasGroup contentGroup = tabs[currentTabIndex].background.GetComponent<CanvasGroup>();
+        if (contentGroup == null)
+            contentGroup = tabs[currentTabIndex].background.AddComponent<CanvasGroup>();
+
+        return contentGroup;
     }
 
     private IEnumerator CompletePageFlipAfterDelay(string stateName, float flipDuration, int flipCount)
@@ -1059,9 +1240,31 @@ public class MenuManager : MonoBehaviour
         isMenuPageFlipping = false;
     }
 
-    private IEnumerator CloseMenuAfterAnimation(PlayerControls controls, float closeAnimationDuration, float endDelay)
+    private IEnumerator RunCloseMenuAnimation(PlayerControls controls)
     {
-        yield return new WaitForSecondsRealtime(closeAnimationDuration + endDelay);
+        float preCloseAnimationDuration = PlayPreCloseAnimation();
+        if (preCloseAnimationDuration > 0f)
+            yield return new WaitForSecondsRealtime(preCloseAnimationDuration);
+
+        if (inventoryPanel == null || !inventoryPanel.activeInHierarchy)
+        {
+            closeMenuRoutine = null;
+            CompleteMenuClose(controls);
+            yield break;
+        }
+
+        if (!PlayMenuAnimationState(menuCloseStateName))
+        {
+            closeMenuRoutine = null;
+            CompleteMenuClose(controls);
+            yield break;
+        }
+
+        float closeAnimationDuration = GetMenuAnimationDuration(menuCloseStateName, menuCloseFallbackDuration);
+        float endDelay = Mathf.Max(0f, menuCloseEndDelay);
+        if (closeAnimationDuration > 0f || endDelay > 0f)
+            yield return new WaitForSecondsRealtime(closeAnimationDuration + endDelay);
+
         closeMenuRoutine = null;
         CompleteMenuClose(controls);
     }
@@ -1075,6 +1278,7 @@ public class MenuManager : MonoBehaviour
         isMenuClosing = false;
         isMenuPageFlipping = false;
         isMenuOpen = false;
+        openingTabIndex = -1;
         ResetMenuAnimatorPlayback();
         ApplyPadFocusVisible(false);
 
@@ -1133,6 +1337,7 @@ public class MenuManager : MonoBehaviour
             return false;
 
         animator.enabled = true;
+        animator.updateMode = AnimatorUpdateMode.UnscaledTime;
 
         string[] candidates = BuildAnimatorStateCandidates(stateName);
         for (int i = 0; i < candidates.Length; i++)
