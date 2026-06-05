@@ -152,10 +152,10 @@ public class MenuManager : MonoBehaviour
 
     private void RequestShowTabAtIndex(int targetIndex)
     {
-        if (!IsValidTabIndex(targetIndex) || isMenuClosing || isMenuPageFlipping)
+        if (!IsValidTabIndex(targetIndex) || IsMenuTransitioning)
             return;
 
-        if (targetIndex == currentTabIndex || !isMenuOpen || isMenuOpening || !IsValidTabIndex(currentTabIndex))
+        if (targetIndex == currentTabIndex || !isMenuOpen || !IsValidTabIndex(currentTabIndex))
         {
             ShowTabAtIndex(targetIndex);
             return;
