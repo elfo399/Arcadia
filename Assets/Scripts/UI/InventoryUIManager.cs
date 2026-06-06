@@ -43,6 +43,8 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     [Header("Detail Panel - Shield Stats")]
     [SerializeField] private GameObject shieldDescriptionRoot;
+    [SerializeField] private TextMeshProUGUI shieldTitle;
+    [SerializeField] private TextMeshProUGUI shieldDesc;
     [SerializeField] private TextMeshProUGUI shieldDamageText;
     [SerializeField] private TextMeshProUGUI shieldCriticalText;
     [SerializeField] private TextMeshProUGUI shieldWeightText;
@@ -54,6 +56,8 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     [Header("Detail Panel - Armor Variant")]
     [SerializeField] private GameObject armorDescriptionRoot;
+    [SerializeField] private TextMeshProUGUI armorTitle;
+    [SerializeField] private TextMeshProUGUI armorDesc;
     [SerializeField] private TextMeshProUGUI armorWeightText;
     [SerializeField] private TextMeshProUGUI armorPhysicalDefenseText;
     [SerializeField] private TextMeshProUGUI armorMagicDefenseText;
@@ -737,6 +741,28 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (weaponDesc != null) weaponDesc.text = description ?? string.Empty;
     }
 
+    private void SetArmorDetailContent(Sprite icon, string title, string description)
+    {
+        if (weaponImage != null) weaponImage.sprite = icon;
+
+        TextMeshProUGUI targetTitle = armorTitle != null ? armorTitle : weaponTitle;
+        if (targetTitle != null) targetTitle.text = title ?? string.Empty;
+
+        TextMeshProUGUI targetDescription = armorDesc != null ? armorDesc : weaponDesc;
+        if (targetDescription != null) targetDescription.text = description ?? string.Empty;
+    }
+
+    private void SetShieldDetailContent(Sprite icon, string title, string description)
+    {
+        if (weaponImage != null) weaponImage.sprite = icon;
+
+        TextMeshProUGUI targetTitle = shieldTitle != null ? shieldTitle : weaponTitle;
+        if (targetTitle != null) targetTitle.text = title ?? string.Empty;
+
+        TextMeshProUGUI targetDescription = shieldDesc != null ? shieldDesc : weaponDesc;
+        if (targetDescription != null) targetDescription.text = description ?? string.Empty;
+    }
+
     private void SetItemDetailContent(Sprite icon, string title, string description)
     {
         if (itemImage != null) itemImage.sprite = icon;
@@ -752,7 +778,10 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (weaponDescriptionRoot != null) weaponDescriptionRoot.SetActive(!isShield);
         if (shieldDescriptionRoot != null) shieldDescriptionRoot.SetActive(isShield);
 
-        SetWeaponDetailContent(icon, title, description);
+        if (isShield)
+            SetShieldDetailContent(icon, title, description);
+        else
+            SetWeaponDetailContent(icon, title, description);
         SetCommonDetailContent(icon, title, description);
 
         if (isShield)
@@ -786,7 +815,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (weaponDetailRoot != null) weaponDetailRoot.SetActive(true);
         if (armorDescriptionRoot != null) armorDescriptionRoot.SetActive(true);
 
-        SetWeaponDetailContent(icon, title, description);
+        SetArmorDetailContent(icon, title, description);
         SetCommonDetailContent(icon, title, description);
 
         if (armorWeightText != null) armorWeightText.text = armor.weight.ToString("0.##");
@@ -798,6 +827,9 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private void ShowGenericItemDetail(Sprite icon, string title, string description)
     {
+        if (weaponDetailRoot != null && itemDetailRoot != null && itemDetailRoot.transform.IsChildOf(weaponDetailRoot.transform))
+            weaponDetailRoot.SetActive(true);
+
         if (itemDetailRoot != null) itemDetailRoot.SetActive(true);
 
         SetItemDetailContent(icon, title, description);
@@ -934,6 +966,15 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
         if (shieldDescriptionRoot != null)
         {
+            if (shieldTitle == null)
+                shieldTitle = FindDeepTextByName(shieldDescriptionRoot.transform, "TitleShield")
+                    ?? FindDeepTextByName(shieldDescriptionRoot.transform, "Title")
+                    ?? FindDeepTextByName(shieldDescriptionRoot.transform, "Name");
+            if (shieldDesc == null)
+                shieldDesc = FindDeepTextByName(shieldDescriptionRoot.transform, "DescShield")
+                    ?? FindDeepTextByName(shieldDescriptionRoot.transform, "Desc_Custom")
+                    ?? FindDeepTextByName(shieldDescriptionRoot.transform, "Desc")
+                    ?? FindDeepTextByName(shieldDescriptionRoot.transform, "Description");
             if (shieldDamageText == null)
                 shieldDamageText = FindStatValueText(shieldDescriptionRoot.transform, "Damage");
             if (shieldCriticalText == null)
@@ -953,6 +994,87 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
                 Transform equipButtonTf = FindDeepChildByName(shieldDescriptionRoot.transform, "EquipBTN");
                 if (equipButtonTf != null) shieldEquipButton = equipButtonTf.GetComponent<Button>();
             }
+
+            if (shieldTitle == null)
+                shieldTitle = weaponTitle;
+            if (shieldDesc == null)
+                shieldDesc = weaponDesc;
+        }
+
+        Transform itemRootTransform = itemDetailRoot != null ? itemDetailRoot.transform : null;
+        if (itemRootTransform == null)
+        {
+            Transform explicitItemRoot = FindDeepChildByName(inventoryRoot, "DescItem");
+            if (explicitItemRoot != null)
+            {
+                itemDetailRoot = explicitItemRoot.gameObject;
+                itemRootTransform = explicitItemRoot;
+            }
+            else if (detailRoot != null)
+            {
+                itemDetailRoot = detailRoot;
+                itemRootTransform = detailRoot.transform;
+            }
+        }
+
+        if (itemRootTransform != null)
+        {
+            Transform itemFirstColumn = FindDeepChildByName(itemRootTransform, "FirstColumn")
+                ?? FindDeepChildByName(itemRootTransform, "FirstCollumn")
+                ?? FindDeepChildByName(itemRootTransform, "FirstCollumn (1)")
+                ?? FindDeepChildByName(itemRootTransform, "FirstCollumn (2)");
+            Transform itemSecondColumn = FindDeepChildByName(itemRootTransform, "SecondColumn")
+                ?? FindDeepChildByName(itemRootTransform, "SecondCollumn")
+                ?? FindDeepChildByName(itemRootTransform, "SecondCollumn (1)")
+                ?? FindDeepChildByName(itemRootTransform, "SecondCollumn (2)");
+
+            if (itemImage == null || itemImage == detailIcon)
+            {
+                Transform imageTf = itemFirstColumn != null
+                    ? FindDeepChildByName(itemFirstColumn, "Image")
+                    : FindDeepChildByName(itemRootTransform, "Image");
+                if (imageTf != null) itemImage = imageTf.GetComponent<Image>();
+            }
+
+            if (itemTitle == null || itemTitle == detailTitle)
+            {
+                itemTitle = itemFirstColumn != null
+                    ? FindDeepTextByName(itemFirstColumn, "Title")
+                        ?? FindDeepTextByName(itemFirstColumn, "Title desc")
+                        ?? FindDeepTextByName(itemFirstColumn, "Name")
+                    : null;
+
+                if (itemTitle == null)
+                    itemTitle = FindDeepTextByName(itemRootTransform, "Title")
+                        ?? FindDeepTextByName(itemRootTransform, "Title desc")
+                        ?? FindDeepTextByName(itemRootTransform, "Name");
+            }
+
+            if (itemDesc == null || itemDesc == detailDescription)
+            {
+                itemDesc = itemSecondColumn != null
+                    ? FindDeepTextByName(itemSecondColumn, "Desc_Custom")
+                        ?? FindDeepTextByName(itemSecondColumn, "DescCustom")
+                        ?? FindDeepTextByName(itemSecondColumn, "Desc")
+                        ?? FindDeepTextByName(itemSecondColumn, "Description")
+                    : null;
+
+                if (itemDesc == null)
+                    itemDesc = FindDeepTextByName(itemRootTransform, "Desc_Custom")
+                        ?? FindDeepTextByName(itemRootTransform, "DescCustom")
+                        ?? FindDeepTextByName(itemRootTransform, "Desc")
+                        ?? FindDeepTextByName(itemRootTransform, "Description");
+            }
+
+            if (equipUsableButton == null)
+            {
+                Transform usableButtonTf = itemFirstColumn != null
+                    ? FindDeepChildByName(itemFirstColumn, "EquipBTN")
+                        ?? FindDeepChildByName(itemFirstColumn, "Button")
+                    : FindDeepChildByName(itemRootTransform, "EquipBTN")
+                        ?? FindDeepChildByName(itemRootTransform, "Button");
+                if (usableButtonTf != null) equipUsableButton = usableButtonTf.GetComponent<Button>();
+            }
         }
 
         if (armorDescriptionRoot == null)
@@ -962,6 +1084,16 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (armorDescriptionRoot == null)
             return;
 
+        if (armorTitle == null)
+            armorTitle = FindDeepTextByName(armorDescriptionRoot.transform, "TitleArmor")
+                ?? FindDeepTextByName(armorDescriptionRoot.transform, "Title")
+                ?? FindDeepTextByName(armorDescriptionRoot.transform, "Name");
+
+        if (armorDesc == null)
+            armorDesc = FindDeepTextByName(armorDescriptionRoot.transform, "DescArmor")
+                ?? FindDeepTextByName(armorDescriptionRoot.transform, "Desc_Custom")
+                ?? FindDeepTextByName(armorDescriptionRoot.transform, "Desc")
+                ?? FindDeepTextByName(armorDescriptionRoot.transform, "Description");
         if (armorWeightText == null)
             armorWeightText = FindStatValueText(armorDescriptionRoot.transform, "Weight");
         if (armorPhysicalDefenseText == null)
@@ -973,6 +1105,12 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             Transform equipButtonTf = FindDeepChildByName(armorDescriptionRoot.transform, "EquipBTN");
             if (equipButtonTf != null) armorEquipButton = equipButtonTf.GetComponent<Button>();
         }
+
+        // Preserve existing UI behaviour when the armor panel has no dedicated description text yet.
+        if (armorTitle == null)
+            armorTitle = weaponTitle;
+        if (armorDesc == null)
+            armorDesc = weaponDesc;
     }
 
     private static TextMeshProUGUI FindStatValueText(Transform root, string statRootName)
