@@ -63,6 +63,7 @@ public class PlayerInventory : MonoBehaviour
     [SerializeField] private ItemDatabase itemDatabase;
 
     private readonly List<InventoryItem> items = new();
+    private readonly List<InventoryItem> magicInventorySlots = new();
     public IReadOnlyList<InventoryItem> Items => items;
     private ItemDatabase cachedLookupDatabase;
     private (Dictionary<string, WeaponItem> weapons, Dictionary<string, MagicItemData> magics, Dictionary<string, ArmorItemData> armors, Dictionary<string, UsableItemData> usables, Dictionary<string, ItemData> items) cachedAssetLookups;
@@ -553,6 +554,30 @@ public class PlayerInventory : MonoBehaviour
     {
         items.Clear();
         if (newItems != null) items.AddRange(newItems);
+        SyncMagicInventorySlots();
+    }
+
+    public List<InventoryItem> GetMagicInventorySlotLayout(int minSlotCount)
+    {
+        SyncMagicInventorySlots(minSlotCount);
+        return new List<InventoryItem>(magicInventorySlots);
+    }
+
+    public void SetMagicInventorySlotLayout(IReadOnlyList<InventoryItem> slotLayout, int minSlotCount)
+    {
+        magicInventorySlots.Clear();
+
+        if (slotLayout != null)
+        {
+            for (int i = 0; i < slotLayout.Count; i++)
+            {
+                var item = slotLayout[i];
+                magicInventorySlots.Add(item != null && item.magicData != null ? item : null);
+            }
+        }
+
+        SyncMagicInventorySlots(minSlotCount);
+        ApplyMagicInventorySlotOrderToItems();
     }
 
     private InventoryItem FindStackableGenericItem(ItemData item)
@@ -565,6 +590,82 @@ public class PlayerInventory : MonoBehaviour
         }
 
         return null;
+    }
+
+    private void SyncMagicInventorySlots(int minSlotCount = 0)
+    {
+        var validMagicItems = new HashSet<InventoryItem>();
+        for (int i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            if (item != null && item.magicData != null)
+                validMagicItems.Add(item);
+        }
+
+        if (magicInventorySlots.Count == 0)
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                if (item != null && item.magicData != null)
+                    magicInventorySlots.Add(item);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < magicInventorySlots.Count; i++)
+            {
+                var item = magicInventorySlots[i];
+                if (item == null || item.magicData == null || !validMagicItems.Contains(item))
+                    magicInventorySlots[i] = null;
+            }
+        }
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            if (item == null || item.magicData == null || magicInventorySlots.Contains(item))
+                continue;
+
+            int emptyIndex = magicInventorySlots.IndexOf(null);
+            if (emptyIndex >= 0)
+                magicInventorySlots[emptyIndex] = item;
+            else
+                magicInventorySlots.Add(item);
+        }
+
+        int required = Mathf.Max(0, minSlotCount);
+        while (magicInventorySlots.Count < required)
+            magicInventorySlots.Add(null);
+    }
+
+    private void ApplyMagicInventorySlotOrderToItems()
+    {
+        var orderedMagicItems = new List<InventoryItem>();
+        for (int i = 0; i < magicInventorySlots.Count; i++)
+        {
+            var item = magicInventorySlots[i];
+            if (item != null && item.magicData != null && items.Contains(item) && !orderedMagicItems.Contains(item))
+                orderedMagicItems.Add(item);
+        }
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            if (item != null && item.magicData != null && !orderedMagicItems.Contains(item))
+                orderedMagicItems.Add(item);
+        }
+
+        int magicIndex = 0;
+        for (int i = 0; i < items.Count && magicIndex < orderedMagicItems.Count; i++)
+        {
+            var item = items[i];
+            if (item == null || item.magicData == null)
+                continue;
+
+            items[i] = orderedMagicItems[magicIndex];
+            magicIndex++;
+        }
     }
 
     private InventoryItem FindStackableUsableItem(UsableItemData usable)

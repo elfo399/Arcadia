@@ -11,6 +11,10 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Transform magicSlotParent;
     [SerializeField] private int magicInitialSlotCount = 12;
 
+    [Header("Drag & Drop")]
+    [SerializeField] private Canvas dragCanvas;
+    [SerializeField] private Image dragPreviewTemplate;
+
     [Header("Magic Detail")]
     [SerializeField] private GameObject magicDetailRoot;
     [SerializeField] private Image magicImage;
@@ -26,6 +30,8 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     private readonly List<InventoryItem> currentItems = new();
     private PlayerInventory playerInventory;
     private EquipmentManager equipmentManager;
+    private Image activeDragPreview;
+    private int dragOriginIndex = -1;
     private bool showPadFocus;
     private int currentSelectedIndex = -1;
     private int padFocusIndex = -1;
@@ -66,6 +72,8 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     public void Cleanup()
     {
+        ClearDragPreview();
+        dragOriginIndex = -1;
     }
 
     public int GetCapacity() => magicInitialSlotCount;
@@ -106,10 +114,45 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         UpdateEquipButtonState();
     }
 
-    public void HandleSlotBeginDrag(int index, PointerEventData eventData) { }
-    public void HandleSlotDrag(PointerEventData eventData) { }
-    public void HandleSlotEndDrag() { }
-    public void HandleSlotDrop(int targetIndex) { }
+    public void HandleSlotBeginDrag(int index, PointerEventData eventData)
+    {
+        if (!HasItem(index)) return;
+
+        dragOriginIndex = index;
+        Vector2 iconSize = Vector2.zero;
+        if (IsValidSlotIndex(index) && slots[index] != null)
+            iconSize = slots[index].GetIconSize();
+
+        CreateDragPreview(GetItemIcon(currentItems[index]), eventData, iconSize);
+    }
+
+    public void HandleSlotDrag(PointerEventData eventData)
+    {
+        if (activeDragPreview != null)
+            activeDragPreview.rectTransform.position = eventData.position;
+    }
+
+    public void HandleSlotEndDrag()
+    {
+        ClearDragPreview();
+        dragOriginIndex = -1;
+    }
+
+    public void HandleSlotDrop(int targetIndex)
+    {
+        if (dragOriginIndex >= 0)
+            SwapItems(dragOriginIndex, targetIndex);
+
+        ClearDragPreview();
+        dragOriginIndex = -1;
+
+        if (HasItem(targetIndex))
+            ShowItemDetailsByIndex(targetIndex);
+        else
+            ClearDetail();
+
+        UpdateEquipButtonState();
+    }
 
     public void HandleSlotSelected(int index)
     {
@@ -221,30 +264,32 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         currentItems.Clear();
         if (playerInventory != null)
         {
-            foreach (var item in playerInventory.Items)
-            {
-                if (item != null && item.magicData != null)
-                    currentItems.Add(item);
-            }
+            currentItems.AddRange(playerInventory.GetMagicInventorySlotLayout(magicInitialSlotCount));
         }
 
-        EnsureSlots(Mathf.Max(magicInitialSlotCount, currentItems.Count, 1));
-        ClearSlots();
-
-        for (int i = 0; i < slots.Count; i++)
-        {
-            if (i < currentItems.Count && currentItems[i] != null)
-                slots[i].Setup(currentItems[i].magicData != null ? currentItems[i].magicData.icon : currentItems[i].icon, currentItems[i].amount, IsItemEquipped(currentItems[i]));
-            else
-                slots[i].Clear();
-
-            slots[i].gameObject.SetActive(i < Mathf.Max(magicInitialSlotCount, currentItems.Count, 1));
-        }
+        RefreshSlotsFromCurrentItems();
 
         currentSelectedIndex = -1;
         ApplyPadFocusVisual(-1);
         ClearDetail();
         UpdateEquipButtonState();
+    }
+
+    private void RefreshSlotsFromCurrentItems()
+    {
+        int activeSlotCount = Mathf.Max(magicInitialSlotCount, currentItems.Count, 1);
+        EnsureSlots(activeSlotCount);
+        ClearSlots();
+
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (i < currentItems.Count && currentItems[i] != null)
+                slots[i].Setup(GetItemIcon(currentItems[i]), currentItems[i].amount, IsItemEquipped(currentItems[i]));
+            else
+                slots[i].Clear();
+
+            slots[i].gameObject.SetActive(i < activeSlotCount);
+        }
     }
 
     private void ClearSlots()
@@ -285,7 +330,34 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         }
     }
 
+    private bool IsValidSlotIndex(int index) => index >= 0 && index < slots.Count;
     private bool HasItem(int index) => index >= 0 && index < currentItems.Count && currentItems[index] != null;
+
+    private void SwapItems(int a, int b)
+    {
+        if (!IsValidSlotIndex(a) || !IsValidSlotIndex(b) || a == b) return;
+
+        int maxIndex = Mathf.Max(a, b);
+        while (currentItems.Count <= maxIndex)
+            currentItems.Add(null);
+
+        var temp = currentItems[a];
+        currentItems[a] = currentItems[b];
+        currentItems[b] = temp;
+
+        PersistMagicSlotLayout();
+        RefreshSlotsFromCurrentItems();
+        ApplyPadFocusVisual(showPadFocus ? b : -1);
+    }
+
+    private void PersistMagicSlotLayout()
+    {
+        EnsurePlayerInventory();
+        if (playerInventory == null)
+            return;
+
+        playerInventory.SetMagicInventorySlotLayout(currentItems, magicInitialSlotCount);
+    }
 
     private void SetPadFocus(int index)
     {
@@ -371,6 +443,59 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         if (item == null || string.IsNullOrEmpty(item.instanceId)) return false;
         EnsurePlayerInventory();
         return playerInventory != null && playerInventory.IsInstanceEquipped(item.instanceId);
+    }
+
+    private Sprite GetItemIcon(InventoryItem item)
+    {
+        if (item == null) return null;
+        return item.magicData != null ? item.magicData.icon : item.icon;
+    }
+
+    private void CreateDragPreview(Sprite icon, PointerEventData eventData, Vector2 iconSize)
+    {
+        ClearDragPreview();
+        if (icon == null) return;
+
+        Canvas targetCanvas = dragCanvas;
+        if (targetCanvas == null)
+            targetCanvas = GetComponentInParent<Canvas>();
+        if (targetCanvas == null)
+            targetCanvas = FindObjectOfType<Canvas>();
+        if (targetCanvas == null) return;
+
+        if (dragPreviewTemplate == null)
+        {
+            GameObject go = new GameObject("MagicDragPreview");
+            go.transform.SetParent(targetCanvas.transform, false);
+            activeDragPreview = go.AddComponent<Image>();
+            activeDragPreview.raycastTarget = false;
+        }
+        else
+        {
+            activeDragPreview = Instantiate(dragPreviewTemplate, targetCanvas.transform);
+        }
+
+        activeDragPreview.sprite = icon;
+        activeDragPreview.preserveAspect = true;
+        activeDragPreview.raycastTarget = false;
+
+        if (iconSize == Vector2.zero)
+        {
+            iconSize = activeDragPreview.rectTransform.sizeDelta;
+            if (iconSize == Vector2.zero)
+                iconSize = new Vector2(48f, 48f);
+        }
+
+        activeDragPreview.rectTransform.sizeDelta = iconSize;
+        activeDragPreview.rectTransform.position = eventData.position;
+        activeDragPreview.gameObject.SetActive(true);
+    }
+
+    private void ClearDragPreview()
+    {
+        if (activeDragPreview == null) return;
+        Destroy(activeDragPreview.gameObject);
+        activeDragPreview = null;
     }
 
     private int GetGridColumnCount()

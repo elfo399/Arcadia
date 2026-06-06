@@ -639,9 +639,19 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         sourceItems[a] = sourceItems[b];
         sourceItems[b] = tempSrc;
 
+        PersistSourceItemsToPlayer();
         RefreshSlot(a);
         RefreshSlot(b);
         RefreshDetailSelection();
+    }
+
+    private void PersistSourceItemsToPlayer()
+    {
+        EnsurePlayerInventory();
+        if (playerInventory == null)
+            return;
+
+        playerInventory.ReplaceAllItems(new List<InventoryItem>(sourceItems));
     }
 
     private void ExtendSourceToIndex(int index)
