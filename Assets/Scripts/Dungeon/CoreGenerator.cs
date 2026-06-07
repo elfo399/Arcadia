@@ -85,6 +85,11 @@ public class CoreGenerator : MonoBehaviour
     private DungeonThemeDefinition activeThemeDefinition;
     private DungeonRoomSet activeRoomSet;
 
+    public event Action<int, string> FloorThemeChanged;
+    public int CurrentFloor => currentFloor;
+    public DungeonThemeDefinition ActiveThemeDefinition => activeThemeDefinition;
+    public string ActiveThemeDisplayName => GetThemeDisplayName(activeThemeDefinition);
+
     // Lookup ricostruito in base al tema attivo del piano.
     private Dictionary<string, Dictionary<Vector2Int, Room[]>> _prefabLookup;
 
@@ -574,18 +579,28 @@ public class CoreGenerator : MonoBehaviour
     {
         activeThemeDefinition = SelectThemeForFloor(currentFloor, currentMasterSeed);
         activeRoomSet = activeThemeDefinition != null ? activeThemeDefinition.roomSet : null;
+        string themeLabel = ActiveThemeDisplayName;
 
         if (activeThemeDefinition != null && activeRoomSet != null)
         {
-            string themeLabel = string.IsNullOrWhiteSpace(activeThemeDefinition.displayName)
-                ? activeThemeDefinition.name
-                : activeThemeDefinition.displayName;
             Debug.Log($"[CoreGenerator] Piano {currentFloor}: tema selezionato '{themeLabel}' | RoomSet: '{activeRoomSet.name}'");
         }
         else
         {
             Debug.Log($"[CoreGenerator] Piano {currentFloor}: nessun tema valido trovato, uso i pool legacy del CoreGenerator.");
         }
+
+        FloorThemeChanged?.Invoke(currentFloor, themeLabel);
+    }
+
+    public static string GetThemeDisplayName(DungeonThemeDefinition themeDefinition)
+    {
+        if (themeDefinition == null)
+            return string.Empty;
+
+        return string.IsNullOrWhiteSpace(themeDefinition.displayName)
+            ? themeDefinition.name
+            : themeDefinition.displayName;
     }
 
     private bool ValidateActiveThemeConfiguration(out string error)
