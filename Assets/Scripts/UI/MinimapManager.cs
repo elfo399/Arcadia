@@ -7,6 +7,7 @@ using System.Linq;
 public class MinimapManager : MonoBehaviour
 {
     public static MinimapManager instance;
+    public event System.Action MapStateChanged;
 
     [Header("Riferimenti UI")]
     public RectTransform mapContainer; 
@@ -35,6 +36,7 @@ public class MinimapManager : MonoBehaviour
     private HashSet<Vector2Int> _visitedRoomAnchors = new HashSet<Vector2Int>();
     private HashSet<Vector2Int> _revealedRoomAnchors = new HashSet<Vector2Int>(); // Stanze da mostrare permanentemente
     private Vector2Int _lastPlayerRoomAnchor = new Vector2Int(-999, -999);
+    private const string RenderedMenuMapIconPrefix = "MenuMapRoomIcon_";
     
     private float FullStep => iconBaseSize + iconSpacing;
 
@@ -91,15 +93,17 @@ public class MinimapManager : MonoBehaviour
 
     public void ClearMap()
     {
-        if (mapContainer == null)
-            return;
+        if (mapContainer != null)
+        {
+            foreach (Transform child in mapContainer) Destroy(child.gameObject);
+        }
 
-        foreach (Transform child in mapContainer) Destroy(child.gameObject);
         _roomIconObjects.Clear();
         _visitedRoomAnchors.Clear();
         _revealedRoomAnchors.Clear();
         _roomData.Clear();
         _lastPlayerRoomAnchor = new Vector2Int(-999,-999);
+        MapStateChanged?.Invoke();
     }
 
     public void RegisterRoom(Vector2Int gridPos, RoomData data)
@@ -113,6 +117,7 @@ public class MinimapManager : MonoBehaviour
         SetupIconVisuals(newIconObj, gridPos, data);
         
         newIconObj.SetActive(false);
+        MapStateChanged?.Invoke();
     }
 
     private void SetupIconVisuals(GameObject iconObj, Vector2Int gridPos, RoomData data)
@@ -130,7 +135,8 @@ public class MinimapManager : MonoBehaviour
         );
 
         Image fillImage = iconObj.transform.Find("RoomFill")?.GetComponent<Image>() ?? iconObj.GetComponent<Image>();
-        fillImage.color = visitedRoomColor;
+        if (fillImage != null)
+            fillImage.color = visitedRoomColor;
 
         Image overlayImg = iconObj.transform.Find("IconOverlay")?.GetComponent<Image>();
         if (overlayImg != null)
@@ -200,15 +206,18 @@ public class MinimapManager : MonoBehaviour
 
                 if (roomAnchor == currentRoomAnchor)
                 {
-                    fillImage.color = currentRoomColor;
+                    if (fillImage != null)
+                        fillImage.color = currentRoomColor;
                 }
                 else if (_visitedRoomAnchors.Contains(roomAnchor))
                 {
-                    fillImage.color = visitedRoomColor;
+                    if (fillImage != null)
+                        fillImage.color = visitedRoomColor;
                 }
                 else // Rivelata ma non visitata (quindi adiacente a una visitata)
                 {
-                    fillImage.color = adjacentRoomColor;
+                    if (fillImage != null)
+                        fillImage.color = adjacentRoomColor;
                 }
             }
             else
@@ -216,6 +225,127 @@ public class MinimapManager : MonoBehaviour
                 iconObj.SetActive(false);
             }
         }
+
+        MapStateChanged?.Invoke();
+    }
+
+    public void RenderExploredMap(
+        RectTransform targetContainer,
+        float padding = 12f,
+        float maxScale = 1f,
+        bool includeUnrevealedRooms = false,
+        bool overrideRoomFillColor = false,
+        Color roomFillColor = default)
+    {
+        if (targetContainer == null)
+            return;
+
+        ClearRenderedMenuMap(targetContainer);
+
+        if (roomIconPrefab == null || _roomData.Count == 0)
+            return;
+
+        List<Vector2Int> visibleAnchors = _roomData.Keys
+            .Where(anchor => includeUnrevealedRooms || _revealedRoomAnchors.Contains(anchor))
+            .ToList();
+
+        if (visibleAnchors.Count == 0)
+            return;
+
+        RectInt bounds = BuildRoomBounds(visibleAnchors);
+        Vector2 boundsCenter = new Vector2(bounds.xMin + bounds.width * 0.5f, bounds.yMin + bounds.height * 0.5f);
+        float contentWidth = Mathf.Max(FullStep, bounds.width * FullStep);
+        float contentHeight = Mathf.Max(FullStep, bounds.height * FullStep);
+        float availableWidth = Mathf.Max(1f, targetContainer.rect.width - padding * 2f);
+        float availableHeight = Mathf.Max(1f, targetContainer.rect.height - padding * 2f);
+        float fitScale = Mathf.Min(maxScale, availableWidth / contentWidth, availableHeight / contentHeight);
+        fitScale = Mathf.Max(0.1f, fitScale);
+
+        for (int i = 0; i < visibleAnchors.Count; i++)
+        {
+            Vector2Int roomAnchor = visibleAnchors[i];
+            RoomData data = _roomData[roomAnchor];
+            GameObject iconObj = Instantiate(roomIconPrefab, targetContainer);
+            iconObj.name = $"{RenderedMenuMapIconPrefix}{roomAnchor.x}_{roomAnchor.y}";
+            SetupIconVisuals(iconObj, roomAnchor, data);
+
+            if (overrideRoomFillColor)
+                ApplyRoomFillColor(iconObj, roomFillColor);
+            else
+                ApplyIconVisibilityState(iconObj, roomAnchor, _lastPlayerRoomAnchor);
+
+            RectTransform iconRect = iconObj.GetComponent<RectTransform>();
+            if (iconRect != null)
+            {
+                iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+                iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+                iconRect.pivot = new Vector2(0, 0);
+                iconRect.anchoredPosition = new Vector2(
+                    (roomAnchor.x - boundsCenter.x) * FullStep * fitScale,
+                    (roomAnchor.y - boundsCenter.y) * FullStep * fitScale
+                );
+                iconRect.localScale = Vector3.one * fitScale;
+            }
+
+            iconObj.SetActive(true);
+        }
+    }
+
+    private void ClearRenderedMenuMap(RectTransform targetContainer)
+    {
+        for (int i = targetContainer.childCount - 1; i >= 0; i--)
+        {
+            Transform child = targetContainer.GetChild(i);
+            if (child != null && child.name.StartsWith(RenderedMenuMapIconPrefix, System.StringComparison.Ordinal))
+                Destroy(child.gameObject);
+        }
+    }
+
+    private RectInt BuildRoomBounds(List<Vector2Int> visibleAnchors)
+    {
+        Vector2Int firstAnchor = visibleAnchors[0];
+        RoomData firstData = _roomData[firstAnchor];
+        int minX = firstAnchor.x;
+        int minY = firstAnchor.y;
+        int maxX = firstAnchor.x + firstData.size.x;
+        int maxY = firstAnchor.y + firstData.size.y;
+
+        for (int i = 1; i < visibleAnchors.Count; i++)
+        {
+            Vector2Int anchor = visibleAnchors[i];
+            RoomData data = _roomData[anchor];
+            minX = Mathf.Min(minX, anchor.x);
+            minY = Mathf.Min(minY, anchor.y);
+            maxX = Mathf.Max(maxX, anchor.x + data.size.x);
+            maxY = Mathf.Max(maxY, anchor.y + data.size.y);
+        }
+
+        return new RectInt(minX, minY, Mathf.Max(1, maxX - minX), Mathf.Max(1, maxY - minY));
+    }
+
+    private void ApplyIconVisibilityState(GameObject iconObj, Vector2Int roomAnchor, Vector2Int currentRoomAnchor)
+    {
+        Image fillImage = iconObj.transform.Find("RoomFill")?.GetComponent<Image>() ?? iconObj.GetComponent<Image>();
+        if (fillImage == null)
+            return;
+
+        if (roomAnchor == currentRoomAnchor)
+            fillImage.color = currentRoomColor;
+        else if (_visitedRoomAnchors.Contains(roomAnchor))
+            fillImage.color = visitedRoomColor;
+        else
+            fillImage.color = adjacentRoomColor;
+    }
+
+    private void ApplyRoomFillColor(GameObject iconObj, Color color)
+    {
+        Transform roomFill = iconObj.transform.Find("RoomFill");
+        Image fillImage = roomFill != null ? roomFill.GetComponent<Image>() : null;
+        if (fillImage == null)
+            fillImage = iconObj.GetComponent<Image>();
+
+        if (fillImage != null)
+            fillImage.color = color;
     }
     
     private bool GetAnchorForCell(Vector2Int cell, out Vector2Int foundAnchor)
