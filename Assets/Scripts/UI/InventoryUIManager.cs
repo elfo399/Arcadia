@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.Events;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
@@ -52,7 +52,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private TextMeshProUGUI shieldRequirementsText;
     [SerializeField] private TextMeshProUGUI weaponPhysicalDefenseText;
     [SerializeField] private TextMeshProUGUI weaponMagicDefenseText;
-    [SerializeField] private Button shieldEquipButton;
 
     [Header("Detail Panel - Armor Variant")]
     [SerializeField] private GameObject armorDescriptionRoot;
@@ -61,7 +60,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private TextMeshProUGUI armorWeightText;
     [SerializeField] private TextMeshProUGUI armorPhysicalDefenseText;
     [SerializeField] private TextMeshProUGUI armorMagicDefenseText;
-    [SerializeField] private Button armorEquipButton;
 
     [Header("Detail Panel - Item / Usable")]
     [SerializeField] private GameObject itemDetailRoot;
@@ -69,9 +67,9 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private TextMeshProUGUI itemTitle;
     [SerializeField] private TextMeshProUGUI itemDesc;
 
-    [Header("Action Buttons")]
-    [SerializeField] private Button equipWeaponButton;
-    [SerializeField] private Button equipUsableButton;
+    [Header("Action Button")]
+    [FormerlySerializedAs("equipWeaponButton")]
+    [SerializeField] private Button equipButton;
 
     [Header("Wallet UI")]
     [SerializeField] private TextMeshProUGUI goldValueText;
@@ -111,7 +109,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
         EnsureEquipmentManager();
         AutoWireArmorDetailReferences();
-        BindEquipButtons();
 
         if (slotParent == null)
             slotParent = transform;
@@ -410,26 +407,12 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     public void ConfirmPadSelection()
     {
-        if (equipWeaponButton != null && equipWeaponButton.gameObject.activeInHierarchy && equipWeaponButton.interactable)
+        if (IsEquipButtonInteractable())
         {
-            OnEquipWeaponButtonClick();
+            OnEquipButtonClick();
             return;
         }
-        if (shieldEquipButton != null && shieldEquipButton.gameObject.activeInHierarchy && shieldEquipButton.interactable)
-        {
-            OnEquipWeaponButtonClick();
-            return;
-        }
-        if (equipUsableButton != null && equipUsableButton.gameObject.activeInHierarchy && equipUsableButton.interactable)
-        {
-            OnEquipUsableButtonClick();
-            return;
-        }
-        if (armorEquipButton != null && armorEquipButton.gameObject.activeInHierarchy && armorEquipButton.interactable)
-        {
-            OnEquipArmorButtonClick();
-            return;
-        }
+
         if (TryEquipFocusedPadItem())
             return;
 
@@ -441,6 +424,31 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
         HandleSlotSubmit(padFocusIndex);
         SetPadFocus(padFocusIndex);
+    }
+
+    public void OnEquipButtonClick()
+    {
+        if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex)) return;
+        EnsureEquipmentManager();
+
+        var item = currentItems[currentSelectedIndex];
+        if (item == null) return;
+
+        var target = GetEffectiveEquipTarget();
+        if (item.weaponData != null && CanEquipWeaponForTarget(target))
+        {
+            OnEquipWeaponButtonClick();
+            return;
+        }
+
+        if (item.armorData != null && CanEquipArmorForTarget(item, target))
+        {
+            OnEquipArmorButtonClick();
+            return;
+        }
+
+        if (item.usableData != null && CanEquipUsableForTarget(target))
+            OnEquipUsableButtonClick();
     }
 
     public void OnEquipWeaponButtonClick()
@@ -960,12 +968,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             weaponDesc = FindDeepTextByName(detailRootTransform, "Desc_Custom")
                 ?? FindDeepTextByName(detailRootTransform, "Desc");
 
-        if (equipWeaponButton == null)
-        {
-            Transform equipButtonTf = FindDeepChildByName(detailRootTransform, "EquipBTN");
-            if (equipButtonTf != null) equipWeaponButton = equipButtonTf.GetComponent<Button>();
-        }
-
         if (weaponDescriptionRoot == null)
             weaponDescriptionRoot = FindDeepChildByName(detailRootTransform, "WeaponColumn")?.gameObject
                 ?? FindDeepChildByName(detailRootTransform, "WeaponCollumn")?.gameObject;
@@ -999,11 +1001,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
                 weaponPhysicalDefenseText = FindStatValueText(shieldDescriptionRoot.transform, "Def Phy");
             if (weaponMagicDefenseText == null)
                 weaponMagicDefenseText = FindStatValueText(shieldDescriptionRoot.transform, "Def Mag");
-            if (shieldEquipButton == null)
-            {
-                Transform equipButtonTf = FindDeepChildByName(shieldDescriptionRoot.transform, "EquipBTN");
-                if (equipButtonTf != null) shieldEquipButton = equipButtonTf.GetComponent<Button>();
-            }
 
             if (shieldTitle == null)
                 shieldTitle = weaponTitle;
@@ -1075,16 +1072,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
                         ?? FindDeepTextByName(itemRootTransform, "Desc")
                         ?? FindDeepTextByName(itemRootTransform, "Description");
             }
-
-            if (equipUsableButton == null)
-            {
-                Transform usableButtonTf = itemFirstColumn != null
-                    ? FindDeepChildByName(itemFirstColumn, "EquipBTN")
-                        ?? FindDeepChildByName(itemFirstColumn, "Button")
-                    : FindDeepChildByName(itemRootTransform, "EquipBTN")
-                        ?? FindDeepChildByName(itemRootTransform, "Button");
-                if (usableButtonTf != null) equipUsableButton = usableButtonTf.GetComponent<Button>();
-            }
         }
 
         if (armorDescriptionRoot == null)
@@ -1110,11 +1097,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             armorPhysicalDefenseText = FindStatValueText(armorDescriptionRoot.transform, "Def Phy");
         if (armorMagicDefenseText == null)
             armorMagicDefenseText = FindStatValueText(armorDescriptionRoot.transform, "Def Mag");
-        if (armorEquipButton == null)
-        {
-            Transform equipButtonTf = FindDeepChildByName(armorDescriptionRoot.transform, "EquipBTN");
-            if (equipButtonTf != null) armorEquipButton = equipButtonTf.GetComponent<Button>();
-        }
 
         // Preserve existing UI behaviour when the armor panel has no dedicated description text yet.
         if (armorTitle == null)
@@ -1191,47 +1173,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         weaponStatsRoot.SetActive(active);
     }
 
-    private void BindEquipButtons()
-    {
-        if (equipWeaponButton != null)
-        {
-            DisablePersistentButtonListeners(equipWeaponButton);
-            equipWeaponButton.onClick.RemoveListener(OnEquipWeaponButtonClick);
-            equipWeaponButton.onClick.AddListener(OnEquipWeaponButtonClick);
-        }
-
-        if (shieldEquipButton != null)
-        {
-            DisablePersistentButtonListeners(shieldEquipButton);
-            shieldEquipButton.onClick.RemoveListener(OnEquipWeaponButtonClick);
-            shieldEquipButton.onClick.AddListener(OnEquipWeaponButtonClick);
-        }
-
-        if (equipUsableButton != null)
-        {
-            DisablePersistentButtonListeners(equipUsableButton);
-            equipUsableButton.onClick.RemoveListener(OnEquipUsableButtonClick);
-            equipUsableButton.onClick.AddListener(OnEquipUsableButtonClick);
-        }
-
-        if (armorEquipButton != null)
-        {
-            DisablePersistentButtonListeners(armorEquipButton);
-            armorEquipButton.onClick.RemoveListener(OnEquipArmorButtonClick);
-            armorEquipButton.onClick.AddListener(OnEquipArmorButtonClick);
-        }
-    }
-
-    private static void DisablePersistentButtonListeners(Button button)
-    {
-        if (button == null)
-            return;
-
-        int persistentCount = button.onClick.GetPersistentEventCount();
-        for (int i = 0; i < persistentCount; i++)
-            button.onClick.SetPersistentListenerState(i, UnityEventCallState.Off);
-    }
-
     private void SwitchSlotContainer(Transform newParent, int minSlotCount)
     {
         if (newParent == null) return;
@@ -1296,86 +1237,81 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private void UpdateEquipButtonState()
     {
-        EnsureEquipmentManager();
-        var currentTarget = GetEffectiveEquipTarget();
-        bool hasSelection = currentSelectedIndex >= 0 && HasItem(currentSelectedIndex);
-        bool selectedWeapon = hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.weaponData != null;
-        bool selectedShield = selectedWeapon && currentItems[currentSelectedIndex].weaponData.category == WeaponCategory.Shield;
-        bool selectedArmor = hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.armorData != null;
-        bool selectedUsable = hasSelection && currentSelectedIndex < currentItems.Count && currentItems[currentSelectedIndex]?.usableData != null;
-        bool allowDirectEquip = currentTarget == EquipmentManager.EquipTarget.None;
+        if (equipButton == null)
+            return;
 
-        if (equipWeaponButton != null)
-        {
-            bool showW =
-                (allowDirectEquip || currentTarget == EquipmentManager.EquipTarget.Right || currentTarget == EquipmentManager.EquipTarget.Left)
-                && selectedWeapon
-                && !selectedShield;
-            equipWeaponButton.gameObject.SetActive(showW);
-            bool canEquipWeapon = showW && selectedWeapon;
-            equipWeaponButton.interactable = canEquipWeapon;
-        }
-
-        if (shieldEquipButton != null)
-        {
-            bool showS =
-                (allowDirectEquip || currentTarget == EquipmentManager.EquipTarget.Right || currentTarget == EquipmentManager.EquipTarget.Left)
-                && selectedShield;
-            shieldEquipButton.gameObject.SetActive(showS);
-            shieldEquipButton.interactable = showS;
-        }
-
-        if (armorEquipButton != null)
-        {
-            bool showA = (allowDirectEquip || currentTarget == EquipmentManager.EquipTarget.Armor) && selectedArmor;
-            armorEquipButton.gameObject.SetActive(showA);
-            bool canEquipArmor = showA && selectedArmor;
-            armorEquipButton.interactable = canEquipArmor;
-        }
-        else if (equipWeaponButton != null)
-        {
-            bool showFallbackArmor = (allowDirectEquip || currentTarget == EquipmentManager.EquipTarget.Armor) && selectedArmor;
-            if (showFallbackArmor)
-            {
-                equipWeaponButton.gameObject.SetActive(true);
-                bool canEquipArmor = selectedArmor;
-                equipWeaponButton.interactable = canEquipArmor;
-            }
-        }
-
-        if (equipUsableButton != null)
-        {
-            bool showU = (allowDirectEquip || currentTarget == EquipmentManager.EquipTarget.Bottom) && selectedUsable;
-            equipUsableButton.gameObject.SetActive(showU);
-            equipUsableButton.interactable = showU && selectedUsable;
-        }
-
+        bool canEquip = CanEquipCurrentSelection();
+        equipButton.gameObject.SetActive(canEquip);
+        equipButton.interactable = canEquip;
     }
 
     private void ResetEquipTarget()
     {
         equipmentManager?.ResetEquipTarget();
 
-        if (equipWeaponButton != null)
-        {
-            equipWeaponButton.gameObject.SetActive(false);
-            equipWeaponButton.interactable = false;
-        }
-        if (shieldEquipButton != null)
-        {
-            shieldEquipButton.gameObject.SetActive(false);
-            shieldEquipButton.interactable = false;
-        }
-        if (equipUsableButton != null)
-        {
-            equipUsableButton.gameObject.SetActive(false);
-            equipUsableButton.interactable = false;
-        }
-        if (armorEquipButton != null)
-        {
-            armorEquipButton.gameObject.SetActive(false);
-            armorEquipButton.interactable = false;
-        }
+        if (equipButton == null)
+            return;
+
+        equipButton.gameObject.SetActive(false);
+        equipButton.interactable = false;
+    }
+
+    private bool IsEquipButtonInteractable()
+    {
+        return equipButton != null
+               && equipButton.gameObject.activeInHierarchy
+               && equipButton.interactable;
+    }
+
+    private bool CanEquipCurrentSelection()
+    {
+        EnsureEquipmentManager();
+        if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex))
+            return false;
+
+        return CanEquipItemForTarget(currentItems[currentSelectedIndex], GetEffectiveEquipTarget());
+    }
+
+    private bool CanEquipItemForTarget(InventoryItem item, EquipmentManager.EquipTarget target)
+    {
+        if (item == null)
+            return false;
+
+        if (item.weaponData != null)
+            return CanEquipWeaponForTarget(target);
+
+        if (item.armorData != null)
+            return CanEquipArmorForTarget(item, target);
+
+        if (item.usableData != null)
+            return CanEquipUsableForTarget(target);
+
+        return false;
+    }
+
+    private static bool CanEquipWeaponForTarget(EquipmentManager.EquipTarget target)
+    {
+        return target == EquipmentManager.EquipTarget.None
+               || target == EquipmentManager.EquipTarget.Right
+               || target == EquipmentManager.EquipTarget.Left;
+    }
+
+    private bool CanEquipArmorForTarget(InventoryItem item, EquipmentManager.EquipTarget target)
+    {
+        if (item?.armorData == null)
+            return false;
+
+        if (target == EquipmentManager.EquipTarget.None)
+            return true;
+
+        return target == EquipmentManager.EquipTarget.Armor
+               && item.armorData.slot == GetEffectiveArmorSlot();
+    }
+
+    private static bool CanEquipUsableForTarget(EquipmentManager.EquipTarget target)
+    {
+        return target == EquipmentManager.EquipTarget.None
+               || target == EquipmentManager.EquipTarget.Bottom;
     }
 
     private Sprite GetItemIcon(InventoryItem item)
@@ -1531,24 +1467,11 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         var focused = currentItems[padFocusIndex];
         if (focused == null) return false;
 
-        switch (target)
-        {
-            case EquipmentManager.EquipTarget.Right:
-            case EquipmentManager.EquipTarget.Left:
-                if (focused.weaponData == null) return false;
-                OnEquipWeaponButtonClick();
-                return true;
-            case EquipmentManager.EquipTarget.Armor:
-                if (focused.armorData == null) return false;
-                OnEquipArmorButtonClick();
-                return true;
-            case EquipmentManager.EquipTarget.Bottom:
-                if (focused.usableData == null) return false;
-                OnEquipUsableButtonClick();
-                return true;
-            default:
-                return false;
-        }
+        if (!CanEquipItemForTarget(focused, target))
+            return false;
+
+        OnEquipButtonClick();
+        return true;
     }
 
     private void CompleteEquipAction()

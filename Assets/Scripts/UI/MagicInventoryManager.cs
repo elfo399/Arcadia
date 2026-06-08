@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
@@ -24,7 +25,8 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private TextMeshProUGUI magicCriticalText;
     [SerializeField] private TextMeshProUGUI magicScalingText;
     [SerializeField] private TextMeshProUGUI magicRequirementsText;
-    [SerializeField] private Button equipMagicButton;
+    [FormerlySerializedAs("equipMagicButton")]
+    [SerializeField] private Button equipButton;
 
     private readonly List<InventorySlot> slots = new();
     private readonly List<InventoryItem> currentItems = new();
@@ -426,16 +428,16 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     private void SetEquipButtonState(bool visible, bool interactable)
     {
-        if (equipMagicButton == null) return;
-        equipMagicButton.gameObject.SetActive(visible);
-        equipMagicButton.interactable = visible && interactable;
+        if (equipButton == null) return;
+        equipButton.gameObject.SetActive(visible);
+        equipButton.interactable = visible && interactable;
     }
 
     private bool IsEquipButtonInteractable()
     {
-        return equipMagicButton != null
-               && equipMagicButton.gameObject.activeInHierarchy
-               && equipMagicButton.interactable;
+        return equipButton != null
+               && equipButton.gameObject.activeInHierarchy
+               && equipButton.interactable;
     }
 
     private bool IsItemEquipped(InventoryItem item)
