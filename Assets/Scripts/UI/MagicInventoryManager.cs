@@ -95,14 +95,12 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     {
         RefreshFromPlayer();
         SetEquipButtonState(false, false);
-        FocusDefaultPadSlot();
     }
 
     public void PrepareMagicEquipSelectionView()
     {
         equipmentManager?.ShowMagicPanel();
         RefreshFromPlayer();
-        FocusDefaultPadSlot();
         UpdateEquipButtonState();
     }
 
@@ -169,7 +167,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         ShowItemDetailsByIndex(index);
     }
 
-    public void FocusDefaultPadSlot()
+    public void FocusDefaultPadSlot(bool selectItem = true)
     {
         if (slots.Count == 0) return;
 
@@ -183,7 +181,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
             }
         }
 
-        SetPadFocus(fallback);
+        SetPadFocus(fallback, selectItem);
     }
 
     public void MovePadFocusHorizontal(int direction)
@@ -216,7 +214,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
         if (padFocusIndex < 0 || !HasItem(padFocusIndex))
         {
-            FocusDefaultPadSlot();
+            FocusDefaultPadSlot(false);
             return;
         }
 
@@ -272,7 +270,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         RefreshSlotsFromCurrentItems();
 
         currentSelectedIndex = -1;
-        ApplyPadFocusVisual(-1);
+        ClearPadFocus();
         ClearDetail();
         UpdateEquipButtonState();
     }
@@ -361,14 +359,38 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         playerInventory.SetMagicInventorySlotLayout(currentItems, magicInitialSlotCount);
     }
 
-    private void SetPadFocus(int index)
+    private void SetPadFocus(int index, bool selectItem = true)
     {
         if (index < 0 || index >= slots.Count) return;
         padFocusIndex = index;
         ApplyPadFocusVisual(index);
-        ShowItemDetailsByIndex(index);
+        if (selectItem)
+            ShowItemDetailsByIndex(index);
         if (EventSystem.current != null && slots[index] != null)
             EventSystem.current.SetSelectedGameObject(slots[index].gameObject);
+    }
+
+    private void ClearPadFocus()
+    {
+        padFocusIndex = -1;
+        ApplyPadFocusVisual(-1);
+        if (EventSystem.current != null && IsCurrentEventSelectionOwnedSlot())
+            EventSystem.current.SetSelectedGameObject(null);
+    }
+
+    private bool IsCurrentEventSelectionOwnedSlot()
+    {
+        var selected = EventSystem.current.currentSelectedGameObject;
+        if (selected == null)
+            return false;
+
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (slots[i] != null && selected == slots[i].gameObject)
+                return true;
+        }
+
+        return false;
     }
 
     private void ApplyPadFocusVisual(int focusedIndex)
@@ -422,8 +444,12 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     private void UpdateEquipButtonState()
     {
-        bool showButton = equipmentManager != null && equipmentManager.CurrentEquipTarget == EquipmentManager.EquipTarget.Top;
-        SetEquipButtonState(showButton, showButton && currentSelectedIndex >= 0 && HasItem(currentSelectedIndex));
+        bool canEquip = equipmentManager != null
+                        && equipmentManager.CurrentEquipTarget == EquipmentManager.EquipTarget.Top
+                        && currentSelectedIndex >= 0
+                        && HasItem(currentSelectedIndex)
+                        && currentItems[currentSelectedIndex]?.magicData != null;
+        SetEquipButtonState(canEquip, canEquip);
     }
 
     private void SetEquipButtonState(bool visible, bool interactable)

@@ -7,6 +7,11 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 {
     public enum EquipTarget { None, Right, Left, Bottom, Top, Armor }
     private enum EquipCrossFocus { Right, Left, Bottom, Top, Armor }
+    private const int RightSlotBase = 0;
+    private const int LeftSlotBase = 3;
+    private const int BottomSlotBase = 6;
+    private const int TopSlotBase = 9;
+    private const int ArmorSlotBase = 12;
 
     [Header("Equipment Slot Prefab")]
     [SerializeField] private InventorySlot slotPrefab;
@@ -299,27 +304,27 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
     {
         if (equipSlotsBuilt) return;
 
-        rightEquipSlots[0] = CreateEquipSlot(rightEquipContainer);
-        rightEquipSlots[1] = CreateEquipSlot(rightEquipContainer2);
-        rightEquipSlots[2] = CreateEquipSlot(rightEquipContainer3);
+        rightEquipSlots[0] = CreateEquipSlot(rightEquipContainer, RightSlotBase, this, false);
+        rightEquipSlots[1] = CreateEquipSlot(rightEquipContainer2, RightSlotBase + 1, this, false);
+        rightEquipSlots[2] = CreateEquipSlot(rightEquipContainer3, RightSlotBase + 2, this, false);
 
-        leftEquipSlots[0] = CreateEquipSlot(leftEquipContainer);
-        leftEquipSlots[1] = CreateEquipSlot(leftEquipContainer2);
-        leftEquipSlots[2] = CreateEquipSlot(leftEquipContainer3);
+        leftEquipSlots[0] = CreateEquipSlot(leftEquipContainer, LeftSlotBase, this, false);
+        leftEquipSlots[1] = CreateEquipSlot(leftEquipContainer2, LeftSlotBase + 1, this, false);
+        leftEquipSlots[2] = CreateEquipSlot(leftEquipContainer3, LeftSlotBase + 2, this, false);
 
-        bottomEquipSlots[0] = CreateEquipSlot(bottomEquipContainer);
-        bottomEquipSlots[1] = CreateEquipSlot(bottomEquipContainer2);
-        bottomEquipSlots[2] = CreateEquipSlot(bottomEquipContainer3);
+        bottomEquipSlots[0] = CreateEquipSlot(bottomEquipContainer, BottomSlotBase, this, false);
+        bottomEquipSlots[1] = CreateEquipSlot(bottomEquipContainer2, BottomSlotBase + 1, this, false);
+        bottomEquipSlots[2] = CreateEquipSlot(bottomEquipContainer3, BottomSlotBase + 2, this, false);
 
-        topEquipSlots[0] = CreateEquipSlot(topEquipContainer);
-        topEquipSlots[1] = CreateEquipSlot(topEquipContainer2);
-        topEquipSlots[2] = CreateEquipSlot(topEquipContainer3);
+        topEquipSlots[0] = CreateEquipSlot(topEquipContainer, TopSlotBase, this, false);
+        topEquipSlots[1] = CreateEquipSlot(topEquipContainer2, TopSlotBase + 1, this, false);
+        topEquipSlots[2] = CreateEquipSlot(topEquipContainer3, TopSlotBase + 2, this, false);
 
         ResolveArmorContainersFromHierarchy();
-        armorEquipSlots[0] = CreateEquipSlot(armorHelmetContainer, 0, this, false);
-        armorEquipSlots[1] = CreateEquipSlot(armorChestplateContainer, 1, this, false);
-        armorEquipSlots[2] = CreateEquipSlot(armorLeggingsContainer, 2, this, false);
-        armorEquipSlots[3] = CreateEquipSlot(armorBootsContainer, 3, this, false);
+        armorEquipSlots[0] = CreateEquipSlot(armorHelmetContainer, ArmorSlotBase, this, false);
+        armorEquipSlots[1] = CreateEquipSlot(armorChestplateContainer, ArmorSlotBase + 1, this, false);
+        armorEquipSlots[2] = CreateEquipSlot(armorLeggingsContainer, ArmorSlotBase + 2, this, false);
+        armorEquipSlots[3] = CreateEquipSlot(armorBootsContainer, ArmorSlotBase + 3, this, false);
 
         equipSlotsBuilt = true;
     }
@@ -727,10 +732,7 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 
     public void HandleSlotPointerDown(int index)
     {
-        if (index < 0 || index >= armorEquipSlots.Length)
-            return;
-
-        BeginEquipArmor((ArmorItemData.ArmorSlot)index);
+        BeginEquipFromEncodedSlot(index);
     }
 
     public void HandleSlotBeginDrag(int index, PointerEventData eventData) { }
@@ -741,10 +743,51 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 
     public void HandleSlotSubmit(int index)
     {
-        if (index < 0 || index >= armorEquipSlots.Length)
+        BeginEquipFromEncodedSlot(index);
+    }
+
+    private void BeginEquipFromEncodedSlot(int encodedSlot)
+    {
+        if (TryDecodeLoadoutSlot(encodedSlot, RightSlotBase, out int rightIndex))
+        {
+            SetEquipmentCrossFocus(EquipCrossFocus.Right, rightIndex);
+            BeginEquipRight(rightIndex);
+            return;
+        }
+
+        if (TryDecodeLoadoutSlot(encodedSlot, LeftSlotBase, out int leftIndex))
+        {
+            SetEquipmentCrossFocus(EquipCrossFocus.Left, leftIndex);
+            BeginEquipLeft(leftIndex);
+            return;
+        }
+
+        if (TryDecodeLoadoutSlot(encodedSlot, BottomSlotBase, out int bottomIndex))
+        {
+            SetEquipmentCrossFocus(EquipCrossFocus.Bottom, bottomIndex);
+            BeginEquipBottom(bottomIndex);
+            return;
+        }
+
+        if (TryDecodeLoadoutSlot(encodedSlot, TopSlotBase, out int topIndex))
+        {
+            SetEquipmentCrossFocus(EquipCrossFocus.Top, topIndex);
+            BeginEquipTop(topIndex);
+            return;
+        }
+
+        int armorIndex = encodedSlot - ArmorSlotBase;
+        if (armorIndex < 0 || armorIndex >= armorEquipSlots.Length)
             return;
 
-        BeginEquipArmor((ArmorItemData.ArmorSlot)index);
+        SetEquipmentCrossFocus(EquipCrossFocus.Armor, armorIndex);
+        BeginEquipArmor((ArmorItemData.ArmorSlot)armorIndex);
+    }
+
+    private static bool TryDecodeLoadoutSlot(int encodedSlot, int slotBase, out int localIndex)
+    {
+        localIndex = encodedSlot - slotBase;
+        return localIndex >= 0 && localIndex < 3;
     }
 
     private readonly struct CrossSlotRef
