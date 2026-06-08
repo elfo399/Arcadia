@@ -34,6 +34,7 @@ public class MapPageManager : MonoBehaviour
     private string lastDisplayedPlayerName;
     private string lastDisplayedWeather;
     private int lastDisplayedRunSeconds = int.MinValue;
+    private const int RunTimerStartSeconds = 0;
 
     private void Awake()
     {
@@ -156,7 +157,7 @@ public class MapPageManager : MonoBehaviour
 
         if (runTimerText != null)
         {
-            int elapsedSeconds = Mathf.FloorToInt(Mathf.Max(0f, Time.timeSinceLevelLoad));
+            int elapsedSeconds = RunTimerStartSeconds + Mathf.FloorToInt(Mathf.Max(0f, Time.timeSinceLevelLoad));
             if (forceRefresh || elapsedSeconds != lastDisplayedRunSeconds)
             {
                 runTimerText.text = FormatText(runTimerFormat, FormatElapsedTime(elapsedSeconds));
