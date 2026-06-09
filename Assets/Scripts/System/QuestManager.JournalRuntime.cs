@@ -3,15 +3,11 @@ using UnityEngine;
 
 public partial class QuestManager
 {
-    public enum JournalQuestFilter { All, Active, Completed }
-    public enum JournalPadSection { Filters, List, Detail }
+    public enum JournalPadSection { List, Detail }
     private enum QuestRewardKind { Item, Weapon, Usable, Magic, Armor, Experience }
 
-    private JournalQuestFilter currentJournalFilter = JournalQuestFilter.All;
-    private JournalPadSection currentJournalPadSection = JournalPadSection.Filters;
-    private int journalPadFilterIndex;
+    private JournalPadSection currentJournalPadSection = JournalPadSection.List;
     private int journalPadListIndex;
-    private int lastJournalFilterToggleFrame = -1;
     private string selectedJournalQuestId;
 
     private Dictionary<string, WeaponItem> questRewardWeaponLookup;
@@ -20,39 +16,14 @@ public partial class QuestManager
     private Dictionary<string, MagicItemData> questRewardMagicLookup;
     private Dictionary<string, ArmorItemData> questRewardArmorLookup;
 
-    public JournalQuestFilter CurrentJournalFilter => currentJournalFilter;
     public JournalPadSection CurrentJournalPadSection => currentJournalPadSection;
-    public int JournalPadFilterIndex => journalPadFilterIndex;
     public int JournalPadListIndex => journalPadListIndex;
     public string SelectedJournalQuestId => selectedJournalQuestId;
 
-    public void SetJournalQuestFilterAll()
-    {
-        currentJournalFilter = JournalQuestFilter.All;
-        ClampJournalPadIndices();
-    }
-
-    public void SetJournalQuestFilterActive()
-    {
-        ToggleJournalFilter(JournalQuestFilter.Active);
-    }
-
-    public void SetJournalQuestFilterCompleted()
-    {
-        ToggleJournalFilter(JournalQuestFilter.Completed);
-    }
-
     public void FocusJournalPadDefault()
     {
-        currentJournalPadSection = HasVisibleJournalQuests() ? JournalPadSection.List : JournalPadSection.Filters;
-        journalPadFilterIndex = Mathf.Clamp(journalPadFilterIndex, 0, 1);
+        currentJournalPadSection = JournalPadSection.List;
         SyncJournalPadListIndexToSelection();
-    }
-
-    public void FocusJournalPadFilters()
-    {
-        currentJournalPadSection = JournalPadSection.Filters;
-        journalPadFilterIndex = currentJournalFilter == JournalQuestFilter.Completed ? 1 : 0;
     }
 
     public void MoveJournalPadFocusHorizontal(int direction)
@@ -68,12 +39,6 @@ public partial class QuestManager
     public void MoveJournalPadFocusVertical(int direction)
     {
         int dir = direction >= 0 ? 1 : -1;
-        if (currentJournalPadSection == JournalPadSection.Filters)
-        {
-            journalPadFilterIndex = Mathf.Clamp(journalPadFilterIndex + dir, 0, 1);
-            return;
-        }
-
         if (currentJournalPadSection != JournalPadSection.List)
             return;
 
@@ -84,15 +49,6 @@ public partial class QuestManager
 
     public bool ConfirmJournalSelection(PlayerInventory inventory, PlayerStats stats, int normalCapacity, int magicCapacity)
     {
-        if (currentJournalPadSection == JournalPadSection.Filters)
-        {
-            if (journalPadFilterIndex == 0)
-                SetJournalQuestFilterActive();
-            else
-                SetJournalQuestFilterCompleted();
-            return false;
-        }
-
         if (currentJournalPadSection == JournalPadSection.List)
         {
             string questId = GetVisibleJournalQuestIdAt(journalPadListIndex);
@@ -114,12 +70,6 @@ public partial class QuestManager
     {
         if (currentJournalPadSection == JournalPadSection.Detail)
         {
-            currentJournalPadSection = HasVisibleJournalQuests() ? JournalPadSection.List : JournalPadSection.Filters;
-            return true;
-        }
-
-        if (currentJournalPadSection == JournalPadSection.Filters && HasVisibleJournalQuests())
-        {
             currentJournalPadSection = JournalPadSection.List;
             return true;
         }
@@ -134,7 +84,7 @@ public partial class QuestManager
         for (int i = 0; i < all.Count; i++)
         {
             var quest = all[i];
-            if (quest == null || !MatchesCurrentJournalFilter(quest))
+            if (quest == null)
                 continue;
             result.Add(quest);
         }
@@ -198,22 +148,6 @@ public partial class QuestManager
         return visible[index]?.questId;
     }
 
-    public bool MatchesCurrentJournalFilter(QuestEntryData quest)
-    {
-        if (quest == null)
-            return false;
-
-        switch (currentJournalFilter)
-        {
-            case JournalQuestFilter.Active:
-                return !quest.completed;
-            case JournalQuestFilter.Completed:
-                return quest.completed;
-            default:
-                return true;
-        }
-    }
-
     public bool IsQuestReadyToClaim(QuestEntryData quest)
     {
         if (quest == null)
@@ -255,24 +189,13 @@ public partial class QuestManager
         return true;
     }
 
-    private void ToggleJournalFilter(JournalQuestFilter target)
-    {
-        if (lastJournalFilterToggleFrame == Time.frameCount)
-            return;
-
-        lastJournalFilterToggleFrame = Time.frameCount;
-        currentJournalFilter = currentJournalFilter == target ? JournalQuestFilter.All : target;
-        ClampJournalPadIndices();
-    }
-
     private void ClampJournalPadIndices()
     {
-        journalPadFilterIndex = Mathf.Clamp(journalPadFilterIndex, 0, 1);
         int visibleCount = GetVisibleJournalQuestCount();
         if (visibleCount <= 0)
         {
             journalPadListIndex = 0;
-            currentJournalPadSection = JournalPadSection.Filters;
+            currentJournalPadSection = JournalPadSection.List;
             return;
         }
 

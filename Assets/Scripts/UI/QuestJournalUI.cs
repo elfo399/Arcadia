@@ -21,16 +21,11 @@ public class QuestJournalUI : MonoBehaviour
 
     [Header("Quest UI")]
     [SerializeField] private bool useQuestManager = true;
-    [SerializeField] private bool autoWireQuestUI = true;
+    [SerializeField] private bool autoWireQuestUI = false;
+    [SerializeField] private bool autoResolveMissingDependencies = false;
+    [SerializeField] private bool editorAutoAssignQuestPrefabs = false;
     [SerializeField] private Transform questListContainer;
-    [SerializeField] private GameObject questItemPrefab;
-    [SerializeField] private Button questActiveFilterButton;
-    [SerializeField] private Button questCompletedFilterButton;
-    [SerializeField] private TextMeshProUGUI questActiveCountText;
-    [SerializeField] private TextMeshProUGUI questCompletedCountText;
-    [SerializeField] private TextMeshProUGUI questActiveFilterLabelText;
-    [SerializeField] private TextMeshProUGUI questCompletedFilterLabelText;
-    [SerializeField] private Color questFilterSelectedColor = new Color(1f, 0.35f, 0.35f, 1f);
+    [SerializeField] private QuestItemUI questItemPrefab;
     [SerializeField] private List<QuestEntryData> startingQuests = new();
 
     [Header("Quest Detail UI")]
@@ -43,14 +38,14 @@ public class QuestJournalUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI questDetailLoreAuthorText;
     [SerializeField] private RectTransform questDetailLoreRoot;
     [SerializeField] private RectTransform questObjectivesSectionRoot;
-    [SerializeField] private GameObject questDetailPanelRoot;
+    [SerializeField] private RectTransform questDetailPanelRoot;
     [SerializeField] private bool showQuestDetailOnlyOnSelection = true;
     [SerializeField] private bool collapseQuestLoreWhenEmpty = true;
     [SerializeField] private float questObjectivesLiftWhenNoLore = -1f;
     [SerializeField] private Transform questObjectivesContainer;
-    [SerializeField] private GameObject questObjectivePrefab;
+    [SerializeField] private QuestObjectiveItemUI questObjectivePrefab;
     [SerializeField] private Transform questRewardsContainer;
-    [SerializeField] private GameObject questRewardPrefab;
+    [SerializeField] private QuestRewardItemUI questRewardPrefab;
     [SerializeField] private Button questClaimRewardButton;
     [SerializeField] private int questRewardInventoryCapacity = -1;
     [SerializeField] private int questRewardMagicCapacity = -1;
@@ -65,14 +60,11 @@ public class QuestJournalUI : MonoBehaviour
     private QuestManager questManager;
     private bool initialized;
     private bool questManagerSubscribed;
-    private bool questFilterBaseColorsCached;
-    private Color questActiveFilterBaseColor = Color.white;
-    private Color questCompletedFilterBaseColor = Color.white;
-    private GameObject questFocusedObject;
+    private Transform questFocusedTransform;
     private Outline questFocusOutline;
-    private readonly List<GameObject> spawnedQuestRows = new();
-    private readonly List<GameObject> spawnedObjectiveRows = new();
-    private readonly List<GameObject> spawnedRewardRows = new();
+    private readonly List<QuestItemUI> spawnedQuestRows = new();
+    private readonly List<QuestObjectiveItemUI> spawnedObjectiveRows = new();
+    private readonly List<QuestRewardItemUI> spawnedRewardRows = new();
     private float questTargetScrollNormalized = 1f;
     private bool questTargetScrollInitialized;
     private bool questObjectivesDefaultPosCached;
@@ -82,14 +74,7 @@ public class QuestJournalUI : MonoBehaviour
     public bool UseQuestManager { get => useQuestManager; set => useQuestManager = value; }
     public bool AutoWireQuestUI { get => autoWireQuestUI; set => autoWireQuestUI = value; }
     public Transform QuestListContainer { get => questListContainer; set => questListContainer = value; }
-    public GameObject QuestItemPrefab { get => questItemPrefab; set => questItemPrefab = value; }
-    public Button QuestActiveFilterButton { get => questActiveFilterButton; set => questActiveFilterButton = value; }
-    public Button QuestCompletedFilterButton { get => questCompletedFilterButton; set => questCompletedFilterButton = value; }
-    public TextMeshProUGUI QuestActiveCountText { get => questActiveCountText; set => questActiveCountText = value; }
-    public TextMeshProUGUI QuestCompletedCountText { get => questCompletedCountText; set => questCompletedCountText = value; }
-    public TextMeshProUGUI QuestActiveFilterLabelText { get => questActiveFilterLabelText; set => questActiveFilterLabelText = value; }
-    public TextMeshProUGUI QuestCompletedFilterLabelText { get => questCompletedFilterLabelText; set => questCompletedFilterLabelText = value; }
-    public Color QuestFilterSelectedColor { get => questFilterSelectedColor; set => questFilterSelectedColor = value; }
+    public QuestItemUI QuestItemPrefab { get => questItemPrefab; set => questItemPrefab = value; }
     public List<QuestEntryData> StartingQuests => startingQuests;
     public TextMeshProUGUI QuestDetailTypeText { get => questDetailTypeText; set => questDetailTypeText = value; }
     public TextMeshProUGUI QuestDetailRecommendedText { get => questDetailRecommendedText; set => questDetailRecommendedText = value; }
@@ -100,14 +85,14 @@ public class QuestJournalUI : MonoBehaviour
     public TextMeshProUGUI QuestDetailLoreAuthorText { get => questDetailLoreAuthorText; set => questDetailLoreAuthorText = value; }
     public RectTransform QuestDetailLoreRoot { get => questDetailLoreRoot; set => questDetailLoreRoot = value; }
     public RectTransform QuestObjectivesSectionRoot { get => questObjectivesSectionRoot; set => questObjectivesSectionRoot = value; }
-    public GameObject QuestDetailPanelRoot { get => questDetailPanelRoot; set => questDetailPanelRoot = value; }
+    public RectTransform QuestDetailPanelRoot { get => questDetailPanelRoot; set => questDetailPanelRoot = value; }
     public bool ShowQuestDetailOnlyOnSelection { get => showQuestDetailOnlyOnSelection; set => showQuestDetailOnlyOnSelection = value; }
     public bool CollapseQuestLoreWhenEmpty { get => collapseQuestLoreWhenEmpty; set => collapseQuestLoreWhenEmpty = value; }
     public float QuestObjectivesLiftWhenNoLore { get => questObjectivesLiftWhenNoLore; set => questObjectivesLiftWhenNoLore = value; }
     public Transform QuestObjectivesContainer { get => questObjectivesContainer; set => questObjectivesContainer = value; }
-    public GameObject QuestObjectivePrefab { get => questObjectivePrefab; set => questObjectivePrefab = value; }
+    public QuestObjectiveItemUI QuestObjectivePrefab { get => questObjectivePrefab; set => questObjectivePrefab = value; }
     public Transform QuestRewardsContainer { get => questRewardsContainer; set => questRewardsContainer = value; }
-    public GameObject QuestRewardPrefab { get => questRewardPrefab; set => questRewardPrefab = value; }
+    public QuestRewardItemUI QuestRewardPrefab { get => questRewardPrefab; set => questRewardPrefab = value; }
     public Button QuestClaimRewardButton { get => questClaimRewardButton; set => questClaimRewardButton = value; }
     public int QuestRewardInventoryCapacity { get => questRewardInventoryCapacity; set => questRewardInventoryCapacity = value; }
     public int QuestRewardMagicCapacity { get => questRewardMagicCapacity; set => questRewardMagicCapacity = value; }
@@ -122,12 +107,6 @@ public class QuestJournalUI : MonoBehaviour
     private void OnDestroy()
     {
         UnbindQuestManager();
-        if (questActiveFilterButton != null)
-            questActiveFilterButton.onClick.RemoveListener(SetQuestFilterActive);
-        if (questCompletedFilterButton != null)
-            questCompletedFilterButton.onClick.RemoveListener(SetQuestFilterCompleted);
-        if (questClaimRewardButton != null)
-            questClaimRewardButton.onClick.RemoveListener(OnQuestClaimRewardButtonClicked);
     }
 
     private void Update()
@@ -147,28 +126,25 @@ public class QuestJournalUI : MonoBehaviour
 
         ResolveDependencies();
 
-        bool needQuestListWiring = questListContainer == null || questItemPrefab == null;
-        if (autoWireQuestUI || needQuestListWiring)
+        if (autoWireQuestUI)
             AutoWireQuestUIReferences();
 
-        TryEditorAutoAssignQuestPrefabs();
+        if (editorAutoAssignQuestPrefabs)
+            TryEditorAutoAssignQuestPrefabs();
 
         if (questListContainer != null)
         {
             if (questItemPrefab == null && questListContainer.childCount > 0)
-                questItemPrefab = questListContainer.GetChild(0).gameObject;
+                questItemPrefab = questListContainer.GetChild(0).GetComponent<QuestItemUI>();
             if (questItemPrefab != null && questItemPrefab.transform.parent == questListContainer)
-                questItemPrefab.SetActive(false);
+                questItemPrefab.gameObject.SetActive(false);
         }
 
         if (questObjectivesContainer != null && questObjectivePrefab != null && questObjectivePrefab.transform.parent == questObjectivesContainer)
-            questObjectivePrefab.SetActive(false);
+            questObjectivePrefab.gameObject.SetActive(false);
         if (questRewardsContainer != null && questRewardPrefab != null && questRewardPrefab.transform.parent == questRewardsContainer)
-            questRewardPrefab.SetActive(false);
+            questRewardPrefab.gameObject.SetActive(false);
 
-        WireQuestFilterButtons();
-        WireQuestClaimButton();
-        CacheQuestFilterBaseColors();
         TryBindQuestManager();
 
         if (useQuestManager && questManager != null)
@@ -182,8 +158,6 @@ public class QuestJournalUI : MonoBehaviour
     {
         InitializeIfNeeded();
         TryBindQuestManager();
-        UpdateQuestFilterVisuals(showPadFocus);
-        UpdateQuestCounters();
         RebuildQuestRows(showPadFocus);
         RefreshSelectedQuestDetails();
         if (showPadFocus && IsQuestTabVisualActive())
@@ -221,9 +195,9 @@ public class QuestJournalUI : MonoBehaviour
         questDetailScrollRect.verticalNormalizedPosition = Mathf.Lerp(current, questTargetScrollNormalized, t);
     }
 
-    public void SetQuestFilterAll() { if (questManager != null) questManager.SetJournalQuestFilterAll(); RefreshUI(IsPadFocusVisible()); }
-    public void SetQuestFilterActive() { if (questManager != null) questManager.SetJournalQuestFilterActive(); RefreshUI(IsPadFocusVisible()); }
-    public void SetQuestFilterCompleted() { if (questManager != null) questManager.SetJournalQuestFilterCompleted(); RefreshUI(IsPadFocusVisible()); }
+    public void SetQuestFilterAll() { RefreshUI(IsPadFocusVisible()); }
+    public void SetQuestFilterActive() { SetQuestFilterAll(); }
+    public void SetQuestFilterCompleted() { SetQuestFilterAll(); }
 
     public void SetQuests(List<QuestEntryData> quests)
     {
@@ -281,10 +255,7 @@ public class QuestJournalUI : MonoBehaviour
 
     public void FocusPadFilters(bool showPadFocus)
     {
-        TryBindQuestManager();
-        if (questManager == null) return;
-        questManager.FocusJournalPadFilters();
-        ApplyPadFocusVisual(showPadFocus);
+        FocusPadDefault(showPadFocus);
     }
 
     public void MovePadFocusHorizontal(int direction, bool showPadFocus)
@@ -342,18 +313,13 @@ public class QuestJournalUI : MonoBehaviour
         if (!IsQuestTabVisualActive())
         {
             ClearPadFocusVisual();
-            ApplyQuestFilterPadFocusHighlight(showPadFocus);
             return;
         }
 
         GameObject selectedTarget = null;
         GameObject visualTarget = null;
-        switch (questManager != null ? questManager.CurrentJournalPadSection : QuestManager.JournalPadSection.Filters)
+        switch (questManager != null ? questManager.CurrentJournalPadSection : QuestManager.JournalPadSection.List)
         {
-            case QuestManager.JournalPadSection.Filters:
-                selectedTarget = GetQuestFilterButtonObject(questManager != null ? questManager.JournalPadFilterIndex : 0);
-                visualTarget = GetQuestFilterVisualObject(questManager != null ? questManager.JournalPadFilterIndex : 0);
-                break;
             case QuestManager.JournalPadSection.List:
                 var rowButton = GetVisibleQuestRowAt(questManager != null ? questManager.JournalPadListIndex : 0);
                 selectedTarget = rowButton != null ? rowButton.gameObject : null;
@@ -365,8 +331,7 @@ public class QuestJournalUI : MonoBehaviour
                 break;
         }
 
-        bool allowVisualAsSelection = questManager == null || questManager.CurrentJournalPadSection != QuestManager.JournalPadSection.Filters;
-        if (selectedTarget == null && allowVisualAsSelection) selectedTarget = visualTarget;
+        if (selectedTarget == null) selectedTarget = visualTarget;
         if (visualTarget == null) visualTarget = selectedTarget;
 
         if (EventSystem.current != null)
@@ -378,14 +343,13 @@ public class QuestJournalUI : MonoBehaviour
         }
 
         SetQuestPadFocusVisualTarget(showPadFocus ? visualTarget : null);
-        ApplyQuestFilterPadFocusHighlight(showPadFocus);
     }
 
     public void ClearPadFocusVisual()
     {
         if (questFocusOutline != null)
             questFocusOutline.enabled = false;
-        questFocusedObject = null;
+        questFocusedTransform = null;
         questFocusOutline = null;
     }
 
@@ -393,7 +357,7 @@ public class QuestJournalUI : MonoBehaviour
     {
         if (!useQuestManager) return;
         if (questManager == null)
-            questManager = QuestManager.Instance != null ? QuestManager.Instance : FindObjectOfType<QuestManager>();
+            questManager = QuestManager.Instance != null ? QuestManager.Instance : (autoResolveMissingDependencies ? FindObjectOfType<QuestManager>() : null);
         if (questManager == null || questManagerSubscribed)
             return;
 
@@ -414,28 +378,9 @@ public class QuestJournalUI : MonoBehaviour
         RefreshUI(IsPadFocusVisible());
     }
 
-    private void UpdateQuestCounters()
-    {
-        var quests = questManager != null ? questManager.GetQuestEntriesSnapshot() : new List<QuestEntryData>();
-        int activeCount = 0;
-        int completedCount = 0;
-        for (int i = 0; i < quests.Count; i++)
-        {
-            var quest = quests[i];
-            if (quest == null) continue;
-            if (quest.completed) completedCount++;
-            else activeCount++;
-        }
-
-        if (questActiveCountText != null) questActiveCountText.text = activeCount.ToString();
-        if (questCompletedCountText != null) questCompletedCountText.text = completedCount.ToString();
-    }
-
     private void OnQuestRowClicked(string questId)
     {
         if (Time.unscaledTime < suppressQuestRowClickUntil)
-            return;
-        if (IsQuestTabVisualActive() && IsPadFocusVisible() && questManager != null && questManager.CurrentJournalPadSection == QuestManager.JournalPadSection.Filters)
             return;
         if (string.IsNullOrWhiteSpace(questId) || questManager == null)
             return;
@@ -452,7 +397,7 @@ public class QuestJournalUI : MonoBehaviour
     private void UpdateQuestDetailPanel(QuestEntryData quest)
     {
         if (questDetailPanelRoot != null && showQuestDetailOnlyOnSelection)
-            questDetailPanelRoot.SetActive(quest != null);
+            questDetailPanelRoot.gameObject.SetActive(quest != null);
 
         if (questDetailTypeText != null) questDetailTypeText.text = quest != null ? (quest.questTypeLabel ?? string.Empty) : string.Empty;
         if (questDetailRecommendedText != null) questDetailRecommendedText.text = quest != null ? (quest.recommendedLabel ?? string.Empty) : string.Empty;
@@ -487,7 +432,7 @@ public class QuestJournalUI : MonoBehaviour
         questClaimRewardButton.interactable = canClaim;
     }
 
-    private void OnQuestClaimRewardButtonClicked()
+    public void OnQuestClaimRewardButtonClicked()
     {
         if (questManager == null)
             return;
@@ -555,10 +500,8 @@ public class QuestJournalUI : MonoBehaviour
             var obj = quest.objectives[i];
             if (obj == null) continue;
             var row = Instantiate(questObjectivePrefab, questObjectivesContainer);
-            row.SetActive(true);
-            var rowUi = row.GetComponent<QuestObjectiveItemUI>();
-            if (rowUi == null) rowUi = row.AddComponent<QuestObjectiveItemUI>();
-            rowUi.SetData(obj.title, obj.description, obj.completed);
+            row.gameObject.SetActive(true);
+            row.SetData(obj.title, obj.description, obj.completed);
             spawnedObjectiveRows.Add(row);
         }
     }
@@ -573,10 +516,8 @@ public class QuestJournalUI : MonoBehaviour
             var reward = quest.rewards[i];
             if (reward == null) continue;
             var row = Instantiate(questRewardPrefab, questRewardsContainer);
-            row.SetActive(true);
-            var rowUi = row.GetComponent<QuestRewardItemUI>();
-            if (rowUi == null) rowUi = row.AddComponent<QuestRewardItemUI>();
-            rowUi.SetData(ResolveRewardIcon(reward), ResolveRewardTypeText(reward), reward.amount, ResolveRewardItemName(reward));
+            row.gameObject.SetActive(true);
+            row.SetData(ResolveRewardIcon(reward), ResolveRewardTypeText(reward), reward.amount, ResolveRewardItemName(reward));
             spawnedRewardRows.Add(row);
         }
     }
@@ -592,14 +533,12 @@ public class QuestJournalUI : MonoBehaviour
             var quest = visible[i];
             if (quest == null) continue;
             var row = Instantiate(questItemPrefab, questListContainer);
-            row.SetActive(true);
-            var rowUi = row.GetComponent<QuestItemUI>();
-            if (rowUi == null) rowUi = row.AddComponent<QuestItemUI>();
-            rowUi.SetData(quest.title, quest.location, quest.completed);
-            rowUi.SetSelected(questManager.IsJournalQuestSelected(quest.questId));
+            row.gameObject.SetActive(true);
+            row.SetData(quest.title, quest.location, quest.completed);
+            row.SetSelected(questManager.IsJournalQuestSelected(quest.questId));
 
             string capturedQuestId = quest.questId;
-            var rowButton = EnsureFilterButton(row);
+            var rowButton = EnsureButton(row.gameObject);
             if (rowButton != null)
             {
                 rowButton.onClick.RemoveAllListeners();
@@ -618,7 +557,7 @@ public class QuestJournalUI : MonoBehaviour
         for (int i = 0; i < spawnedQuestRows.Count; i++)
         {
             if (spawnedQuestRows[i] != null)
-                Destroy(spawnedQuestRows[i]);
+                Destroy(spawnedQuestRows[i].gameObject);
         }
 
         if (questListContainer == null)
@@ -630,44 +569,17 @@ public class QuestJournalUI : MonoBehaviour
         for (int i = questListContainer.childCount - 1; i >= 0; i--)
         {
             var child = questListContainer.GetChild(i).gameObject;
-            if (child == questItemPrefab) continue;
+            if (questItemPrefab != null && child == questItemPrefab.gameObject) continue;
             Destroy(child);
         }
 
         spawnedQuestRows.Clear();
     }
 
-    private void UpdateQuestFilterVisuals(bool showPadFocus)
-    {
-        if (questActiveFilterLabelText != null)
-            questActiveFilterLabelText.color = questManager != null && questManager.CurrentJournalFilter == QuestManager.JournalQuestFilter.Active ? questFilterSelectedColor : questActiveFilterBaseColor;
-
-        if (questCompletedFilterLabelText != null)
-            questCompletedFilterLabelText.color = questManager != null && questManager.CurrentJournalFilter == QuestManager.JournalQuestFilter.Completed ? questFilterSelectedColor : questCompletedFilterBaseColor;
-
-        ApplyQuestFilterPadFocusHighlight(showPadFocus);
-    }
-
-    private void ApplyQuestFilterPadFocusHighlight(bool showPadFocus)
-    {
-        if (questActiveFilterLabelText == null && questCompletedFilterLabelText == null) return;
-        if (!showPadFocus || !IsQuestTabVisualActive() || questManager == null || questManager.CurrentJournalPadSection != QuestManager.JournalPadSection.Filters)
-            return;
-
-        if (questManager.JournalPadFilterIndex <= 0)
-        {
-            if (questActiveFilterLabelText != null) questActiveFilterLabelText.color = questPadFocusBorderColor;
-        }
-        else
-        {
-            if (questCompletedFilterLabelText != null) questCompletedFilterLabelText.color = questPadFocusBorderColor;
-        }
-    }
-
     private void SetQuestPadFocusVisualTarget(GameObject target)
     {
         target = ResolveQuestFocusGraphicTarget(target);
-        if (target == questFocusedObject && questFocusOutline != null)
+        if (target != null && target.transform == questFocusedTransform && questFocusOutline != null)
         {
             questFocusOutline.enabled = true;
             questFocusOutline.effectColor = questPadFocusBorderColor;
@@ -689,55 +601,11 @@ public class QuestJournalUI : MonoBehaviour
         outline.effectColor = questPadFocusBorderColor;
         outline.effectDistance = questPadFocusBorderThickness;
         outline.enabled = true;
-        questFocusedObject = target;
+        questFocusedTransform = target.transform;
         questFocusOutline = outline;
         if (created && outline.useGraphicAlpha == false)
             outline.useGraphicAlpha = true;
     }
-    private GameObject GetQuestFilterButtonObject(int index)
-    {
-        InitializeIfNeeded();
-        if (index <= 0)
-        {
-            if (questActiveFilterButton == null)
-            {
-                questActiveFilterButton = EnsureFilterButtonFromLabelOrCount(questActiveFilterLabelText, questActiveCountText);
-                if (questActiveFilterButton != null)
-                {
-                    questActiveFilterButton.onClick.RemoveListener(SetQuestFilterActive);
-                    questActiveFilterButton.onClick.AddListener(SetQuestFilterActive);
-                }
-            }
-            return questActiveFilterButton != null ? questActiveFilterButton.gameObject : null;
-        }
-
-        if (questCompletedFilterButton == null)
-        {
-            questCompletedFilterButton = EnsureFilterButtonFromLabelOrCount(questCompletedFilterLabelText, questCompletedCountText);
-            if (questCompletedFilterButton != null)
-            {
-                questCompletedFilterButton.onClick.RemoveListener(SetQuestFilterCompleted);
-                questCompletedFilterButton.onClick.AddListener(SetQuestFilterCompleted);
-            }
-        }
-
-        return questCompletedFilterButton != null ? questCompletedFilterButton.gameObject : null;
-    }
-
-    private GameObject GetQuestFilterVisualObject(int index)
-    {
-        if (index <= 0)
-        {
-            if (questActiveFilterLabelText != null) return questActiveFilterLabelText.gameObject;
-            if (questActiveFilterButton != null) return questActiveFilterButton.gameObject;
-            return questActiveCountText != null ? questActiveCountText.gameObject : null;
-        }
-
-        if (questCompletedFilterLabelText != null) return questCompletedFilterLabelText.gameObject;
-        if (questCompletedFilterButton != null) return questCompletedFilterButton.gameObject;
-        return questCompletedCountText != null ? questCompletedCountText.gameObject : null;
-    }
-
     private Button GetVisibleQuestRowAt(int index)
     {
         if (index < 0) return null;
@@ -745,40 +613,11 @@ public class QuestJournalUI : MonoBehaviour
         for (int i = 0; i < spawnedQuestRows.Count; i++)
         {
             var row = spawnedQuestRows[i];
-            if (row == null || !row.activeInHierarchy) continue;
+            if (row == null || !row.gameObject.activeInHierarchy) continue;
             if (cursor == index) return row.GetComponent<Button>();
             cursor++;
         }
         return null;
-    }
-
-    private void WireQuestFilterButtons()
-    {
-        if (questActiveFilterButton != null)
-        {
-            questActiveFilterButton.onClick.RemoveListener(SetQuestFilterActive);
-            questActiveFilterButton.onClick.AddListener(SetQuestFilterActive);
-        }
-        if (questCompletedFilterButton != null)
-        {
-            questCompletedFilterButton.onClick.RemoveListener(SetQuestFilterCompleted);
-            questCompletedFilterButton.onClick.AddListener(SetQuestFilterCompleted);
-        }
-    }
-
-    private void WireQuestClaimButton()
-    {
-        if (questClaimRewardButton == null) return;
-        questClaimRewardButton.onClick.RemoveListener(OnQuestClaimRewardButtonClicked);
-        questClaimRewardButton.onClick.AddListener(OnQuestClaimRewardButtonClicked);
-    }
-
-    private void CacheQuestFilterBaseColors()
-    {
-        if (questFilterBaseColorsCached) return;
-        if (questActiveFilterLabelText != null) questActiveFilterBaseColor = questActiveFilterLabelText.color;
-        if (questCompletedFilterLabelText != null) questCompletedFilterBaseColor = questCompletedFilterLabelText.color;
-        questFilterBaseColorsCached = true;
     }
 
     public void SetPadFocusVisible(bool visible)
@@ -833,18 +672,21 @@ public class QuestJournalUI : MonoBehaviour
 
     private void EnsurePlayerInventory()
     {
-        if (playerInventory == null)
+        if (playerInventory == null && autoResolveMissingDependencies)
             playerInventory = FindObjectOfType<PlayerInventory>();
     }
 
     private void EnsurePlayerStats()
     {
-        if (playerStats == null)
+        if (playerStats == null && autoResolveMissingDependencies)
             playerStats = PlayerStats.instance != null ? PlayerStats.instance : FindObjectOfType<PlayerStats>();
     }
 
     private void ResolveDependencies()
     {
+        if (!autoResolveMissingDependencies)
+            return;
+
         if (menuManager == null)
             menuManager = FindObjectOfType<MenuManager>(true);
         if (inventoryUIManager == null)
@@ -883,22 +725,11 @@ public class QuestJournalUI : MonoBehaviour
         if (questListContainer == null)
             questListContainer = FindDescendantByPath(questRoot, "LeftSide/QuestPanel") ?? FindDescendantByPath(questRoot, "LeftSide/Quest") ?? FindDeepChildByName(questRoot, "QuestPanel");
 
-        Transform filterRoot = FindDescendantByPath(questRoot, "LeftSide/Filter") ?? FindDeepChildByName(questRoot, "Filter");
-        if (filterRoot == null) return;
-
-        var activeRow = FindFilterRowByLabel(filterRoot, "ACTIVE");
-        var completedRow = FindFilterRowByLabel(filterRoot, "COMPLETED");
-        if (questActiveFilterButton == null && activeRow != null) questActiveFilterButton = EnsureFilterButton(activeRow.gameObject);
-        if (questCompletedFilterButton == null && completedRow != null) questCompletedFilterButton = EnsureFilterButton(completedRow.gameObject);
-        if (questActiveCountText == null && activeRow != null) questActiveCountText = FindCounterTextOnFilterRow(activeRow, "ACTIVE");
-        if (questCompletedCountText == null && completedRow != null) questCompletedCountText = FindCounterTextOnFilterRow(completedRow, "COMPLETED");
-        if (questActiveFilterLabelText == null && activeRow != null) questActiveFilterLabelText = FindFilterLabelText(activeRow, "ACTIVE");
-        if (questCompletedFilterLabelText == null && completedRow != null) questCompletedFilterLabelText = FindFilterLabelText(completedRow, "COMPLETED");
         Transform rightSide = FindDescendantByPath(questRoot, "RightSide");
         if (rightSide != null)
         {
             if (questDetailScrollRect == null) questDetailScrollRect = rightSide.GetComponent<ScrollRect>();
-            if (questDetailPanelRoot == null) questDetailPanelRoot = rightSide.gameObject;
+            if (questDetailPanelRoot == null) questDetailPanelRoot = rightSide as RectTransform;
 
             Transform body = FindDeepChildByName(rightSide, "Body");
             Transform lore = body != null ? FindDeepChildByName(body, "Lore") : FindDeepChildByName(rightSide, "Lore");
@@ -928,38 +759,46 @@ public class QuestJournalUI : MonoBehaviour
         }
 
         if (questObjectivesContainer != null && questObjectivePrefab == null && questObjectivesContainer.childCount > 0)
-            questObjectivePrefab = questObjectivesContainer.GetChild(0).gameObject;
+            questObjectivePrefab = questObjectivesContainer.GetChild(0).GetComponent<QuestObjectiveItemUI>();
         if (questRewardsContainer != null && questRewardPrefab == null && questRewardsContainer.childCount > 0)
-            questRewardPrefab = questRewardsContainer.GetChild(0).gameObject;
+            questRewardPrefab = questRewardsContainer.GetChild(0).GetComponent<QuestRewardItemUI>();
     }
 
     private void TryEditorAutoAssignQuestPrefabs()
     {
 #if UNITY_EDITOR
         if (questItemPrefab == null)
-            questItemPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/Quest.prefab");
+            questItemPrefab = LoadPrefabComponentAtPath<QuestItemUI>("Assets/Prefabs/UI/Quest.prefab");
         if (questObjectivePrefab == null)
         {
             var byName = AssetDatabase.FindAssets("t:prefab *Objective*");
             if (byName != null && byName.Length > 0)
-                questObjectivePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(byName[0]));
+                questObjectivePrefab = LoadPrefabComponentAtPath<QuestObjectiveItemUI>(AssetDatabase.GUIDToAssetPath(byName[0]));
         }
         if (questRewardPrefab == null)
         {
             var byName = AssetDatabase.FindAssets("t:prefab *Reward*");
             if (byName != null && byName.Length > 0)
-                questRewardPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(byName[0]));
+                questRewardPrefab = LoadPrefabComponentAtPath<QuestRewardItemUI>(AssetDatabase.GUIDToAssetPath(byName[0]));
         }
 #endif
     }
 
-    private static void ClearSpawnedRows(List<GameObject> spawned, Transform container, GameObject prefabRef)
+#if UNITY_EDITOR
+    private static T LoadPrefabComponentAtPath<T>(string path) where T : Component
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        return prefab != null ? prefab.GetComponent<T>() : null;
+    }
+#endif
+
+    private static void ClearSpawnedRows<T>(List<T> spawned, Transform container, T prefabRef) where T : Component
     {
         if (spawned != null)
         {
             for (int i = 0; i < spawned.Count; i++)
             {
-                if (spawned[i] != null) Destroy(spawned[i]);
+                if (spawned[i] != null) Destroy(spawned[i].gameObject);
             }
             spawned.Clear();
         }
@@ -968,12 +807,12 @@ public class QuestJournalUI : MonoBehaviour
         for (int i = container.childCount - 1; i >= 0; i--)
         {
             var child = container.GetChild(i).gameObject;
-            if (prefabRef != null && child == prefabRef) continue;
+            if (prefabRef != null && child == prefabRef.gameObject) continue;
             Destroy(child);
         }
     }
 
-    private static Button EnsureFilterButton(GameObject target)
+    private static Button EnsureButton(GameObject target)
     {
         if (target == null) return null;
         var button = target.GetComponent<Button>();
@@ -985,50 +824,6 @@ public class QuestJournalUI : MonoBehaviour
             button.targetGraphic = graphic;
         }
         return button;
-    }
-
-    private static Button EnsureFilterButtonFromLabelOrCount(TextMeshProUGUI label, TextMeshProUGUI count)
-    {
-        Transform row = null;
-        if (label != null) row = label.transform.parent != null ? label.transform.parent : label.transform;
-        else if (count != null) row = count.transform.parent != null ? count.transform.parent : count.transform;
-        return row != null ? EnsureFilterButton(row.gameObject) : null;
-    }
-    private static Transform FindFilterRowByLabel(Transform filterRoot, string label)
-    {
-        if (filterRoot == null || string.IsNullOrEmpty(label)) return null;
-        var texts = filterRoot.GetComponentsInChildren<TextMeshProUGUI>(true);
-        for (int i = 0; i < texts.Length; i++)
-        {
-            if (texts[i] == null) continue;
-            if (!string.Equals(texts[i].text.Trim(), label, StringComparison.OrdinalIgnoreCase)) continue;
-            return texts[i].transform.parent != null ? texts[i].transform.parent : texts[i].transform;
-        }
-        return null;
-    }
-
-    private static TextMeshProUGUI FindCounterTextOnFilterRow(Transform row, string rowLabel)
-    {
-        if (row == null) return null;
-        var texts = row.GetComponentsInChildren<TextMeshProUGUI>(true);
-        for (int i = 0; i < texts.Length; i++)
-        {
-            if (texts[i] == null) continue;
-            if (!string.Equals(texts[i].text.Trim(), rowLabel, StringComparison.OrdinalIgnoreCase)) return texts[i];
-        }
-        return null;
-    }
-
-    private static TextMeshProUGUI FindFilterLabelText(Transform row, string label)
-    {
-        if (row == null || string.IsNullOrEmpty(label)) return null;
-        var texts = row.GetComponentsInChildren<TextMeshProUGUI>(true);
-        for (int i = 0; i < texts.Length; i++)
-        {
-            if (texts[i] == null) continue;
-            if (string.Equals(texts[i].text.Trim(), label, StringComparison.OrdinalIgnoreCase)) return texts[i];
-        }
-        return null;
     }
 
     private static Transform FindDescendantByPath(Transform root, string path)

@@ -472,21 +472,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         int targetSlot = GetEffectiveEquipSlot();
 
         if (target == EquipmentManager.EquipTarget.None)
-        {
-            if (newWeapon.category == WeaponCategory.Shield)
-            {
-                targetSlot = Mathf.Clamp(playerInventory.currentLeftIndex, 0, playerInventory.leftLoadout.Length - 1);
-                playerInventory.SetLeftAtSlot(targetSlot, newWeapon, item.instanceId);
-            }
-            else
-            {
-                targetSlot = Mathf.Clamp(playerInventory.currentRightIndex, 0, playerInventory.rightLoadout.Length - 1);
-                playerInventory.SetRightAtSlot(targetSlot, newWeapon, item.instanceId);
-            }
-
-            CompletePostDirectEquipAction();
             return;
-        }
 
         if (target == EquipmentManager.EquipTarget.Right)
             playerInventory.SetRightAtSlot(targetSlot, newWeapon, item.instanceId);
@@ -513,14 +499,11 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             ? GetEffectiveArmorSlot()
             : item.armorData.slot;
 
-        if (target != EquipmentManager.EquipTarget.None && target != EquipmentManager.EquipTarget.Armor) return;
+        if (target != EquipmentManager.EquipTarget.Armor) return;
         if (item.armorData.slot != targetSlot) return;
 
         playerInventory.SetArmorAtSlot(targetSlot, item.armorData, item.instanceId);
-        if (target == EquipmentManager.EquipTarget.None)
-            CompletePostDirectEquipAction();
-        else
-            CompleteEquipAction();
+        CompleteEquipAction();
     }
 
     public void OnEquipUsableButtonClick()
@@ -536,12 +519,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         int targetSlot = GetEffectiveEquipSlot();
 
         if (target == EquipmentManager.EquipTarget.None)
-        {
-            targetSlot = Mathf.Clamp(playerInventory.currentUsableIndex, 0, playerInventory.usableLoadout.Length - 1);
-            playerInventory.SetUsableAtSlot(targetSlot, item.usableData, item.instanceId);
-            CompletePostDirectEquipAction();
             return;
-        }
 
         if (target == EquipmentManager.EquipTarget.Bottom)
             playerInventory.SetUsableAtSlot(targetSlot, item.usableData, item.instanceId);
@@ -1269,7 +1247,9 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex))
             return false;
 
-        return CanEquipItemForTarget(currentItems[currentSelectedIndex], GetEffectiveEquipTarget());
+        var target = GetEffectiveEquipTarget();
+        return target != EquipmentManager.EquipTarget.None
+               && CanEquipItemForTarget(currentItems[currentSelectedIndex], target);
     }
 
     private bool CanEquipItemForTarget(InventoryItem item, EquipmentManager.EquipTarget target)
@@ -1291,8 +1271,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private static bool CanEquipWeaponForTarget(EquipmentManager.EquipTarget target)
     {
-        return target == EquipmentManager.EquipTarget.None
-               || target == EquipmentManager.EquipTarget.Right
+        return target == EquipmentManager.EquipTarget.Right
                || target == EquipmentManager.EquipTarget.Left;
     }
 
@@ -1301,17 +1280,13 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (item?.armorData == null)
             return false;
 
-        if (target == EquipmentManager.EquipTarget.None)
-            return true;
-
         return target == EquipmentManager.EquipTarget.Armor
                && item.armorData.slot == GetEffectiveArmorSlot();
     }
 
     private static bool CanEquipUsableForTarget(EquipmentManager.EquipTarget target)
     {
-        return target == EquipmentManager.EquipTarget.None
-               || target == EquipmentManager.EquipTarget.Bottom;
+        return target == EquipmentManager.EquipTarget.Bottom;
     }
 
     private Sprite GetItemIcon(InventoryItem item)
@@ -1494,13 +1469,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         ForceShowEquipmentView();
     }
 
-    private void CompleteDirectEquipAction()
-    {
-        RefreshSlot(currentSelectedIndex);
-        RefreshDetailSelection();
-        equipmentManager?.RefreshEquipmentCross();
-    }
-
     private EquipmentManager.EquipTarget GetEffectiveEquipTarget()
     {
         EquipmentManager.EquipTarget currentTarget = equipmentManager != null ? equipmentManager.CurrentEquipTarget : EquipmentManager.EquipTarget.None;
@@ -1543,29 +1511,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         pendingEquipTarget = EquipmentManager.EquipTarget.None;
         pendingEquipSlot = 0;
         pendingArmorSlot = ArmorItemData.ArmorSlot.Helmet;
-    }
-
-    private void CompletePostDirectEquipAction()
-    {
-        bool shouldReturnToEquipment = equipSelectionMode
-                                       || GetEffectiveEquipTarget() != EquipmentManager.EquipTarget.None
-                                       || IsEquipmentTabActive();
-
-        if (shouldReturnToEquipment)
-            CompleteEquipAction();
-        else
-            CompleteDirectEquipAction();
-    }
-
-    private bool IsEquipmentTabActive()
-    {
-        EnsureEquipmentManager();
-        if (equipmentManager != null && equipmentManager.IsEquipmentCrossModeActive())
-            return true;
-
-        MenuManager menuManager = FindObjectOfType<MenuManager>(true);
-        return menuManager != null
-               && string.Equals(menuManager.CurrentTabKey, "Equipment", System.StringComparison.OrdinalIgnoreCase);
     }
 
     private void ForceShowEquipmentView()
