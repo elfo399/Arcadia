@@ -129,6 +129,8 @@ public class QuestJournalUI : MonoBehaviour
         if (autoWireQuestUI)
             AutoWireQuestUIReferences();
 
+        RepairQuestDetailPanelRootReference();
+
         if (editorAutoAssignQuestPrefabs)
             TryEditorAutoAssignQuestPrefabs();
 
@@ -762,6 +764,74 @@ public class QuestJournalUI : MonoBehaviour
             questObjectivePrefab = questObjectivesContainer.GetChild(0).GetComponent<QuestObjectiveItemUI>();
         if (questRewardsContainer != null && questRewardPrefab == null && questRewardsContainer.childCount > 0)
             questRewardPrefab = questRewardsContainer.GetChild(0).GetComponent<QuestRewardItemUI>();
+    }
+
+    private void RepairQuestDetailPanelRootReference()
+    {
+        if (questListContainer == null)
+            return;
+
+        if (questDetailPanelRoot != null && !ContainsTransform(questDetailPanelRoot, questListContainer))
+            return;
+
+        Transform start = questDetailPanelRoot != null ? questDetailPanelRoot : questListContainer;
+        RectTransform repairedRoot = FindSiblingQuestDetailPanel(start, questListContainer);
+        if (repairedRoot != null)
+            questDetailPanelRoot = repairedRoot;
+    }
+
+    private static RectTransform FindSiblingQuestDetailPanel(Transform start, Transform listContainer)
+    {
+        for (Transform current = start; current != null; current = current.parent)
+        {
+            Transform parent = current.parent;
+            if (parent == null)
+                continue;
+
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                Transform sibling = parent.GetChild(i);
+                if (sibling == null || sibling == current)
+                    continue;
+                if (ContainsTransform(sibling, listContainer))
+                    continue;
+                if (!LooksLikeQuestDetailPanel(sibling))
+                    continue;
+
+                return sibling as RectTransform;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool LooksLikeQuestDetailPanel(Transform candidate)
+    {
+        if (candidate == null)
+            return false;
+
+        string n = candidate.name.ToLowerInvariant();
+        if (n.Contains("side") || n.Contains("detail"))
+            return true;
+
+        return FindDeepChildByName(candidate, "QuestDetail") != null
+               || FindDeepChildByName(candidate, "Lore") != null
+               || FindDeepChildByName(candidate, "Objectives") != null
+               || FindDeepChildByName(candidate, "Rewards") != null;
+    }
+
+    private static bool ContainsTransform(Transform root, Transform target)
+    {
+        if (root == null || target == null)
+            return false;
+
+        for (Transform current = target; current != null; current = current.parent)
+        {
+            if (current == root)
+                return true;
+        }
+
+        return false;
     }
 
     private void TryEditorAutoAssignQuestPrefabs()
