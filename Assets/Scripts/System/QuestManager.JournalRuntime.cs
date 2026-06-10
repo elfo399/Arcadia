@@ -162,8 +162,11 @@ public partial class QuestManager
         if (quest == null)
             return false;
 
+        if (quest.completed)
+            return true;
+
         if (quest.objectives == null || quest.objectives.Count == 0)
-            return quest.completed;
+            return false;
 
         for (int i = 0; i < quest.objectives.Count; i++)
         {

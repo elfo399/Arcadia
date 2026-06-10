@@ -22,7 +22,6 @@ public class QuestJournalUI : MonoBehaviour
     [Header("Quest UI")]
     [SerializeField] private bool useQuestManager = true;
     [SerializeField] private bool autoWireQuestUI = false;
-    [SerializeField] private bool autoResolveMissingDependencies = false;
     [SerializeField] private bool editorAutoAssignQuestPrefabs = false;
     [SerializeField] private Transform questListContainer;
     [SerializeField] private QuestItemUI questItemPrefab;
@@ -274,6 +273,7 @@ public class QuestJournalUI : MonoBehaviour
         TryBindQuestManager();
         if (questManager == null) return;
 
+        string previousQuestId = questManager.SelectedJournalQuestId;
         EnsurePlayerInventory();
         EnsurePlayerStats();
         bool claimed = questManager.ConfirmJournalSelection(playerInventory, playerStats, GetQuestRewardNormalCapacityValue(), GetQuestRewardMagicCapacityValue());
@@ -283,6 +283,9 @@ public class QuestJournalUI : MonoBehaviour
             RefreshUI(showPadFocus);
             return;
         }
+
+        if (!string.Equals(previousQuestId, questManager.SelectedJournalQuestId, StringComparison.OrdinalIgnoreCase))
+            LogSelectedQuestCompletionState();
 
         RefreshQuestRowsSelection();
         RefreshSelectedQuestDetails();
@@ -391,6 +394,7 @@ public class QuestJournalUI : MonoBehaviour
             return;
 
         questManager.SelectJournalQuest(questId);
+        LogSelectedQuestCompletionState();
         RefreshQuestRowsSelection();
         RefreshSelectedQuestDetails();
 
@@ -402,6 +406,24 @@ public class QuestJournalUI : MonoBehaviour
     private void RefreshSelectedQuestDetails()
     {
         UpdateQuestDetailPanel(questManager != null ? questManager.GetSelectedVisibleJournalQuest() : null);
+    }
+
+    private void LogSelectedQuestCompletionState()
+    {
+        if (questManager == null)
+            return;
+
+        var quest = questManager.GetSelectedVisibleJournalQuest();
+        if (quest == null)
+            return;
+
+        bool readyToClaim = questManager.IsQuestReadyToClaim(quest);
+        EnsurePlayerInventory();
+        EnsurePlayerStats();
+
+        bool canClaim = questManager.CanClaimJournalQuest(quest, playerInventory, playerStats, GetQuestRewardNormalCapacityValue(), GetQuestRewardMagicCapacityValue(), out string failureReason);
+        string claimDetails = canClaim ? "claim=si" : $"claim=no, reason={failureReason}";
+        Debug.Log($"[QuestJournalUI] Quest selezionata '{quest.questId}' ({quest.title}): completedFlag={(quest.completed ? "si" : "no")}, readyToClaim={(readyToClaim ? "si" : "no")}, {claimDetails}.", this);
     }
 
     private void UpdateQuestDetailPanel(QuestEntryData quest)
@@ -434,12 +456,17 @@ public class QuestJournalUI : MonoBehaviour
 
         EnsurePlayerInventory();
         EnsurePlayerStats();
-        bool canClaim = questManager.CanClaimJournalQuest(quest, playerInventory, playerStats, GetQuestRewardNormalCapacityValue(), GetQuestRewardMagicCapacityValue(), out _);
+        bool canClaim = questManager.CanClaimJournalQuest(quest, playerInventory, playerStats, GetQuestRewardNormalCapacityValue(), GetQuestRewardMagicCapacityValue(), out string failureReason);
         questClaimRewardButton.interactable = canClaim;
+
+        string questId = quest != null ? quest.questId : "none";
+        Debug.Log($"[QuestJournalUI] Claim button state: quest='{questId}', canClaim={(canClaim ? "si" : "no")}, interactable={(questClaimRewardButton.interactable ? "si" : "no")}, isInteractable={(questClaimRewardButton.IsInteractable() ? "si" : "no")}, activeInHierarchy={(questClaimRewardButton.gameObject.activeInHierarchy ? "si" : "no")}{(canClaim ? string.Empty : ", reason=" + failureReason)}.", this);
     }
 
     public void OnQuestClaimRewardButtonClicked()
     {
+        Debug.Log("[QuestJournalUI] Claim button clicked.", this);
+
         if (questManager == null)
         {
             Debug.LogWarning("[QuestJournalUI] Claim reward failed: QuestManager non assegnato.", this);
@@ -461,6 +488,7 @@ public class QuestJournalUI : MonoBehaviour
 
         RefreshQuestSourcesFromPlayer();
         RefreshUI(IsPadFocusVisible());
+        Debug.Log("[QuestJournalUI] Claim reward completed.", this);
     }
     private void UpdateQuestLoreVisibility(QuestEntryData quest)
     {
@@ -515,7 +543,7 @@ public class QuestJournalUI : MonoBehaviour
             if (quest == null) continue;
             var row = Instantiate(questItemPrefab, questListContainer);
             row.gameObject.SetActive(true);
-            row.SetData(quest.title, quest.location, quest.completed);
+            row.SetData(quest.title, quest.location, quest.completed || questManager.IsQuestReadyToClaim(quest));
             row.SetSelected(questManager.IsJournalQuestSelected(quest.questId));
 
             string capturedQuestId = quest.questId;
