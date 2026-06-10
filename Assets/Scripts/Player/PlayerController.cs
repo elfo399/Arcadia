@@ -56,6 +56,7 @@ public class PlayerController : MonoBehaviour
     [HideInInspector] public bool isFalling = false;
     
     public bool IsInventoryOpen => menuManager != null && menuManager.IsMenuOpen;
+    public static Transform CurrentPlayerTransform { get; private set; }
 
     [SerializeField] private Animator animator;
     private CharacterController controller;
@@ -92,6 +93,7 @@ public class PlayerController : MonoBehaviour
 
     void Awake()
     {
+        CurrentPlayerTransform = transform;
         controller = GetComponent<CharacterController>();
         cam = Camera.main != null ? Camera.main.transform : null;
         EnsureControlsInitialized();
@@ -114,6 +116,7 @@ public class PlayerController : MonoBehaviour
 
     void OnEnable()
     {
+        CurrentPlayerTransform = transform;
         EnsureControlsInitialized();
         if (Controls != null) Controls.Player.Enable();
         canMove = menuManager == null || !menuManager.IsMenuOpen;
@@ -129,6 +132,9 @@ public class PlayerController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (CurrentPlayerTransform == transform)
+            CurrentPlayerTransform = null;
+
         if (controlsInitialized && Controls != null)
             Controls.Player.Inventory.performed -= OnInventoryPerformed;
     }

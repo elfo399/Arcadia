@@ -99,8 +99,7 @@ public class SimpleEnemyAI : MonoBehaviour
     {
         if (agent != null) agent.enabled = false;
 
-        if (playerTarget == null && PlayerStats.instance != null)
-            playerTarget = PlayerStats.instance.transform;
+        ResolvePlayerTarget();
 
         Invoke(nameof(ActivateAgent), 0.5f);
     }
@@ -109,18 +108,36 @@ public class SimpleEnemyAI : MonoBehaviour
     {
         if (agent == null) return;
 
+        bool sampledNavMesh = false;
+        Vector3 sampledPosition = transform.position;
         if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 5f, NavMesh.AllAreas))
         {
-            transform.position = hit.position;
-            agent.Warp(hit.position);
+            sampledNavMesh = true;
+            sampledPosition = hit.position;
+            transform.position = sampledPosition;
         }
 
-        agent.enabled = true;
+        if (!agent.enabled)
+            agent.enabled = true;
+
+        if (sampledNavMesh && agent.isOnNavMesh)
+            agent.Warp(sampledPosition);
+
+        if (!agent.isOnNavMesh)
+        {
+            if (debugLogs)
+                Debug.LogWarning($"[SimpleEnemyAI] {name} non e' sul NavMesh, retry ActivateAgent.");
+            Invoke(nameof(ActivateAgent), 0.25f);
+            return;
+        }
+
         EnterState(AiState.Idle);
     }
 
     private void Update()
     {
+        if (playerTarget == null)
+            ResolvePlayerTarget();
         if (playerTarget == null || agent == null || !agent.enabled || !agent.isOnNavMesh) return;
 
         float dt = Time.deltaTime;
@@ -301,6 +318,27 @@ public class SimpleEnemyAI : MonoBehaviour
             damageable.TakeDamage(attackDamage);
         if (debugLogs)
             Debug.Log($"[SimpleEnemyAI] {name} hit player for {attackDamage} damage.");
+    }
+
+    private void ResolvePlayerTarget()
+    {
+        if (playerTarget != null)
+            return;
+
+        if (PlayerController.CurrentPlayerTransform != null)
+        {
+            playerTarget = PlayerController.CurrentPlayerTransform;
+            return;
+        }
+
+        if (PlayerStats.instance != null)
+            playerTarget = PlayerStats.instance.transform;
+    }
+
+    public void SetPlayerTarget(Transform target)
+    {
+        if (target != null)
+            playerTarget = target;
     }
 
     public void ApplyParryStagger(float duration)

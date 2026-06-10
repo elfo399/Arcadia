@@ -36,12 +36,27 @@ public class EnemySpawner : MonoBehaviour
         if (agent != null) agent.speed = data.moveSpeed;
 
         SimpleEnemyAI ai = enemy.GetComponent<SimpleEnemyAI>();
-        if (ai != null) ai.ConfigureFromData(data);
+        if (ai != null)
+        {
+            ai.SetPlayerTarget(ResolvePlayerTarget());
+            ai.ConfigureFromData(data);
+        }
 
         if (enemy.CompareTag("Enemy"))
         {
             Room room = GetComponentInParent<Room>();
             if (room != null) room.RegisterEnemy(enemy);
         }
+    }
+
+    private static Transform ResolvePlayerTarget()
+    {
+        if (CoreGenerator.Instance != null && CoreGenerator.Instance.playerTransform != null)
+            return CoreGenerator.Instance.playerTransform;
+
+        if (PlayerController.CurrentPlayerTransform != null)
+            return PlayerController.CurrentPlayerTransform;
+
+        return PlayerStats.instance != null ? PlayerStats.instance.transform : null;
     }
 }
