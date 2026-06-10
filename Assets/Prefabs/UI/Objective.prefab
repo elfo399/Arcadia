@@ -107,10 +107,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1308012942183659221}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 15, y: -15}
-  m_SizeDelta: {x: 700, y: 25}
+  m_AnchorMin: {x: 0.5, y: 0}
+  m_AnchorMax: {x: 0.5, y: 0}
+  m_AnchoredPosition: {x: -35, y: 1.73}
+  m_SizeDelta: {x: 167.6, y: 25}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &6714968308707461341
 CanvasRenderer:
@@ -142,15 +142,15 @@ MonoBehaviour:
       m_Calls: []
   m_text: Locate the ritual gorunds entry
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: bccbd71d0b971e6428b4e526837ae324, type: 2}
+  m_sharedMaterial: {fileID: -5498226165177804877, guid: bccbd71d0b971e6428b4e526837ae324, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+    rgba: 4278190080
+  m_fontColor: {r: 0, g: 0, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -167,8 +167,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 20
-  m_fontSizeBase: 20
+  m_fontSize: 10
+  m_fontSizeBase: 10
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -241,10 +241,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1308012942183659221}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 15, y: 5}
-  m_SizeDelta: {x: 700, y: 50}
+  m_AnchorMin: {x: 1, y: 0.5}
+  m_AnchorMax: {x: 1, y: 0.5}
+  m_AnchoredPosition: {x: -131.6, y: 1.8}
+  m_SizeDelta: {x: 271.5243, y: 17.5}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1058679697109422154
 CanvasRenderer:
@@ -276,15 +276,15 @@ MonoBehaviour:
       m_Calls: []
   m_text: Traverse the blighted lands
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: bccbd71d0b971e6428b4e526837ae324, type: 2}
+  m_sharedMaterial: {fileID: -5498226165177804877, guid: bccbd71d0b971e6428b4e526837ae324, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+    rgba: 4278190080
+  m_fontColor: {r: 0, g: 0, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -301,8 +301,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 30
-  m_fontSizeBase: 30
+  m_fontSize: 15
+  m_fontSizeBase: 15
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -377,7 +377,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 20, y: 0}
+  m_AnchoredPosition: {x: 10, y: 0}
   m_SizeDelta: {x: 20, y: 20}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &7426682045401007185
@@ -438,7 +438,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1308012942183659221}
   - component: {fileID: 6978820643100117035}
-  - component: {fileID: 7391042326656114274}
+  - component: {fileID: 6629776226922982998}
   m_Layer: 0
   m_Name: Objective
   m_TagString: Untagged
@@ -465,8 +465,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -323.6593, y: 0}
-  m_SizeDelta: {x: 747.3186, y: 100}
+  m_AnchoredPosition: {x: -612.10706, y: 32.62372}
+  m_SizeDelta: {x: 291.3145, y: 34.7526}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &6978820643100117035
 CanvasRenderer:
@@ -476,7 +476,7 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7747928810618371753}
   m_CullTransparentMesh: 1
---- !u!114 &7391042326656114274
+--- !u!114 &6629776226922982998
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -485,27 +485,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 7747928810618371753}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Script: {fileID: 11500000, guid: b5fe8a2c9ef14744b52f92fca638383f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.20392157}
-  m_RaycastTarget: 1
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_Sprite: {fileID: 0}
-  m_Type: 0
-  m_PreserveAspect: 0
-  m_FillCenter: 1
-  m_FillMethod: 4
-  m_FillAmount: 1
-  m_FillClockwise: 1
-  m_FillOrigin: 0
-  m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  titleText: {fileID: 6566692487666610026}
+  descriptionText: {fileID: 4284023910711492758}
+  completedToggle: {fileID: 7426682045401007185}
+  checkImage: {fileID: 1108732192291656071}
 --- !u!1 &7938212778282028926
 GameObject:
   m_ObjectHideFlags: 0

@@ -97,14 +97,13 @@ public partial class QuestManager
         if (string.IsNullOrWhiteSpace(selectedJournalQuestId))
             return null;
 
-        var visible = GetVisibleJournalQuestEntriesSnapshot();
-        for (int i = 0; i < visible.Count; i++)
+        for (int i = 0; i < quests.Count; i++)
         {
-            var quest = visible[i];
+            var quest = quests[i];
             if (quest == null)
                 continue;
             if (string.Equals(quest.questId, selectedJournalQuestId, System.StringComparison.OrdinalIgnoreCase))
-                return quest;
+                return MapToInventoryEntry(quest);
         }
 
         return null;
@@ -128,7 +127,14 @@ public partial class QuestManager
 
     public int GetVisibleJournalQuestCount()
     {
-        return GetVisibleJournalQuestEntriesSnapshot().Count;
+        int count = 0;
+        for (int i = 0; i < quests.Count; i++)
+        {
+            if (quests[i] != null)
+                count++;
+        }
+
+        return count;
     }
 
     public bool HasVisibleJournalQuests()
@@ -141,11 +147,20 @@ public partial class QuestManager
         if (index < 0)
             return null;
 
-        var visible = GetVisibleJournalQuestEntriesSnapshot();
-        if (index >= visible.Count)
-            return null;
+        int visibleIndex = 0;
+        for (int i = 0; i < quests.Count; i++)
+        {
+            var quest = quests[i];
+            if (quest == null)
+                continue;
 
-        return visible[index]?.questId;
+            if (visibleIndex == index)
+                return quest.questId;
+
+            visibleIndex++;
+        }
+
+        return null;
     }
 
     public bool IsQuestReadyToClaim(QuestEntryData quest)
@@ -170,17 +185,42 @@ public partial class QuestManager
 
     public bool CanClaimSelectedQuestRewards(PlayerInventory inventory, PlayerStats stats, int normalCapacity, int magicCapacity)
     {
-        return CanClaimQuestRewards(GetSelectedVisibleJournalQuest(), inventory, stats, normalCapacity, magicCapacity);
+        return CanClaimSelectedQuestRewards(inventory, stats, normalCapacity, magicCapacity, out _);
+    }
+
+    public bool CanClaimSelectedQuestRewards(PlayerInventory inventory, PlayerStats stats, int normalCapacity, int magicCapacity, out string failureReason)
+    {
+        return CanClaimJournalQuest(GetSelectedVisibleJournalQuest(), inventory, stats, normalCapacity, magicCapacity, out failureReason);
+    }
+
+    public bool CanClaimJournalQuest(QuestEntryData quest, PlayerInventory inventory, PlayerStats stats, int normalCapacity, int magicCapacity, out string failureReason)
+    {
+        failureReason = string.Empty;
+        if (quest == null)
+        {
+            failureReason = "Nessuna quest selezionata.";
+            return false;
+        }
+
+        if (!IsQuestReadyToClaim(quest))
+        {
+            failureReason = GetQuestReadinessFailureReason(quest);
+            return false;
+        }
+
+        if (quest.rewards == null || quest.rewards.Count == 0)
+        {
+            failureReason = "La quest non ha reward da claimare.";
+            return false;
+        }
+
+        return CanClaimQuestRewards(quest, inventory, stats, normalCapacity, magicCapacity, out failureReason);
     }
 
     public bool TryClaimSelectedQuestRewards(PlayerInventory inventory, PlayerStats stats, int normalCapacity, int magicCapacity)
     {
         var quest = GetSelectedVisibleJournalQuest();
-        if (quest == null)
-            return false;
-        if (!IsQuestReadyToClaim(quest) || quest.rewards == null || quest.rewards.Count == 0)
-            return false;
-        if (!CanClaimQuestRewards(quest, inventory, stats, normalCapacity, magicCapacity))
+        if (!CanClaimJournalQuest(quest, inventory, stats, normalCapacity, magicCapacity, out _))
             return false;
         if (!TryApplyQuestRewards(quest, inventory, stats))
             return false;
@@ -219,16 +259,19 @@ public partial class QuestManager
             return;
         }
 
-        var visible = GetVisibleJournalQuestEntriesSnapshot();
-        for (int i = 0; i < visible.Count; i++)
+        int visibleIndex = 0;
+        for (int i = 0; i < quests.Count; i++)
         {
-            var quest = visible[i];
+            var quest = quests[i];
             if (quest == null)
                 continue;
             if (!string.Equals(quest.questId, selectedJournalQuestId, System.StringComparison.OrdinalIgnoreCase))
+            {
+                visibleIndex++;
                 continue;
+            }
 
-            journalPadListIndex = i;
+            journalPadListIndex = visibleIndex;
             ClampJournalPadIndices();
             return;
         }
@@ -236,10 +279,20 @@ public partial class QuestManager
         ClampJournalPadIndices();
     }
 
-    private bool CanClaimQuestRewards(QuestEntryData quest, PlayerInventory inventory, PlayerStats stats, int normalCapacity, int magicCapacity)
+    private bool CanClaimQuestRewards(QuestEntryData quest, PlayerInventory inventory, PlayerStats stats, int normalCapacity, int magicCapacity, out string failureReason)
     {
-        if (quest == null || inventory == null)
+        failureReason = string.Empty;
+        if (quest == null)
+        {
+            failureReason = "Nessuna quest selezionata.";
             return false;
+        }
+
+        if (inventory == null)
+        {
+            failureReason = "Player Inventory non assegnato.";
+            return false;
+        }
 
         CountInventoryUsage(inventory.Items, out int normalUsed, out int magicUsed);
 
@@ -249,7 +302,10 @@ public partial class QuestManager
         var magicStacks = new HashSet<string>();
 
         if (quest.rewards == null)
+        {
+            failureReason = "La lista reward della quest e' nulla.";
             return false;
+        }
 
         for (int i = 0; i < quest.rewards.Count; i++)
         {
@@ -259,32 +315,60 @@ public partial class QuestManager
 
             int amount = Mathf.Max(1, reward.amount);
             if (!TryResolveQuestRewardType(reward, out var kind))
+            {
+                failureReason = DescribeQuestReward(reward, i) + ": tipo reward non riconosciuto.";
                 return false;
+            }
 
             switch (kind)
             {
                 case QuestRewardKind.Experience:
+                    if (stats == null)
+                    {
+                        failureReason = DescribeQuestReward(reward, i) + ": Player Stats non assegnato.";
+                        return false;
+                    }
                     continue;
                 case QuestRewardKind.Weapon:
-                    if (!TryResolveWeaponReward(reward, out _)) return false;
+                    if (!TryResolveWeaponReward(reward, out _))
+                    {
+                        failureReason = DescribeQuestReward(reward, i) + ": weapon asset non risolto.";
+                        return false;
+                    }
                     normalAdditional += amount;
                     break;
                 case QuestRewardKind.Armor:
-                    if (!TryResolveArmorReward(reward, out _)) return false;
+                    if (!TryResolveArmorReward(reward, out _))
+                    {
+                        failureReason = DescribeQuestReward(reward, i) + ": armor asset non risolto.";
+                        return false;
+                    }
                     normalAdditional += amount;
                     break;
                 case QuestRewardKind.Usable:
-                    if (!TryResolveUsableReward(reward, out var usable)) return false;
+                    if (!TryResolveUsableReward(reward, out var usable))
+                    {
+                        failureReason = DescribeQuestReward(reward, i) + ": usable asset non risolto.";
+                        return false;
+                    }
                     if (!WouldStackUsable(inventory, usable, normalStacks))
                         normalAdditional += 1;
                     break;
                 case QuestRewardKind.Item:
-                    if (!TryResolveItemReward(reward, out var item)) return false;
+                    if (!TryResolveItemReward(reward, out var item))
+                    {
+                        failureReason = DescribeQuestReward(reward, i) + ": item asset non risolto.";
+                        return false;
+                    }
                     if (!WouldStackItem(inventory, item, normalStacks))
                         normalAdditional += 1;
                     break;
                 case QuestRewardKind.Magic:
-                    if (!TryResolveMagicReward(reward, out var magic)) return false;
+                    if (!TryResolveMagicReward(reward, out var magic))
+                    {
+                        failureReason = DescribeQuestReward(reward, i) + ": magic asset non risolto.";
+                        return false;
+                    }
                     if (!WouldStackMagic(inventory, magic, magicStacks))
                         magicAdditional += 1;
                     break;
@@ -293,7 +377,52 @@ public partial class QuestManager
 
         bool normalOk = normalCapacity <= 0 || (normalUsed + normalAdditional) <= normalCapacity;
         bool magicOk = magicCapacity <= 0 || (magicUsed + magicAdditional) <= magicCapacity;
+        if (!normalOk)
+        {
+            failureReason = $"Inventario pieno: {normalUsed} usati + {normalAdditional} reward > {normalCapacity}.";
+            return false;
+        }
+
+        if (!magicOk)
+        {
+            failureReason = $"Inventario magie pieno: {magicUsed} usati + {magicAdditional} reward > {magicCapacity}.";
+            return false;
+        }
+
         return normalOk && magicOk;
+    }
+
+    private static string GetQuestReadinessFailureReason(QuestEntryData quest)
+    {
+        if (quest == null)
+            return "Nessuna quest selezionata.";
+
+        if (quest.objectives == null || quest.objectives.Count == 0)
+            return quest.completed ? string.Empty : "Quest senza obiettivi non marcata completata.";
+
+        for (int i = 0; i < quest.objectives.Count; i++)
+        {
+            var objective = quest.objectives[i];
+            if (objective == null || objective.completed)
+                continue;
+
+            string title = string.IsNullOrWhiteSpace(objective.title) ? objective.description : objective.title;
+            if (string.IsNullOrWhiteSpace(title))
+                title = "obiettivo " + (i + 1);
+            return "Obiettivo non completato: " + title + ".";
+        }
+
+        return string.Empty;
+    }
+
+    private static string DescribeQuestReward(QuestRewardEntryData reward, int index)
+    {
+        if (reward == null)
+            return "Reward #" + (index + 1);
+
+        string name = string.IsNullOrWhiteSpace(reward.itemName) ? "senza nome" : reward.itemName.Trim();
+        string type = string.IsNullOrWhiteSpace(reward.type) ? reward.rewardType.ToString() : reward.type.Trim();
+        return "Reward #" + (index + 1) + " '" + name + "' (" + type + ")";
     }
 
     private bool TryApplyQuestRewards(QuestEntryData quest, PlayerInventory inventory, PlayerStats stats)
@@ -544,9 +673,6 @@ public partial class QuestManager
         }
 
         string raw = string.IsNullOrWhiteSpace(reward.type) ? string.Empty : reward.type.Trim().ToLowerInvariant();
-        if (string.IsNullOrEmpty(raw))
-            return false;
-
         if (raw.Contains("weapon")) { kind = QuestRewardKind.Weapon; return true; }
         if (raw.Contains("usable") || raw.Contains("consumable") || raw.Contains("potion")) { kind = QuestRewardKind.Usable; return true; }
         if (raw.Contains("magic") || raw.Contains("spell") || raw.Contains("magia")) { kind = QuestRewardKind.Magic; return true; }
@@ -554,67 +680,82 @@ public partial class QuestManager
         if (raw.Contains("experience") || raw == "xp" || raw.Contains("exp") || raw.Contains("esperienza")) { kind = QuestRewardKind.Experience; return true; }
         if (raw.Contains("item")) { kind = QuestRewardKind.Item; return true; }
 
-        return false;
+        return reward.rewardType == QuestRewardType.Item;
     }
 
     private bool TryResolveWeaponReward(QuestRewardEntryData reward, out WeaponItem weapon)
     {
-        EnsureQuestRewardLookups();
         weapon = null;
-        if (reward != null && reward.weaponAsset != null)
+        if (reward == null)
+            return false;
+        if (reward.weaponAsset != null)
         {
             weapon = reward.weaponAsset;
             return true;
         }
-        return reward != null && questRewardWeaponLookup != null && TryLookupByRewardName(reward, questRewardWeaponLookup, out weapon);
+
+        EnsureQuestRewardLookups();
+        return questRewardWeaponLookup != null && TryLookupByRewardName(reward, questRewardWeaponLookup, out weapon);
     }
 
     private bool TryResolveUsableReward(QuestRewardEntryData reward, out UsableItemData usable)
     {
-        EnsureQuestRewardLookups();
         usable = null;
-        if (reward != null && reward.usableAsset != null)
+        if (reward == null)
+            return false;
+        if (reward.usableAsset != null)
         {
             usable = reward.usableAsset;
             return true;
         }
-        return reward != null && questRewardUsableLookup != null && TryLookupByRewardName(reward, questRewardUsableLookup, out usable);
+
+        EnsureQuestRewardLookups();
+        return questRewardUsableLookup != null && TryLookupByRewardName(reward, questRewardUsableLookup, out usable);
     }
 
     private bool TryResolveItemReward(QuestRewardEntryData reward, out ItemData item)
     {
-        EnsureQuestRewardLookups();
         item = null;
-        if (reward != null && reward.itemAsset != null)
+        if (reward == null)
+            return false;
+        if (reward.itemAsset != null)
         {
             item = reward.itemAsset;
             return true;
         }
-        return reward != null && questRewardItemLookup != null && TryLookupByRewardName(reward, questRewardItemLookup, out item);
+
+        EnsureQuestRewardLookups();
+        return questRewardItemLookup != null && TryLookupByRewardName(reward, questRewardItemLookup, out item);
     }
 
     private bool TryResolveMagicReward(QuestRewardEntryData reward, out MagicItemData magic)
     {
-        EnsureQuestRewardLookups();
         magic = null;
-        if (reward != null && reward.magicAsset != null)
+        if (reward == null)
+            return false;
+        if (reward.magicAsset != null)
         {
             magic = reward.magicAsset;
             return true;
         }
-        return reward != null && questRewardMagicLookup != null && TryLookupByRewardName(reward, questRewardMagicLookup, out magic);
+
+        EnsureQuestRewardLookups();
+        return questRewardMagicLookup != null && TryLookupByRewardName(reward, questRewardMagicLookup, out magic);
     }
 
     private bool TryResolveArmorReward(QuestRewardEntryData reward, out ArmorItemData armor)
     {
-        EnsureQuestRewardLookups();
         armor = null;
-        if (reward != null && reward.armorAsset != null)
+        if (reward == null)
+            return false;
+        if (reward.armorAsset != null)
         {
             armor = reward.armorAsset;
             return true;
         }
-        return reward != null && questRewardArmorLookup != null && TryLookupByRewardName(reward, questRewardArmorLookup, out armor);
+
+        EnsureQuestRewardLookups();
+        return questRewardArmorLookup != null && TryLookupByRewardName(reward, questRewardArmorLookup, out armor);
     }
 
     private void EnsureQuestRewardLookups()
