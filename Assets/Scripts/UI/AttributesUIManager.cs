@@ -31,6 +31,7 @@ public class AttributesUIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI attributesPhyDefValueText;
     [SerializeField] private TextMeshProUGUI attributesMagicDefValueText;
     [SerializeField] private TextMeshProUGUI attributesLoadValueText;
+    [SerializeField] private TextMeshProUGUI attributesLoadTierValueText;
     [SerializeField] private Scrollbar attributesLoadScrollbar;
     [SerializeField] private Color attributesSelectedColor = new Color(1f, 0.85f, 0.2f, 1f);
     [SerializeField] private Color attributesNormalColor = Color.white;
@@ -314,7 +315,7 @@ public class AttributesUIManager : MonoBehaviour
         float xpProgress = playerStats.GetLevelProgress01();
 
         if (attributesLevelLabelText != null)
-            attributesLevelLabelText.text = $"Level (Points: {playerStats.unspentAttributePoints})";
+            attributesLevelLabelText.text = "Level";
         if (attributesLevelValueText != null) attributesLevelValueText.text = level.ToString();
         if (attributesXpValueText != null) attributesXpValueText.text = $"{playerStats.levelExperience}/{playerStats.experienceToNextLevel}";
         ApplyReadOnlyProgressToScrollbar(attributesXpScrollbar, xpProgress);
@@ -339,7 +340,8 @@ public class AttributesUIManager : MonoBehaviour
         if (attributesMagicDamageValueText != null) attributesMagicDamageValueText.text = magicDamage.ToString();
         if (attributesPhyDefValueText != null) attributesPhyDefValueText.text = phyDef.ToString();
         if (attributesMagicDefValueText != null) attributesMagicDefValueText.text = magicDef.ToString();
-        if (attributesLoadValueText != null) attributesLoadValueText.text = equipWeight.ToString("0.0") + " / " + maxLoad.ToString("0.0") + " (" + loadTierLabel + ")";
+        if (attributesLoadValueText != null) attributesLoadValueText.text = equipWeight.ToString("0.0") + " / " + maxLoad.ToString("0.0");
+        if (attributesLoadTierValueText != null) attributesLoadTierValueText.text = loadTierLabel;
         ApplyReadOnlyProgressToScrollbar(attributesLoadScrollbar, loadRatio);
     }
 
