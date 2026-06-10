@@ -78,6 +78,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private TextMeshProUGUI keyValueText;
     [SerializeField] private WalletSource walletSource = WalletSource.Run;
     [SerializeField] private bool autoRefreshWallet = true;
+    [SerializeField] private bool autoWireDetailReferences = false;
 
     private readonly List<InventorySlot> slots = new();
     private List<InventoryItem> currentItems = new();
@@ -99,7 +100,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     private int pendingEquipSlot;
     private ArmorItemData.ArmorSlot pendingArmorSlot = ArmorItemData.ArmorSlot.Helmet;
     private ArmorItemData.ArmorSlot? activeArmorFilterSlot;
-    private PlayerStats playerStats;
+    [SerializeField] private PlayerStats playerStats;
     private bool isInitialized;
 
     public void Initialize(PlayerInventory inventory, EquipmentManager equipment)
@@ -107,8 +108,8 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         equipmentManager = equipment != null ? equipment : equipmentManager;
         playerInventory = inventory != null ? inventory : playerInventory;
 
-        EnsureEquipmentManager();
-        AutoWireArmorDetailReferences();
+        if (autoWireDetailReferences)
+            AutoWireArmorDetailReferences();
 
         if (slotParent == null)
             slotParent = transform;
@@ -593,14 +594,10 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private void EnsurePlayerInventory()
     {
-        if (playerInventory == null)
-            playerInventory = FindObjectOfType<PlayerInventory>();
     }
 
     private void EnsureEquipmentManager()
     {
-        if (equipmentManager == null)
-            equipmentManager = FindObjectOfType<EquipmentManager>(true);
     }
 
     private bool IsValidIndex(int index) => index >= 0 && index < slots.Count;
@@ -1354,8 +1351,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         Canvas targetCanvas = dragCanvas;
         if (targetCanvas == null)
             targetCanvas = GetComponentInParent<Canvas>();
-        if (targetCanvas == null)
-            targetCanvas = FindObjectOfType<Canvas>();
         if (targetCanvas == null) return;
 
         if (dragPreviewTemplate == null)
@@ -1393,7 +1388,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     private void CachePlayerStats()
     {
         if (playerStats != null) return;
-        playerStats = PlayerStats.instance != null ? PlayerStats.instance : FindObjectOfType<PlayerStats>();
+        playerStats = PlayerStats.instance;
         if (playerStats != null)
         {
             playerStats.OnBankChanged += HandleBankChanged;
@@ -1515,21 +1510,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private void ForceShowEquipmentView()
     {
-        Transform root = transform.root;
-        if (root == null)
-            return;
-
-        Transform inventoryRoot = FindDeepChildByName(root, "invBackground");
-        if (inventoryRoot != null)
-            inventoryRoot.gameObject.SetActive(false);
-
-        Transform equipmentRoot = FindDeepChildByName(root, "EquipmentBackground");
-        if (equipmentRoot != null)
-            equipmentRoot.gameObject.SetActive(true);
-
-        Transform magicRoot = FindDeepChildByName(root, "MagicBackground");
-        if (magicRoot != null)
-            magicRoot.gameObject.SetActive(false);
+        // EquipmentManager.CloseEquipGrid() already restores the equipment page when it is linked.
     }
 
 }

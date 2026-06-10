@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -15,6 +16,11 @@ public class MenuManager : MonoBehaviour
     [SerializeField] private EquipmentManager equipmentManager;
     [SerializeField] private AttributesUIManager attributesUIManager;
     [SerializeField] private QuestJournalUI questJournalUI;
+    [SerializeField] private PlayerInventory scenePlayerInventory;
+
+    [Header("Camera Input")]
+    [SerializeField] private CinemachineInputProvider[] cameraInputProviders;
+    [SerializeField] private CinemachineFreeLook[] cameraInputFallbacks;
 
     [Header("Book Animation")]
     [SerializeField] private Animator menuAnimator;
@@ -361,7 +367,6 @@ public class MenuManager : MonoBehaviour
         if (!isMenuOpen || IsMenuTransitioning || controls == null)
             return;
 
-        ResolveReferences();
         if (equipmentManager == null || inventoryUIManager == null || magicInventoryManager == null || attributesUIManager == null)
             return;
 
@@ -554,8 +559,9 @@ public class MenuManager : MonoBehaviour
         isMenuOpening = false;
         isMenuClosing = false;
         isMenuPageFlipping = false;
-        currentPlayerInventory = playerInventory;
+        currentPlayerInventory = playerInventory != null ? playerInventory : scenePlayerInventory;
         isMenuOpen = true;
+        InitializeLinkedManagers();
 
         openingTabIndex = ResolveTabIndexOrFallback(GetDefaultOpenTabKey());
         currentTabIndex = -1;
@@ -587,7 +593,7 @@ public class MenuManager : MonoBehaviour
         inventoryUIManager.FocusDefaultPadSlot();
         lastNavigationMoveTime = Time.time;
 
-        CameraInputBlocker.SetAllCinemachineInput(false);
+        SetMenuCameraInputActive(false);
         if (controls != null)
             controls.Player.Look.Disable();
         Cursor.lockState = CursorLockMode.None;
@@ -643,7 +649,7 @@ public class MenuManager : MonoBehaviour
         isMenuOpen = false;
         currentTabIndex = -1;
         openingTabIndex = -1;
-        currentPlayerInventory = FindObjectOfType<PlayerInventory>(true);
+        currentPlayerInventory = scenePlayerInventory != null ? scenePlayerInventory : currentPlayerInventory;
         ApplyPadFocusVisible(false);
 
         if (inventoryPanel != null)
@@ -651,7 +657,7 @@ public class MenuManager : MonoBehaviour
         if (playerHudPanel != null)
             playerHudPanel.SetActive(true);
 
-        CameraInputBlocker.SetAllCinemachineInput(true);
+        SetMenuCameraInputActive(true);
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
@@ -756,54 +762,52 @@ public class MenuManager : MonoBehaviour
 
     private void ResolveReferences()
     {
-        if (inventoryPanel == null)
-            inventoryPanel = GameObject.Find("HUD_Inventory");
-        if (playerHudPanel == null)
-            playerHudPanel = GameObject.Find("HUD_Canvas");
-        if (menuAnimator == null && inventoryPanel != null)
-        {
-            menuAnimator = inventoryPanel.GetComponent<Animator>();
-            if (menuAnimator == null)
-                menuAnimator = inventoryPanel.GetComponentInChildren<Animator>(true);
-        }
-        ResolveTabBackgroundImage();
-
-        if (inventoryUIManager == null && inventoryPanel != null)
-            inventoryUIManager = inventoryPanel.GetComponentInChildren<InventoryUIManager>(true);
-        if (inventoryUIManager == null)
-            inventoryUIManager = FindObjectOfType<InventoryUIManager>(true);
-
-        if (magicInventoryManager == null && inventoryPanel != null)
-            magicInventoryManager = inventoryPanel.GetComponentInChildren<MagicInventoryManager>(true);
-        if (magicInventoryManager == null)
-            magicInventoryManager = FindObjectOfType<MagicInventoryManager>(true);
-
-        if (equipmentManager == null && inventoryPanel != null)
-            equipmentManager = inventoryPanel.GetComponentInChildren<EquipmentManager>(true);
-        if (equipmentManager == null)
-            equipmentManager = FindObjectOfType<EquipmentManager>(true);
-
-        if (attributesUIManager == null && inventoryPanel != null)
-            attributesUIManager = inventoryPanel.GetComponentInChildren<AttributesUIManager>(true);
-        if (attributesUIManager == null)
-            attributesUIManager = FindObjectOfType<AttributesUIManager>(true);
-
-        if (questJournalUI == null && inventoryPanel != null)
-        {
-            questJournalUI = inventoryPanel.GetComponentInChildren<QuestJournalUI>(true);
-            if (questJournalUI == null)
-                questJournalUI = inventoryPanel.GetComponentInParent<QuestJournalUI>(true);
-        }
-
-        if (questJournalUI == null)
-            questJournalUI = FindObjectOfType<QuestJournalUI>(true);
         if (currentPlayerInventory == null)
-            currentPlayerInventory = FindObjectOfType<PlayerInventory>(true);
+            currentPlayerInventory = scenePlayerInventory;
 
+        ResolveTabBackgroundImage();
+        InitializeLinkedManagers();
+    }
+
+    private void InitializeLinkedManagers()
+    {
         equipmentManager?.Initialize(currentPlayerInventory, inventoryUIManager, magicInventoryManager);
         inventoryUIManager?.Initialize(currentPlayerInventory, equipmentManager);
         magicInventoryManager?.Initialize(currentPlayerInventory, equipmentManager);
         attributesUIManager?.Initialize();
+    }
+
+    private void SetMenuCameraInputActive(bool active)
+    {
+        if (cameraInputProviders != null)
+        {
+            for (int i = 0; i < cameraInputProviders.Length; i++)
+            {
+                if (cameraInputProviders[i] != null)
+                    cameraInputProviders[i].enabled = active;
+            }
+        }
+
+        if (cameraInputFallbacks == null)
+            return;
+
+        for (int i = 0; i < cameraInputFallbacks.Length; i++)
+        {
+            var cam = cameraInputFallbacks[i];
+            if (cam == null)
+                continue;
+
+            if (active)
+            {
+                cam.m_XAxis.m_InputAxisName = "Mouse X";
+                cam.m_YAxis.m_InputAxisName = "Mouse Y";
+            }
+            else
+            {
+                cam.m_XAxis.m_InputAxisName = "";
+                cam.m_YAxis.m_InputAxisName = "";
+            }
+        }
     }
 
     private void ResolveTabBackgroundImage()
@@ -1287,7 +1291,7 @@ public class MenuManager : MonoBehaviour
         if (playerHudPanel != null)
             playerHudPanel.SetActive(true);
 
-        CameraInputBlocker.SetAllCinemachineInput(true);
+        SetMenuCameraInputActive(true);
         if (controls != null)
             controls.Player.Look.Enable();
         Cursor.lockState = CursorLockMode.Locked;

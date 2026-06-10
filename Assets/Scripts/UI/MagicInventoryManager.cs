@@ -17,6 +17,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Image dragPreviewTemplate;
 
     [Header("Magic Detail")]
+    [SerializeField] private bool autoWireMagicReferences = false;
     [SerializeField] private GameObject magicDetailRoot;
     [SerializeField] private Image magicImage;
     [SerializeField] private TextMeshProUGUI magicTitle;
@@ -44,7 +45,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         playerInventory = inventory != null ? inventory : playerInventory;
         equipmentManager = equipment != null ? equipment : equipmentManager;
 
-        if (magicSlotParent == null)
+        if (autoWireMagicReferences && magicSlotParent == null)
             AutoWireMagicReferences();
 
         if (magicSlotParent == null)
@@ -224,8 +225,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     public void OnEquipMagicButtonClick()
     {
         EnsurePlayerInventory();
-        if (equipmentManager == null)
-            equipmentManager = FindObjectOfType<EquipmentManager>(true);
 
         int targetIndex = currentSelectedIndex;
         if (!HasItem(targetIndex) && HasItem(padFocusIndex))
@@ -487,8 +486,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         Canvas targetCanvas = dragCanvas;
         if (targetCanvas == null)
             targetCanvas = GetComponentInParent<Canvas>();
-        if (targetCanvas == null)
-            targetCanvas = FindObjectOfType<Canvas>();
         if (targetCanvas == null) return;
 
         if (dragPreviewTemplate == null)
@@ -536,8 +533,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     private void EnsurePlayerInventory()
     {
-        if (playerInventory == null)
-            playerInventory = FindObjectOfType<PlayerInventory>();
     }
 
     private void AutoWireMagicReferences()

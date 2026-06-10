@@ -1157,14 +1157,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private QuestManager GetCachedQuestManager()
     {
         if (cachedQuestManager != null) return cachedQuestManager;
-        cachedQuestManager = QuestManager.Instance != null ? QuestManager.Instance : FindObjectOfType<QuestManager>();
+        cachedQuestManager = QuestManager.Instance;
         return cachedQuestManager;
     }
 
     private PlayerInventory GetCachedPlayerInventory()
     {
         if (cachedPlayerInventory != null) return cachedPlayerInventory;
-        cachedPlayerInventory = FindObjectOfType<PlayerInventory>();
+        cachedPlayerInventory = GetComponent<PlayerInventory>();
         return cachedPlayerInventory;
     }
 

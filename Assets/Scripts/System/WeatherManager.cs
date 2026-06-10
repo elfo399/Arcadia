@@ -552,34 +552,7 @@ public class WeatherManager : MonoBehaviour
 
     private void ResolveReferences()
     {
-        if (weatherAnimator == null)
-            weatherAnimator = FindAnimatorByObjectName("WeatherAnimationDisplay");
-
         if (directionalLight == null)
-            directionalLight = RenderSettings.sun != null ? RenderSettings.sun : FindDirectionalLight();
-    }
-
-    private static Animator FindAnimatorByObjectName(string objectName)
-    {
-        Animator[] animators = FindObjectsOfType<Animator>(true);
-        for (int i = 0; i < animators.Length; i++)
-        {
-            if (animators[i] != null && string.Equals(animators[i].gameObject.name, objectName, StringComparison.OrdinalIgnoreCase))
-                return animators[i];
-        }
-
-        return null;
-    }
-
-    private static Light FindDirectionalLight()
-    {
-        Light[] lights = FindObjectsOfType<Light>(true);
-        for (int i = 0; i < lights.Length; i++)
-        {
-            if (lights[i] != null && lights[i].type == LightType.Directional)
-                return lights[i];
-        }
-
-        return null;
+            directionalLight = RenderSettings.sun;
     }
 }

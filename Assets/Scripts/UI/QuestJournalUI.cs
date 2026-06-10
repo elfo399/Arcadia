@@ -360,7 +360,7 @@ public class QuestJournalUI : MonoBehaviour
     {
         if (!useQuestManager) return;
         if (questManager == null)
-            questManager = QuestManager.Instance != null ? QuestManager.Instance : (autoResolveMissingDependencies ? FindObjectOfType<QuestManager>() : null);
+            questManager = QuestManager.Instance;
         if (questManager == null || questManagerSubscribed)
             return;
 
@@ -671,27 +671,16 @@ public class QuestJournalUI : MonoBehaviour
 
     private void EnsurePlayerInventory()
     {
-        if (playerInventory == null && autoResolveMissingDependencies)
-            playerInventory = FindObjectOfType<PlayerInventory>();
     }
 
     private void EnsurePlayerStats()
     {
-        if (playerStats == null && autoResolveMissingDependencies)
-            playerStats = PlayerStats.instance != null ? PlayerStats.instance : FindObjectOfType<PlayerStats>();
+        if (playerStats == null)
+            playerStats = PlayerStats.instance;
     }
 
     private void ResolveDependencies()
     {
-        if (!autoResolveMissingDependencies)
-            return;
-
-        if (menuManager == null)
-            menuManager = FindObjectOfType<MenuManager>(true);
-        if (inventoryUIManager == null)
-            inventoryUIManager = FindObjectOfType<InventoryUIManager>(true);
-        if (magicInventoryManager == null)
-            magicInventoryManager = FindObjectOfType<MagicInventoryManager>(true);
         EnsurePlayerInventory();
         EnsurePlayerStats();
     }

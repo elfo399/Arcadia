@@ -108,8 +108,8 @@ public class CoreGenerator : MonoBehaviour
     void Awake() 
     { 
         Instance = this;
-        playerStats = FindObjectOfType<PlayerStats>();
         ResolvePlayerTransform();
+        CachePlayerStats();
         if (playerStats == null) Debug.LogWarning("[CoreGenerator] PlayerStats non trovato! La generazione di stanze speciali (Curch/EvilCurch) non funzionerà.");
         
     }
@@ -132,8 +132,15 @@ public class CoreGenerator : MonoBehaviour
 
     #region --- Core Generation Logic ---
 
+    private void CachePlayerStats()
+    {
+        if (playerStats == null)
+            playerStats = PlayerStats.instance;
+    }
+
     public void Generate()
     {
+        CachePlayerStats();
         ResolvePlayerTransform();
 
         if (useRandomSeed)
@@ -916,12 +923,8 @@ public class CoreGenerator : MonoBehaviour
         if (playerTransform != null && playerTransform.GetComponent<CharacterController>() != null)
             return;
 
-        PlayerController controller = FindObjectOfType<PlayerController>(true);
-        if (controller != null)
-        {
-            playerTransform = controller.transform;
-            return;
-        }
+        if (playerTransform == null)
+            Debug.LogWarning("[CoreGenerator] Player Transform non assegnato e PlayerStats.instance non disponibile.");
     }
 
     string GenerateSeedString()

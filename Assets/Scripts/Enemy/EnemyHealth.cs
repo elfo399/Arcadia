@@ -35,7 +35,7 @@ public class EnemyHealth : MonoBehaviour, IDamageable
         if (isDead) return;
         isDead = true;
 
-        var stats = PlayerStats.instance != null ? PlayerStats.instance : FindObjectOfType<PlayerStats>();
+        var stats = PlayerStats.instance;
         if (stats != null && experienceReward > 0)
             stats.AddExperience(experienceReward);
 

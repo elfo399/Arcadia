@@ -11255,7 +11255,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rightHandSocket: {fileID: 2007308087}
   leftHandSocket: {fileID: 2115150574}
-  autoResolveHumanoidHandBones: 1
+  autoResolveHumanoidHandBones: 0
   currentRightVisualWeapon: {fileID: 0}
   currentLeftVisualWeapon: {fileID: 0}
 --- !u!114 &800217474
@@ -28916,6 +28916,11 @@ MonoBehaviour:
   equipmentManager: {fileID: 339103045}
   attributesUIManager: {fileID: 1986539571}
   questJournalUI: {fileID: 496487926}
+  scenePlayerInventory: {fileID: 800217478}
+  cameraInputProviders:
+  - {fileID: 381813325}
+  cameraInputFallbacks:
+  - {fileID: 381813326}
   menuAnimator: {fileID: 656903554}
   menuOpenStateName: BookOpen
   menuPostOpenStateName: AppearTabs
@@ -31132,7 +31137,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9dafb18f89b30b14cafe8e8c969e8920, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoWireAttributesUI: 1
+  autoWireAttributesUI: 0
   attributesRoot: {fileID: 856384546}
   attributesLevelLabelText: {fileID: 926450953}
   attributesLevelValueText: {fileID: 156059276}

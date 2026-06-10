@@ -4671,7 +4671,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rightHandSocket: {fileID: 1792941682}
   leftHandSocket: {fileID: 278690949}
-  autoResolveHumanoidHandBones: 1
+  autoResolveHumanoidHandBones: 0
   currentRightVisualWeapon: {fileID: 0}
   currentLeftVisualWeapon: {fileID: 0}
 --- !u!1 &228623047
@@ -9412,7 +9412,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &516914361
 RectTransform:
   m_ObjectHideFlags: 0
@@ -9507,7 +9507,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 516914360}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e2bfe96896da8a349be099e04270c91d, type: 3}
   m_Name: 
@@ -10747,6 +10747,11 @@ MonoBehaviour:
   equipmentManager: {fileID: 1588103660}
   attributesUIManager: {fileID: 1354719865}
   questJournalUI: {fileID: 1102352506}
+  scenePlayerInventory: {fileID: 220392754}
+  cameraInputProviders:
+  - {fileID: 419000996}
+  cameraInputFallbacks:
+  - {fileID: 419000995}
   menuAnimator: {fileID: 866589190}
   menuOpenStateName: BookOpen
   menuPostOpenStateName: AppearTabs
@@ -20830,7 +20835,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9dafb18f89b30b14cafe8e8c969e8920, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoWireAttributesUI: 1
+  autoWireAttributesUI: 0
   attributesRoot: {fileID: 2124733423}
   attributesLevelLabelText: {fileID: 661777968}
   attributesLevelValueText: {fileID: 298411412}
@@ -20904,6 +20909,8 @@ MonoBehaviour:
     descText: {fileID: 61053047}
     addButton: {fileID: 253465678}
   menuManager: {fileID: 633410528}
+  playerStats: {fileID: 220392753}
+  playerController: {fileID: 220392749}
 --- !u!1 &1374312577
 GameObject:
   m_ObjectHideFlags: 0
@@ -27848,6 +27855,8 @@ MonoBehaviour:
   keyValueText: {fileID: 0}
   walletSource: 0
   autoRefreshWallet: 1
+  autoWireDetailReferences: 0
+  playerStats: {fileID: 0}
 --- !u!1 &1770219019
 GameObject:
   m_ObjectHideFlags: 0
@@ -33480,6 +33489,7 @@ MonoBehaviour:
   magicInitialSlotCount: 6
   dragCanvas: {fileID: 0}
   dragPreviewTemplate: {fileID: 0}
+  autoWireMagicReferences: 0
   magicDetailRoot: {fileID: 1054778184}
   magicImage: {fileID: 1671258335}
   magicTitle: {fileID: 14712462}

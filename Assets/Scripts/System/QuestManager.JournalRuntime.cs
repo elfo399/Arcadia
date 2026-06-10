@@ -10,12 +10,6 @@ public partial class QuestManager
     private int journalPadListIndex;
     private string selectedJournalQuestId;
 
-    private Dictionary<string, WeaponItem> questRewardWeaponLookup;
-    private Dictionary<string, UsableItemData> questRewardUsableLookup;
-    private Dictionary<string, ItemData> questRewardItemLookup;
-    private Dictionary<string, MagicItemData> questRewardMagicLookup;
-    private Dictionary<string, ArmorItemData> questRewardArmorLookup;
-
     public JournalPadSection CurrentJournalPadSection => currentJournalPadSection;
     public int JournalPadListIndex => journalPadListIndex;
     public string SelectedJournalQuestId => selectedJournalQuestId;
@@ -694,8 +688,7 @@ public partial class QuestManager
             return true;
         }
 
-        EnsureQuestRewardLookups();
-        return questRewardWeaponLookup != null && TryLookupByRewardName(reward, questRewardWeaponLookup, out weapon);
+        return false;
     }
 
     private bool TryResolveUsableReward(QuestRewardEntryData reward, out UsableItemData usable)
@@ -709,8 +702,7 @@ public partial class QuestManager
             return true;
         }
 
-        EnsureQuestRewardLookups();
-        return questRewardUsableLookup != null && TryLookupByRewardName(reward, questRewardUsableLookup, out usable);
+        return false;
     }
 
     private bool TryResolveItemReward(QuestRewardEntryData reward, out ItemData item)
@@ -724,8 +716,7 @@ public partial class QuestManager
             return true;
         }
 
-        EnsureQuestRewardLookups();
-        return questRewardItemLookup != null && TryLookupByRewardName(reward, questRewardItemLookup, out item);
+        return false;
     }
 
     private bool TryResolveMagicReward(QuestRewardEntryData reward, out MagicItemData magic)
@@ -739,8 +730,7 @@ public partial class QuestManager
             return true;
         }
 
-        EnsureQuestRewardLookups();
-        return questRewardMagicLookup != null && TryLookupByRewardName(reward, questRewardMagicLookup, out magic);
+        return false;
     }
 
     private bool TryResolveArmorReward(QuestRewardEntryData reward, out ArmorItemData armor)
@@ -754,67 +744,7 @@ public partial class QuestManager
             return true;
         }
 
-        EnsureQuestRewardLookups();
-        return questRewardArmorLookup != null && TryLookupByRewardName(reward, questRewardArmorLookup, out armor);
-    }
-
-    private void EnsureQuestRewardLookups()
-    {
-        if (questRewardWeaponLookup != null
-            && questRewardUsableLookup != null
-            && questRewardItemLookup != null
-            && questRewardMagicLookup != null
-            && questRewardArmorLookup != null)
-            return;
-
-        questRewardWeaponLookup = new Dictionary<string, WeaponItem>();
-        questRewardUsableLookup = new Dictionary<string, UsableItemData>();
-        questRewardItemLookup = new Dictionary<string, ItemData>();
-        questRewardMagicLookup = new Dictionary<string, MagicItemData>();
-        questRewardArmorLookup = new Dictionary<string, ArmorItemData>();
-
-        RegisterAssets(questRewardWeaponLookup, Resources.LoadAll<WeaponItem>(""), x => x != null ? x.weaponName : null);
-        RegisterAssets(questRewardUsableLookup, Resources.LoadAll<UsableItemData>(""), x => x != null ? x.itemName : null);
-        RegisterAssets(questRewardItemLookup, Resources.LoadAll<ItemData>(""), x => x != null ? x.itemName : null);
-        RegisterAssets(questRewardMagicLookup, Resources.LoadAll<MagicItemData>(""), x => x != null ? x.magicName : null);
-        RegisterAssets(questRewardArmorLookup, Resources.LoadAll<ArmorItemData>(""), x => x != null ? x.itemName : null);
-
-        RegisterAssets(questRewardWeaponLookup, Resources.FindObjectsOfTypeAll<WeaponItem>(), x => x != null ? x.weaponName : null);
-        RegisterAssets(questRewardUsableLookup, Resources.FindObjectsOfTypeAll<UsableItemData>(), x => x != null ? x.itemName : null);
-        RegisterAssets(questRewardItemLookup, Resources.FindObjectsOfTypeAll<ItemData>(), x => x != null ? x.itemName : null);
-        RegisterAssets(questRewardMagicLookup, Resources.FindObjectsOfTypeAll<MagicItemData>(), x => x != null ? x.magicName : null);
-        RegisterAssets(questRewardArmorLookup, Resources.FindObjectsOfTypeAll<ArmorItemData>(), x => x != null ? x.itemName : null);
-    }
-
-    private static void RegisterAssets<T>(Dictionary<string, T> lookup, T[] source, System.Func<T, string> displayNameResolver) where T : Object
-    {
-        if (lookup == null || source == null)
-            return;
-
-        for (int i = 0; i < source.Length; i++)
-        {
-            T asset = source[i];
-            if (asset == null)
-                continue;
-
-            string assetName = NormalizeLookupKey(asset.name);
-            if (!string.IsNullOrEmpty(assetName) && !lookup.ContainsKey(assetName))
-                lookup.Add(assetName, asset);
-
-            string displayName = NormalizeLookupKey(displayNameResolver != null ? displayNameResolver(asset) : null);
-            if (!string.IsNullOrEmpty(displayName) && !lookup.ContainsKey(displayName))
-                lookup.Add(displayName, asset);
-        }
-    }
-
-    private static bool TryLookupByRewardName<T>(QuestRewardEntryData reward, Dictionary<string, T> lookup, out T resolved) where T : Object
-    {
-        resolved = null;
-        if (reward == null || lookup == null)
-            return false;
-
-        string key = NormalizeLookupKey(reward.itemName);
-        return !string.IsNullOrEmpty(key) && lookup.TryGetValue(key, out resolved);
+        return false;
     }
 
     private static string NormalizeLookupKey(string value)

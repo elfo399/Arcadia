@@ -99,8 +99,8 @@ public class SimpleEnemyAI : MonoBehaviour
     {
         if (agent != null) agent.enabled = false;
 
-        GameObject p = GameObject.FindGameObjectWithTag("Player");
-        if (p != null) playerTarget = p.transform;
+        if (playerTarget == null && PlayerStats.instance != null)
+            playerTarget = PlayerStats.instance.transform;
 
         Invoke(nameof(ActivateAgent), 0.5f);
     }
@@ -288,8 +288,6 @@ public class SimpleEnemyAI : MonoBehaviour
         // separato dal Transform taggato "Player".
         if (damageable == null && PlayerStats.instance != null)
             damageable = PlayerStats.instance;
-        if (damageable == null)
-            damageable = FindObjectOfType<PlayerStats>();
         if (damageable == null)
         {
             if (debugLogs)

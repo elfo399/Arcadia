@@ -93,7 +93,6 @@ public class TargetLockSystem : MonoBehaviour
     {
         mainCam = Camera.main;
         playerController = GetComponentInParent<PlayerController>();
-        targetIcon = FindTargetIcon();
         StopLockOn();
     }
 
@@ -222,18 +221,6 @@ public class TargetLockSystem : MonoBehaviour
         
         // FIX ROTAZIONE (Mantenuto)
         if (playerModel != null) playerModel.localRotation = Quaternion.identity;
-    }
-
-    private RectTransform FindTargetIcon()
-    {
-        if (targetIcon != null)
-            return targetIcon;
-
-        GameObject iconObject = GameObject.Find("targetLock");
-        if (iconObject != null)
-            return iconObject.GetComponent<RectTransform>();
-
-        return null;
     }
 
     void HandleRotation()

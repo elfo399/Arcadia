@@ -8,16 +8,35 @@ public class FpsDisplay : MonoBehaviour
     private int frameCount;
     private int currentFps;
     private GUIStyle labelStyle;
+    private static FpsDisplay instance;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Create()
     {
-        if (FindObjectOfType<FpsDisplay>() != null)
+        if (instance != null)
             return;
 
         var display = new GameObject("FPS Display");
         DontDestroyOnLoad(display);
         display.AddComponent<FpsDisplay>();
+    }
+
+    private void Awake()
+    {
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
+
+    private void OnDestroy()
+    {
+        if (instance == this)
+            instance = null;
     }
 
     private void Update()

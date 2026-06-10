@@ -1,7 +1,6 @@
 using System;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 public class MapPageManager : MonoBehaviour
 {
@@ -181,31 +180,10 @@ public class MapPageManager : MonoBehaviour
     private void ResolveReferences()
     {
         if (generator == null)
-            generator = CoreGenerator.Instance != null ? CoreGenerator.Instance : FindObjectOfType<CoreGenerator>();
+            generator = CoreGenerator.Instance;
 
         if (weatherManager == null)
-            weatherManager = WeatherManager.Instance != null ? WeatherManager.Instance : FindObjectOfType<WeatherManager>();
-
-        if (floorText == null)
-            floorText = FindTextByObjectName("Floor");
-
-        if (themeText == null)
-            themeText = FindTextByObjectName("Theme");
-
-        if (playerNameText == null)
-            playerNameText = FindTextByObjectNames("PlayerName", "PlayerNameText");
-
-        if (weatherText == null)
-            weatherText = FindTextByObjectNames("CurrentWeather", "Weather", "WeatherText");
-
-        if (runTimerText == null)
-            runTimerText = FindTextByObjectNames("RunTimer", "RunTimerText", "Timer", "TimerText");
-
-        if (playerNameInput == null)
-            playerNameInput = FindInputByObjectNames("PlayerNameInput", "NameInput", "PlayerInput");
-
-        if (mapContainer == null)
-            mapContainer = FindMenuMapContainer();
+            weatherManager = WeatherManager.Instance;
     }
 
     private void SubscribeToGenerator()
@@ -284,70 +262,6 @@ public class MapPageManager : MonoBehaviour
         ApplyRunInfoTexts(forceRefresh: true);
     }
 
-    private static TextMeshProUGUI FindTextByObjectName(string objectName)
-    {
-        TextMeshProUGUI[] texts = FindObjectsOfType<TextMeshProUGUI>(true);
-        for (int i = 0; i < texts.Length; i++)
-        {
-            if (texts[i].name == objectName)
-                return texts[i];
-        }
-
-        return null;
-    }
-
-    private static TextMeshProUGUI FindTextByObjectNames(params string[] objectNames)
-    {
-        for (int i = 0; i < objectNames.Length; i++)
-        {
-            TextMeshProUGUI text = FindTextByObjectName(objectNames[i]);
-            if (text != null)
-                return text;
-        }
-
-        return null;
-    }
-
-    private static TMP_InputField FindInputByObjectNames(params string[] objectNames)
-    {
-        TMP_InputField[] inputs = FindObjectsOfType<TMP_InputField>(true);
-        for (int i = 0; i < objectNames.Length; i++)
-        {
-            for (int j = 0; j < inputs.Length; j++)
-            {
-                if (inputs[j].name == objectNames[i])
-                    return inputs[j];
-            }
-        }
-
-        return null;
-    }
-
-    private RectTransform FindMenuMapContainer()
-    {
-        Transform[] transforms = FindObjectsOfType<Transform>(true);
-        for (int i = 0; i < transforms.Length; i++)
-        {
-            Transform candidate = transforms[i];
-            if (candidate == null || candidate.name != "Map")
-                continue;
-
-            if (candidate.GetComponent<Button>() != null)
-                continue;
-
-            Transform parent = candidate.parent;
-            while (parent != null)
-            {
-                if (parent.name == "MapPage")
-                    return candidate as RectTransform;
-
-                parent = parent.parent;
-            }
-        }
-
-        return null;
-    }
-
     private static string FormatText(string format, object value)
     {
         if (string.IsNullOrEmpty(format))
@@ -373,7 +287,7 @@ public class MapPageManager : MonoBehaviour
     private string ResolveCurrentWeather()
     {
         if (weatherManager == null)
-            weatherManager = WeatherManager.Instance != null ? WeatherManager.Instance : FindObjectOfType<WeatherManager>();
+            weatherManager = WeatherManager.Instance;
 
         if (weatherManager != null && !string.IsNullOrWhiteSpace(weatherManager.CurrentDisplayName))
             return weatherManager.CurrentDisplayName.Trim();

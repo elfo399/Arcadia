@@ -6,7 +6,7 @@ public class PlayerWeaponVisuals : MonoBehaviour
     [Header("Sockets")]
     [SerializeField] private Transform rightHandSocket;
     [SerializeField] private Transform leftHandSocket;
-    [SerializeField] private bool autoResolveHumanoidHandBones = true;
+    [SerializeField] private bool autoResolveHumanoidHandBones = false;
 
     [Header("Runtime")]
     [SerializeField] private WeaponItem currentRightVisualWeapon;
@@ -20,7 +20,6 @@ public class PlayerWeaponVisuals : MonoBehaviour
     private void Awake()
     {
         inventory = GetComponent<PlayerInventory>();
-        cachedAnimator = GetComponentInChildren<Animator>();
         ResolveSocketsIfNeeded();
         RefreshNow();
     }
@@ -60,7 +59,10 @@ public class PlayerWeaponVisuals : MonoBehaviour
 
     private void ResolveSocketsIfNeeded()
     {
-        if (!autoResolveHumanoidHandBones || cachedAnimator == null || !cachedAnimator.isHuman) return;
+        if (!autoResolveHumanoidHandBones) return;
+        if (cachedAnimator == null)
+            cachedAnimator = GetComponentInChildren<Animator>();
+        if (cachedAnimator == null || !cachedAnimator.isHuman) return;
         if (rightHandSocket == null)
             rightHandSocket = cachedAnimator.GetBoneTransform(HumanBodyBones.RightHand);
         if (leftHandSocket == null)
@@ -114,4 +116,3 @@ public class PlayerWeaponVisuals : MonoBehaviour
         leftModelInstance = null;
     }
 }
-

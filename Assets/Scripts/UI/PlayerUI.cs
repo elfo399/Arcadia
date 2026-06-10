@@ -101,13 +101,11 @@ public class PlayerUI : MonoBehaviour
 
     private void ResolveReferences()
     {
-        playerStats = PlayerStats.instance != null ? PlayerStats.instance : FindObjectOfType<PlayerStats>(true);
-        playerInventory = FindObjectOfType<PlayerInventory>(true);
+        if (playerStats == null)
+            playerStats = PlayerStats.instance;
         healthBarFrame = ResolveBarFrame(healthBarFill, healthBarFrame);
         staminaBarFrame = ResolveBarFrame(staminaBarFill, staminaBarFrame);
         manaBarFrame = ResolveBarFrame(manaBarFill, manaBarFrame);
-        if (flaskCountText == null) flaskCountText = FindTextByName("FlaskCount") ?? FindTextByName("FlaskCounter");
-        if (keyCountText == null) keyCountText = FindTextByName("KeyCount");
     }
 
     private RectTransform ResolveBarFrame(Image fill, RectTransform currentFrame)
@@ -270,18 +268,4 @@ public class PlayerUI : MonoBehaviour
         parentImage.enabled = false;
     }
 
-    private TextMeshProUGUI FindTextByName(string objectName)
-    {
-        if (string.IsNullOrWhiteSpace(objectName))
-            return null;
-
-        var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
-        for (int i = 0; i < texts.Length; i++)
-        {
-            if (texts[i] != null && string.Equals(texts[i].gameObject.name, objectName, System.StringComparison.OrdinalIgnoreCase))
-                return texts[i];
-        }
-
-        return null;
-    }
 }

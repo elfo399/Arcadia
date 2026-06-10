@@ -17,7 +17,7 @@ public class AttributesUIManager : MonoBehaviour
     }
 
     [Header("Attributes UI")]
-    [SerializeField] private bool autoWireAttributesUI = true;
+    [SerializeField] private bool autoWireAttributesUI = false;
     [SerializeField] private Transform attributesRoot;
     [SerializeField] private TextMeshProUGUI attributesLevelLabelText;
     [SerializeField] private TextMeshProUGUI attributesLevelValueText;
@@ -37,9 +37,9 @@ public class AttributesUIManager : MonoBehaviour
     [SerializeField] private Color attributesNormalColor = Color.white;
     [SerializeField] private List<AttributeRowBinding> attributeRows = new();
     [SerializeField] private MenuManager menuManager;
+    [SerializeField] private PlayerStats playerStats;
+    [SerializeField] private PlayerController playerController;
 
-    private PlayerStats playerStats;
-    private PlayerController playerController;
     private string selectedAttributeKey;
     private bool attributesUiInitialized;
     private int attributesPadIndex;
@@ -49,7 +49,7 @@ public class AttributesUIManager : MonoBehaviour
     {
         if (attributesUiInitialized) return;
 
-        if (autoWireAttributesUI || attributesRoot == null || attributeRows == null || attributeRows.Count == 0)
+        if (autoWireAttributesUI)
             AutoWireAttributesUIReferences();
 
         if (attributeRows == null) attributeRows = new List<AttributeRowBinding>();
@@ -58,23 +58,18 @@ public class AttributesUIManager : MonoBehaviour
         {
             var row = attributeRows[i];
             if (row == null) continue;
-            if (row.root == null && !string.IsNullOrWhiteSpace(row.key) && attributesRoot != null)
+            if (autoWireAttributesUI && row.root == null && !string.IsNullOrWhiteSpace(row.key) && attributesRoot != null)
                 row.root = FindDeepChildByName(attributesRoot, row.key);
             if (row.root == null) continue;
 
             if (string.IsNullOrWhiteSpace(row.key)) row.key = row.root.name;
-            if (row.labelText == null) row.labelText = FindDeepTextByName(row.root, "Txt");
-            if (row.valueText == null) row.valueText = FindDeepTextByName(row.root, "Value");
-            if (row.descText == null) row.descText = FindDeepTextByName(row.root, "Desc");
-            if (row.addButton == null)
+            if (autoWireAttributesUI && row.labelText == null) row.labelText = FindDeepTextByName(row.root, "Txt");
+            if (autoWireAttributesUI && row.valueText == null) row.valueText = FindDeepTextByName(row.root, "Value");
+            if (autoWireAttributesUI && row.descText == null) row.descText = FindDeepTextByName(row.root, "Desc");
+            if (autoWireAttributesUI && row.addButton == null)
             {
                 var btnTf = FindDeepChildByName(row.root, "Button");
                 if (btnTf != null) row.addButton = btnTf.GetComponent<Button>();
-                if (row.addButton == null)
-                {
-                    row.addButton = row.root.GetComponent<Button>();
-                    if (row.addButton == null) row.addButton = row.root.gameObject.AddComponent<Button>();
-                }
             }
         }
 
@@ -189,13 +184,11 @@ public class AttributesUIManager : MonoBehaviour
     private void CachePlayerStats()
     {
         if (playerStats != null) return;
-        playerStats = PlayerStats.instance != null ? PlayerStats.instance : FindObjectOfType<PlayerStats>();
+        playerStats = PlayerStats.instance;
     }
 
     private void CachePlayerController()
     {
-        if (playerController != null) return;
-        playerController = FindObjectOfType<PlayerController>(true);
     }
 
     private void AutoWireAttributesUIReferences()

@@ -659,8 +659,6 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 
     private void EnsurePlayerInventory()
     {
-        if (playerInventory == null)
-            playerInventory = FindObjectOfType<PlayerInventory>();
     }
 
     private static Transform FindNamedChild(Transform root, string childName)
@@ -698,25 +696,6 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
             found = FindNamedChild(inventoryBackground.transform, childName);
             if (found != null)
                 return found;
-        }
-
-        return FindNamedTransformInScene(childName);
-    }
-
-    private static Transform FindNamedTransformInScene(string childName)
-    {
-        if (string.IsNullOrWhiteSpace(childName))
-            return null;
-
-        var allTransforms = Resources.FindObjectsOfTypeAll<Transform>();
-        for (int i = 0; i < allTransforms.Length; i++)
-        {
-            Transform candidate = allTransforms[i];
-            if (candidate == null || candidate.name != childName)
-                continue;
-            if (!candidate.gameObject.scene.IsValid())
-                continue;
-            return candidate;
         }
 
         return null;

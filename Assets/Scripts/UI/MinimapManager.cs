@@ -49,7 +49,6 @@ public class MinimapManager : MonoBehaviour
         }
 
         instance = this;
-        ResolveReferences();
     }
 
     private void OnEnable()
@@ -69,18 +68,7 @@ public class MinimapManager : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        ResolveReferences();
         UpdateMapVisibilityForScene(scene.name);
-    }
-
-    private void ResolveReferences()
-    {
-        if (mapContainer == null)
-        {
-            Transform container = FindNamedTransform("MinimapContainer");
-            if (container != null)
-                mapContainer = container as RectTransform;
-        }
     }
 
     private void UpdateMapVisibilityForScene(string sceneName)
@@ -386,19 +374,4 @@ public class MinimapManager : MonoBehaviour
         return false;
     }
 
-    private static Transform FindNamedTransform(string targetName)
-    {
-        if (string.IsNullOrWhiteSpace(targetName))
-            return null;
-
-        Transform[] allTransforms = Object.FindObjectsOfType<Transform>(true);
-        for (int i = 0; i < allTransforms.Length; i++)
-        {
-            Transform candidate = allTransforms[i];
-            if (candidate != null && candidate.name == targetName)
-                return candidate;
-        }
-
-        return null;
-    }
 }

@@ -106,9 +106,7 @@ public class PlayerController : MonoBehaviour
         combat = GetComponent<PlayerCombat>();
 
         if (menuManager == null)
-            menuManager = FindObjectOfType<MenuManager>(true);
-        if (menuManager == null)
-            Debug.LogWarning("[PlayerController] MenuManager non trovato in scena.");
+            Debug.LogWarning("[PlayerController] MenuManager non assegnato. Collegalo in Inspector.");
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -139,8 +137,6 @@ public class PlayerController : MonoBehaviour
     {
         if (Controls == null || controller == null) return;
         if (cam == null && Camera.main != null) cam = Camera.main.transform;
-        if (menuManager == null)
-            menuManager = FindObjectOfType<MenuManager>(true);
 
         if (IsInventoryOpen)
         {
@@ -209,7 +205,6 @@ public class PlayerController : MonoBehaviour
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         cam = Camera.main != null ? Camera.main.transform : null;
-        menuManager = FindObjectOfType<MenuManager>(true);
         playerInventory = GetComponent<PlayerInventory>();
         playerStats = GetComponent<PlayerStats>();
         combat = GetComponent<PlayerCombat>();
