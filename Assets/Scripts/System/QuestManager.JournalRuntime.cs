@@ -205,6 +205,12 @@ public partial class QuestManager
             return false;
         }
 
+        if (quest.rewardClaimed)
+        {
+            failureReason = "Reward gia' claimato.";
+            return false;
+        }
+
         if (quest.rewards == null || quest.rewards.Count == 0)
         {
             failureReason = "La quest non ha reward da claimare.";
@@ -487,8 +493,7 @@ public partial class QuestManager
                 continue;
 
             quest.completed = true;
-            if (quest.rewards != null && quest.rewards.Count > 0)
-                quest.rewards.Clear();
+            quest.rewardClaimed = true;
             changed = true;
             break;
         }

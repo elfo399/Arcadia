@@ -13,6 +13,7 @@ public partial class QuestManager : MonoBehaviour
         public string title;
         public string location;
         public bool completed;
+        public bool rewardClaimed;
         public string questTypeLabel = "Main Quest";
         public string recommendedLabel = "";
         public string loreTitle = "";
@@ -136,6 +137,8 @@ public partial class QuestManager : MonoBehaviour
             quests[index].title = title;
             quests[index].location = location;
             quests[index].completed = completed;
+            if (!completed)
+                quests[index].rewardClaimed = false;
         }
         else
         {
@@ -144,7 +147,8 @@ public partial class QuestManager : MonoBehaviour
                 questId = normalizedId,
                 title = title,
                 location = location,
-                completed = completed
+                completed = completed,
+                rewardClaimed = false
             });
         }
 
@@ -158,6 +162,8 @@ public partial class QuestManager : MonoBehaviour
         if (index < 0) return false;
 
         quests[index].completed = completed;
+        if (!completed)
+            quests[index].rewardClaimed = false;
         if (notify)
             NotifyChanged();
         return true;
@@ -289,6 +295,7 @@ public partial class QuestManager : MonoBehaviour
             title = source.title,
             location = source.location,
             completed = source.completed,
+            rewardClaimed = source.rewardClaimed,
             questTypeLabel = source.questTypeLabel,
             recommendedLabel = source.recommendedLabel,
             loreTitle = source.loreTitle,
@@ -364,6 +371,7 @@ public partial class QuestManager : MonoBehaviour
             title = source.title,
             location = source.location,
             completed = source.completed,
+            rewardClaimed = source.rewardClaimed,
             questTypeLabel = source.questTypeLabel,
             recommendedLabel = source.recommendedLabel,
             loreTitle = source.loreTitle,
@@ -383,6 +391,7 @@ public partial class QuestManager : MonoBehaviour
             title = source.title,
             location = source.location,
             completed = source.completed,
+            rewardClaimed = source.rewardClaimed,
             questTypeLabel = source.questTypeLabel,
             recommendedLabel = source.recommendedLabel,
             loreTitle = source.loreTitle,

@@ -213,6 +213,7 @@ public class QuestJournalUI : MonoBehaviour
                     title = entry.title,
                     location = entry.location,
                     completed = entry.completed,
+                    rewardClaimed = entry.rewardClaimed,
                     questTypeLabel = entry.questTypeLabel,
                     recommendedLabel = entry.recommendedLabel,
                     loreTitle = entry.loreTitle,
@@ -332,7 +333,7 @@ public class QuestJournalUI : MonoBehaviour
                 visualTarget = selectedTarget;
                 break;
             case QuestManager.JournalPadSection.Detail:
-                selectedTarget = questClaimRewardButton != null ? questClaimRewardButton.gameObject : null;
+                selectedTarget = questClaimRewardButton != null && questClaimRewardButton.gameObject.activeInHierarchy ? questClaimRewardButton.gameObject : null;
                 visualTarget = selectedTarget;
                 break;
         }
@@ -448,6 +449,16 @@ public class QuestJournalUI : MonoBehaviour
     private void UpdateQuestClaimButtonState(QuestEntryData quest)
     {
         if (questClaimRewardButton == null) return;
+        bool shouldShowButton = quest != null && !quest.rewardClaimed;
+        if (questClaimRewardButton.gameObject.activeSelf != shouldShowButton)
+            questClaimRewardButton.gameObject.SetActive(shouldShowButton);
+
+        if (!shouldShowButton)
+        {
+            questClaimRewardButton.interactable = false;
+            return;
+        }
+
         if (questManager == null)
         {
             questClaimRewardButton.interactable = false;

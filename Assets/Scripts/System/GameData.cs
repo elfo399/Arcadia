@@ -21,6 +21,7 @@ public class SavedQuestData
     public string title;
     public string location;
     public bool completed;
+    public bool rewardClaimed;
     public string questTypeLabel;
     public string recommendedLabel;
     public string loreTitle;

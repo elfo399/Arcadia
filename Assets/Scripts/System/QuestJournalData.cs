@@ -34,6 +34,7 @@ public class QuestEntryData
     public string title;
     public string location;
     public bool completed;
+    public bool rewardClaimed;
     public string questTypeLabel = "Main Quest";
     public string recommendedLabel = "";
     public string loreTitle = "";
