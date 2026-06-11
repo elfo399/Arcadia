@@ -11126,7 +11126,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   persistAcrossScenes: 1
   autoNotifyOnStart: 1
-  initialQuests: []
+  initialQuestDefinitions:
+  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
 --- !u!1 &648361017
 GameObject:
   m_ObjectHideFlags: 0
@@ -16917,6 +16918,7 @@ MonoBehaviour:
     rewardClaimed: 0
     questTypeLabel: Incarico
     recommendedLabel: 100 Lvl
+    questImage: {fileID: 0}
     loreTitle: Gay
     loreDescription: Gay Gay Gay
     loreAuthor: Tony
@@ -16936,6 +16938,7 @@ MonoBehaviour:
       armorAsset: {fileID: 0}
   questDetailTypeText: {fileID: 158454139}
   questDetailRecommendedText: {fileID: 1381451575}
+  questDetailImage: {fileID: 1057308028}
   questDetailTitleText: {fileID: 1598781266}
   questDetailLocationText: {fileID: 2062648136}
   questDetailLoreTitleText: {fileID: 1374312579}

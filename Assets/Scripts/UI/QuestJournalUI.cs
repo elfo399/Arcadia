@@ -30,6 +30,7 @@ public class QuestJournalUI : MonoBehaviour
     [Header("Quest Detail UI")]
     [SerializeField] private TextMeshProUGUI questDetailTypeText;
     [SerializeField] private TextMeshProUGUI questDetailRecommendedText;
+    [SerializeField] private Image questDetailImage;
     [SerializeField] private TextMeshProUGUI questDetailTitleText;
     [SerializeField] private TextMeshProUGUI questDetailLocationText;
     [SerializeField] private TextMeshProUGUI questDetailLoreTitleText;
@@ -73,6 +74,7 @@ public class QuestJournalUI : MonoBehaviour
     public List<QuestEntryData> StartingQuests => startingQuests;
     public TextMeshProUGUI QuestDetailTypeText { get => questDetailTypeText; set => questDetailTypeText = value; }
     public TextMeshProUGUI QuestDetailRecommendedText { get => questDetailRecommendedText; set => questDetailRecommendedText = value; }
+    public Image QuestDetailImage { get => questDetailImage; set => questDetailImage = value; }
     public TextMeshProUGUI QuestDetailTitleText { get => questDetailTitleText; set => questDetailTitleText = value; }
     public TextMeshProUGUI QuestDetailLocationText { get => questDetailLocationText; set => questDetailLocationText = value; }
     public TextMeshProUGUI QuestDetailLoreTitleText { get => questDetailLoreTitleText; set => questDetailLoreTitleText = value; }
@@ -216,6 +218,7 @@ public class QuestJournalUI : MonoBehaviour
                     rewardClaimed = entry.rewardClaimed,
                     questTypeLabel = entry.questTypeLabel,
                     recommendedLabel = entry.recommendedLabel,
+                    questImage = entry.questImage,
                     loreTitle = entry.loreTitle,
                     loreDescription = entry.loreDescription,
                     loreAuthor = entry.loreAuthor,
@@ -434,6 +437,12 @@ public class QuestJournalUI : MonoBehaviour
 
         if (questDetailTypeText != null) questDetailTypeText.text = quest != null ? (quest.questTypeLabel ?? string.Empty) : string.Empty;
         if (questDetailRecommendedText != null) questDetailRecommendedText.text = quest != null ? (quest.recommendedLabel ?? string.Empty) : string.Empty;
+        if (questDetailImage != null)
+        {
+            Sprite image = quest != null ? quest.questImage : null;
+            questDetailImage.sprite = image;
+            questDetailImage.enabled = image != null;
+        }
         if (questDetailTitleText != null) questDetailTitleText.text = quest != null ? (quest.title ?? string.Empty) : string.Empty;
         if (questDetailLocationText != null) questDetailLocationText.text = quest != null ? (quest.location ?? string.Empty) : string.Empty;
         if (questDetailLoreTitleText != null) questDetailLoreTitleText.text = quest != null ? (quest.loreTitle ?? string.Empty) : string.Empty;

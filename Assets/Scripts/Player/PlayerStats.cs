@@ -1085,7 +1085,15 @@ public class PlayerStats : MonoBehaviour, IDamageable
         var questManager = GetCachedQuestManager();
         if (questManager == null) return;
 
-        var mapped = DeserializeQuests(loadedDataCache.quests);
+        if (loadedDataCache.quests.Length == 0)
+        {
+            loadedQuestStateApplied = true;
+            return;
+        }
+
+        var mapped = MergeSavedQuestStateIntoDefinitions(
+            questManager.GetInitialQuestsSnapshot(),
+            DeserializeQuests(loadedDataCache.quests));
         questManager.ReplaceAllQuests(mapped);
         loadedQuestStateApplied = true;
     }
@@ -1199,6 +1207,64 @@ public class PlayerStats : MonoBehaviour, IDamageable
         }
 
         return result;
+    }
+
+    private static List<QuestManager.QuestData> MergeSavedQuestStateIntoDefinitions(List<QuestManager.QuestData> definitions, List<QuestManager.QuestData> saved)
+    {
+        if (definitions == null || definitions.Count == 0)
+            return saved ?? new List<QuestManager.QuestData>();
+        if (saved == null || saved.Count == 0)
+            return definitions;
+
+        for (int i = 0; i < saved.Count; i++)
+        {
+            var savedQuest = saved[i];
+            if (savedQuest == null || string.IsNullOrWhiteSpace(savedQuest.questId))
+                continue;
+
+            var definedQuest = FindQuestById(definitions, savedQuest.questId);
+            if (definedQuest == null)
+            {
+                definitions.Add(savedQuest);
+                continue;
+            }
+
+            definedQuest.completed = savedQuest.completed;
+            definedQuest.rewardClaimed = savedQuest.rewardClaimed;
+            ApplySavedObjectiveState(definedQuest.objectives, savedQuest.objectives);
+        }
+
+        return definitions;
+    }
+
+    private static QuestManager.QuestData FindQuestById(List<QuestManager.QuestData> quests, string questId)
+    {
+        if (quests == null || string.IsNullOrWhiteSpace(questId))
+            return null;
+
+        for (int i = 0; i < quests.Count; i++)
+        {
+            var quest = quests[i];
+            if (quest == null) continue;
+            if (string.Equals(quest.questId, questId, StringComparison.OrdinalIgnoreCase))
+                return quest;
+        }
+
+        return null;
+    }
+
+    private static void ApplySavedObjectiveState(List<QuestManager.QuestObjectiveData> definitions, List<QuestManager.QuestObjectiveData> saved)
+    {
+        if (definitions == null || definitions.Count == 0 || saved == null || saved.Count == 0)
+            return;
+
+        int count = Mathf.Min(definitions.Count, saved.Count);
+        for (int i = 0; i < count; i++)
+        {
+            if (definitions[i] == null || saved[i] == null)
+                continue;
+            definitions[i].completed = saved[i].completed;
+        }
     }
 
     private static List<QuestManager.QuestObjectiveData> DeserializeObjectives(SavedQuestObjectiveData[] source)

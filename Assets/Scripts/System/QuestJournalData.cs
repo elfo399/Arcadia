@@ -37,6 +37,7 @@ public class QuestEntryData
     public bool rewardClaimed;
     public string questTypeLabel = "Main Quest";
     public string recommendedLabel = "";
+    public Sprite questImage;
     public string loreTitle = "";
     [TextArea(2, 6)] public string loreDescription = "";
     public string loreAuthor = "";

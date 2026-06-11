@@ -16,6 +16,7 @@ public partial class QuestManager : MonoBehaviour
         public bool rewardClaimed;
         public string questTypeLabel = "Main Quest";
         public string recommendedLabel = "";
+        public Sprite questImage;
         public string loreTitle = "";
         [TextArea(2, 6)] public string loreDescription = "";
         public string loreAuthor = "";
@@ -48,7 +49,7 @@ public partial class QuestManager : MonoBehaviour
     [Header("Settings")]
     [SerializeField] private bool persistAcrossScenes = true;
     [SerializeField] private bool autoNotifyOnStart = true;
-    [SerializeField] private List<QuestData> initialQuests = new();
+    [SerializeField] private List<QuestDefinition> initialQuestDefinitions = new();
 
     private readonly List<QuestData> quests = new();
 
@@ -68,8 +69,8 @@ public partial class QuestManager : MonoBehaviour
         if (persistAcrossScenes)
             MarkPersistentRoot();
 
-        if (quests.Count == 0 && initialQuests != null && initialQuests.Count > 0)
-            ReplaceAllQuests(initialQuests, false);
+        if (quests.Count == 0)
+            ReplaceAllQuests(BuildInitialQuests(), false);
     }
 
     private void Start()
@@ -95,6 +96,11 @@ public partial class QuestManager : MonoBehaviour
     public List<QuestData> GetQuestsSnapshot()
     {
         return CloneQuestList(quests);
+    }
+
+    public List<QuestData> GetInitialQuestsSnapshot()
+    {
+        return CloneQuestList(BuildInitialQuests());
     }
 
     public List<QuestEntryData> GetQuestEntriesSnapshot()
@@ -129,7 +135,24 @@ public partial class QuestManager : MonoBehaviour
 
     public void ResetToInitialQuests(bool notify = true)
     {
-        ReplaceAllQuests(initialQuests, notify);
+        ReplaceAllQuests(BuildInitialQuests(), notify);
+    }
+
+    private List<QuestData> BuildInitialQuests()
+    {
+        var result = new List<QuestData>();
+
+        if (initialQuestDefinitions != null)
+        {
+            for (int i = 0; i < initialQuestDefinitions.Count; i++)
+            {
+                var definition = initialQuestDefinitions[i];
+                if (definition == null) continue;
+                result.Add(definition.CreateRuntimeData());
+            }
+        }
+
+        return result;
     }
 
     public void AddOrUpdateQuest(string questId, string title, string location, bool completed = false, bool notify = true)
@@ -303,6 +326,7 @@ public partial class QuestManager : MonoBehaviour
             rewardClaimed = source.rewardClaimed,
             questTypeLabel = source.questTypeLabel,
             recommendedLabel = source.recommendedLabel,
+            questImage = source.questImage,
             loreTitle = source.loreTitle,
             loreDescription = source.loreDescription,
             loreAuthor = source.loreAuthor,
@@ -379,6 +403,7 @@ public partial class QuestManager : MonoBehaviour
             rewardClaimed = source.rewardClaimed,
             questTypeLabel = source.questTypeLabel,
             recommendedLabel = source.recommendedLabel,
+            questImage = source.questImage,
             loreTitle = source.loreTitle,
             loreDescription = source.loreDescription,
             loreAuthor = source.loreAuthor,
@@ -399,6 +424,7 @@ public partial class QuestManager : MonoBehaviour
             rewardClaimed = source.rewardClaimed,
             questTypeLabel = source.questTypeLabel,
             recommendedLabel = source.recommendedLabel,
+            questImage = source.questImage,
             loreTitle = source.loreTitle,
             loreDescription = source.loreDescription,
             loreAuthor = source.loreAuthor,

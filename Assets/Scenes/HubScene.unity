@@ -21103,7 +21103,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   persistAcrossScenes: 1
   autoNotifyOnStart: 1
-  initialQuests: []
+  initialQuestDefinitions:
+  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
 --- !u!1 &1366356386
 GameObject:
   m_ObjectHideFlags: 0
