@@ -41,6 +41,7 @@ public class MenuManager : MonoBehaviour
     [Header("Content Animation")]
     [SerializeField] private Animator menuContentAnimator;
     [SerializeField] private string menuContentAppearStateName = "";
+    [SerializeField] private string menuContentPreCloseStateName = "";
     [SerializeField] [Min(0f)] private float menuContentAppearFallbackDuration = 0.25f;
 
     [Header("Tabs")]
@@ -629,7 +630,6 @@ public class MenuManager : MonoBehaviour
         }
 
         ApplyPadFocusVisible(false);
-        HideAllTabBackgrounds();
         HideContentAppearAnimation();
         if (!StartCloseMenuAnimation(controls))
             CompleteMenuClose(controls);
@@ -890,6 +890,19 @@ public class MenuManager : MonoBehaviour
         }
     }
 
+    private void HideCurrentTabBackground()
+    {
+        if (!IsValidTabIndex(currentTabIndex))
+            return;
+
+        GameObject background = tabs[currentTabIndex].background;
+        if (background == null)
+            return;
+
+        ResetTabContentCanvasGroup(background);
+        background.SetActive(false);
+    }
+
     private void ResetTabContentCanvasGroup(GameObject tabBackground)
     {
         CanvasGroup contentGroup = tabBackground != null ? tabBackground.GetComponent<CanvasGroup>() : null;
@@ -1076,6 +1089,11 @@ public class MenuManager : MonoBehaviour
         return !string.IsNullOrWhiteSpace(menuContentAppearStateName);
     }
 
+    private bool HasContentPreCloseAnimation()
+    {
+        return !string.IsNullOrWhiteSpace(menuContentPreCloseStateName);
+    }
+
     private float PlayPostOpenAnimation()
     {
         if (!HasPostOpenAnimation())
@@ -1114,6 +1132,47 @@ public class MenuManager : MonoBehaviour
         return GetAnimatorAnimationDuration(menuContentAnimator, menuContentAppearStateName, menuContentAppearFallbackDuration);
     }
 
+    private IEnumerator RunContentPreCloseAnimation()
+    {
+        if (!HasContentPreCloseAnimation())
+            yield break;
+
+        PrepareContentAppearAnimationObject();
+
+        if (!TryGetAnimatorStateHash(menuContentAnimator, menuContentPreCloseStateName, out int stateHash))
+        {
+            HideContentAppearAnimation();
+            yield break;
+        }
+
+        float duration = GetAnimatorAnimationDuration(menuContentAnimator, menuContentPreCloseStateName, menuContentAppearFallbackDuration);
+        if (duration <= 0f)
+        {
+            menuContentAnimator.Play(stateHash, 0, 0f);
+            menuContentAnimator.Update(0f);
+            HideContentAppearAnimation();
+            yield break;
+        }
+
+        menuContentAnimator.enabled = true;
+        menuContentAnimator.updateMode = AnimatorUpdateMode.UnscaledTime;
+        menuContentAnimator.speed = 0f;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            float normalizedTime = 1f - Mathf.Clamp01(elapsed / duration);
+            menuContentAnimator.Play(stateHash, 0, normalizedTime);
+            menuContentAnimator.Update(0f);
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        menuContentAnimator.Play(stateHash, 0, 0f);
+        menuContentAnimator.Update(0f);
+        HideContentAppearAnimation();
+    }
+
     private void PrepareContentAppearAnimationObject()
     {
         if (menuContentAnimator == null)
@@ -1145,6 +1204,7 @@ public class MenuManager : MonoBehaviour
         if (contentAppearImage != null)
             contentAppearImage.enabled = false;
 
+        menuContentAnimator.speed = 1f;
         menuContentAnimator.enabled = false;
     }
 
@@ -1247,6 +1307,9 @@ public class MenuManager : MonoBehaviour
 
     private IEnumerator RunCloseMenuAnimation(PlayerControls controls)
     {
+        yield return RunContentPreCloseAnimation();
+        HideCurrentTabBackground();
+
         float preCloseAnimationDuration = PlayPreCloseAnimation();
         if (preCloseAnimationDuration > 0f)
             yield return new WaitForSecondsRealtime(preCloseAnimationDuration);
@@ -1343,24 +1406,14 @@ public class MenuManager : MonoBehaviour
 
         animator.enabled = true;
         animator.updateMode = AnimatorUpdateMode.UnscaledTime;
+        animator.speed = 1f;
 
-        string[] candidates = BuildAnimatorStateCandidates(stateName);
-        for (int i = 0; i < candidates.Length; i++)
-        {
-            string candidate = candidates[i];
-            if (string.IsNullOrWhiteSpace(candidate))
-                continue;
+        if (!TryGetAnimatorStateHash(animator, stateName, out int stateHash))
+            return false;
 
-            int stateHash = Animator.StringToHash(GetAnimatorStatePath(candidate));
-            if (!animator.HasState(0, stateHash))
-                continue;
-
-            animator.Play(stateHash, 0, 0f);
-            animator.Update(0f);
-            return true;
-        }
-
-        return false;
+        animator.Play(stateHash, 0, 0f);
+        animator.Update(0f);
+        return true;
     }
 
     private float GetMenuAnimationDuration(string clipName, float fallbackDuration)
@@ -1389,6 +1442,30 @@ public class MenuManager : MonoBehaviour
         }
 
         return Mathf.Max(0f, fallbackDuration);
+    }
+
+    private static bool TryGetAnimatorStateHash(Animator animator, string stateName, out int stateHash)
+    {
+        stateHash = 0;
+        if (animator == null || animator.runtimeAnimatorController == null || string.IsNullOrWhiteSpace(stateName))
+            return false;
+
+        string[] candidates = BuildAnimatorStateCandidates(stateName);
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            string candidate = candidates[i];
+            if (string.IsNullOrWhiteSpace(candidate))
+                continue;
+
+            int candidateHash = Animator.StringToHash(GetAnimatorStatePath(candidate));
+            if (!animator.HasState(0, candidateHash))
+                continue;
+
+            stateHash = candidateHash;
+            return true;
+        }
+
+        return false;
     }
 
     private static string GetAnimatorStatePath(string stateName)
