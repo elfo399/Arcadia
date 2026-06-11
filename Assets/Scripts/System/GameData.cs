@@ -71,6 +71,11 @@ public class SavedPlayerInventoryData
 [System.Serializable]
 public class GameData
 {
+    // Selected character archetype. The start package is applied once, then the
+    // normal runtime stats/inventory become authoritative.
+    public string selectedCharacterId;
+    public bool selectedCharacterStartApplied;
+
     // Leveling
     public int playerLevel;
     public int levelExperience;

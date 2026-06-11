@@ -127,6 +127,11 @@ public partial class QuestManager : MonoBehaviour
             NotifyChanged();
     }
 
+    public void ResetToInitialQuests(bool notify = true)
+    {
+        ReplaceAllQuests(initialQuests, notify);
+    }
+
     public void AddOrUpdateQuest(string questId, string title, string location, bool completed = false, bool notify = true)
     {
         string normalizedId = NormalizeQuestId(questId, title, location);

@@ -32,7 +32,10 @@ public class AttributesUIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI attributesMagicDefValueText;
     [SerializeField] private TextMeshProUGUI attributesLoadValueText;
     [SerializeField] private TextMeshProUGUI attributesLoadTierValueText;
+    [SerializeField] private Image playerPortraitImage;
     [SerializeField] private Scrollbar attributesLoadScrollbar;
+    [SerializeField] private PlayerCharacterDatabase playerCharacterDatabase;
+    [SerializeField] private bool hidePlayerPortraitWhenMissing = true;
     [SerializeField] private Color attributesSelectedColor = new Color(1f, 0.85f, 0.2f, 1f);
     [SerializeField] private Color attributesNormalColor = Color.white;
     [SerializeField] private List<AttributeRowBinding> attributeRows = new();
@@ -44,6 +47,8 @@ public class AttributesUIManager : MonoBehaviour
     private bool attributesUiInitialized;
     private int attributesPadIndex;
     private bool showPadFocus;
+    private string lastDisplayedCharacterId;
+    private Sprite lastDisplayedPlayerPortrait;
 
     public void Initialize()
     {
@@ -108,6 +113,7 @@ public class AttributesUIManager : MonoBehaviour
         SetReadOnlyScrollbar(attributesLoadScrollbar);
         RefreshAttributeRowsValues();
         RefreshAttributeDerivedPanel();
+        RefreshPlayerPortrait();
         RefreshAttributeSelectionVisual();
     }
 
@@ -189,6 +195,40 @@ public class AttributesUIManager : MonoBehaviour
 
     private void CachePlayerController()
     {
+    }
+
+    private void RefreshPlayerPortrait()
+    {
+        if (playerPortraitImage == null)
+            return;
+
+        PlayerCharacterData character = ResolveSelectedCharacter();
+        string characterId = character != null ? character.GetCharacterId() : string.Empty;
+        Sprite portrait = character != null ? character.portrait : null;
+
+        if (characterId == lastDisplayedCharacterId && portrait == lastDisplayedPlayerPortrait)
+            return;
+
+        playerPortraitImage.sprite = portrait;
+        playerPortraitImage.enabled = portrait != null || !hidePlayerPortraitWhenMissing;
+        lastDisplayedCharacterId = characterId;
+        lastDisplayedPlayerPortrait = portrait;
+    }
+
+    private PlayerCharacterData ResolveSelectedCharacter()
+    {
+        if (playerCharacterDatabase == null)
+            playerCharacterDatabase = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
+
+        if (playerCharacterDatabase == null)
+            return null;
+
+        CachePlayerStats();
+        string selectedCharacterId = playerStats != null ? playerStats.SelectedCharacterId : string.Empty;
+        if (string.IsNullOrWhiteSpace(selectedCharacterId))
+            selectedCharacterId = PlayerCharacterSelection.GetSelectedCharacterId();
+
+        return playerCharacterDatabase.GetById(selectedCharacterId);
     }
 
     private void AutoWireAttributesUIReferences()

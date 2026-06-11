@@ -218,6 +218,7 @@ public class MenuManager : MonoBehaviour
         {
             inventoryUIManager?.RefreshSourceItemsFromPlayer();
             equipmentManager?.CloseEquipGrid();
+            equipmentManager?.RefreshEquipmentCross();
             equipmentManager?.FocusEquipmentCrossDefault();
         }
 

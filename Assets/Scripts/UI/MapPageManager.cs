@@ -1,6 +1,7 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class MapPageManager : MonoBehaviour
 {
@@ -11,8 +12,10 @@ public class MapPageManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI playerNameText;
     [SerializeField] private TextMeshProUGUI weatherText;
     [SerializeField] private TextMeshProUGUI runTimerText;
+    [SerializeField] private Image playerPortraitImage;
     [SerializeField] private TMP_InputField playerNameInput;
     [SerializeField] private RectTransform mapContainer;
+    [SerializeField] private PlayerCharacterDatabase playerCharacterDatabase;
     [SerializeField] private string floorFormat = "Floor {0}";
     [SerializeField] private string themeFormat = "{0}";
     [SerializeField] private string playerNameFormat = "{0}";
@@ -25,6 +28,7 @@ public class MapPageManager : MonoBehaviour
     [SerializeField] private float mapMaxScale = 0.85f;
     [SerializeField] private bool showFullMapForTesting = true;
     [SerializeField] private bool matchBookPageRoomBackground = true;
+    [SerializeField] private bool hidePlayerPortraitWhenMissing = true;
     [SerializeField] private Color bookPageRoomBackgroundColor = new Color(0.93f, 0.70f, 0.48f, 1f);
 
     private CoreGenerator subscribedGenerator;
@@ -32,6 +36,8 @@ public class MapPageManager : MonoBehaviour
     private TMP_InputField subscribedPlayerNameInput;
     private string lastDisplayedPlayerName;
     private string lastDisplayedWeather;
+    private string lastDisplayedCharacterId;
+    private Sprite lastDisplayedPlayerPortrait;
     private int lastDisplayedRunSeconds = int.MinValue;
     private const int RunTimerStartSeconds = 0;
 
@@ -85,12 +91,14 @@ public class MapPageManager : MonoBehaviour
         {
             ApplyTexts(0, string.Empty);
             ApplyRunInfoTexts(forceRefresh: true);
+            ApplyPlayerPortrait(forceRefresh: true);
             RefreshMap();
             return;
         }
 
         ApplyTexts(generator.CurrentFloor, generator.ActiveThemeDisplayName);
         ApplyRunInfoTexts(forceRefresh: true);
+        ApplyPlayerPortrait(forceRefresh: true);
         RefreshMap();
     }
 
@@ -165,6 +173,28 @@ public class MapPageManager : MonoBehaviour
         }
     }
 
+    private void ApplyPlayerPortrait(bool forceRefresh = false)
+    {
+        if (playerPortraitImage == null)
+            return;
+
+        PlayerCharacterData character = ResolveSelectedCharacter();
+        string characterId = character != null ? character.GetCharacterId() : string.Empty;
+        Sprite portrait = character != null ? character.portrait : null;
+
+        if (!forceRefresh
+            && characterId == lastDisplayedCharacterId
+            && portrait == lastDisplayedPlayerPortrait)
+        {
+            return;
+        }
+
+        playerPortraitImage.sprite = portrait;
+        playerPortraitImage.enabled = portrait != null || !hidePlayerPortraitWhenMissing;
+        lastDisplayedCharacterId = characterId;
+        lastDisplayedPlayerPortrait = portrait;
+    }
+
     public void SetPlayerName(string value)
     {
         defaultPlayerName = value;
@@ -184,6 +214,27 @@ public class MapPageManager : MonoBehaviour
 
         if (weatherManager == null)
             weatherManager = WeatherManager.Instance;
+
+        if (playerCharacterDatabase == null)
+            playerCharacterDatabase = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
+    }
+
+    private PlayerCharacterData ResolveSelectedCharacter()
+    {
+        if (playerCharacterDatabase == null)
+            playerCharacterDatabase = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
+
+        if (playerCharacterDatabase == null)
+            return null;
+
+        string selectedCharacterId = PlayerStats.instance != null
+            ? PlayerStats.instance.SelectedCharacterId
+            : string.Empty;
+
+        if (string.IsNullOrWhiteSpace(selectedCharacterId))
+            selectedCharacterId = PlayerCharacterSelection.GetSelectedCharacterId();
+
+        return playerCharacterDatabase.GetById(selectedCharacterId);
     }
 
     private void SubscribeToGenerator()
