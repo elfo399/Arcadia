@@ -1096,16 +1096,16 @@ public class PlayerInventory : MonoBehaviour
         }
         // Fallback: se il save non contiene item, mantieni quelli iniziali (startingLoadout).
 
-        // Se il save non ha slot validi, mantieni il loadout iniziale già costruito in Awake().
-        if (HasAnyValidWeaponSlot(data.rightLoadout, lookups.weapons))
+        // Se il save contiene slot, questi sovrascrivono lo startingLoadout anche quando sono vuoti.
+        if (HasSavedLoadoutSlots(data.rightLoadout))
             DeserializeWeaponLoadout(data.rightLoadout, rightLoadout, rightInstanceIds, lookups.weapons);
-        if (HasAnyValidWeaponSlot(data.leftLoadout, lookups.weapons))
+        if (HasSavedLoadoutSlots(data.leftLoadout))
             DeserializeWeaponLoadout(data.leftLoadout, leftLoadout, leftInstanceIds, lookups.weapons);
-        if (HasAnyValidMagicSlot(data.magicLoadout, lookups.magics))
+        if (HasSavedLoadoutSlots(data.magicLoadout))
             DeserializeMagicLoadout(data.magicLoadout, magicLoadout, magicInstanceIds, lookups.magics);
-        if (HasAnyValidUsableSlot(data.usableLoadout, lookups.usables))
+        if (HasSavedLoadoutSlots(data.usableLoadout))
             DeserializeUsableLoadout(data.usableLoadout, usableLoadout, usableInstanceIds, lookups.usables);
-        if (HasAnyValidArmorSlot(data.armorLoadout, lookups.armors))
+        if (HasSavedLoadoutSlots(data.armorLoadout))
             DeserializeArmorLoadout(data.armorLoadout, armorLoadout, armorInstanceIds, lookups.armors);
         EnsureLoadoutInstancesInInventory();
 
@@ -1113,6 +1113,7 @@ public class PlayerInventory : MonoBehaviour
         currentLeftIndex = Mathf.Clamp(data.currentLeftIndex, 0, leftLoadout.Length - 1);
         currentMagicIndex = Mathf.Clamp(data.currentMagicIndex, 0, magicLoadout.Length - 1);
         currentUsableIndex = Mathf.Clamp(data.currentUsableIndex, 0, usableLoadout.Length - 1);
+        SyncMagicInventorySlots();
         SyncEquippedReferences();
     }
 
@@ -1556,6 +1557,11 @@ public class PlayerInventory : MonoBehaviour
             string key = it.name.Trim().ToLowerInvariant();
             if (!lookup.ContainsKey(key)) lookup.Add(key, it);
         }
+    }
+
+    private static bool HasSavedLoadoutSlots(SavedLoadoutSlotData[] source)
+    {
+        return source != null && source.Length > 0;
     }
 
     private static bool HasAnyValidWeaponSlot(SavedLoadoutSlotData[] source, Dictionary<string, WeaponItem> weaponLookup)

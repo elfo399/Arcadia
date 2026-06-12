@@ -10,12 +10,15 @@ public static class PlayerCharacterSelection
 
     public static string GetSelectedCharacterId()
     {
+        string storedId = PlayerPrefs.GetString(PlayerPrefsSelectedCharacterKey, string.Empty);
+        if (!string.IsNullOrWhiteSpace(storedId))
+            return storedId;
+
         GameData data = SaveSystem.LoadData();
         if (data != null && !string.IsNullOrWhiteSpace(data.selectedCharacterId))
             return data.selectedCharacterId;
 
-        string storedId = PlayerPrefs.GetString(PlayerPrefsSelectedCharacterKey, string.Empty);
-        return string.IsNullOrWhiteSpace(storedId) ? DefaultCharacterId : storedId;
+        return DefaultCharacterId;
     }
 
     public static void StartNewCharacter(PlayerCharacterData character)
@@ -26,21 +29,35 @@ public static class PlayerCharacterSelection
             return;
         }
 
-        StartNewCharacter(character.GetCharacterId());
+        StartNewCharacter(character.GetCharacterId(), character.displayName);
     }
 
     public static void StartNewCharacter(string characterId)
     {
+        StartNewCharacter(characterId, null);
+    }
+
+    private static void StartNewCharacter(string characterId, string characterName)
+    {
         string resolvedId = string.IsNullOrWhiteSpace(characterId) ? DefaultCharacterId : characterId.Trim();
+        string resolvedName = string.IsNullOrWhiteSpace(characterName) ? resolvedId : characterName.Trim();
+
+        if (PlayerStats.instance != null)
+            PlayerStats.instance.SaveStatsImmediate();
+
         pendingNewCharacterId = resolvedId;
         PlayerPrefs.SetString(PlayerPrefsSelectedCharacterKey, resolvedId);
         PlayerPrefs.Save();
 
-        SaveSystem.SaveData(new GameData
+        if (!SaveSystem.HasData(resolvedId))
         {
-            selectedCharacterId = resolvedId,
-            selectedCharacterStartApplied = false
-        });
+            SaveSystem.SaveData(new GameData
+            {
+                selectedCharacterId = resolvedId,
+                characterName = resolvedName,
+                selectedCharacterStartApplied = false
+            });
+        }
     }
 
     internal static void ClearPendingNewCharacter(string characterId)

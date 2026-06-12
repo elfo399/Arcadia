@@ -33,6 +33,8 @@ public class AttributesUIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI attributesLoadValueText;
     [SerializeField] private TextMeshProUGUI attributesLoadTierValueText;
     [SerializeField] private Image playerPortraitImage;
+    [SerializeField] private TextMeshProUGUI playerNameText;
+    [SerializeField] private string playerNameFormat = "{0}";
     [SerializeField] private Scrollbar attributesLoadScrollbar;
     [SerializeField] private PlayerCharacterDatabase playerCharacterDatabase;
     [SerializeField] private bool hidePlayerPortraitWhenMissing = true;
@@ -49,6 +51,7 @@ public class AttributesUIManager : MonoBehaviour
     private bool showPadFocus;
     private string lastDisplayedCharacterId;
     private Sprite lastDisplayedPlayerPortrait;
+    private string lastDisplayedPlayerName;
 
     public void Initialize()
     {
@@ -63,15 +66,15 @@ public class AttributesUIManager : MonoBehaviour
         {
             var row = attributeRows[i];
             if (row == null) continue;
-            if (autoWireAttributesUI && row.root == null && !string.IsNullOrWhiteSpace(row.key) && attributesRoot != null)
+            if (row.root == null && !string.IsNullOrWhiteSpace(row.key) && attributesRoot != null)
                 row.root = FindDeepChildByName(attributesRoot, row.key);
             if (row.root == null) continue;
 
             if (string.IsNullOrWhiteSpace(row.key)) row.key = row.root.name;
-            if (autoWireAttributesUI && row.labelText == null) row.labelText = FindDeepTextByName(row.root, "Txt");
-            if (autoWireAttributesUI && row.valueText == null) row.valueText = FindDeepTextByName(row.root, "Value");
-            if (autoWireAttributesUI && row.descText == null) row.descText = FindDeepTextByName(row.root, "Desc");
-            if (autoWireAttributesUI && row.addButton == null)
+            if (row.labelText == null) row.labelText = FindDeepTextByName(row.root, "Txt");
+            if (row.valueText == null) row.valueText = FindDeepTextByName(row.root, "Value");
+            if (row.descText == null) row.descText = FindDeepTextByName(row.root, "Desc");
+            if (row.addButton == null)
             {
                 var btnTf = FindDeepChildByName(row.root, "Button");
                 if (btnTf != null) row.addButton = btnTf.GetComponent<Button>();
@@ -114,6 +117,7 @@ public class AttributesUIManager : MonoBehaviour
         RefreshAttributeRowsValues();
         RefreshAttributeDerivedPanel();
         RefreshPlayerPortrait();
+        RefreshPlayerName();
         RefreshAttributeSelectionVisual();
     }
 
@@ -213,6 +217,55 @@ public class AttributesUIManager : MonoBehaviour
         playerPortraitImage.enabled = portrait != null || !hidePlayerPortraitWhenMissing;
         lastDisplayedCharacterId = characterId;
         lastDisplayedPlayerPortrait = portrait;
+    }
+
+    private void RefreshPlayerName()
+    {
+        if (playerNameText == null)
+            return;
+
+        PlayerCharacterData character = ResolveSelectedCharacter();
+        string resolvedName = ResolveSelectedCharacterName(character);
+        string formattedName = FormatText(playerNameFormat, resolvedName);
+
+        if (formattedName == lastDisplayedPlayerName)
+            return;
+
+        playerNameText.text = formattedName;
+        lastDisplayedPlayerName = formattedName;
+    }
+
+    private string ResolveSelectedCharacterName(PlayerCharacterData character)
+    {
+        CachePlayerStats();
+        if (playerStats != null && !string.IsNullOrWhiteSpace(playerStats.CharacterName))
+            return playerStats.CharacterName.Trim();
+
+        if (character != null)
+        {
+            if (!string.IsNullOrWhiteSpace(character.displayName))
+                return character.displayName.Trim();
+
+            return character.GetCharacterId();
+        }
+
+        string selectedCharacterId = PlayerCharacterSelection.GetSelectedCharacterId();
+        return string.IsNullOrWhiteSpace(selectedCharacterId) ? "Player" : selectedCharacterId.Trim();
+    }
+
+    private static string FormatText(string format, object value)
+    {
+        if (string.IsNullOrEmpty(format))
+            return value?.ToString() ?? string.Empty;
+
+        try
+        {
+            return string.Format(format, value);
+        }
+        catch (System.FormatException)
+        {
+            return value?.ToString() ?? string.Empty;
+        }
     }
 
     private PlayerCharacterData ResolveSelectedCharacter()

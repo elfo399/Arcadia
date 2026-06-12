@@ -197,7 +197,10 @@ public class MapPageManager : MonoBehaviour
 
     public void SetPlayerName(string value)
     {
-        defaultPlayerName = value;
+        defaultPlayerName = string.IsNullOrWhiteSpace(value) ? defaultPlayerName : value.Trim();
+        if (PlayerStats.instance != null && !string.IsNullOrWhiteSpace(value))
+            PlayerStats.instance.SetCharacterName(value);
+
         ApplyRunInfoTexts(forceRefresh: true);
     }
 
@@ -309,7 +312,13 @@ public class MapPageManager : MonoBehaviour
 
     private void HandlePlayerNameInputChanged(string value)
     {
-        defaultPlayerName = value;
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            defaultPlayerName = value.Trim();
+            if (PlayerStats.instance != null)
+                PlayerStats.instance.SetCharacterName(defaultPlayerName);
+        }
+
         ApplyRunInfoTexts(forceRefresh: true);
     }
 
@@ -330,6 +339,18 @@ public class MapPageManager : MonoBehaviour
 
     private string ResolvePlayerName()
     {
+        if (PlayerStats.instance != null && !string.IsNullOrWhiteSpace(PlayerStats.instance.CharacterName))
+            return PlayerStats.instance.CharacterName.Trim();
+
+        PlayerCharacterData character = ResolveSelectedCharacter();
+        if (character != null)
+        {
+            if (!string.IsNullOrWhiteSpace(character.displayName))
+                return character.displayName.Trim();
+
+            return character.GetCharacterId();
+        }
+
         string inputName = playerNameInput != null ? playerNameInput.text : null;
         string resolvedName = string.IsNullOrWhiteSpace(inputName) ? defaultPlayerName : inputName;
         return string.IsNullOrWhiteSpace(resolvedName) ? "Player" : resolvedName.Trim();

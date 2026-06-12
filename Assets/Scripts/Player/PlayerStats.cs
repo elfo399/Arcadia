@@ -83,6 +83,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private Animator animator;
     private GameData loadedDataCache;
     private string selectedCharacterId;
+    private string characterName;
     private bool selectedCharacterStartApplied;
     private bool loadedQuestStateApplied = false;
     private bool loadedInventoryStateApplied = false;
@@ -109,6 +110,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public int TotalArmorMagicDefense => totalArmorMagicDefense;
     public float TotalArmorWeight => totalArmorWeight;
     public string SelectedCharacterId => selectedCharacterId;
+    public string CharacterName => ResolveCharacterName();
     public bool HasInspectorStartingCharacter => useInspectorStartingCharacter && inspectorStartingCharacter != null;
 
     void Awake()
@@ -446,11 +448,13 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     private void PerformSave()
     {
+        bool questStateWasApplied = loadedQuestStateApplied;
+        bool inventoryStateWasApplied = loadedInventoryStateApplied;
         GameData data = BuildGameDataSnapshot();
         SaveSystem.SaveData(data);
         loadedDataCache = data;
-        loadedQuestStateApplied = true;
-        loadedInventoryStateApplied = true;
+        loadedQuestStateApplied = questStateWasApplied;
+        loadedInventoryStateApplied = inventoryStateWasApplied;
         lastSaveRealtime = Time.unscaledTime;
     }
 
@@ -459,6 +463,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         GameData data = new GameData
         {
             selectedCharacterId = this.selectedCharacterId,
+            characterName = ResolveCharacterName(),
             selectedCharacterStartApplied = this.selectedCharacterStartApplied,
             playerLevel = this.playerLevel,
             levelExperience = this.levelExperience,
@@ -481,35 +486,58 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         var questManager = GetCachedQuestManager();
         if (questManager != null)
-            data.quests = SerializeQuests(questManager.GetQuestsSnapshot());
+        {
+            data.quests = !loadedQuestStateApplied && loadedDataCache != null && loadedDataCache.quests != null
+                ? loadedDataCache.quests
+                : SerializeQuests(questManager.GetQuestsSnapshot());
+        }
+        else if (loadedDataCache != null && loadedDataCache.quests != null)
+        {
+            data.quests = loadedDataCache.quests;
+        }
 
         var playerInventory = GetCachedPlayerInventory();
         if (playerInventory != null)
-            data.playerInventory = playerInventory.CreateSaveData();
+        {
+            data.playerInventory = !loadedInventoryStateApplied && loadedDataCache != null && loadedDataCache.playerInventory != null
+                ? loadedDataCache.playerInventory
+                : playerInventory.CreateSaveData();
+        }
+        else if (loadedDataCache != null && loadedDataCache.playerInventory != null)
+        {
+            data.playerInventory = loadedDataCache.playerInventory;
+        }
 
         return data;
     }
 
     public void LoadStats()
     {
-        if (forceStartDataIgnoreSave)
+        string requestedCharacterId = PlayerCharacterSelection.GetSelectedCharacterId();
+        GameData data = SaveSystem.LoadData(requestedCharacterId);
+
+        if (forceStartDataIgnoreSave && data == null)
         {
             loadedDataCache = null;
             selectedCharacterId = string.Empty;
+            characterName = string.Empty;
             selectedCharacterStartApplied = false;
             loadedQuestStateApplied = true;
             loadedInventoryStateApplied = true;
-            Debug.Log("ForceStartData attivo: caricamento save ignorato, uso dati iniziali da Inspector/StartingLoadout.");
+            Debug.Log("ForceStartData attivo e nessun salvataggio trovato: uso dati iniziali da Inspector/StartingLoadout.");
             return;
         }
 
-        GameData data = SaveSystem.LoadData();
+        if (forceStartDataIgnoreSave)
+            Debug.LogWarning("ForceStartData attivo, ma esiste un salvataggio: carico il salvataggio per evitare reset involontari.");
+
         loadedDataCache = data;
         loadedQuestStateApplied = false;
         loadedInventoryStateApplied = false;
         if (data != null)
         {
-            selectedCharacterId = data.selectedCharacterId;
+            selectedCharacterId = !string.IsNullOrWhiteSpace(data.selectedCharacterId) ? data.selectedCharacterId : requestedCharacterId;
+            characterName = ResolveLoadedCharacterName(data.characterName, selectedCharacterId);
             selectedCharacterStartApplied = data.selectedCharacterStartApplied;
             this.playerLevel = Mathf.Max(1, data.playerLevel > 0 ? data.playerLevel : this.playerLevel);
             this.levelExperience = Mathf.Max(0, data.levelExperience);
@@ -538,9 +566,41 @@ public class PlayerStats : MonoBehaviour, IDamageable
         else
         {
             selectedCharacterId = string.Empty;
+            characterName = string.Empty;
             selectedCharacterStartApplied = false;
             Debug.Log("Nessun file di salvataggio trovato. Verranno usati i valori correnti (da Inspector alla prima esecuzione).");
         }
+    }
+
+    private void ApplyLoadedCharacterData(GameData data, string fallbackCharacterId)
+    {
+        if (data == null)
+            return;
+
+        loadedDataCache = data;
+        loadedQuestStateApplied = false;
+        loadedInventoryStateApplied = false;
+
+        selectedCharacterId = !string.IsNullOrWhiteSpace(data.selectedCharacterId) ? data.selectedCharacterId : fallbackCharacterId;
+        characterName = ResolveLoadedCharacterName(data.characterName, selectedCharacterId);
+        selectedCharacterStartApplied = data.selectedCharacterStartApplied;
+        this.playerLevel = Mathf.Max(1, data.playerLevel > 0 ? data.playerLevel : this.playerLevel);
+        this.levelExperience = Mathf.Max(0, data.levelExperience);
+        this.experienceToNextLevel = Mathf.Max(1, data.experienceToNextLevel > 0 ? data.experienceToNextLevel : this.experienceToNextLevel);
+        this.unspentAttributePoints = Mathf.Max(0, data.unspentAttributePoints);
+        this.vigor = data.vigor > 0 ? data.vigor : this.vigor;
+        this.mind = data.mind > 0 ? data.mind : this.mind;
+        this.endurance = data.endurance > 0 ? data.endurance : this.endurance;
+        this.strength = data.strength > 0 ? data.strength : this.strength;
+        this.dexterity = data.dexterity > 0 ? data.dexterity : this.dexterity;
+        this.intelligence = data.intelligence > 0 ? data.intelligence : this.intelligence;
+        this.faith = data.faith > 0 ? data.faith : this.faith;
+        this.karma = data.karma;
+        this.benedetto = data.benedetto;
+        this.malefico = data.malefico;
+        this.bankGold = data.bankGold;
+        this.bankSilver = data.bankSilver;
+        this.bankCopper = data.bankCopper;
     }
 
     public bool TryApplySelectedCharacterStart(PlayerCharacterDatabase database)
@@ -551,11 +611,31 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         string pendingCharacterId = PlayerCharacterSelection.PendingNewCharacterId;
         bool hasPendingNewCharacter = !string.IsNullOrWhiteSpace(pendingCharacterId);
-        bool hasLoadedSave = !forceStartDataIgnoreSave && loadedDataCache != null;
+        if (hasPendingNewCharacter)
+        {
+            GameData pendingData = SaveSystem.LoadData(pendingCharacterId);
+            if (pendingData != null && pendingData.selectedCharacterStartApplied)
+            {
+                ApplyLoadedCharacterData(pendingData, pendingCharacterId);
+                PlayerCharacterSelection.ClearPendingNewCharacter(selectedCharacterId);
+                RecalculateDerivedStats(keepCurrentRatio: true);
+                RefreshArmorTotals();
+                UpdateAllUI();
+                NotifyBankChanged();
+                NotifyRunWalletChanged();
+                NotifyKeysChanged();
+                ApplyLoadedQuestStateIfPossible();
+                ApplyLoadedInventoryStateIfPossible();
+                return true;
+            }
+        }
+
+        bool hasLoadedSave = loadedDataCache != null;
+        bool forceInspectorStart = forceStartDataIgnoreSave && !hasLoadedSave;
         bool shouldUseInspectorCharacter = hasInspectorCharacter
             && !hasPendingNewCharacter
             && !inspectorStartingCharacterAppliedThisSession
-            && (forceStartDataIgnoreSave
+            && (forceInspectorStart
                 || resetSaveFromInspectorCharacterOnPlay
                 || !hasLoadedSave
                 || !loadedDataCache.selectedCharacterStartApplied
@@ -601,6 +681,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             return;
 
         selectedCharacterId = character.GetCharacterId();
+        characterName = ResolveCharacterDisplayName(character);
 
         playerLevel = Mathf.Max(1, character.startingLevel);
         levelExperience = 0;
@@ -651,6 +732,55 @@ public class PlayerStats : MonoBehaviour, IDamageable
         NotifyRunWalletChanged();
         NotifyBankChanged();
         NotifyKeysChanged();
+    }
+
+    public void SetCharacterName(string value, bool save = true)
+    {
+        string resolvedName = string.IsNullOrWhiteSpace(value) ? ResolveCharacterName() : value.Trim();
+        if (string.Equals(characterName, resolvedName, StringComparison.Ordinal))
+            return;
+
+        characterName = resolvedName;
+        if (save)
+            SaveStats();
+    }
+
+    private string ResolveCharacterName()
+    {
+        if (!string.IsNullOrWhiteSpace(characterName))
+            return characterName.Trim();
+
+        return ResolveLoadedCharacterName(string.Empty, selectedCharacterId);
+    }
+
+    private string ResolveLoadedCharacterName(string savedName, string fallbackCharacterId)
+    {
+        if (!string.IsNullOrWhiteSpace(savedName))
+            return savedName.Trim();
+
+        PlayerCharacterData character = ResolveCharacterDataById(fallbackCharacterId);
+        string displayName = ResolveCharacterDisplayName(character);
+        if (!string.IsNullOrWhiteSpace(displayName))
+            return displayName;
+
+        return string.IsNullOrWhiteSpace(fallbackCharacterId) ? "Player" : fallbackCharacterId.Trim();
+    }
+
+    private static string ResolveCharacterDisplayName(PlayerCharacterData character)
+    {
+        if (character == null)
+            return string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(character.displayName))
+            return character.displayName.Trim();
+
+        return character.GetCharacterId();
+    }
+
+    private static PlayerCharacterData ResolveCharacterDataById(string characterId)
+    {
+        PlayerCharacterDatabase database = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
+        return database != null ? database.GetById(characterId) : null;
     }
 
 
