@@ -237,7 +237,31 @@ public class MapPageManager : MonoBehaviour
         if (string.IsNullOrWhiteSpace(selectedCharacterId))
             selectedCharacterId = PlayerCharacterSelection.GetSelectedCharacterId();
 
-        return playerCharacterDatabase.GetById(selectedCharacterId);
+        PlayerCharacterData explicitMatch = ResolveCharacterById(selectedCharacterId);
+        return explicitMatch != null ? explicitMatch : playerCharacterDatabase.GetById(selectedCharacterId);
+    }
+
+    private PlayerCharacterData ResolveCharacterById(string characterId)
+    {
+        if (playerCharacterDatabase == null || string.IsNullOrWhiteSpace(characterId))
+            return null;
+
+        var characters = playerCharacterDatabase.Characters;
+        if (characters == null)
+            return null;
+
+        string normalizedId = characterId.Trim();
+        for (int i = 0; i < characters.Length; i++)
+        {
+            var candidate = characters[i];
+            if (candidate == null)
+                continue;
+
+            if (string.Equals(candidate.GetCharacterId(), normalizedId, StringComparison.OrdinalIgnoreCase))
+                return candidate;
+        }
+
+        return null;
     }
 
     private void SubscribeToGenerator()
@@ -339,9 +363,6 @@ public class MapPageManager : MonoBehaviour
 
     private string ResolvePlayerName()
     {
-        if (PlayerStats.instance != null && !string.IsNullOrWhiteSpace(PlayerStats.instance.CharacterName))
-            return PlayerStats.instance.CharacterName.Trim();
-
         PlayerCharacterData character = ResolveSelectedCharacter();
         if (character != null)
         {
@@ -350,6 +371,9 @@ public class MapPageManager : MonoBehaviour
 
             return character.GetCharacterId();
         }
+
+        if (PlayerStats.instance != null && !string.IsNullOrWhiteSpace(PlayerStats.instance.CharacterName))
+            return PlayerStats.instance.CharacterName.Trim();
 
         string inputName = playerNameInput != null ? playerNameInput.text : null;
         string resolvedName = string.IsNullOrWhiteSpace(inputName) ? defaultPlayerName : inputName;

@@ -238,8 +238,13 @@ public class AttributesUIManager : MonoBehaviour
     private string ResolveSelectedCharacterName(PlayerCharacterData character)
     {
         CachePlayerStats();
-        if (playerStats != null && !string.IsNullOrWhiteSpace(playerStats.CharacterName))
-            return playerStats.CharacterName.Trim();
+        string selectedCharacterId = playerStats != null ? playerStats.SelectedCharacterId : string.Empty;
+        if (string.IsNullOrWhiteSpace(selectedCharacterId))
+            selectedCharacterId = PlayerCharacterSelection.GetSelectedCharacterId();
+
+        PlayerCharacterData selectedCharacter = ResolveCharacterById(selectedCharacterId);
+        if (selectedCharacter != null)
+            character = selectedCharacter;
 
         if (character != null)
         {
@@ -249,8 +254,36 @@ public class AttributesUIManager : MonoBehaviour
             return character.GetCharacterId();
         }
 
-        string selectedCharacterId = PlayerCharacterSelection.GetSelectedCharacterId();
+        if (playerStats != null && !string.IsNullOrWhiteSpace(playerStats.CharacterName))
+            return playerStats.CharacterName.Trim();
+
         return string.IsNullOrWhiteSpace(selectedCharacterId) ? "Player" : selectedCharacterId.Trim();
+    }
+
+    private PlayerCharacterData ResolveCharacterById(string characterId)
+    {
+        if (playerCharacterDatabase == null)
+            playerCharacterDatabase = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
+
+        if (playerCharacterDatabase == null || string.IsNullOrWhiteSpace(characterId))
+            return null;
+
+        var characters = playerCharacterDatabase.Characters;
+        if (characters == null)
+            return null;
+
+        string normalizedId = characterId.Trim();
+        for (int i = 0; i < characters.Length; i++)
+        {
+            var candidate = characters[i];
+            if (candidate == null)
+                continue;
+
+            if (string.Equals(candidate.GetCharacterId(), normalizedId, System.StringComparison.OrdinalIgnoreCase))
+                return candidate;
+        }
+
+        return null;
     }
 
     private static string FormatText(string format, object value)

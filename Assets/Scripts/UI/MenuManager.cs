@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Cinemachine;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -91,7 +92,11 @@ public class MenuManager : MonoBehaviour
         ResetMenuAnimatorPlayback();
 
         if (inventoryPanel != null)
+        {
+            SetInventoryPanelInteraction(false);
+            SetInventorySlotInputEnabled(false);
             inventoryPanel.SetActive(false);
+        }
 
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
@@ -572,6 +577,8 @@ public class MenuManager : MonoBehaviour
         if (inventoryPanel != null)
         {
             inventoryPanel.SetActive(true);
+            SetInventoryPanelInteraction(true);
+            SetInventorySlotInputEnabled(true);
             HideAllTabBackgrounds();
             StartOpenMenuAnimation();
         }
@@ -613,6 +620,11 @@ public class MenuManager : MonoBehaviour
         isMenuOpening = false;
         isMenuPageFlipping = false;
         ResetMenuAnimatorPlayback();
+        SetInventoryPanelInteraction(false);
+        SetInventorySlotInputEnabled(false);
+        CancelActiveInventoryDrag();
+        if (EventSystem.current != null)
+            EventSystem.current.SetSelectedGameObject(null);
 
         PlayerInventory inventoryToUse = playerInventory != null ? playerInventory : currentPlayerInventory;
 
@@ -645,6 +657,7 @@ public class MenuManager : MonoBehaviour
         isMenuClosing = false;
         isMenuPageFlipping = false;
         ResetMenuAnimatorPlayback();
+        CancelActiveInventoryDrag();
 
         // Il menu non deve attraversare il cambio scena in stato aperto.
         isMenuOpen = false;
@@ -652,9 +665,14 @@ public class MenuManager : MonoBehaviour
         openingTabIndex = -1;
         currentPlayerInventory = scenePlayerInventory != null ? scenePlayerInventory : currentPlayerInventory;
         ApplyPadFocusVisible(false);
+        HideMenuContentPanels();
 
         if (inventoryPanel != null)
+        {
+            SetInventoryPanelInteraction(false);
+            SetInventorySlotInputEnabled(false);
             inventoryPanel.SetActive(false);
+        }
         if (playerHudPanel != null)
             playerHudPanel.SetActive(true);
 
@@ -1308,6 +1326,7 @@ public class MenuManager : MonoBehaviour
     private IEnumerator RunCloseMenuAnimation(PlayerControls controls)
     {
         yield return RunContentPreCloseAnimation();
+        HideMenuContentPanels();
         HideCurrentTabBackground();
 
         float preCloseAnimationDuration = PlayPreCloseAnimation();
@@ -1348,10 +1367,16 @@ public class MenuManager : MonoBehaviour
         isMenuOpen = false;
         openingTabIndex = -1;
         ResetMenuAnimatorPlayback();
+        CancelActiveInventoryDrag();
         ApplyPadFocusVisible(false);
+        HideMenuContentPanels();
 
         if (inventoryPanel != null)
+        {
+            SetInventoryPanelInteraction(false);
+            SetInventorySlotInputEnabled(false);
             inventoryPanel.SetActive(false);
+        }
         if (playerHudPanel != null)
             playerHudPanel.SetActive(true);
 
@@ -1360,6 +1385,36 @@ public class MenuManager : MonoBehaviour
             controls.Player.Look.Enable();
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+    }
+
+    private void CancelActiveInventoryDrag()
+    {
+        inventoryUIManager?.CancelActiveDrag();
+        magicInventoryManager?.CancelActiveDrag();
+    }
+
+    private void HideMenuContentPanels()
+    {
+        equipmentManager?.HideMenuContentPanels();
+    }
+
+    private void SetInventorySlotInputEnabled(bool enabled)
+    {
+        inventoryUIManager?.SetSlotInputEnabled(enabled);
+        magicInventoryManager?.SetSlotInputEnabled(enabled);
+    }
+
+    private void SetInventoryPanelInteraction(bool enabled)
+    {
+        if (inventoryPanel == null)
+            return;
+
+        CanvasGroup canvasGroup = inventoryPanel.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+            canvasGroup = inventoryPanel.AddComponent<CanvasGroup>();
+
+        canvasGroup.interactable = enabled;
+        canvasGroup.blocksRaycasts = enabled;
     }
 
     private void StopPendingCloseMenuRoutine()

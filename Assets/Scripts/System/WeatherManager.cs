@@ -352,6 +352,9 @@ public class WeatherManager : MonoBehaviour
         if (weatherAnimator == null || weatherAnimator.runtimeAnimatorController == null || string.IsNullOrWhiteSpace(stateName))
             return;
 
+        if (!weatherAnimator.isActiveAndEnabled || !weatherAnimator.gameObject.activeInHierarchy)
+            return;
+
         weatherAnimator.Play(stateName, 0, 0f);
     }
 

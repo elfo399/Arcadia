@@ -35,6 +35,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     private EquipmentManager equipmentManager;
     private Image activeDragPreview;
     private int dragOriginIndex = -1;
+    private bool slotInputEnabled = true;
     private bool showPadFocus;
     private int currentSelectedIndex = -1;
     private int padFocusIndex = -1;
@@ -75,8 +76,12 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     public void Cleanup()
     {
-        ClearDragPreview();
-        dragOriginIndex = -1;
+        CancelActiveDrag();
+    }
+
+    private void OnDisable()
+    {
+        CancelActiveDrag();
     }
 
     public int GetCapacity() => magicInitialSlotCount;
@@ -107,6 +112,8 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     public void HandleSlotPointerDown(int index)
     {
+        if (!slotInputEnabled) return;
+
         ApplyPadFocusVisual(index);
         if (HasItem(index))
             ShowItemDetailsByIndex(index);
@@ -117,6 +124,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     public void HandleSlotBeginDrag(int index, PointerEventData eventData)
     {
+        if (!slotInputEnabled) return;
         if (!HasItem(index)) return;
 
         dragOriginIndex = index;
@@ -129,18 +137,24 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     public void HandleSlotDrag(PointerEventData eventData)
     {
+        if (!slotInputEnabled) return;
         if (activeDragPreview != null)
-            activeDragPreview.rectTransform.position = eventData.position;
+            MoveDragPreview(eventData);
     }
 
     public void HandleSlotEndDrag()
     {
-        ClearDragPreview();
-        dragOriginIndex = -1;
+        CancelActiveDrag();
     }
 
     public void HandleSlotDrop(int targetIndex)
     {
+        if (!slotInputEnabled)
+        {
+            CancelActiveDrag();
+            return;
+        }
+
         if (dragOriginIndex >= 0)
             SwapItems(dragOriginIndex, targetIndex);
 
@@ -155,13 +169,29 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         UpdateEquipButtonState();
     }
 
+    public void CancelActiveDrag()
+    {
+        ClearDragPreview();
+        dragOriginIndex = -1;
+    }
+
+    public void SetSlotInputEnabled(bool enabled)
+    {
+        slotInputEnabled = enabled;
+        if (!slotInputEnabled)
+            CancelActiveDrag();
+    }
+
     public void HandleSlotSelected(int index)
     {
+        if (!slotInputEnabled) return;
         HandleSlotPointerDown(index);
     }
 
     public void HandleSlotSubmit(int index)
     {
+        if (!slotInputEnabled) return;
+
         if (!HasItem(index))
             return;
 
@@ -483,24 +513,26 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         ClearDragPreview();
         if (icon == null) return;
 
-        Canvas targetCanvas = dragCanvas;
-        if (targetCanvas == null)
-            targetCanvas = GetComponentInParent<Canvas>();
+        Canvas targetCanvas = ResolveDragCanvas();
         if (targetCanvas == null) return;
+
+        RectTransform previewRoot = ResolveDragPreviewRoot(targetCanvas);
+        if (previewRoot == null) return;
 
         if (dragPreviewTemplate == null)
         {
-            GameObject go = new GameObject("MagicDragPreview");
-            go.transform.SetParent(targetCanvas.transform, false);
-            activeDragPreview = go.AddComponent<Image>();
+            GameObject go = new GameObject("MagicDragPreview", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            go.transform.SetParent(previewRoot, false);
+            activeDragPreview = go.GetComponent<Image>();
             activeDragPreview.raycastTarget = false;
         }
         else
         {
-            activeDragPreview = Instantiate(dragPreviewTemplate, targetCanvas.transform);
+            activeDragPreview = Instantiate(dragPreviewTemplate, previewRoot);
         }
 
         activeDragPreview.sprite = icon;
+        activeDragPreview.color = Color.white;
         activeDragPreview.preserveAspect = true;
         activeDragPreview.raycastTarget = false;
 
@@ -512,8 +544,91 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         }
 
         activeDragPreview.rectTransform.sizeDelta = iconSize;
-        activeDragPreview.rectTransform.position = eventData.position;
+        activeDragPreview.transform.SetAsLastSibling();
+        MoveDragPreview(eventData);
         activeDragPreview.gameObject.SetActive(true);
+    }
+
+    private void MoveDragPreview(PointerEventData eventData)
+    {
+        if (activeDragPreview == null || eventData == null)
+            return;
+
+        RectTransform parentRect = activeDragPreview.rectTransform.parent as RectTransform;
+        if (parentRect != null &&
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, eventData.position, eventData.pressEventCamera, out Vector2 localPoint))
+        {
+            activeDragPreview.rectTransform.anchoredPosition = localPoint;
+            return;
+        }
+
+        activeDragPreview.rectTransform.position = eventData.position;
+    }
+
+    private Canvas ResolveDragCanvas()
+    {
+        if (dragCanvas != null && dragCanvas.isActiveAndEnabled)
+            return dragCanvas;
+
+        Canvas parentCanvas = GetComponentInParent<Canvas>();
+        if (parentCanvas != null && parentCanvas.isActiveAndEnabled)
+            return parentCanvas;
+
+        Canvas[] canvases = FindObjectsOfType<Canvas>();
+        Canvas bestCanvas = null;
+        int bestScore = int.MinValue;
+        for (int i = 0; i < canvases.Length; i++)
+        {
+            Canvas canvas = canvases[i];
+            if (canvas == null || !canvas.isActiveAndEnabled || !canvas.gameObject.activeInHierarchy)
+                continue;
+
+            int score = canvas.sortingOrder;
+            if (canvas.renderMode != RenderMode.WorldSpace)
+                score += 10000;
+            if (canvas.isRootCanvas)
+                score += 1000;
+
+            if (bestCanvas == null || score >= bestScore)
+            {
+                bestCanvas = canvas;
+                bestScore = score;
+            }
+        }
+
+        return bestCanvas;
+    }
+
+    private RectTransform ResolveDragPreviewRoot(Canvas targetCanvas)
+    {
+        const string previewRootName = "DragPreviewLayer";
+        Transform existing = targetCanvas.transform.Find(previewRootName);
+        if (existing != null && existing is RectTransform existingRect)
+        {
+            existing.SetAsLastSibling();
+            return existingRect;
+        }
+
+        GameObject root = new GameObject(previewRootName, typeof(RectTransform), typeof(Canvas), typeof(CanvasGroup));
+        root.transform.SetParent(targetCanvas.transform, false);
+        root.transform.SetAsLastSibling();
+
+        RectTransform rectTransform = root.GetComponent<RectTransform>();
+        rectTransform.anchorMin = Vector2.zero;
+        rectTransform.anchorMax = Vector2.one;
+        rectTransform.offsetMin = Vector2.zero;
+        rectTransform.offsetMax = Vector2.zero;
+        rectTransform.localScale = Vector3.one;
+
+        Canvas canvas = root.GetComponent<Canvas>();
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = targetCanvas.sortingOrder + 1000;
+
+        CanvasGroup canvasGroup = root.GetComponent<CanvasGroup>();
+        canvasGroup.blocksRaycasts = false;
+        canvasGroup.interactable = false;
+
+        return rectTransform;
     }
 
     private void ClearDragPreview()

@@ -187,6 +187,13 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
         ShowEquipmentInventory(true);
     }
 
+    public void HideMenuContentPanels()
+    {
+        if (equipmentBackground != null) equipmentBackground.SetActive(false);
+        if (inventoryBackground != null) inventoryBackground.SetActive(false);
+        if (magicBackground != null) magicBackground.SetActive(false);
+    }
+
     public void FocusEquipmentCrossDefault()
     {
         EnsurePlayerInventory();
