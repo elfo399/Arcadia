@@ -106,6 +106,138 @@ public class MenuManager : MonoBehaviour
         SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        AutoAssignPageFlipSpritesInEditor();
+    }
+
+    private void AutoAssignPageFlipSpritesInEditor()
+    {
+        if (tabs == null)
+            return;
+
+        bool changed = false;
+        for (int i = 0; i < tabs.Length; i++)
+        {
+            MenuTabEntry tab = tabs[i];
+            if (tab == null || string.IsNullOrWhiteSpace(tab.key))
+                continue;
+
+            if (!HasCompletePageFlipSprites(tab.flipRightSprites, 9))
+            {
+                Sprite[] sprites = LoadPageFlipSpritesInEditor(tab.key, false);
+                if (sprites != null)
+                {
+                    tab.flipRightSprites = sprites;
+                    changed = true;
+                }
+            }
+
+            if (!HasCompletePageFlipSprites(tab.flipLeftSprites, 9))
+            {
+                Sprite[] sprites = LoadPageFlipSpritesInEditor(tab.key, true);
+                if (sprites != null)
+                {
+                    tab.flipLeftSprites = sprites;
+                    changed = true;
+                }
+            }
+        }
+
+        if (!changed)
+            return;
+
+        UnityEditor.EditorUtility.SetDirty(this);
+        if (gameObject != null && gameObject.scene.IsValid())
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+    }
+
+    private static Sprite[] LoadPageFlipSpritesInEditor(string tabKey, bool flipLeft)
+    {
+        string directionFolder = flipLeft ? "Flip Left" : "Flip Right";
+        string[] folderCandidates = GetPageFlipFolderCandidates(tabKey, flipLeft);
+        for (int i = 0; i < folderCandidates.Length; i++)
+        {
+            string folder = folderCandidates[i];
+            if (string.IsNullOrWhiteSpace(folder))
+                continue;
+
+            Sprite[] sprites = LoadPageFlipSpritesFromFolderInEditor(directionFolder, folder);
+            if (sprites != null)
+                return sprites;
+        }
+
+        return null;
+    }
+
+    private static Sprite[] LoadPageFlipSpritesFromFolderInEditor(string directionFolder, string tabFolder)
+    {
+        const int frameCount = 9;
+        Sprite[] sprites = new Sprite[frameCount];
+        string basePath = "Assets/Sprites/UI/Animation/PauseBook/" + directionFolder + "/" + tabFolder;
+
+        for (int i = 0; i < frameCount; i++)
+        {
+            string path = basePath + "/" + (i + 1) + ".png";
+            Sprite sprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (sprite == null)
+                return null;
+
+            sprites[i] = sprite;
+        }
+
+        return sprites;
+    }
+
+    private static string[] GetPageFlipFolderCandidates(string tabKey, bool flipLeft)
+    {
+        if (string.Equals(tabKey, "Maps", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "Map", System.StringComparison.OrdinalIgnoreCase))
+            return new[] { "Map", "Maps" };
+
+        if (string.Equals(tabKey, "Equipment", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "Equip", System.StringComparison.OrdinalIgnoreCase))
+            return new[] { "Equip", "Equipment" };
+
+        if (string.Equals(tabKey, "Inventory", System.StringComparison.OrdinalIgnoreCase))
+            return flipLeft ? new[] { "Inventory", "inventory" } : new[] { "inventory", "Inventory" };
+
+        if (string.Equals(tabKey, "Magic", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "MagicInventory", System.StringComparison.OrdinalIgnoreCase))
+            return new[] { "MagicInventory", "Magic" };
+
+        if (string.Equals(tabKey, "Attributes", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "Skill", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "Stats", System.StringComparison.OrdinalIgnoreCase))
+            return new[] { "Stats", "Attributes", "Skill" };
+
+        if (string.Equals(tabKey, "Journal", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "Quest", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "Quests", System.StringComparison.OrdinalIgnoreCase))
+            return new[] { "Quest", "Journal", "Quests" };
+
+        if (string.Equals(tabKey, "Setting", System.StringComparison.OrdinalIgnoreCase))
+            return new[] { "Setting" };
+
+        return new[] { tabKey };
+    }
+
+    private static bool HasCompletePageFlipSprites(Sprite[] sprites, int expectedFrameCount)
+    {
+        if (sprites == null || sprites.Length != expectedFrameCount)
+            return false;
+
+        for (int i = 0; i < sprites.Length; i++)
+        {
+            if (sprites[i] == null)
+                return false;
+        }
+
+        return true;
+    }
+#endif
+
     public MenuTabEntry[] GetTabs()
     {
         return tabs;
@@ -982,17 +1114,40 @@ public class MenuManager : MonoBehaviour
             return false;
         }
 
+        string animationStateName = ResolveCurrentTabPageFlipStateName(stateName);
         float playbackSpeed = GetPageFlipPlaybackSpeed(flipCount);
-        SetMenuAnimatorPlaybackSpeed(playbackSpeed);
+        bool hasAnimationState = HasMenuAnimationState(animationStateName);
+        if (!hasAnimationState)
+        {
+            Sprite[] manualFlipSprites = GetCurrentTabPageFlipSprites(stateName);
+            if (tabBackgroundImage != null && HasPageFlipSprites(manualFlipSprites))
+            {
+                float manualFlipDuration = GetMenuAnimationDuration(stateName, menuPageFlipFallbackDuration) / playbackSpeed;
+                if (manualFlipDuration > 0f)
+                {
+                    HideAllTabBackgrounds();
+                    HideContentAppearAnimation();
+                    DisableMenuAnimator();
+                    tabBackgroundImage.enabled = true;
+                    pendingTabIndex = targetTabIndex;
+                    isMenuPageFlipping = true;
+                    pageFlipRoutine = StartCoroutine(CompleteManualPageFlipAfterDelay(manualFlipSprites, manualFlipDuration, flipCount));
+                    return true;
+                }
+            }
+        }
 
-        if (!PlayMenuAnimationState(stateName))
+        if (!PlayMenuAnimationState(animationStateName))
         {
             ResetMenuAnimatorPlayback();
             isMenuPageFlipping = false;
             return false;
         }
 
-        float flipDuration = GetMenuAnimationDuration(stateName, menuPageFlipFallbackDuration) / playbackSpeed;
+        SetMenuAnimatorPlaybackSpeed(playbackSpeed);
+
+        float baseFlipDuration = GetMenuAnimationDuration(animationStateName, menuPageFlipFallbackDuration);
+        float flipDuration = baseFlipDuration / playbackSpeed;
         if (flipDuration <= 0f)
         {
             ResetMenuAnimatorPlayback();
@@ -1004,8 +1159,90 @@ public class MenuManager : MonoBehaviour
         HideContentAppearAnimation();
         pendingTabIndex = targetTabIndex;
         isMenuPageFlipping = true;
-        pageFlipRoutine = StartCoroutine(CompletePageFlipAfterDelay(stateName, flipDuration, flipCount));
+        pageFlipRoutine = StartCoroutine(CompletePageFlipAfterDelay(animationStateName, flipDuration, flipCount));
         return true;
+    }
+
+    private string ResolveCurrentTabPageFlipStateName(string baseStateName)
+    {
+        if (!IsValidTabIndex(currentTabIndex))
+            return baseStateName;
+
+        string tabAnimationKey = GetPageFlipAnimationKey(tabs[currentTabIndex].key);
+        if (string.IsNullOrWhiteSpace(tabAnimationKey))
+            return baseStateName;
+
+        string tabStateName = baseStateName + "_" + tabAnimationKey;
+        return HasMenuAnimationState(tabStateName) ? tabStateName : baseStateName;
+    }
+
+    private bool HasMenuAnimationState(string stateName)
+    {
+        return TryGetAnimatorStateHash(menuAnimator, stateName, out _);
+    }
+
+    private Sprite[] GetCurrentTabPageFlipSprites(string stateName)
+    {
+        if (!IsValidTabIndex(currentTabIndex))
+            return null;
+
+        MenuTabEntry tab = tabs[currentTabIndex];
+        return IsFlipLeftAnimationState(stateName) ? tab.flipLeftSprites : tab.flipRightSprites;
+    }
+
+    private bool IsFlipLeftAnimationState(string stateName)
+    {
+        return string.Equals(stateName, menuFlipLeftStateName, System.StringComparison.Ordinal)
+               || string.Equals(stateName, "FlipLeftPage", System.StringComparison.Ordinal)
+               || (!string.IsNullOrWhiteSpace(stateName)
+                   && stateName.IndexOf("Left", System.StringComparison.OrdinalIgnoreCase) >= 0);
+    }
+
+    private static string GetPageFlipAnimationKey(string tabKey)
+    {
+        if (string.Equals(tabKey, "Maps", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "Map", System.StringComparison.OrdinalIgnoreCase))
+            return "Map";
+
+        if (string.Equals(tabKey, "Equipment", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "Equip", System.StringComparison.OrdinalIgnoreCase))
+            return "Equip";
+
+        if (string.Equals(tabKey, "Inventory", System.StringComparison.OrdinalIgnoreCase))
+            return "Inventory";
+
+        if (string.Equals(tabKey, "Magic", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "MagicInventory", System.StringComparison.OrdinalIgnoreCase))
+            return "MagicInventory";
+
+        if (string.Equals(tabKey, "Attributes", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "Skill", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "Stats", System.StringComparison.OrdinalIgnoreCase))
+            return "Stats";
+
+        if (string.Equals(tabKey, "Journal", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "Quest", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tabKey, "Quests", System.StringComparison.OrdinalIgnoreCase))
+            return "Quest";
+
+        if (string.Equals(tabKey, "Setting", System.StringComparison.OrdinalIgnoreCase))
+            return "Setting";
+
+        return tabKey;
+    }
+
+    private static bool HasPageFlipSprites(Sprite[] sprites)
+    {
+        if (sprites == null || sprites.Length == 0)
+            return false;
+
+        for (int i = 0; i < sprites.Length; i++)
+        {
+            if (sprites[i] != null)
+                return true;
+        }
+
+        return false;
     }
 
     private void StartOpenMenuAnimation()
@@ -1309,6 +1546,8 @@ public class MenuManager : MonoBehaviour
 
             if (!PlayMenuAnimationState(stateName))
                 break;
+
+            SetMenuAnimatorPlaybackSpeed(GetPageFlipPlaybackSpeed(flipCount));
         }
 
         ResetMenuAnimatorPlayback();
@@ -1321,6 +1560,61 @@ public class MenuManager : MonoBehaviour
         pendingTabIndex = -1;
         pageFlipRoutine = null;
         isMenuPageFlipping = false;
+    }
+
+    private IEnumerator CompleteManualPageFlipAfterDelay(Sprite[] flipSprites, float flipDuration, int flipCount)
+    {
+        for (int playedFlips = 1; playedFlips <= flipCount; playedFlips++)
+        {
+            yield return PlayManualPageFlipFrames(flipSprites, flipDuration);
+
+            if (playedFlips >= flipCount)
+                break;
+
+            if (!isMenuOpen || isMenuClosing)
+            {
+                ApplyCurrentTabBackgroundSprite();
+                pendingTabIndex = -1;
+                pageFlipRoutine = null;
+                isMenuPageFlipping = false;
+                yield break;
+            }
+        }
+
+        DisableMenuAnimator();
+        if (IsValidTabIndex(pendingTabIndex))
+            ShowTabAtIndex(pendingTabIndex);
+        else
+            ApplyCurrentTabBackgroundSprite();
+
+        pendingTabIndex = -1;
+        pageFlipRoutine = null;
+        isMenuPageFlipping = false;
+    }
+
+    private IEnumerator PlayManualPageFlipFrames(Sprite[] flipSprites, float flipDuration)
+    {
+        if (tabBackgroundImage == null || !HasPageFlipSprites(flipSprites))
+        {
+            yield return new WaitForSecondsRealtime(flipDuration);
+            yield break;
+        }
+
+        flipDuration = Mathf.Max(0f, flipDuration);
+        float frameDuration = flipSprites.Length > 0 ? flipDuration / flipSprites.Length : flipDuration;
+
+        for (int i = 0; i < flipSprites.Length; i++)
+        {
+            Sprite sprite = flipSprites[i];
+            if (sprite != null)
+            {
+                tabBackgroundImage.sprite = sprite;
+                tabBackgroundImage.enabled = true;
+            }
+
+            if (frameDuration > 0f)
+                yield return new WaitForSecondsRealtime(frameDuration);
+        }
     }
 
     private IEnumerator RunCloseMenuAnimation(PlayerControls controls)
