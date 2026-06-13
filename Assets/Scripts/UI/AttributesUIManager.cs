@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public class AttributesUIManager : MonoBehaviour
@@ -22,7 +23,8 @@ public class AttributesUIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI attributesLevelLabelText;
     [SerializeField] private TextMeshProUGUI attributesLevelValueText;
     [SerializeField] private TextMeshProUGUI attributesXpValueText;
-    [SerializeField] private Scrollbar attributesXpScrollbar;
+    [FormerlySerializedAs("attributesXpScrollbar")]
+    [SerializeField] private ProgressBarUI attributesXpProgressBar;
     [SerializeField] private TextMeshProUGUI attributesHpValueText;
     [SerializeField] private TextMeshProUGUI attributesManaValueText;
     [SerializeField] private TextMeshProUGUI attributesStaminaValueText;
@@ -35,7 +37,8 @@ public class AttributesUIManager : MonoBehaviour
     [SerializeField] private Image playerPortraitImage;
     [SerializeField] private TextMeshProUGUI playerNameText;
     [SerializeField] private string playerNameFormat = "{0}";
-    [SerializeField] private Scrollbar attributesLoadScrollbar;
+    [FormerlySerializedAs("attributesLoadScrollbar")]
+    [SerializeField] private ProgressBarUI attributesLoadProgressBar;
     [SerializeField] private PlayerCharacterDatabase playerCharacterDatabase;
     [SerializeField] private bool hidePlayerPortraitWhenMissing = true;
     [SerializeField] private Color attributesSelectedColor = new Color(1f, 0.85f, 0.2f, 1f);
@@ -112,8 +115,6 @@ public class AttributesUIManager : MonoBehaviour
         CachePlayerController();
         if (playerStats == null) return;
 
-        SetReadOnlyScrollbar(attributesXpScrollbar);
-        SetReadOnlyScrollbar(attributesLoadScrollbar);
         RefreshAttributeRowsValues();
         RefreshAttributeDerivedPanel();
         RefreshPlayerPortrait();
@@ -346,7 +347,7 @@ public class AttributesUIManager : MonoBehaviour
         if (attributesLevelLabelText == null && centerPanel != null) attributesLevelLabelText = FindDeepTextByName(centerPanel, "LevelTxt");
         if (attributesLevelValueText == null && centerPanel != null) attributesLevelValueText = FindDeepTextByName(centerPanel, "LevelValue");
         if (attributesXpValueText == null && centerPanel != null) attributesXpValueText = FindDeepTextByName(centerPanel, "XpValue");
-        if (attributesXpScrollbar == null && centerPanel != null) attributesXpScrollbar = centerPanel.GetComponentInChildren<Scrollbar>(true);
+        if (attributesXpProgressBar == null && centerPanel != null) attributesXpProgressBar = centerPanel.GetComponentInChildren<ProgressBarUI>(true);
 
         Transform leftRoot = FindDescendantByPath(skillRoot, "Left");
         if (attributesHpValueText == null && leftRoot != null) attributesHpValueText = FindDeepTextByName(leftRoot, "HPValue");
@@ -357,10 +358,10 @@ public class AttributesUIManager : MonoBehaviour
         if (attributesPhyDefValueText == null && leftRoot != null) attributesPhyDefValueText = FindDeepTextByName(leftRoot, "PhyDefValue");
         if (attributesMagicDefValueText == null && leftRoot != null) attributesMagicDefValueText = FindDeepTextByName(leftRoot, "MagicDefValue");
         if (attributesLoadValueText == null && leftRoot != null) attributesLoadValueText = FindDeepTextByName(leftRoot, "LoadValue");
-        if (attributesLoadScrollbar == null)
+        if (attributesLoadProgressBar == null)
         {
             var loadRoot = leftRoot != null ? FindDeepChildByName(leftRoot, "Load") : null;
-            if (loadRoot != null) attributesLoadScrollbar = loadRoot.GetComponentInChildren<Scrollbar>(true);
+            if (loadRoot != null) attributesLoadProgressBar = loadRoot.GetComponentInChildren<ProgressBarUI>(true);
         }
 
         if (attributeRows == null) attributeRows = new List<AttributeRowBinding>();
@@ -435,9 +436,10 @@ public class AttributesUIManager : MonoBehaviour
 
         if (attributesLevelLabelText != null)
             attributesLevelLabelText.text = "Level";
+        string xpText = $"{playerStats.levelExperience}/{playerStats.experienceToNextLevel}";
         if (attributesLevelValueText != null) attributesLevelValueText.text = level.ToString();
-        if (attributesXpValueText != null) attributesXpValueText.text = $"{playerStats.levelExperience}/{playerStats.experienceToNextLevel}";
-        ApplyReadOnlyProgressToScrollbar(attributesXpScrollbar, xpProgress);
+        if (attributesXpValueText != null) attributesXpValueText.text = xpText;
+        ApplyProgress(attributesXpProgressBar, xpProgress, xpText);
 
         int hp = Mathf.RoundToInt(playerStats.maxHealth);
         int mana = Mathf.RoundToInt(playerStats.maxMana);
@@ -459,9 +461,10 @@ public class AttributesUIManager : MonoBehaviour
         if (attributesMagicDamageValueText != null) attributesMagicDamageValueText.text = magicDamage.ToString();
         if (attributesPhyDefValueText != null) attributesPhyDefValueText.text = phyDef.ToString();
         if (attributesMagicDefValueText != null) attributesMagicDefValueText.text = magicDef.ToString();
-        if (attributesLoadValueText != null) attributesLoadValueText.text = equipWeight.ToString("0.0") + " / " + maxLoad.ToString("0.0");
+        string loadText = equipWeight.ToString("0.0") + " / " + maxLoad.ToString("0.0");
+        if (attributesLoadValueText != null) attributesLoadValueText.text = loadText;
         if (attributesLoadTierValueText != null) attributesLoadTierValueText.text = loadTierLabel;
-        ApplyReadOnlyProgressToScrollbar(attributesLoadScrollbar, loadRatio);
+        ApplyProgress(attributesLoadProgressBar, loadRatio, loadText);
     }
 
     private static string ResolveLoadTierLabelFallback(float loadRatio)
@@ -471,33 +474,10 @@ public class AttributesUIManager : MonoBehaviour
         return "Normal";
     }
 
-    private static void SetReadOnlyScrollbar(Scrollbar bar)
+    private static void ApplyProgress(ProgressBarUI bar, float normalized, string displayText)
     {
         if (bar == null) return;
-        bar.interactable = false;
-        var nav = bar.navigation;
-        nav.mode = Navigation.Mode.None;
-        bar.navigation = nav;
-    }
-
-    private static void ApplyReadOnlyProgressToScrollbar(Scrollbar bar, float normalized)
-    {
-        if (bar == null) return;
-
-        normalized = Mathf.Clamp01(normalized);
-        bar.size = normalized;
-
-        switch (bar.direction)
-        {
-            case Scrollbar.Direction.LeftToRight:
-            case Scrollbar.Direction.BottomToTop:
-                bar.value = 0f;
-                break;
-            case Scrollbar.Direction.RightToLeft:
-            case Scrollbar.Direction.TopToBottom:
-                bar.value = 1f;
-                break;
-        }
+        bar.SetProgress(normalized, displayText);
     }
 
     private void RefreshAttributeSelectionVisual()

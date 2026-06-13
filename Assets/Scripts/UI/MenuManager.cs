@@ -453,7 +453,7 @@ public class MenuManager : MonoBehaviour
         {
             int next = (startIndex + offset) % tabs.Length;
             if (!IsValidTabIndex(next)) continue;
-            ChangeTabAfterPageFlip(next, menuFlipRightStateName, offset);
+            ChangeTabAfterPageFlip(next, menuFlipLeftStateName, offset);
             return;
         }
     }
@@ -469,7 +469,7 @@ public class MenuManager : MonoBehaviour
         {
             int prev = (startIndex - offset + tabs.Length) % tabs.Length;
             if (!IsValidTabIndex(prev)) continue;
-            ChangeTabAfterPageFlip(prev, menuFlipLeftStateName, offset);
+            ChangeTabAfterPageFlip(prev, menuFlipRightStateName, offset);
             return;
         }
     }
@@ -486,7 +486,7 @@ public class MenuManager : MonoBehaviour
         }
 
         int signedDistance = targetIndex - currentTabIndex;
-        string animationStateName = signedDistance > 0 ? menuFlipRightStateName : menuFlipLeftStateName;
+        string animationStateName = signedDistance > 0 ? menuFlipLeftStateName : menuFlipRightStateName;
         ChangeTabAfterPageFlip(targetIndex, animationStateName, Mathf.Abs(signedDistance));
     }
 
