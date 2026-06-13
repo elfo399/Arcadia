@@ -773,6 +773,7 @@ public class MenuManager : MonoBehaviour
             equipmentManager.RefreshEquipmentCross();
         }
 
+        HideActiveDetailPanelsForMenuClose();
         ApplyPadFocusVisible(false);
         HideContentAppearAnimation();
         if (!StartCloseMenuAnimation(controls))
@@ -1685,6 +1686,13 @@ public class MenuManager : MonoBehaviour
     {
         inventoryUIManager?.CancelActiveDrag();
         magicInventoryManager?.CancelActiveDrag();
+    }
+
+    private void HideActiveDetailPanelsForMenuClose()
+    {
+        inventoryUIManager?.HideActiveDetailForMenuClose();
+        magicInventoryManager?.HideActiveDetailForMenuClose();
+        questJournalUI?.HideActiveDetailForMenuClose();
     }
 
     private void HideMenuContentPanels()

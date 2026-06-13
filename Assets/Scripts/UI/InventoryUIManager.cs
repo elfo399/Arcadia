@@ -156,6 +156,12 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         CancelActiveDrag();
     }
 
+    public void HideActiveDetailForMenuClose()
+    {
+        ClearDetailPanel();
+        UpdateEquipButtonState();
+    }
+
     public void SetPlayerInventory(PlayerInventory inventory)
     {
         playerInventory = inventory;

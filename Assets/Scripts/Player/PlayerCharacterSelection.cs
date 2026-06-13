@@ -3,14 +3,13 @@ using UnityEngine;
 public static class PlayerCharacterSelection
 {
     public const string DefaultCharacterId = "warrior";
-    private const string PlayerPrefsSelectedCharacterKey = "SelectedCharacterId";
     private static string pendingNewCharacterId;
 
     public static string PendingNewCharacterId => pendingNewCharacterId;
 
     public static string GetSelectedCharacterId()
     {
-        string storedId = PlayerPrefs.GetString(PlayerPrefsSelectedCharacterKey, string.Empty);
+        string storedId = SaveSystem.GetSelectedCharacterId();
         if (!string.IsNullOrWhiteSpace(storedId))
             return storedId;
 
@@ -42,22 +41,12 @@ public static class PlayerCharacterSelection
         string resolvedId = string.IsNullOrWhiteSpace(characterId) ? DefaultCharacterId : characterId.Trim();
         string resolvedName = string.IsNullOrWhiteSpace(characterName) ? resolvedId : characterName.Trim();
 
-        if (PlayerStats.instance != null)
+        if (PlayerStats.instance != null && !string.IsNullOrWhiteSpace(PlayerStats.instance.SelectedCharacterId))
             PlayerStats.instance.SaveStatsImmediate();
 
         pendingNewCharacterId = resolvedId;
-        PlayerPrefs.SetString(PlayerPrefsSelectedCharacterKey, resolvedId);
-        PlayerPrefs.Save();
-
-        if (!SaveSystem.HasData(resolvedId))
-        {
-            SaveSystem.SaveData(new GameData
-            {
-                selectedCharacterId = resolvedId,
-                characterName = resolvedName,
-                selectedCharacterStartApplied = false
-            });
-        }
+        SaveSystem.SelectCharacter(resolvedId);
+        SaveSystem.EnsureCharacterData(resolvedId, resolvedName);
     }
 
     internal static void ClearPendingNewCharacter(string characterId)

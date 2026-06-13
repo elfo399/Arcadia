@@ -513,8 +513,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public void LoadStats()
     {
-        string requestedCharacterId = PlayerCharacterSelection.GetSelectedCharacterId();
-        GameData data = SaveSystem.LoadData(requestedCharacterId);
+        bool inspectorCharacterSelectsSlot;
+        string requestedCharacterId = ResolveRequestedCharacterIdForLoad(out inspectorCharacterSelectsSlot);
+        GameData data = SaveSystem.LoadData(requestedCharacterId, allowLegacyFallback: !inspectorCharacterSelectsSlot);
 
         if (forceStartDataIgnoreSave && data == null)
         {
@@ -572,6 +573,24 @@ public class PlayerStats : MonoBehaviour, IDamageable
         }
     }
 
+    private string ResolveRequestedCharacterIdForLoad(out bool inspectorCharacterSelectsSlot)
+    {
+        inspectorCharacterSelectsSlot = false;
+
+        if (HasInspectorStartingCharacter)
+        {
+            string inspectorCharacterId = inspectorStartingCharacter.GetCharacterId();
+            if (!string.IsNullOrWhiteSpace(inspectorCharacterId))
+            {
+                inspectorCharacterSelectsSlot = true;
+                SaveSystem.SelectCharacter(inspectorCharacterId);
+                return inspectorCharacterId;
+            }
+        }
+
+        return PlayerCharacterSelection.GetSelectedCharacterId();
+    }
+
     private void ApplyLoadedCharacterData(GameData data, string fallbackCharacterId)
     {
         if (data == null)
@@ -613,7 +632,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         bool hasPendingNewCharacter = !string.IsNullOrWhiteSpace(pendingCharacterId);
         if (hasPendingNewCharacter)
         {
-            GameData pendingData = SaveSystem.LoadData(pendingCharacterId);
+            GameData pendingData = SaveSystem.LoadData(pendingCharacterId, allowLegacyFallback: false);
             if (pendingData != null && pendingData.selectedCharacterStartApplied)
             {
                 ApplyLoadedCharacterData(pendingData, pendingCharacterId);

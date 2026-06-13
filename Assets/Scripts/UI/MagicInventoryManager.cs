@@ -79,6 +79,12 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         CancelActiveDrag();
     }
 
+    public void HideActiveDetailForMenuClose()
+    {
+        ClearDetail();
+        UpdateEquipButtonState();
+    }
+
     private void OnDisable()
     {
         CancelActiveDrag();

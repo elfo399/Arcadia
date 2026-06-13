@@ -161,6 +161,12 @@ public class QuestJournalUI : MonoBehaviour
             ApplyPadFocusVisual(showPadFocus);
     }
 
+    public void HideActiveDetailForMenuClose()
+    {
+        UpdateQuestDetailPanel(null);
+        ClearPadFocusVisual();
+    }
+
     public void UpdateMouseWheelSmoothScroll(bool isQuestTabActive)
     {
         if (!smoothQuestMouseWheel || !isQuestTabActive) return;

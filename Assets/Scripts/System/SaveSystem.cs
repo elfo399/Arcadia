@@ -8,6 +8,41 @@ public static class SaveSystem
     private const string CharacterSaveExtension = ".json";
     private const string PlayerPrefsSelectedCharacterKey = "SelectedCharacterId";
 
+    public static string GetSelectedCharacterId()
+    {
+        return PlayerPrefs.GetString(PlayerPrefsSelectedCharacterKey, string.Empty);
+    }
+
+    public static void SelectCharacter(string characterId)
+    {
+        StoreSelectedCharacterId(characterId);
+    }
+
+    public static GameData EnsureCharacterData(string characterId, string characterName)
+    {
+        string normalizedId = NormalizeCharacterId(characterId);
+        if (string.IsNullOrWhiteSpace(normalizedId))
+            return null;
+
+        string resolvedName = string.IsNullOrWhiteSpace(characterName) ? normalizedId : characterName.Trim();
+        GameData existingData = LoadData(normalizedId, allowLegacyFallback: false, storeSelectedCharacter: false);
+        if (existingData != null)
+        {
+            StoreSelectedCharacterId(normalizedId);
+            return existingData;
+        }
+
+        GameData newData = new GameData
+        {
+            selectedCharacterId = normalizedId,
+            characterName = resolvedName,
+            selectedCharacterStartApplied = false
+        };
+
+        SaveData(newData);
+        return newData;
+    }
+
     public static void SaveData(GameData data)
     {
         string path = GetSaveFilePath(data != null ? data.selectedCharacterId : string.Empty);
@@ -28,7 +63,7 @@ public static class SaveSystem
 
     public static GameData LoadData()
     {
-        string selectedCharacterId = PlayerPrefs.GetString(PlayerPrefsSelectedCharacterKey, string.Empty);
+        string selectedCharacterId = GetSelectedCharacterId();
         if (!string.IsNullOrWhiteSpace(selectedCharacterId))
         {
             GameData selectedData = LoadData(selectedCharacterId);
@@ -54,15 +89,25 @@ public static class SaveSystem
 
     public static GameData LoadData(string characterId, bool allowLegacyFallback = true)
     {
+        return LoadData(characterId, allowLegacyFallback, storeSelectedCharacter: true);
+    }
+
+    private static GameData LoadData(string characterId, bool allowLegacyFallback, bool storeSelectedCharacter)
+    {
         string normalizedId = NormalizeCharacterId(characterId);
         if (!string.IsNullOrWhiteSpace(normalizedId))
         {
             GameData characterData = LoadDataFromPath(GetCharacterSaveFilePath(normalizedId), logMissing: false);
             if (characterData != null)
             {
-                if (string.IsNullOrWhiteSpace(characterData.selectedCharacterId))
+                if (string.IsNullOrWhiteSpace(characterData.selectedCharacterId)
+                    || !string.Equals(characterData.selectedCharacterId.Trim(), normalizedId, System.StringComparison.OrdinalIgnoreCase))
+                {
                     characterData.selectedCharacterId = normalizedId;
-                StoreSelectedCharacterId(characterData.selectedCharacterId);
+                }
+
+                if (storeSelectedCharacter)
+                    StoreSelectedCharacterId(characterData.selectedCharacterId);
                 return characterData;
             }
         }
@@ -80,7 +125,7 @@ public static class SaveSystem
         {
             if (string.IsNullOrWhiteSpace(legacyData.selectedCharacterId))
                 legacyData.selectedCharacterId = normalizedId;
-            if (!string.IsNullOrWhiteSpace(legacyData.selectedCharacterId))
+            if (storeSelectedCharacter && !string.IsNullOrWhiteSpace(legacyData.selectedCharacterId))
                 StoreSelectedCharacterId(legacyData.selectedCharacterId);
             return legacyData;
         }
@@ -105,7 +150,7 @@ public static class SaveSystem
 
     public static string GetSaveFilePath()
     {
-        string selectedCharacterId = PlayerPrefs.GetString(PlayerPrefsSelectedCharacterKey, string.Empty);
+        string selectedCharacterId = GetSelectedCharacterId();
         return GetSaveFilePath(selectedCharacterId);
     }
 
