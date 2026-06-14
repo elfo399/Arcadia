@@ -24,6 +24,11 @@ public class PlayerUI : MonoBehaviour
     public RectTransform staminaBarFrame;
     public RectTransform manaBarFrame;
 
+    [Header("Dynamic Bars")]
+    public DynamicBar healthBar;
+    public DynamicBar staminaBar;
+    public DynamicBar manaBar;
+
     [Header("Bar Sizing")]
     [SerializeField] private float healthBaseWidth = 140f;
     [SerializeField] private float staminaBaseWidth = 140f;
@@ -106,6 +111,10 @@ public class PlayerUI : MonoBehaviour
         healthBarFrame = ResolveBarFrame(healthBarFill, healthBarFrame);
         staminaBarFrame = ResolveBarFrame(staminaBarFill, staminaBarFrame);
         manaBarFrame = ResolveBarFrame(manaBarFill, manaBarFrame);
+
+        healthBar = ResolveDynamicBar(healthBarFill, healthBar);
+        staminaBar = ResolveDynamicBar(staminaBarFill, staminaBar);
+        manaBar = ResolveDynamicBar(manaBarFill, manaBar);
     }
 
     private RectTransform ResolveBarFrame(Image fill, RectTransform currentFrame)
@@ -120,62 +129,106 @@ public class PlayerUI : MonoBehaviour
         return currentFrame;
     }
 
+    private DynamicBar ResolveDynamicBar(Image fill, DynamicBar currentBar)
+    {
+        if (currentBar != null)
+            return currentBar;
+
+        if (fill == null)
+            return null;
+
+        return fill.GetComponentInParent<DynamicBar>();
+    }
+
     // Refresh health, stamina, and mana bar fill amounts
     void UpdateBars()
     {
+        bool useHealthDynamicBar = ShouldUseDynamicBar(healthBar);
+        bool useStaminaDynamicBar = ShouldUseDynamicBar(staminaBar);
+        bool useManaDynamicBar = ShouldUseDynamicBar(manaBar);
+
         if (!Mathf.Approximately(playerStats.maxHealth, lastHealthMax))
         {
-            ResizeBar(healthBarFrame, healthBaseWidth, healthWidthPerPoint, playerStats.maxHealth);
-            SyncFillToFrame(healthBarFill, healthBarFrame);
+            if (useHealthDynamicBar)
+                healthBar.SetMax(playerStats.maxHealth, CalculateBarWidth(healthBaseWidth, healthWidthPerPoint, playerStats.maxHealth));
+            else
+            {
+                ResizeBar(healthBarFrame, healthBaseWidth, healthWidthPerPoint, playerStats.maxHealth);
+                SyncFillToFrame(healthBarFill, healthBarFrame);
+            }
             lastHealthMax = playerStats.maxHealth;
         }
 
-        if (healthBarFill != null)
+        if (useHealthDynamicBar || healthBarFill != null)
         {
             float t = playerStats.currentHealth / playerStats.maxHealth;
             float v = Mathf.Clamp01(t);
             if (!Mathf.Approximately(v, lastHealthFill))
             {
-                healthBarFill.fillAmount = v;
+                if (useHealthDynamicBar)
+                    healthBar.SetCurrent(playerStats.currentHealth);
+                else
+                    healthBarFill.fillAmount = v;
                 lastHealthFill = v;
             }
         }
 
         if (!Mathf.Approximately(playerStats.maxStamina, lastStaminaMax))
         {
-            ResizeBar(staminaBarFrame, staminaBaseWidth, staminaWidthPerPoint, playerStats.maxStamina);
-            SyncFillToFrame(staminaBarFill, staminaBarFrame);
+            if (useStaminaDynamicBar)
+                staminaBar.SetMax(playerStats.maxStamina, CalculateBarWidth(staminaBaseWidth, staminaWidthPerPoint, playerStats.maxStamina));
+            else
+            {
+                ResizeBar(staminaBarFrame, staminaBaseWidth, staminaWidthPerPoint, playerStats.maxStamina);
+                SyncFillToFrame(staminaBarFill, staminaBarFrame);
+            }
             lastStaminaMax = playerStats.maxStamina;
         }
 
-        if (staminaBarFill != null)
+        if (useStaminaDynamicBar || staminaBarFill != null)
         {
             float t = playerStats.currentStamina / playerStats.maxStamina;
             float v = Mathf.Clamp01(t);
             if (!Mathf.Approximately(v, lastStaminaFill))
             {
-                staminaBarFill.fillAmount = v;
+                if (useStaminaDynamicBar)
+                    staminaBar.SetCurrent(playerStats.currentStamina);
+                else
+                    staminaBarFill.fillAmount = v;
                 lastStaminaFill = v;
             }
         }
 
         if (!Mathf.Approximately(playerStats.maxMana, lastManaMax))
         {
-            ResizeBar(manaBarFrame, manaBaseWidth, manaWidthPerPoint, playerStats.maxMana);
-            SyncFillToFrame(manaBarFill, manaBarFrame);
+            if (useManaDynamicBar)
+                manaBar.SetMax(playerStats.maxMana, CalculateBarWidth(manaBaseWidth, manaWidthPerPoint, playerStats.maxMana));
+            else
+            {
+                ResizeBar(manaBarFrame, manaBaseWidth, manaWidthPerPoint, playerStats.maxMana);
+                SyncFillToFrame(manaBarFill, manaBarFrame);
+            }
             lastManaMax = playerStats.maxMana;
         }
 
-        if (manaBarFill != null)
+        if (useManaDynamicBar || manaBarFill != null)
         {
             float t = playerStats.currentMana / playerStats.maxMana;
             float v = Mathf.Clamp01(t);
             if (!Mathf.Approximately(v, lastManaFill))
             {
-                manaBarFill.fillAmount = v;
+                if (useManaDynamicBar)
+                    manaBar.SetCurrent(playerStats.currentMana);
+                else
+                    manaBarFill.fillAmount = v;
                 lastManaFill = v;
             }
         }
+    }
+
+    private static bool ShouldUseDynamicBar(DynamicBar bar)
+    {
+        return bar != null && bar.UsesSegmentedLayout;
     }
 
     private void ResizeBar(RectTransform frame, float baseWidth, float widthPerPoint, float maxValue)
@@ -183,10 +236,15 @@ public class PlayerUI : MonoBehaviour
         if (frame == null)
             return;
 
+        float width = CalculateBarWidth(baseWidth, widthPerPoint, maxValue);
+        frame.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
+    }
+
+    private float CalculateBarWidth(float baseWidth, float widthPerPoint, float maxValue)
+    {
         float width = baseWidth + maxValue * widthPerPoint;
         width *= Mathf.Max(0.1f, barWidthScale);
-        width = Mathf.Clamp(width, minBarWidth, maxBarWidth);
-        frame.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
+        return Mathf.Clamp(width, minBarWidth, maxBarWidth);
     }
 
     private void SyncFillToFrame(Image fill, RectTransform frame)

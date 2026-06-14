@@ -504,10 +504,19 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
+        if (!menuManager.IsMenuOpen && !CanOpenMenuInCurrentRoom())
+            return;
+
         bool menuOpen = menuManager.ToggleMenu(Controls, playerInventory);
         canMove = !menuOpen;
         if (!canMove)
             StopMovementImmediate();
+    }
+
+    private bool CanOpenMenuInCurrentRoom()
+    {
+        Room currentRoom = Room.CurrentPlayerRoom;
+        return currentRoom == null || currentRoom.CanOpenMenuHere();
     }
 
 }

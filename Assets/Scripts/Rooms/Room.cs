@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 public class Room : MonoBehaviour
 {
+    public static Room CurrentPlayerRoom { get; private set; }
+
     [Header("Dati Stanza")]
     public RoomData roomData;
     [HideInInspector] public string internalRoomType = "Normal";
@@ -43,6 +45,34 @@ public class Room : MonoBehaviour
 
     private bool playerEntered = false;
     private GameObject spawnedPortal;
+    private bool battleActive = false;
+
+    public bool CanOpenMenuHere()
+    {
+        if (isLocked)
+            return false;
+
+        if (battleActive)
+            return false;
+
+        return AreConnectedDoorsOpen();
+    }
+
+    private bool AreConnectedDoorsOpen()
+    {
+        foreach (var d in doors)
+        {
+            if (!d.isConnected)
+                continue;
+
+            if (d.lockObject != null && d.lockObject.activeInHierarchy)
+                return false;
+            if (d.wallObject != null && d.wallObject.activeInHierarchy)
+                return false;
+        }
+
+        return true;
+    }
 
     void Start()
     {
@@ -117,6 +147,9 @@ public class Room : MonoBehaviour
     // --- BATTLE LOGIC ---
     void OnTriggerEnter(Collider other)
     {
+        if (other.CompareTag("Player"))
+            CurrentPlayerRoom = this;
+
         if (other.CompareTag("Player") && !playerEntered && !roomCleared && !isLocked)
         {
             if (activeEnemies.Count > 0)
@@ -132,8 +165,22 @@ public class Room : MonoBehaviour
         }
     }
 
+    void OnTriggerStay(Collider other)
+    {
+        if (other.CompareTag("Player"))
+            CurrentPlayerRoom = this;
+    }
+
+    void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("Player") && CurrentPlayerRoom == this)
+            CurrentPlayerRoom = null;
+    }
+
     void LockRoomBattle()
     {
+        battleActive = true;
+
         foreach (var d in doors)
         {
             // Chiudi solo le porte che erano aperte
@@ -156,6 +203,7 @@ public class Room : MonoBehaviour
     void UnlockRoomBattle()
     {
         roomCleared = true;
+        battleActive = false;
         
         foreach (var d in doors)
         {
