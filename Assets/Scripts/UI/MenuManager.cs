@@ -1637,6 +1637,7 @@ public class MenuManager : MonoBehaviour
 
         if (!PlayMenuAnimationState(menuCloseStateName))
         {
+            yield return FadeMenuPanelOut();
             closeMenuRoutine = null;
             CompleteMenuClose(controls);
             yield break;
@@ -1647,8 +1648,20 @@ public class MenuManager : MonoBehaviour
         if (closeAnimationDuration > 0f || endDelay > 0f)
             yield return new WaitForSecondsRealtime(closeAnimationDuration + endDelay);
 
+        yield return FadeMenuPanelOut();
+
         closeMenuRoutine = null;
         CompleteMenuClose(controls);
+    }
+
+    private IEnumerator FadeMenuPanelOut()
+    {
+        if (inventoryPanel == null)
+            yield break;
+
+        CanvasGroupFadeInOnEnable fade = inventoryPanel.GetComponentInChildren<CanvasGroupFadeInOnEnable>();
+        if (fade != null && fade.isActiveAndEnabled)
+            yield return fade.FadeOut();
     }
 
     private void CompleteMenuClose(PlayerControls controls)
