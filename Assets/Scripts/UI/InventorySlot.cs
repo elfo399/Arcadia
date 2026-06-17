@@ -19,6 +19,7 @@ public class InventorySlot : MonoBehaviour,
     [SerializeField] private Image iconImage;
     [SerializeField] private Image backgroundImage;
     [SerializeField] private TextMeshProUGUI quantityText;
+    [SerializeField] private TextMeshProUGUI equippedText;
     [SerializeField] private bool logMissingReferences = false;
     [SerializeField] private bool displayOnly = false; // se true mostra solo l'icona, nessuna interazione
     [SerializeField] private Outline focusOutline;
@@ -94,7 +95,9 @@ public class InventorySlot : MonoBehaviour,
             iconImage.preserveAspect = true;
             iconImage.raycastTarget = false;
             iconImage.canvasRenderer.SetAlpha(1f);
-            iconImage.transform.SetAsLastSibling();
+            iconImage.transform.SetAsFirstSibling();
+            BringOverlayTextToFront(quantityText);
+            BringOverlayTextToFront(equippedText);
 
         }
         else
@@ -103,27 +106,30 @@ public class InventorySlot : MonoBehaviour,
             return;
         }
 
-        if (forceShowQuantity)
+        bool hasSeparateEquippedText = equippedText != null && equippedText != quantityText;
+        int safeQuantity = Mathf.Max(0, quantity);
+        bool showQuantity = forceShowQuantity || quantity > 1;
+
+        if (hasSeparateEquippedText)
         {
-            quantityText.raycastTarget = false;
-            quantityText.enabled = true;
-            quantityText.text = Mathf.Max(0, quantity).ToString();
+            SetTextVisible(quantityText, showQuantity, safeQuantity.ToString());
+            SetTextVisible(equippedText, isEquipped, "E");
+        }
+        else if (forceShowQuantity)
+        {
+            SetTextVisible(quantityText, true, safeQuantity.ToString());
         }
         else if (quantity > 1)
         {
-            quantityText.raycastTarget = false;
-            quantityText.enabled = true;
-            quantityText.text = isEquipped ? $"{quantity} E" : quantity.ToString();
+            SetTextVisible(quantityText, true, isEquipped ? $"{quantity} E" : quantity.ToString());
         }
         else if (isEquipped)
         {
-            quantityText.raycastTarget = false;
-            quantityText.enabled = true;
-            quantityText.text = "E";
+            SetTextVisible(quantityText, true, "E");
         }
         else
         {
-            quantityText.enabled = false;
+            SetTextVisible(quantityText, false);
         }
     }
 
@@ -141,11 +147,10 @@ public class InventorySlot : MonoBehaviour,
 
         }
 
-        if (quantityText != null)
-        {
-            quantityText.enabled = false;
-            quantityText.text = "";
-        }
+        SetTextVisible(quantityText, false);
+
+        if (equippedText != null && equippedText != quantityText)
+            SetTextVisible(equippedText, false);
     }
 
     // --- EventSystem handlers ---
@@ -234,17 +239,40 @@ public class InventorySlot : MonoBehaviour,
             }
         }
 
-        if (quantityText == null)
-        {
-            // Cerca child chiamato "QuantityText" oppure il primo TMP figlio
-            var qtTransform = transform.Find("QuantityText");
-            if (qtTransform != null)
-                quantityText = qtTransform.GetComponent<TextMeshProUGUI>();
-            if (quantityText == null)
-            {
-                quantityText = GetComponentInChildren<TextMeshProUGUI>(true);
-            }
-        }
+    }
+
+    private void SetTextVisible(TextMeshProUGUI text, bool visible, string value = "")
+    {
+        if (text == null) return;
+
+        Transform overlayRoot = GetOverlayRoot(text);
+        if (overlayRoot != null && overlayRoot.gameObject.activeSelf != visible)
+            overlayRoot.gameObject.SetActive(visible);
+
+        text.raycastTarget = false;
+        text.enabled = visible;
+        text.text = visible ? value : "";
+    }
+
+    private void BringOverlayTextToFront(TextMeshProUGUI text)
+    {
+        if (text == null) return;
+
+        Transform overlayRoot = GetOverlayRoot(text);
+
+        if (overlayRoot.parent == transform)
+            overlayRoot.SetAsLastSibling();
+    }
+
+    private Transform GetOverlayRoot(TextMeshProUGUI text)
+    {
+        if (text == null) return null;
+
+        Transform overlayRoot = text.transform;
+        while (overlayRoot.parent != null && overlayRoot.parent != transform)
+            overlayRoot = overlayRoot.parent;
+
+        return overlayRoot;
     }
 
     private void CacheDefaultBackgroundColor()

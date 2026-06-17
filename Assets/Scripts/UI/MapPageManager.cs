@@ -15,6 +15,9 @@ public class MapPageManager : MonoBehaviour
     [SerializeField] private Image playerPortraitImage;
     [SerializeField] private TMP_InputField playerNameInput;
     [SerializeField] private RectTransform mapContainer;
+    [SerializeField] private ProgressBarUI hpProgressBar;
+    [SerializeField] private ProgressBarUI manaProgressBar;
+    [SerializeField] private ProgressBarUI xpProgressBar;
     [SerializeField] private PlayerCharacterDatabase playerCharacterDatabase;
     [SerializeField] private string floorFormat = "Floor {0}";
     [SerializeField] private string themeFormat = "{0}";
@@ -34,11 +37,18 @@ public class MapPageManager : MonoBehaviour
     private CoreGenerator subscribedGenerator;
     private MinimapManager subscribedMinimap;
     private TMP_InputField subscribedPlayerNameInput;
+    private PlayerStats playerStats;
     private string lastDisplayedPlayerName;
     private string lastDisplayedWeather;
     private string lastDisplayedCharacterId;
     private Sprite lastDisplayedPlayerPortrait;
     private int lastDisplayedRunSeconds = int.MinValue;
+    private float lastDisplayedHealth = float.MinValue;
+    private float lastDisplayedMaxHealth = float.MinValue;
+    private float lastDisplayedMana = float.MinValue;
+    private float lastDisplayedMaxMana = float.MinValue;
+    private int lastDisplayedLevelExperience = int.MinValue;
+    private int lastDisplayedExperienceToNextLevel = int.MinValue;
     private const int RunTimerStartSeconds = 0;
 
     private void Awake()
@@ -67,6 +77,7 @@ public class MapPageManager : MonoBehaviour
     private void Update()
     {
         ApplyRunInfoTexts();
+        ApplyPlayerProgressBars();
     }
 
     private void OnDisable()
@@ -92,6 +103,7 @@ public class MapPageManager : MonoBehaviour
             ApplyTexts(0, string.Empty);
             ApplyRunInfoTexts(forceRefresh: true);
             ApplyPlayerPortrait(forceRefresh: true);
+            ApplyPlayerProgressBars(forceRefresh: true);
             RefreshMap();
             return;
         }
@@ -99,6 +111,7 @@ public class MapPageManager : MonoBehaviour
         ApplyTexts(generator.CurrentFloor, generator.ActiveThemeDisplayName);
         ApplyRunInfoTexts(forceRefresh: true);
         ApplyPlayerPortrait(forceRefresh: true);
+        ApplyPlayerProgressBars(forceRefresh: true);
         RefreshMap();
     }
 
@@ -195,6 +208,64 @@ public class MapPageManager : MonoBehaviour
         lastDisplayedPlayerPortrait = portrait;
     }
 
+    private void ApplyPlayerProgressBars(bool forceRefresh = false)
+    {
+        ResolvePlayerStats();
+
+        if (playerStats == null)
+        {
+            ApplyProgress(hpProgressBar, 0f, string.Empty);
+            ApplyProgress(manaProgressBar, 0f, string.Empty);
+            ApplyProgress(xpProgressBar, 0f, string.Empty);
+            return;
+        }
+
+        float currentHealth = Mathf.Clamp(playerStats.currentHealth, 0f, playerStats.maxHealth);
+        float maxHealth = Mathf.Max(1f, playerStats.maxHealth);
+        if (forceRefresh
+            || !Mathf.Approximately(currentHealth, lastDisplayedHealth)
+            || !Mathf.Approximately(maxHealth, lastDisplayedMaxHealth))
+        {
+            ApplyProgress(
+                hpProgressBar,
+                currentHealth / maxHealth,
+                $"{Mathf.RoundToInt(currentHealth)}/{Mathf.RoundToInt(maxHealth)}");
+
+            lastDisplayedHealth = currentHealth;
+            lastDisplayedMaxHealth = maxHealth;
+        }
+
+        float currentMana = Mathf.Clamp(playerStats.currentMana, 0f, playerStats.maxMana);
+        float maxMana = Mathf.Max(1f, playerStats.maxMana);
+        if (forceRefresh
+            || !Mathf.Approximately(currentMana, lastDisplayedMana)
+            || !Mathf.Approximately(maxMana, lastDisplayedMaxMana))
+        {
+            ApplyProgress(
+                manaProgressBar,
+                currentMana / maxMana,
+                $"{Mathf.RoundToInt(currentMana)}/{Mathf.RoundToInt(maxMana)}");
+
+            lastDisplayedMana = currentMana;
+            lastDisplayedMaxMana = maxMana;
+        }
+
+        int levelExperience = Mathf.Max(0, playerStats.levelExperience);
+        int experienceToNextLevel = Mathf.Max(1, playerStats.experienceToNextLevel);
+        if (forceRefresh
+            || levelExperience != lastDisplayedLevelExperience
+            || experienceToNextLevel != lastDisplayedExperienceToNextLevel)
+        {
+            ApplyProgress(
+                xpProgressBar,
+                (float)levelExperience / experienceToNextLevel,
+                $"{levelExperience}/{experienceToNextLevel}");
+
+            lastDisplayedLevelExperience = levelExperience;
+            lastDisplayedExperienceToNextLevel = experienceToNextLevel;
+        }
+    }
+
     public void SetPlayerName(string value)
     {
         defaultPlayerName = string.IsNullOrWhiteSpace(value) ? defaultPlayerName : value.Trim();
@@ -220,6 +291,14 @@ public class MapPageManager : MonoBehaviour
 
         if (playerCharacterDatabase == null)
             playerCharacterDatabase = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
+
+        ResolvePlayerStats();
+    }
+
+    private void ResolvePlayerStats()
+    {
+        if (playerStats == null)
+            playerStats = PlayerStats.instance;
     }
 
     private PlayerCharacterData ResolveSelectedCharacter()
@@ -359,6 +438,12 @@ public class MapPageManager : MonoBehaviour
         {
             return value?.ToString() ?? string.Empty;
         }
+    }
+
+    private static void ApplyProgress(ProgressBarUI bar, float normalized, string displayText)
+    {
+        if (bar == null) return;
+        bar.SetProgress(normalized, displayText);
     }
 
     private string ResolvePlayerName()
