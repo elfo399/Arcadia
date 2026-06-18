@@ -72,6 +72,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Button equipButton;
 
     [Header("Wallet UI")]
+    [SerializeField] private TextMeshProUGUI coinValueText;
     [SerializeField] private TextMeshProUGUI goldValueText;
     [SerializeField] private TextMeshProUGUI silverValueText;
     [SerializeField] private TextMeshProUGUI copperValueText;
@@ -148,8 +149,8 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     {
         if (playerStats != null)
         {
-            playerStats.OnBankChanged -= HandleBankChanged;
-            playerStats.OnRunWalletChanged -= HandleRunWalletChanged;
+            playerStats.OnBankCoinsChanged -= HandleBankCoinsChanged;
+            playerStats.OnRunCoinsChanged -= HandleRunCoinsChanged;
             playerStats.OnKeysChanged -= HandleKeysChanged;
         }
 
@@ -205,9 +206,9 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             return;
 
         if (walletSource == WalletSource.Bank)
-            SetWalletValues(playerStats.bankGold, playerStats.bankSilver, playerStats.bankCopper);
+            SetWalletValue(playerStats.bankCoins);
         else
-            SetWalletValues(playerStats.runGold, playerStats.runSilver, playerStats.runCopper);
+            SetWalletValue(playerStats.runCoins);
 
         SetKeyValue(playerStats.currentKeys);
     }
@@ -1514,22 +1515,22 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         playerStats = PlayerStats.instance;
         if (playerStats != null)
         {
-            playerStats.OnBankChanged += HandleBankChanged;
-            playerStats.OnRunWalletChanged += HandleRunWalletChanged;
+            playerStats.OnBankCoinsChanged += HandleBankCoinsChanged;
+            playerStats.OnRunCoinsChanged += HandleRunCoinsChanged;
             playerStats.OnKeysChanged += HandleKeysChanged;
         }
     }
 
-    private void HandleBankChanged(int gold, int silver, int copper)
+    private void HandleBankCoinsChanged(int coins)
     {
         if (walletSource == WalletSource.Bank)
-            SetWalletValues(gold, silver, copper);
+            SetWalletValue(coins);
     }
 
-    private void HandleRunWalletChanged(int gold, int silver, int copper)
+    private void HandleRunCoinsChanged(int coins)
     {
         if (walletSource == WalletSource.Run)
-            SetWalletValues(gold, silver, copper);
+            SetWalletValue(coins);
         SetKeyValue(playerStats != null ? playerStats.currentKeys : 0);
     }
 
@@ -1538,11 +1539,101 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         SetKeyValue(keys);
     }
 
-    private void SetWalletValues(int gold, int silver, int copper)
+    private void SetWalletValue(int coins)
     {
-        if (goldValueText != null) goldValueText.text = gold.ToString();
-        if (silverValueText != null) silverValueText.text = silver.ToString();
-        if (copperValueText != null) copperValueText.text = copper.ToString();
+        TextMeshProUGUI target = ResolveCoinValueText();
+        ApplyUnifiedWalletVisuals(target);
+
+        if (target != null)
+            target.text = Mathf.Max(0, coins).ToString();
+
+        ClearLegacyWalletText(goldValueText, target);
+        ClearLegacyWalletText(silverValueText, target);
+        ClearLegacyWalletText(copperValueText, target);
+    }
+
+    private TextMeshProUGUI ResolveCoinValueText()
+    {
+        if (coinValueText != null) return coinValueText;
+        if (goldValueText != null) return goldValueText;
+        if (copperValueText != null) return copperValueText;
+        return silverValueText;
+    }
+
+    private static void ClearLegacyWalletText(TextMeshProUGUI text, TextMeshProUGUI target)
+    {
+        if (text != null && text != target)
+            text.text = string.Empty;
+    }
+
+    private void ApplyUnifiedWalletVisuals(TextMeshProUGUI target)
+    {
+        SetWalletGroupActive(goldValueText, target);
+        SetWalletGroupActive(silverValueText, target);
+        SetWalletGroupActive(copperValueText, target);
+        RenameWalletLabel(target, "Coin");
+    }
+
+    private void SetWalletGroupActive(TextMeshProUGUI text, TextMeshProUGUI target)
+    {
+        if (text == null)
+            return;
+
+        Transform root = FindWalletRoot(text);
+        if (root == null)
+            return;
+
+        bool shouldBeActive = text == target || (target != null && target.transform.IsChildOf(root));
+        root.gameObject.SetActive(shouldBeActive);
+    }
+
+    private void RenameWalletLabel(TextMeshProUGUI target, string label)
+    {
+        if (target == null)
+            return;
+
+        Transform root = FindWalletRoot(target);
+        if (root == null)
+            return;
+
+        TextMeshProUGUI[] texts = root.GetComponentsInChildren<TextMeshProUGUI>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            TextMeshProUGUI candidate = texts[i];
+            if (candidate == null || candidate == target)
+                continue;
+
+            string value = candidate.text != null ? candidate.text.Trim() : string.Empty;
+            if (value == "Gold" || value == "Silver" || value == "Copper")
+            {
+                candidate.text = label;
+                return;
+            }
+        }
+    }
+
+    private Transform FindWalletRoot(TextMeshProUGUI text)
+    {
+        if (text == null)
+            return null;
+
+        Transform current = text.transform;
+        while (current != null && current != transform)
+        {
+            if (IsWalletRootName(current.name))
+                return current;
+            current = current.parent;
+        }
+
+        return text.transform.parent != null ? text.transform.parent : text.transform;
+    }
+
+    private static bool IsWalletRootName(string objectName)
+    {
+        return objectName == "Gold"
+            || objectName == "Silver"
+            || objectName == "Copper"
+            || objectName == "Coin";
     }
 
     private void SetKeyValue(int keys)

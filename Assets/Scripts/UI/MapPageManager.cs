@@ -12,6 +12,7 @@ public class MapPageManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI playerNameText;
     [SerializeField] private TextMeshProUGUI weatherText;
     [SerializeField] private TextMeshProUGUI runTimerText;
+    [SerializeField] private TextMeshProUGUI coinValueText;
     [SerializeField] private Image playerPortraitImage;
     [SerializeField] private TMP_InputField playerNameInput;
     [SerializeField] private RectTransform mapContainer;
@@ -43,6 +44,7 @@ public class MapPageManager : MonoBehaviour
     private string lastDisplayedCharacterId;
     private Sprite lastDisplayedPlayerPortrait;
     private int lastDisplayedRunSeconds = int.MinValue;
+    private int lastDisplayedCoins = int.MinValue;
     private float lastDisplayedHealth = float.MinValue;
     private float lastDisplayedMaxHealth = float.MinValue;
     private float lastDisplayedMana = float.MinValue;
@@ -77,6 +79,7 @@ public class MapPageManager : MonoBehaviour
     private void Update()
     {
         ApplyRunInfoTexts();
+        ApplyCoinText();
         ApplyPlayerProgressBars();
     }
 
@@ -102,6 +105,7 @@ public class MapPageManager : MonoBehaviour
         {
             ApplyTexts(0, string.Empty);
             ApplyRunInfoTexts(forceRefresh: true);
+            ApplyCoinText(forceRefresh: true);
             ApplyPlayerPortrait(forceRefresh: true);
             ApplyPlayerProgressBars(forceRefresh: true);
             RefreshMap();
@@ -110,6 +114,7 @@ public class MapPageManager : MonoBehaviour
 
         ApplyTexts(generator.CurrentFloor, generator.ActiveThemeDisplayName);
         ApplyRunInfoTexts(forceRefresh: true);
+        ApplyCoinText(forceRefresh: true);
         ApplyPlayerPortrait(forceRefresh: true);
         ApplyPlayerProgressBars(forceRefresh: true);
         RefreshMap();
@@ -183,6 +188,31 @@ public class MapPageManager : MonoBehaviour
                 runTimerText.text = FormatText(runTimerFormat, FormatElapsedTime(elapsedSeconds));
                 lastDisplayedRunSeconds = elapsedSeconds;
             }
+        }
+    }
+
+    private void ApplyCoinText(bool forceRefresh = false)
+    {
+        ResolveCoinValueText();
+        if (coinValueText == null)
+            return;
+
+        ResolvePlayerStats();
+        if (playerStats == null)
+        {
+            if (forceRefresh || lastDisplayedCoins != 0)
+            {
+                coinValueText.text = string.Empty;
+                lastDisplayedCoins = 0;
+            }
+            return;
+        }
+
+        int coins = Mathf.Max(0, playerStats.runCoins);
+        if (forceRefresh || coins != lastDisplayedCoins)
+        {
+            coinValueText.text = coins.ToString();
+            lastDisplayedCoins = coins;
         }
     }
 
@@ -292,6 +322,7 @@ public class MapPageManager : MonoBehaviour
         if (playerCharacterDatabase == null)
             playerCharacterDatabase = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
 
+        ResolveCoinValueText();
         ResolvePlayerStats();
     }
 
@@ -299,6 +330,52 @@ public class MapPageManager : MonoBehaviour
     {
         if (playerStats == null)
             playerStats = PlayerStats.instance;
+    }
+
+    private void ResolveCoinValueText()
+    {
+        if (coinValueText != null)
+            return;
+
+        coinValueText = FindMapPageCoinCountText();
+    }
+
+    private static TextMeshProUGUI FindMapPageCoinCountText()
+    {
+        TextMeshProUGUI fallback = null;
+        TextMeshProUGUI[] texts = FindObjectsOfType<TextMeshProUGUI>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            TextMeshProUGUI text = texts[i];
+            if (text == null || text.name != "Count")
+                continue;
+
+            Transform parent = text.transform.parent;
+            if (parent == null || parent.name != "Coin")
+                continue;
+
+            if (HasAncestor(parent, "MapPage"))
+                return text;
+
+            if (fallback == null)
+                fallback = text;
+        }
+
+        return fallback;
+    }
+
+    private static bool HasAncestor(Transform transform, string ancestorName)
+    {
+        Transform current = transform;
+        while (current != null)
+        {
+            if (current.name == ancestorName)
+                return true;
+
+            current = current.parent;
+        }
+
+        return false;
     }
 
     private PlayerCharacterData ResolveSelectedCharacter()

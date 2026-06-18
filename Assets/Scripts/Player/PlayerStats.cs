@@ -5,6 +5,9 @@ using System.Collections.Generic;
 
 public class PlayerStats : MonoBehaviour, IDamageable
 {
+    public const int BronzeCoinValue = 1;
+    public const int SilverCoinValue = 5;
+    public const int GoldCoinValue = 10;
     public const int MaxAllocatableAttributeLevel = 99;
     public static PlayerStats instance;
 
@@ -36,15 +39,19 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public float flaskUseCooldown = 1f;
 
     [Header("Economia (Run Corrente)")]
-    public int runGold = 0;
-    public int runSilver = 0;
-    public int runCopper = 0;
+    public int runCoins = 0;
+    [HideInInspector] public int runGold = 0;
+    [HideInInspector] public int runSilver = 0;
+    [HideInInspector] public int runCopper = 0;
+    public event Action<int> OnRunCoinsChanged;
     public event Action<int, int, int> OnRunWalletChanged;
 
     [Header("Banca (Persistente)")]
-    public int bankGold = 0;
-    public int bankSilver = 0;
-    public int bankCopper = 0;
+    public int bankCoins = 0;
+    [HideInInspector] public int bankGold = 0;
+    [HideInInspector] public int bankSilver = 0;
+    [HideInInspector] public int bankCopper = 0;
+    public event Action<int> OnBankCoinsChanged;
     public event Action<int, int, int> OnBankChanged;
 
     [Header("Chiavi")]
@@ -140,6 +147,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         currentFlasks = maxFlasks;
 
         LoadStats();
+        MigrateSerializedWalletsIfNeeded();
         RecalculateDerivedStats(keepCurrentRatio: true);
         RefreshArmorTotals();
         UpdateAllUI();
@@ -185,16 +193,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
         ApplyLoadedQuestStateIfPossible();
         ApplyLoadedInventoryStateIfPossible();
 
-        // Ogni run parte senza monete portatili
-        if (scene.name == "GameScene")
-        {
-            ResetRunWallet();
-        }
+        SyncLegacyWalletFields();
+        NotifyRunWalletChanged();
     }
 
     private void ResetRunWallet()
     {
-        runGold = runSilver = runCopper = 0;
+        runCoins = 0;
+        SyncLegacyWalletFields();
         NotifyRunWalletChanged();
     }
 
@@ -209,12 +215,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
     }
 
     // --- GESTIONE MONETE ---
-    public void AddCoins(int copperAmount)
+    public void AddCoins(int coinAmount)
     {
-        // Tutte le monete raccolte sono espresse in rame, converti
-        runCopper += Mathf.Max(0, copperAmount);
-        NormalizeRunWallet();
+        runCoins += Mathf.Max(0, coinAmount);
+        SyncLegacyWalletFields();
         NotifyRunWalletChanged();
+        SaveStats();
     }
 
     // --- GESTIONE CHIAVI ---
@@ -479,6 +485,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
             karma = this.karma,
             benedetto = this.benedetto,
             malefico = this.malefico,
+            usesUnifiedCoins = true,
+            bankCoins = this.bankCoins,
+            runCoins = this.runCoins,
             bankGold = this.bankGold,
             bankSilver = this.bankSilver,
             bankCopper = this.bankCopper
@@ -554,9 +563,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
             this.karma = data.karma;
             this.benedetto = data.benedetto;
             this.malefico = data.malefico;
-            this.bankGold = data.bankGold;
-            this.bankSilver = data.bankSilver;
-            this.bankCopper = data.bankCopper;
+            this.runCoins = Mathf.Max(0, data.runCoins);
+            this.bankCoins = ResolveSavedBankCoins(data);
+            SyncLegacyWalletFields();
             // Non applicare qui quest/inventory: se avviene prima degli Awake degli altri componenti
             // (es. PlayerInventory), il loro Awake può sovrascrivere i dati caricati.
             // L'applicazione viene fatta in Start() e OnSceneLoaded().
@@ -617,9 +626,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
         this.karma = data.karma;
         this.benedetto = data.benedetto;
         this.malefico = data.malefico;
-        this.bankGold = data.bankGold;
-        this.bankSilver = data.bankSilver;
-        this.bankCopper = data.bankCopper;
+        this.runCoins = Mathf.Max(0, data.runCoins);
+        this.bankCoins = ResolveSavedBankCoins(data);
+        SyncLegacyWalletFields();
     }
 
     public bool TryApplySelectedCharacterStart(PlayerCharacterDatabase database)
@@ -718,12 +727,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
         karma = character.karma;
         benedetto = character.benedetto;
         malefico = character.malefico;
-        runGold = 0;
-        runSilver = 0;
-        runCopper = 0;
-        bankGold = 0;
-        bankSilver = 0;
-        bankCopper = 0;
+        runCoins = 0;
+        bankCoins = 0;
+        SyncLegacyWalletFields();
         currentKeys = 0;
 
         baseMaxHealth = Mathf.Max(1f, character.baseMaxHealth);
@@ -1126,58 +1132,61 @@ public class PlayerStats : MonoBehaviour, IDamageable
     }
 
     // --- BANCA PERSISTENTE ---
-    public void Deposit(int gold, int silver, int copper)
+    public void DepositCoins(int amount)
     {
-        // Preleva dal wallet di run e deposita in banca
-        gold = Mathf.Max(0, gold);
-        silver = Mathf.Max(0, silver);
-        copper = Mathf.Max(0, copper);
+        amount = Mathf.Max(0, amount);
+        if (!SpendRunCoins(amount)) return;
 
-        if (!SpendRunFunds(gold, silver, copper)) return;
-
-        bankGold += gold;
-        bankSilver += silver;
-        bankCopper += copper;
-        NormalizeBank();
+        bankCoins += amount;
+        SyncLegacyWalletFields();
         SaveStats();
         NotifyBankChanged();
         NotifyRunWalletChanged();
     }
 
-    public bool Withdraw(int gold, int silver, int copper)
+    public void Deposit(int gold, int silver, int copper)
     {
-        NormalizeBank();
-        if (!HasBankFunds(gold, silver, copper)) return false;
+        DepositCoins(ConvertCoinTripletToCoins(gold, silver, copper));
+    }
 
-        bankGold -= gold;
-        bankSilver -= silver;
-        bankCopper -= copper;
-        NormalizeBank();
-        // Aggiunge al wallet di run
-        runGold += gold;
-        runSilver += silver;
-        runCopper += copper;
-        NormalizeRunWallet();
+    public bool WithdrawCoins(int amount)
+    {
+        amount = Mathf.Max(0, amount);
+        if (!HasBankCoins(amount)) return false;
+
+        bankCoins -= amount;
+        runCoins += amount;
+        SyncLegacyWalletFields();
         SaveStats();
         NotifyBankChanged();
         NotifyRunWalletChanged();
         return true;
     }
 
+    public bool Withdraw(int gold, int silver, int copper)
+    {
+        return WithdrawCoins(ConvertCoinTripletToCoins(gold, silver, copper));
+    }
+
+    public bool HasBankCoins(int amount)
+    {
+        return bankCoins >= Mathf.Max(0, amount);
+    }
+
     public bool HasBankFunds(int gold, int silver, int copper)
     {
-        NormalizeBank();
-        // Semplificazione: confronta per valuta separata
-        return bankGold >= gold && bankSilver >= silver && bankCopper >= copper;
+        return HasBankCoins(ConvertCoinTripletToCoins(gold, silver, copper));
     }
 
     private void NormalizeBank()
     {
-        NormalizeWallet(ref bankGold, ref bankSilver, ref bankCopper);
+        bankCoins = Mathf.Max(0, bankCoins);
+        SyncLegacyWalletFields();
     }
 
     private void NotifyBankChanged()
     {
+        OnBankCoinsChanged?.Invoke(bankCoins);
         OnBankChanged?.Invoke(bankGold, bankSilver, bankCopper);
     }
 
@@ -1188,36 +1197,48 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     void Die()
     {
+        ResetRunWallet();
         SaveStatsImmediate();
         Debug.Log("SEI MORTO! Ritorno all'Hub...");
         SceneManager.LoadScene("HubScene");
     }
 
     // --- WALLET DI RUN ---
-    public bool HasRunFunds(int gold, int silver, int copper)
+    public bool HasRunCoins(int amount)
     {
-        NormalizeRunWallet();
-        return runGold >= gold && runSilver >= silver && runCopper >= copper;
+        return runCoins >= Mathf.Max(0, amount);
     }
 
-    public bool SpendRunFunds(int gold, int silver, int copper)
+    public bool HasRunFunds(int gold, int silver, int copper)
     {
-        if (!HasRunFunds(gold, silver, copper)) return false;
-        runGold -= gold;
-        runSilver -= silver;
-        runCopper -= copper;
-        NormalizeRunWallet();
+        return HasRunCoins(ConvertCoinTripletToCoins(gold, silver, copper));
+    }
+
+    public bool SpendRunCoins(int amount)
+    {
+        amount = Mathf.Max(0, amount);
+        if (!HasRunCoins(amount)) return false;
+
+        runCoins -= amount;
+        SyncLegacyWalletFields();
         NotifyRunWalletChanged();
         return true;
     }
 
+    public bool SpendRunFunds(int gold, int silver, int copper)
+    {
+        return SpendRunCoins(ConvertCoinTripletToCoins(gold, silver, copper));
+    }
+
     private void NormalizeRunWallet()
     {
-        NormalizeWallet(ref runGold, ref runSilver, ref runCopper);
+        runCoins = Mathf.Max(0, runCoins);
+        SyncLegacyWalletFields();
     }
 
     private void NotifyRunWalletChanged()
     {
+        OnRunCoinsChanged?.Invoke(runCoins);
         OnRunWalletChanged?.Invoke(runGold, runSilver, runCopper);
     }
 
@@ -1512,23 +1533,56 @@ public class PlayerStats : MonoBehaviour, IDamageable
         return cachedPlayerInventory;
     }
 
-    private static void NormalizeWallet(ref int gold, ref int silver, ref int copper)
+    private void MigrateSerializedWalletsIfNeeded()
     {
-        const int rate = 100; // 100 rame = 1 argento, 100 argento = 1 oro
-        if (copper >= rate)
-        {
-            silver += copper / rate;
-            copper %= rate;
-        }
-        if (silver >= rate)
-        {
-            gold += silver / rate;
-            silver %= rate;
-        }
+        if (runCoins <= 0 && HasLegacyWalletValue(runGold, runSilver, runCopper))
+            runCoins = ConvertCoinTripletToCoins(runGold, runSilver, runCopper);
 
-        gold = Mathf.Max(0, gold);
-        silver = Mathf.Max(0, silver);
-        copper = Mathf.Max(0, copper);
+        if (bankCoins <= 0 && HasLegacyWalletValue(bankGold, bankSilver, bankCopper))
+            bankCoins = ConvertCoinTripletToCoins(bankGold, bankSilver, bankCopper);
+
+        runCoins = Mathf.Max(0, runCoins);
+        bankCoins = Mathf.Max(0, bankCoins);
+        SyncLegacyWalletFields();
+    }
+
+    private void SyncLegacyWalletFields()
+    {
+        runCoins = Mathf.Max(0, runCoins);
+        bankCoins = Mathf.Max(0, bankCoins);
+
+        runGold = 0;
+        runSilver = 0;
+        runCopper = runCoins;
+
+        bankGold = 0;
+        bankSilver = 0;
+        bankCopper = bankCoins;
+    }
+
+    private static int ResolveSavedBankCoins(GameData data)
+    {
+        if (data == null)
+            return 0;
+
+        if (data.usesUnifiedCoins)
+            return Mathf.Max(0, data.bankCoins);
+
+        return ConvertCoinTripletToCoins(data.bankGold, data.bankSilver, data.bankCopper);
+    }
+
+    private static bool HasLegacyWalletValue(int gold, int silver, int copper)
+    {
+        return gold > 0 || silver > 0 || copper > 0;
+    }
+
+    private static int ConvertCoinTripletToCoins(int gold, int silver, int copper)
+    {
+        long total = 0;
+        total += (long)Mathf.Max(0, gold) * GoldCoinValue;
+        total += (long)Mathf.Max(0, silver) * SilverCoinValue;
+        total += (long)Mathf.Max(0, copper) * BronzeCoinValue;
+        return total > int.MaxValue ? int.MaxValue : (int)total;
     }
 }
 

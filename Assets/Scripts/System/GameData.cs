@@ -97,8 +97,16 @@ public class GameData
     public int malefico;
 
     // Banked currency (persistent across runs)
+    public bool usesUnifiedCoins;
+    public int bankCoins;
+    public int runCoins;
+
+    // Legacy currency fields, kept only in memory to migrate older saves.
+    [System.NonSerialized]
     public int bankGold;
+    [System.NonSerialized]
     public int bankSilver;
+    [System.NonSerialized]
     public int bankCopper;
 
     // Quest state (completo) per ricostruire il Journal identico al salvataggio

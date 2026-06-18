@@ -36,7 +36,8 @@ public static class SaveSystem
         {
             selectedCharacterId = normalizedId,
             characterName = resolvedName,
-            selectedCharacterStartApplied = false
+            selectedCharacterStartApplied = false,
+            usesUnifiedCoins = true
         };
 
         SaveData(newData);
@@ -45,6 +46,9 @@ public static class SaveSystem
 
     public static void SaveData(GameData data)
     {
+        if (data != null)
+            data.usesUnifiedCoins = true;
+
         string path = GetSaveFilePath(data != null ? data.selectedCharacterId : string.Empty);
         string json = JsonUtility.ToJson(data, true); // 'true' per formattare il JSON in modo leggibile
 
@@ -183,6 +187,7 @@ public static class SaveSystem
         {
             string json = File.ReadAllText(path);
             GameData data = JsonUtility.FromJson<GameData>(json);
+            MigrateLegacyCurrencyFields(data, json);
             Debug.Log($"Dati caricati con successo da: {path}");
             return data;
         }
@@ -229,5 +234,47 @@ public static class SaveSystem
             normalized = normalized.Replace(invalid[i], '_');
 
         return normalized;
+    }
+
+    private static void MigrateLegacyCurrencyFields(GameData data, string json)
+    {
+        if (data == null || string.IsNullOrWhiteSpace(json) || data.usesUnifiedCoins)
+            return;
+
+        if (data.bankCoins > 0)
+        {
+            data.usesUnifiedCoins = true;
+            return;
+        }
+
+        int legacyGold = ReadJsonInt(json, "bankGold");
+        int legacySilver = ReadJsonInt(json, "bankSilver");
+        int legacyCopper = ReadJsonInt(json, "bankCopper");
+
+        if (legacyGold <= 0 && legacySilver <= 0 && legacyCopper <= 0)
+            return;
+
+        long migratedCoins = 0;
+        migratedCoins += (long)Mathf.Max(0, legacyGold) * PlayerStats.GoldCoinValue;
+        migratedCoins += (long)Mathf.Max(0, legacySilver) * PlayerStats.SilverCoinValue;
+        migratedCoins += (long)Mathf.Max(0, legacyCopper) * PlayerStats.BronzeCoinValue;
+
+        data.bankCoins = migratedCoins > int.MaxValue ? int.MaxValue : (int)migratedCoins;
+        data.usesUnifiedCoins = true;
+    }
+
+    private static int ReadJsonInt(string json, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(json) || string.IsNullOrWhiteSpace(fieldName))
+            return 0;
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            json,
+            "\"" + System.Text.RegularExpressions.Regex.Escape(fieldName) + "\"\\s*:\\s*(-?\\d+)");
+
+        if (!match.Success)
+            return 0;
+
+        return int.TryParse(match.Groups[1].Value, out int value) ? value : 0;
     }
 }
