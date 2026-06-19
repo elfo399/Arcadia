@@ -12,12 +12,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Transform magicSlotParent;
     [SerializeField] private int magicInitialSlotCount = 12;
 
-    [Header("Drag & Drop")]
-    [SerializeField] private Canvas dragCanvas;
-    [SerializeField] private Image dragPreviewTemplate;
-
     [Header("Magic Detail")]
-    [SerializeField] private bool autoWireMagicReferences = false;
     [SerializeField] private GameObject magicDetailRoot;
     [SerializeField] private Image magicImage;
     [SerializeField] private TextMeshProUGUI magicTitle;
@@ -45,9 +40,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     {
         playerInventory = inventory != null ? inventory : playerInventory;
         equipmentManager = equipment != null ? equipment : equipmentManager;
-
-        if (autoWireMagicReferences && magicSlotParent == null)
-            AutoWireMagicReferences();
 
         if (magicSlotParent == null)
             return;
@@ -525,17 +517,10 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         RectTransform previewRoot = ResolveDragPreviewRoot(targetCanvas);
         if (previewRoot == null) return;
 
-        if (dragPreviewTemplate == null)
-        {
-            GameObject go = new GameObject("MagicDragPreview", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-            go.transform.SetParent(previewRoot, false);
-            activeDragPreview = go.GetComponent<Image>();
-            activeDragPreview.raycastTarget = false;
-        }
-        else
-        {
-            activeDragPreview = Instantiate(dragPreviewTemplate, previewRoot);
-        }
+        GameObject go = new GameObject("MagicDragPreview", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        go.transform.SetParent(previewRoot, false);
+        activeDragPreview = go.GetComponent<Image>();
+        activeDragPreview.raycastTarget = false;
 
         activeDragPreview.sprite = icon;
         activeDragPreview.color = Color.white;
@@ -573,9 +558,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     private Canvas ResolveDragCanvas()
     {
-        if (dragCanvas != null && dragCanvas.isActiveAndEnabled)
-            return dragCanvas;
-
         Canvas parentCanvas = GetComponentInParent<Canvas>();
         if (parentCanvas != null && parentCanvas.isActiveAndEnabled)
             return parentCanvas;
@@ -656,62 +638,4 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     {
     }
 
-    private void AutoWireMagicReferences()
-    {
-        GameObject magicRootObject = equipmentManager != null ? equipmentManager.MagicBackground : null;
-        if (magicRootObject == null)
-            magicRootObject = FindDeepChildByName(transform.root, "MagicBackground")?.gameObject;
-
-        var root = magicRootObject != null ? magicRootObject.transform : null;
-        if (root == null) return;
-
-        if (magicSlotParent == null)
-            magicSlotParent = FindDescendantByPath(root, "GridBackground/GridInv") ?? FindDeepChildByName(root, "GridInv");
-
-        if (magicDetailRoot == null)
-            magicDetailRoot = FindDeepChildByName(root, "DescMagic")?.gameObject;
-
-        var detailTf = magicDetailRoot != null ? magicDetailRoot.transform : null;
-        if (detailTf != null)
-        {
-            if (magicImage == null)
-            {
-                var imageTf = FindDeepChildByName(detailTf, "Image");
-                if (imageTf != null) magicImage = imageTf.GetComponent<Image>();
-            }
-
-            if (magicTitle == null) magicTitle = FindDeepTextByName(detailTf, "Title");
-            if (magicDesc == null) magicDesc = FindDeepTextByName(detailTf, "Desc");
-            if (magicDamageText == null) magicDamageText = FindDeepTextByName(detailTf, "Damage");
-            if (magicCriticalText == null) magicCriticalText = FindDeepTextByName(detailTf, "Critical");
-            if (magicScalingText == null) magicScalingText = FindDeepTextByName(detailTf, "Scaling");
-            if (magicRequirementsText == null) magicRequirementsText = FindDeepTextByName(detailTf, "Requirement");
-        }
-    }
-
-    private static Transform FindDescendantByPath(Transform root, string path)
-    {
-        return root != null && !string.IsNullOrWhiteSpace(path) ? root.Find(path) : null;
-    }
-
-    private static Transform FindDeepChildByName(Transform root, string childName)
-    {
-        if (root == null || string.IsNullOrWhiteSpace(childName)) return null;
-        for (int i = 0; i < root.childCount; i++)
-        {
-            var child = root.GetChild(i);
-            if (child.name == childName)
-                return child;
-            var found = FindDeepChildByName(child, childName);
-            if (found != null)
-                return found;
-        }
-        return null;
-    }
-
-    private static TextMeshProUGUI FindDeepTextByName(Transform root, string childName)
-    {
-        var tf = FindDeepChildByName(root, childName);
-        return tf != null ? tf.GetComponent<TextMeshProUGUI>() : null;
-    }
 }

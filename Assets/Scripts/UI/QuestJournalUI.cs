@@ -4,11 +4,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 public class QuestJournalUI : MonoBehaviour
 {
@@ -21,8 +17,6 @@ public class QuestJournalUI : MonoBehaviour
 
     [Header("Quest UI")]
     [SerializeField] private bool useQuestManager = true;
-    [SerializeField] private bool autoWireQuestUI = false;
-    [SerializeField] private bool editorAutoAssignQuestPrefabs = false;
     [SerializeField] private Transform questListContainer;
     [SerializeField] private QuestItemUI questItemPrefab;
     [SerializeField] private List<QuestEntryData> startingQuests = new();
@@ -36,10 +30,8 @@ public class QuestJournalUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI questDetailLoreTitleText;
     [SerializeField] private TextMeshProUGUI questDetailLoreDescriptionText;
     [SerializeField] private TextMeshProUGUI questDetailLoreAuthorText;
-    [SerializeField] private RectTransform questDetailLoreRoot;
     [SerializeField] private RectTransform questDetailPanelRoot;
     [SerializeField] private bool showQuestDetailOnlyOnSelection = true;
-    [SerializeField] private bool collapseQuestLoreWhenEmpty = true;
     [SerializeField] private Transform questObjectivesContainer;
     [SerializeField] private QuestObjectiveItemUI questObjectivePrefab;
     [SerializeField] private Transform questRewardsContainer;
@@ -47,11 +39,6 @@ public class QuestJournalUI : MonoBehaviour
     [SerializeField] private Button questClaimRewardButton;
     [SerializeField] private int questRewardInventoryCapacity = -1;
     [SerializeField] private int questRewardMagicCapacity = -1;
-    [SerializeField] private ScrollRect questDetailScrollRect;
-    [SerializeField] private bool smoothQuestMouseWheel = true;
-    [SerializeField] private float questMouseWheelStepNormalized = 0.10f;
-    [SerializeField] private float questMouseWheelSmoothSpeed = 14f;
-    [SerializeField] private float questPadRightStickScrollSpeed = 0.65f;
     [SerializeField] private Color questPadFocusBorderColor = new Color(1f, 0.85f, 0.2f, 1f);
     [SerializeField] private Vector2 questPadFocusBorderThickness = new Vector2(3f, 3f);
 
@@ -63,12 +50,9 @@ public class QuestJournalUI : MonoBehaviour
     private readonly List<QuestItemUI> spawnedQuestRows = new();
     private readonly List<QuestObjectiveItemUI> spawnedObjectiveRows = new();
     private readonly List<QuestRewardItemUI> spawnedRewardRows = new();
-    private float questTargetScrollNormalized = 1f;
-    private bool questTargetScrollInitialized;
     private float suppressQuestRowClickUntil;
 
     public bool UseQuestManager { get => useQuestManager; set => useQuestManager = value; }
-    public bool AutoWireQuestUI { get => autoWireQuestUI; set => autoWireQuestUI = value; }
     public Transform QuestListContainer { get => questListContainer; set => questListContainer = value; }
     public QuestItemUI QuestItemPrefab { get => questItemPrefab; set => questItemPrefab = value; }
     public List<QuestEntryData> StartingQuests => startingQuests;
@@ -80,10 +64,8 @@ public class QuestJournalUI : MonoBehaviour
     public TextMeshProUGUI QuestDetailLoreTitleText { get => questDetailLoreTitleText; set => questDetailLoreTitleText = value; }
     public TextMeshProUGUI QuestDetailLoreDescriptionText { get => questDetailLoreDescriptionText; set => questDetailLoreDescriptionText = value; }
     public TextMeshProUGUI QuestDetailLoreAuthorText { get => questDetailLoreAuthorText; set => questDetailLoreAuthorText = value; }
-    public RectTransform QuestDetailLoreRoot { get => questDetailLoreRoot; set => questDetailLoreRoot = value; }
     public RectTransform QuestDetailPanelRoot { get => questDetailPanelRoot; set => questDetailPanelRoot = value; }
     public bool ShowQuestDetailOnlyOnSelection { get => showQuestDetailOnlyOnSelection; set => showQuestDetailOnlyOnSelection = value; }
-    public bool CollapseQuestLoreWhenEmpty { get => collapseQuestLoreWhenEmpty; set => collapseQuestLoreWhenEmpty = value; }
     public Transform QuestObjectivesContainer { get => questObjectivesContainer; set => questObjectivesContainer = value; }
     public QuestObjectiveItemUI QuestObjectivePrefab { get => questObjectivePrefab; set => questObjectivePrefab = value; }
     public Transform QuestRewardsContainer { get => questRewardsContainer; set => questRewardsContainer = value; }
@@ -91,25 +73,12 @@ public class QuestJournalUI : MonoBehaviour
     public Button QuestClaimRewardButton { get => questClaimRewardButton; set => questClaimRewardButton = value; }
     public int QuestRewardInventoryCapacity { get => questRewardInventoryCapacity; set => questRewardInventoryCapacity = value; }
     public int QuestRewardMagicCapacity { get => questRewardMagicCapacity; set => questRewardMagicCapacity = value; }
-    public ScrollRect QuestDetailScrollRect { get => questDetailScrollRect; set => questDetailScrollRect = value; }
-    public bool SmoothQuestMouseWheel { get => smoothQuestMouseWheel; set => smoothQuestMouseWheel = value; }
-    public float QuestMouseWheelStepNormalized { get => questMouseWheelStepNormalized; set => questMouseWheelStepNormalized = value; }
-    public float QuestMouseWheelSmoothSpeed { get => questMouseWheelSmoothSpeed; set => questMouseWheelSmoothSpeed = value; }
-    public float QuestPadRightStickScrollSpeed { get => questPadRightStickScrollSpeed; set => questPadRightStickScrollSpeed = value; }
     public Color QuestPadFocusBorderColor { get => questPadFocusBorderColor; set => questPadFocusBorderColor = value; }
     public Vector2 QuestPadFocusBorderThickness { get => questPadFocusBorderThickness; set => questPadFocusBorderThickness = value; }
 
     private void OnDestroy()
     {
         UnbindQuestManager();
-    }
-
-    private void Update()
-    {
-        if (!initialized)
-            return;
-
-        UpdateMouseWheelSmoothScroll(IsQuestTabVisualActive());
     }
 
     public void InitializeIfNeeded()
@@ -121,18 +90,8 @@ public class QuestJournalUI : MonoBehaviour
 
         ResolveDependencies();
 
-        if (autoWireQuestUI)
-            AutoWireQuestUIReferences();
-
-        RepairQuestDetailPanelRootReference();
-
-        if (editorAutoAssignQuestPrefabs)
-            TryEditorAutoAssignQuestPrefabs();
-
         if (questListContainer != null)
         {
-            if (questItemPrefab == null && questListContainer.childCount > 0)
-                questItemPrefab = questListContainer.GetChild(0).GetComponent<QuestItemUI>();
             if (questItemPrefab != null && questItemPrefab.transform.parent == questListContainer)
                 questItemPrefab.gameObject.SetActive(false);
         }
@@ -165,37 +124,6 @@ public class QuestJournalUI : MonoBehaviour
     {
         UpdateQuestDetailPanel(null);
         ClearPadFocusVisual();
-    }
-
-    public void UpdateMouseWheelSmoothScroll(bool isQuestTabActive)
-    {
-        if (!smoothQuestMouseWheel || !isQuestTabActive) return;
-        if (questDetailScrollRect == null || !questDetailScrollRect.vertical) return;
-        if (Mouse.current == null) return;
-
-        if (!questTargetScrollInitialized)
-        {
-            questTargetScrollNormalized = questDetailScrollRect.verticalNormalizedPosition;
-            questTargetScrollInitialized = true;
-        }
-
-        if (questDetailScrollRect.scrollSensitivity != 0f)
-            questDetailScrollRect.scrollSensitivity = 0f;
-
-        var viewport = questDetailScrollRect.viewport != null ? questDetailScrollRect.viewport : questDetailScrollRect.transform as RectTransform;
-        if (viewport == null) return;
-
-        Vector2 mousePos = Mouse.current.position.ReadValue();
-        if (!RectTransformUtility.RectangleContainsScreenPoint(viewport, mousePos, null))
-            return;
-
-        float wheel = Mouse.current.scroll.ReadValue().y;
-        if (Mathf.Abs(wheel) > 0.01f)
-            questTargetScrollNormalized = Mathf.Clamp01(questTargetScrollNormalized + (wheel * questMouseWheelStepNormalized / 120f));
-
-        float current = questDetailScrollRect.verticalNormalizedPosition;
-        float t = 1f - Mathf.Exp(-questMouseWheelSmoothSpeed * Time.unscaledDeltaTime);
-        questDetailScrollRect.verticalNormalizedPosition = Mathf.Lerp(current, questTargetScrollNormalized, t);
     }
 
     public void SetQuestFilterAll() { RefreshUI(IsPadFocusVisible()); }
@@ -301,17 +229,6 @@ public class QuestJournalUI : MonoBehaviour
         RefreshSelectedQuestDetails();
         if (showPadFocus && IsQuestTabVisualActive())
             ApplyPadFocusVisual(showPadFocus);
-    }
-
-    public void ScrollDetailByPad(float axisY, float deltaTime, bool isQuestTabActive)
-    {
-        if (!isQuestTabActive) return;
-        if (questManager == null || questManager.CurrentJournalPadSection != QuestManager.JournalPadSection.Detail) return;
-        if (questDetailScrollRect == null || !questDetailScrollRect.vertical) return;
-        if (Mathf.Abs(axisY) < 0.15f) return;
-
-        float delta = axisY * questPadRightStickScrollSpeed * Mathf.Max(0.001f, deltaTime);
-        questDetailScrollRect.verticalNormalizedPosition = Mathf.Clamp01(questDetailScrollRect.verticalNormalizedPosition + delta);
     }
 
     public bool HandlePadBack(bool showPadFocus)
@@ -455,7 +372,6 @@ public class QuestJournalUI : MonoBehaviour
         if (questDetailLoreDescriptionText != null) questDetailLoreDescriptionText.text = quest != null ? (quest.loreDescription ?? string.Empty) : string.Empty;
         if (questDetailLoreAuthorText != null) questDetailLoreAuthorText.text = quest != null ? (quest.loreAuthor ?? string.Empty) : string.Empty;
 
-        UpdateQuestLoreVisibility(quest);
         UpdateQuestClaimButtonState(quest);
         RebuildQuestObjectiveRows(quest);
         RebuildQuestRewardRows(quest);
@@ -516,15 +432,6 @@ public class QuestJournalUI : MonoBehaviour
         RefreshUI(IsPadFocusVisible());
         Debug.Log("[QuestJournalUI] Claim reward completed.", this);
     }
-    private void UpdateQuestLoreVisibility(QuestEntryData quest)
-    {
-        bool hasLore = quest != null && (!string.IsNullOrWhiteSpace(quest.loreTitle) || !string.IsNullOrWhiteSpace(quest.loreDescription) || !string.IsNullOrWhiteSpace(quest.loreAuthor));
-        if (collapseQuestLoreWhenEmpty && questDetailLoreRoot != null)
-            questDetailLoreRoot.gameObject.SetActive(hasLore);
-        else if (questDetailLoreRoot != null)
-            questDetailLoreRoot.gameObject.SetActive(true);
-    }
-
     private void RebuildQuestObjectiveRows(QuestEntryData quest)
     {
         ClearSpawnedRows(spawnedObjectiveRows, questObjectivesContainer, questObjectivePrefab);
@@ -739,163 +646,6 @@ public class QuestJournalUI : MonoBehaviour
         EnsurePlayerStats();
     }
 
-    private void AutoWireQuestUIReferences()
-    {
-        ResolveDependencies();
-        Transform questRoot = null;
-        var tabs = menuManager != null ? menuManager.GetTabs() : null;
-        if (tabs != null)
-        {
-            for (int i = 0; i < tabs.Length; i++)
-            {
-                var tab = tabs[i];
-                if (tab == null || tab.background == null) continue;
-                if (!string.Equals(tab.key, "Quest", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(tab.key, "Quests", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(tab.key, "Journal", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                questRoot = tab.background.transform;
-                break;
-            }
-        }
-
-        if (questRoot == null)
-            questRoot = FindDeepChildByName(transform.root, "QuestBackground");
-        if (questRoot == null) return;
-
-        if (questListContainer == null)
-            questListContainer = FindDescendantByPath(questRoot, "LeftSide/QuestPanel") ?? FindDescendantByPath(questRoot, "LeftSide/Quest") ?? FindDeepChildByName(questRoot, "QuestPanel");
-
-        Transform rightSide = FindDescendantByPath(questRoot, "RightSide");
-        if (rightSide != null)
-        {
-            if (questDetailScrollRect == null) questDetailScrollRect = rightSide.GetComponent<ScrollRect>();
-            if (questDetailPanelRoot == null) questDetailPanelRoot = rightSide as RectTransform;
-
-            Transform body = FindDeepChildByName(rightSide, "Body");
-            Transform lore = body != null ? FindDeepChildByName(body, "Lore") : FindDeepChildByName(rightSide, "Lore");
-            if (questDetailLoreRoot == null) questDetailLoreRoot = lore as RectTransform;
-            if (questDetailTypeText == null) questDetailTypeText = FindDeepTextByName(rightSide, "Type");
-            if (questDetailRecommendedText == null) questDetailRecommendedText = FindDeepTextByName(rightSide, "Lvl");
-            if (questDetailTitleText == null) questDetailTitleText = FindDeepTextByName(rightSide, "Title");
-            if (questDetailLocationText == null) questDetailLocationText = FindDeepTextByName(rightSide, "Location");
-            if (questDetailLoreTitleText == null) questDetailLoreTitleText = FindDeepTextByName(lore, "Title desc") ?? FindDeepTextByName(lore, "Title");
-            if (questDetailLoreDescriptionText == null) questDetailLoreDescriptionText = FindDeepTextByName(lore, "Desc");
-            if (questDetailLoreAuthorText == null) questDetailLoreAuthorText = FindDeepTextByName(lore, "Cit");
-            if (questObjectivesContainer == null)
-                questObjectivesContainer = FindDeepChildByName(rightSide, "BG_objective") ?? FindDeepChildByName(rightSide, "CurrentObjectives") ?? FindDeepChildByName(rightSide, "Objectives");
-            if (questRewardsContainer == null)
-                questRewardsContainer = FindDeepChildByName(rightSide, "BG_Rewards") ?? FindDeepChildByName(rightSide, "RewardContainer") ?? FindDeepChildByName(rightSide, "Rewards");
-            if (questClaimRewardButton == null)
-            {
-                var claim = FindDeepChildByName(rightSide, "Claim");
-                if (claim != null) questClaimRewardButton = claim.GetComponent<Button>();
-            }
-        }
-
-        if (questObjectivesContainer != null && questObjectivePrefab == null && questObjectivesContainer.childCount > 0)
-            questObjectivePrefab = questObjectivesContainer.GetChild(0).GetComponent<QuestObjectiveItemUI>();
-        if (questRewardsContainer != null && questRewardPrefab == null && questRewardsContainer.childCount > 0)
-            questRewardPrefab = questRewardsContainer.GetChild(0).GetComponent<QuestRewardItemUI>();
-    }
-
-    private void RepairQuestDetailPanelRootReference()
-    {
-        if (questListContainer == null)
-            return;
-
-        if (questDetailPanelRoot != null && !ContainsTransform(questDetailPanelRoot, questListContainer))
-            return;
-
-        Transform start = questDetailPanelRoot != null ? questDetailPanelRoot : questListContainer;
-        RectTransform repairedRoot = FindSiblingQuestDetailPanel(start, questListContainer);
-        if (repairedRoot != null)
-            questDetailPanelRoot = repairedRoot;
-    }
-
-    private static RectTransform FindSiblingQuestDetailPanel(Transform start, Transform listContainer)
-    {
-        for (Transform current = start; current != null; current = current.parent)
-        {
-            Transform parent = current.parent;
-            if (parent == null)
-                continue;
-
-            for (int i = 0; i < parent.childCount; i++)
-            {
-                Transform sibling = parent.GetChild(i);
-                if (sibling == null || sibling == current)
-                    continue;
-                if (ContainsTransform(sibling, listContainer))
-                    continue;
-                if (!LooksLikeQuestDetailPanel(sibling))
-                    continue;
-
-                return sibling as RectTransform;
-            }
-        }
-
-        return null;
-    }
-
-    private static bool LooksLikeQuestDetailPanel(Transform candidate)
-    {
-        if (candidate == null)
-            return false;
-
-        string n = candidate.name.ToLowerInvariant();
-        if (n.Contains("side") || n.Contains("detail"))
-            return true;
-
-        return FindDeepChildByName(candidate, "QuestDetail") != null
-               || FindDeepChildByName(candidate, "Lore") != null
-               || FindDeepChildByName(candidate, "Objectives") != null
-               || FindDeepChildByName(candidate, "Rewards") != null;
-    }
-
-    private static bool ContainsTransform(Transform root, Transform target)
-    {
-        if (root == null || target == null)
-            return false;
-
-        for (Transform current = target; current != null; current = current.parent)
-        {
-            if (current == root)
-                return true;
-        }
-
-        return false;
-    }
-
-    private void TryEditorAutoAssignQuestPrefabs()
-    {
-#if UNITY_EDITOR
-        if (questItemPrefab == null)
-            questItemPrefab = LoadPrefabComponentAtPath<QuestItemUI>("Assets/Prefabs/UI/Quest.prefab");
-        if (questObjectivePrefab == null)
-        {
-            var byName = AssetDatabase.FindAssets("t:prefab *Objective*");
-            if (byName != null && byName.Length > 0)
-                questObjectivePrefab = LoadPrefabComponentAtPath<QuestObjectiveItemUI>(AssetDatabase.GUIDToAssetPath(byName[0]));
-        }
-        if (questRewardPrefab == null)
-        {
-            var byName = AssetDatabase.FindAssets("t:prefab *Reward*");
-            if (byName != null && byName.Length > 0)
-                questRewardPrefab = LoadPrefabComponentAtPath<QuestRewardItemUI>(AssetDatabase.GUIDToAssetPath(byName[0]));
-        }
-#endif
-    }
-
-#if UNITY_EDITOR
-    private static T LoadPrefabComponentAtPath<T>(string path) where T : Component
-    {
-        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-        return prefab != null ? prefab.GetComponent<T>() : null;
-    }
-#endif
-
     private static void ClearSpawnedRows<T>(List<T> spawned, Transform container, T prefabRef) where T : Component
     {
         if (spawned != null)
@@ -928,40 +678,6 @@ public class QuestJournalUI : MonoBehaviour
             button.targetGraphic = graphic;
         }
         return button;
-    }
-
-    private static Transform FindDescendantByPath(Transform root, string path)
-    {
-        if (root == null || string.IsNullOrEmpty(path)) return null;
-        var parts = path.Split('/');
-        var current = root;
-        for (int i = 0; i < parts.Length; i++)
-        {
-            current = current.Find(parts[i]);
-            if (current == null) return null;
-        }
-        return current;
-    }
-
-    private static Transform FindDeepChildByName(Transform root, string name)
-    {
-        if (root == null || string.IsNullOrEmpty(name)) return null;
-        for (int i = 0; i < root.childCount; i++)
-        {
-            var child = root.GetChild(i);
-            if (string.Equals(child.name, name, StringComparison.OrdinalIgnoreCase)) return child;
-            var nested = FindDeepChildByName(child, name);
-            if (nested != null) return nested;
-        }
-        return null;
-    }
-
-    private static TextMeshProUGUI FindDeepTextByName(Transform root, string objectName)
-    {
-        if (root == null || string.IsNullOrWhiteSpace(objectName)) return null;
-        Transform t = FindDeepChildByName(root, objectName);
-        if (t == null) return null;
-        return t.GetComponent<TextMeshProUGUI>() ?? t.GetComponentInChildren<TextMeshProUGUI>(true);
     }
 
     private static GameObject ResolveQuestFocusGraphicTarget(GameObject target)

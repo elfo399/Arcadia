@@ -23,23 +23,14 @@ public class ProgressBarUI : MonoBehaviour
     public float Value => value;
     public Color ProgressColor => progressColor;
 
-    private void Reset()
-    {
-        AutoWire();
-        ApplyVisuals();
-        ApplyProgress();
-    }
-
     private void Awake()
     {
-        AutoWire();
         ApplyVisuals();
         ApplyProgress();
     }
 
     private void OnValidate()
     {
-        AutoWire();
         value = Mathf.Clamp01(value);
         ApplyVisuals();
         ApplyProgress();
@@ -67,22 +58,6 @@ public class ProgressBarUI : MonoBehaviour
     {
         progressColor = color;
         ApplyVisuals();
-    }
-
-    private void AutoWire()
-    {
-        if (fillRect == null)
-        {
-            Transform fill = FindDeepChildByName(transform, "Fill") ?? FindDeepChildByName(transform, "Handle");
-            if (fill != null)
-                fillRect = fill.GetComponent<RectTransform>();
-        }
-
-        if (fillImage == null && fillRect != null)
-            fillImage = fillRect.GetComponent<Image>();
-
-        if (valueText == null)
-            valueText = GetComponentInChildren<TextMeshProUGUI>(true);
     }
 
     private void ApplyVisuals()
@@ -129,22 +104,4 @@ public class ProgressBarUI : MonoBehaviour
             targetRect.gameObject.SetActive(shouldShowFill);
     }
 
-    private static Transform FindDeepChildByName(Transform root, string objectName)
-    {
-        if (root == null || string.IsNullOrWhiteSpace(objectName))
-            return null;
-
-        for (int i = 0; i < root.childCount; i++)
-        {
-            Transform child = root.GetChild(i);
-            if (string.Equals(child.name, objectName, System.StringComparison.OrdinalIgnoreCase))
-                return child;
-
-            Transform nested = FindDeepChildByName(child, objectName);
-            if (nested != null)
-                return nested;
-        }
-
-        return null;
-    }
 }

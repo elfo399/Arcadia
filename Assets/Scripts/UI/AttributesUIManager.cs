@@ -26,8 +26,6 @@ public class AttributesUIManager : MonoBehaviour
     }
 
     [Header("Attributes UI")]
-    [Tooltip("Se disattivato, tutti i riferimenti UI devono essere assegnati manualmente nell'Inspector.")]
-    [SerializeField] private bool autoWireAttributesUI = false;
     [SerializeField] private Transform attributesRoot;
     [SerializeField] private TextMeshProUGUI attributesLevelLabelText;
     [SerializeField] private TextMeshProUGUI attributesLevelValueText;
@@ -81,31 +79,17 @@ public class AttributesUIManager : MonoBehaviour
     {
         if (attributesUiInitialized) return;
 
-        if (autoWireAttributesUI)
-            AutoWireAttributesUIReferences();
-
         if (attributeRows == null) attributeRows = new List<AttributeRowBinding>();
 
         for (int i = 0; i < attributeRows.Count; i++)
         {
             var row = attributeRows[i];
             if (row == null) continue;
-            if (autoWireAttributesUI && row.root == null && !string.IsNullOrWhiteSpace(row.key) && attributesRoot != null)
-                row.root = FindDeepChildByName(attributesRoot, row.key);
             if (row.root == null) continue;
 
             if (string.IsNullOrWhiteSpace(row.key)) row.key = row.root.name;
-            if (autoWireAttributesUI)
-            {
-                if (row.labelText == null) row.labelText = FindDeepTextByName(row.root, "Txt");
-                if (row.valueText == null) row.valueText = FindDeepTextByName(row.root, "Value");
-                if (row.descText == null) row.descText = FindDeepTextByName(row.root, "Desc");
-                AutoWireAttributeRowButtons(row);
-            }
         }
 
-        if (autoWireAttributesUI)
-            AutoWireConfirmButton();
         BindAttributeButtons();
         BindConfirmButton();
         if (string.IsNullOrWhiteSpace(selectedAttributeKey))
@@ -419,76 +403,6 @@ public class AttributesUIManager : MonoBehaviour
             selectedCharacterId = PlayerCharacterSelection.GetSelectedCharacterId();
 
         return playerCharacterDatabase.GetById(selectedCharacterId);
-    }
-
-    private void AutoWireAttributesUIReferences()
-    {
-        Transform skillRoot = null;
-        var menuTabs = menuManager != null ? menuManager.GetTabs() : null;
-        if (menuTabs != null)
-        {
-            for (int i = 0; i < menuTabs.Length; i++)
-            {
-                if (menuTabs[i] == null || menuTabs[i].background == null) continue;
-                if (!string.Equals(menuTabs[i].key, "Skill", System.StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(menuTabs[i].key, "Attributes", System.StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                skillRoot = menuTabs[i].background.transform;
-                break;
-            }
-        }
-
-        if (skillRoot == null)
-            skillRoot = FindDeepChildByName(transform.root, "SkillBackground");
-        if (skillRoot == null) return;
-
-        if (attributesRoot == null)
-            attributesRoot = FindDescendantByPath(skillRoot, "Right/Attributes") ?? FindDeepChildByName(skillRoot, "Attributes");
-
-        Transform centerPanel = FindDescendantByPath(skillRoot, "Center/Panel");
-        if (attributesLevelLabelText == null && centerPanel != null) attributesLevelLabelText = FindDeepTextByName(centerPanel, "LevelTxt");
-        if (attributesLevelValueText == null && centerPanel != null) attributesLevelValueText = FindDeepTextByName(centerPanel, "LevelValue");
-        if (attributesXpValueText == null && centerPanel != null) attributesXpValueText = FindDeepTextByName(centerPanel, "XpValue");
-        if (attributesXpProgressBar == null && centerPanel != null) attributesXpProgressBar = centerPanel.GetComponentInChildren<ProgressBarUI>(true);
-
-        Transform leftRoot = FindDescendantByPath(skillRoot, "Left");
-        if (attributesHpValueText == null && leftRoot != null) attributesHpValueText = FindDeepTextByName(leftRoot, "HPValue");
-        if (attributesManaValueText == null && leftRoot != null) attributesManaValueText = FindDeepTextByName(leftRoot, "ManaValue");
-        if (attributesStaminaValueText == null && leftRoot != null) attributesStaminaValueText = FindDeepTextByName(leftRoot, "StaminaValue");
-        if (attributesBasePhyDamageValueText == null && leftRoot != null) attributesBasePhyDamageValueText = FindDeepTextByName(leftRoot, "BasePhyDamageValue");
-        if (attributesMagicDamageValueText == null && leftRoot != null) attributesMagicDamageValueText = FindDeepTextByName(leftRoot, "MagicDamageValue");
-        if (attributesPhyDefValueText == null && leftRoot != null) attributesPhyDefValueText = FindDeepTextByName(leftRoot, "PhyDefValue");
-        if (attributesMagicDefValueText == null && leftRoot != null) attributesMagicDefValueText = FindDeepTextByName(leftRoot, "MagicDefValue");
-        if (attributesLoadValueText == null && leftRoot != null) attributesLoadValueText = FindDeepTextByName(leftRoot, "LoadValue");
-        if (attributesLoadProgressBar == null)
-        {
-            var loadRoot = leftRoot != null ? FindDeepChildByName(leftRoot, "Load") : null;
-            if (loadRoot != null) attributesLoadProgressBar = loadRoot.GetComponentInChildren<ProgressBarUI>(true);
-        }
-
-        if (attributeRows == null) attributeRows = new List<AttributeRowBinding>();
-        if (attributesRoot == null) return;
-
-        if (attributeRows.Count == 0)
-        {
-            string[] keys = { "Vigor", "Mind", "Endurance", "Strength", "Dexterity", "Intelligence", "Faith", "Evil", "Karma" };
-            for (int i = 0; i < keys.Length; i++)
-            {
-                var rowTf = FindDeepChildByName(attributesRoot, keys[i]);
-                if (rowTf == null) continue;
-
-                attributeRows.Add(new AttributeRowBinding
-                {
-                    key = keys[i],
-                    root = rowTf,
-                    labelText = FindDeepTextByName(rowTf, "Txt"),
-                    valueText = FindDeepTextByName(rowTf, "Value"),
-                    descText = FindDeepTextByName(rowTf, "Desc"),
-                    increaseButtonReference = FindDeepChildByName(rowTf, "Button") != null ? FindDeepChildByName(rowTf, "Button").GetComponent<Button>() : null
-                });
-            }
-        }
     }
 
     private void BindAttributeButtons()
@@ -898,56 +812,6 @@ public class AttributesUIManager : MonoBehaviour
         return Mathf.Max(0, playerStats.unspentAttributePoints - GetPendingAttributeLevelCount());
     }
 
-    private static void AutoWireAttributeRowButtons(AttributeRowBinding row)
-    {
-        if (row == null || row.root == null) return;
-
-        Button[] buttons = row.root.GetComponentsInChildren<Button>(true);
-        if (buttons == null || buttons.Length == 0) return;
-
-        if (buttons.Length == 1)
-        {
-            if (row.increaseButtonReference == null)
-                row.increaseButtonReference = buttons[0];
-            return;
-        }
-
-        System.Array.Sort(buttons, (a, b) =>
-        {
-            float aX = row.root.InverseTransformPoint(a.transform.position).x;
-            float bX = row.root.InverseTransformPoint(b.transform.position).x;
-            return aX.CompareTo(bX);
-        });
-
-        if (row.decreaseButtonReference == null)
-            row.decreaseButtonReference = buttons[0];
-        if (row.increaseButtonReference == null)
-            row.increaseButtonReference = buttons[buttons.Length - 1];
-    }
-
-    private void AutoWireConfirmButton()
-    {
-        if (confirmButton != null) return;
-
-        confirmButton = FindButtonByLabel(attributesRoot, "Confirm")
-                        ?? FindButtonByLabel(transform.root, "Confirm");
-    }
-
-    private static Button FindButtonByLabel(Transform root, string label)
-    {
-        if (root == null || string.IsNullOrWhiteSpace(label)) return null;
-
-        Button[] buttons = root.GetComponentsInChildren<Button>(true);
-        for (int i = 0; i < buttons.Length; i++)
-        {
-            TextMeshProUGUI text = buttons[i].GetComponentInChildren<TextMeshProUGUI>(true);
-            if (text != null && string.Equals(text.text?.Trim(), label, System.StringComparison.OrdinalIgnoreCase))
-                return buttons[i];
-        }
-
-        return null;
-    }
-
     private static string GetDefaultAttributeDescription(string key)
     {
         string k = string.IsNullOrWhiteSpace(key) ? string.Empty : key.Trim().ToLowerInvariant();
@@ -966,44 +830,4 @@ public class AttributesUIManager : MonoBehaviour
         }
     }
 
-    private static Transform FindDescendantByPath(Transform root, string path)
-    {
-        if (root == null || string.IsNullOrWhiteSpace(path)) return null;
-        string[] parts = path.Split('/');
-        Transform current = root;
-        for (int i = 0; i < parts.Length; i++)
-        {
-            if (current == null) return null;
-            current = current.Find(parts[i]);
-        }
-        return current;
-    }
-
-    private static Transform FindDeepChildByName(Transform root, string name)
-    {
-        if (root == null || string.IsNullOrEmpty(name)) return null;
-
-        for (int i = 0; i < root.childCount; i++)
-        {
-            var child = root.GetChild(i);
-            if (string.Equals(child.name, name, System.StringComparison.OrdinalIgnoreCase))
-                return child;
-
-            var nested = FindDeepChildByName(child, name);
-            if (nested != null) return nested;
-        }
-
-        return null;
-    }
-
-    private static TextMeshProUGUI FindDeepTextByName(Transform root, string objectName)
-    {
-        if (root == null || string.IsNullOrWhiteSpace(objectName)) return null;
-
-        Transform t = FindDeepChildByName(root, objectName);
-        if (t == null) return null;
-        var own = t.GetComponent<TextMeshProUGUI>();
-        if (own != null) return own;
-        return t.GetComponentInChildren<TextMeshProUGUI>(true);
-    }
 }

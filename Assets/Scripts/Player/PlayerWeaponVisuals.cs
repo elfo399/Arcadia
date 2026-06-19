@@ -6,7 +6,6 @@ public class PlayerWeaponVisuals : MonoBehaviour
     [Header("Sockets")]
     [SerializeField] private Transform rightHandSocket;
     [SerializeField] private Transform leftHandSocket;
-    [SerializeField] private bool autoResolveHumanoidHandBones = false;
 
     [Header("Runtime")]
     [SerializeField] private WeaponItem currentRightVisualWeapon;
@@ -15,20 +14,15 @@ public class PlayerWeaponVisuals : MonoBehaviour
     private PlayerInventory inventory;
     private GameObject rightModelInstance;
     private GameObject leftModelInstance;
-    private Animator cachedAnimator;
-
     private void Awake()
     {
         inventory = GetComponent<PlayerInventory>();
-        ResolveSocketsIfNeeded();
         RefreshNow();
     }
 
     private void LateUpdate()
     {
         if (inventory == null) return;
-        ResolveSocketsIfNeeded();
-
         WeaponItem right = inventory.GetWeaponForHand(Hand.Right);
         WeaponItem left = inventory.GetWeaponForHand(Hand.Left);
 
@@ -48,25 +42,11 @@ public class PlayerWeaponVisuals : MonoBehaviour
     public void RefreshNow()
     {
         if (inventory == null) return;
-        ResolveSocketsIfNeeded();
-
         currentRightVisualWeapon = inventory.GetWeaponForHand(Hand.Right);
         currentLeftVisualWeapon = inventory.GetWeaponForHand(Hand.Left);
 
         RebuildHandModel(Hand.Right, currentRightVisualWeapon);
         RebuildHandModel(Hand.Left, currentLeftVisualWeapon);
-    }
-
-    private void ResolveSocketsIfNeeded()
-    {
-        if (!autoResolveHumanoidHandBones) return;
-        if (cachedAnimator == null)
-            cachedAnimator = GetComponentInChildren<Animator>();
-        if (cachedAnimator == null || !cachedAnimator.isHuman) return;
-        if (rightHandSocket == null)
-            rightHandSocket = cachedAnimator.GetBoneTransform(HumanBodyBones.RightHand);
-        if (leftHandSocket == null)
-            leftHandSocket = cachedAnimator.GetBoneTransform(HumanBodyBones.LeftHand);
     }
 
     private void RebuildHandModel(Hand hand, WeaponItem weapon)

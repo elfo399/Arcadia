@@ -4630,7 +4630,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   animator: {fileID: 2018147930}
   playerController: {fileID: 220392749}
-  combat: {fileID: 0}
+  combat: {fileID: 220392752}
 --- !u!114 &220392752
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12378,7 +12378,7 @@ MonoBehaviour:
     - {fileID: 21300000, guid: 1775abc1d9159f54d88ad53b2619a2f3, type: 3}
     - {fileID: 21300000, guid: cbb5d3bb45f3ef7449f76840d57ef23a, type: 3}
     - {fileID: 21300000, guid: ea05014fccfce4c40b1d05c5f1ee2996, type: 3}
-  tabBackgroundImage: {fileID: 0}
+  tabBackgroundImage: {fileID: 866589185}
   defaultOpenTabKey: Maps
   openPauseMenuByDefault: 1
   pauseMenuTabKey: Pause
@@ -14675,7 +14675,7 @@ MonoBehaviour:
   hpProgressBar: {fileID: 1932414341}
   manaProgressBar: {fileID: 2140867855}
   xpProgressBar: {fileID: 1298744154}
-  playerCharacterDatabase: {fileID: 0}
+  playerCharacterDatabase: {fileID: 11400000, guid: a15fb32dca48451fa0e6ce06388747f2, type: 2}
   floorFormat: Floor {0}
   themeFormat: '{0}'
   playerNameFormat: '{0}'
@@ -19240,10 +19240,8 @@ MonoBehaviour:
   questDetailLoreTitleText: {fileID: 1374312579}
   questDetailLoreDescriptionText: {fileID: 1787999455}
   questDetailLoreAuthorText: {fileID: 1354135924}
-  questDetailLoreRoot: {fileID: 0}
   questDetailPanelRoot: {fileID: 31803097}
   showQuestDetailOnlyOnSelection: 1
-  collapseQuestLoreWhenEmpty: 1
   questObjectivesContainer: {fileID: 1770219020}
   questObjectivePrefab: {fileID: 6629776226922982998, guid: 397da7efdc80d8847acf411eec279085, type: 3}
   questRewardsContainer: {fileID: 1925633159}
@@ -19251,11 +19249,6 @@ MonoBehaviour:
   questClaimRewardButton: {fileID: 407606909}
   questRewardInventoryCapacity: -1
   questRewardMagicCapacity: -1
-  questDetailScrollRect: {fileID: 0}
-  smoothQuestMouseWheel: 1
-  questMouseWheelStepNormalized: 0.1
-  questMouseWheelSmoothSpeed: 14
-  questPadRightStickScrollSpeed: 0.65
   questPadFocusBorderColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   questPadFocusBorderThickness: {x: 3, y: 3}
 --- !u!4 &1102352507
@@ -24206,7 +24199,7 @@ MonoBehaviour:
   playerNameText: {fileID: 394375335}
   playerNameFormat: '{0}'
   attributesLoadProgressBar: {fileID: 837082766}
-  playerCharacterDatabase: {fileID: 0}
+  playerCharacterDatabase: {fileID: 11400000, guid: a15fb32dca48451fa0e6ce06388747f2, type: 2}
   hidePlayerPortraitWhenMissing: 1
   attributesSelectedColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   attributesNormalColor: {r: 0, g: 0, b: 0, a: 1}
@@ -31033,15 +31026,7 @@ MonoBehaviour:
   itemTitle: {fileID: 243755637}
   itemDesc: {fileID: 1110631819}
   equipButton: {fileID: 327439427}
-  coinValueText: {fileID: 0}
-  goldValueText: {fileID: 0}
-  silverValueText: {fileID: 0}
-  copperValueText: {fileID: 0}
-  keyValueText: {fileID: 0}
-  walletSource: 0
-  autoRefreshWallet: 1
   autoWireDetailReferences: 0
-  playerStats: {fileID: 0}
 --- !u!1 &1770219019
 GameObject:
   m_ObjectHideFlags: 0

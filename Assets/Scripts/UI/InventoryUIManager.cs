@@ -7,18 +7,12 @@ using UnityEngine.UI;
 
 public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 {
-    public enum WalletSource { Run, Bank }
-
     private enum Filter { All, Weapons, Armors, Usables }
 
     [Header("Slot Grid")]
     [SerializeField] private InventorySlot slotPrefab;
     [SerializeField] private Transform slotParent;
     [SerializeField] private int initialSlotCount = 0;
-
-    [Header("Drag & Drop")]
-    [SerializeField] private Canvas dragCanvas;
-    [SerializeField] private Image dragPreviewTemplate;
 
     [Header("Detail Panel - Shared")]
     [SerializeField] private GameObject detailRoot;
@@ -71,16 +65,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     [FormerlySerializedAs("equipWeaponButton")]
     [SerializeField] private Button equipButton;
 
-    [Header("Wallet UI")]
-    [SerializeField] private TextMeshProUGUI coinValueText;
-    [SerializeField] private TextMeshProUGUI goldValueText;
-    [SerializeField] private TextMeshProUGUI silverValueText;
-    [SerializeField] private TextMeshProUGUI copperValueText;
-    [SerializeField] private TextMeshProUGUI keyValueText;
-    [SerializeField] private WalletSource walletSource = WalletSource.Run;
-    [SerializeField] private bool autoRefreshWallet = true;
-    [SerializeField] private bool autoWireDetailReferences = false;
-
     private readonly List<InventorySlot> slots = new();
     private List<InventoryItem> currentItems = new();
     private List<InventoryItem> sourceItems = new();
@@ -102,16 +86,12 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     private int pendingEquipSlot;
     private ArmorItemData.ArmorSlot pendingArmorSlot = ArmorItemData.ArmorSlot.Helmet;
     private ArmorItemData.ArmorSlot? activeArmorFilterSlot;
-    [SerializeField] private PlayerStats playerStats;
     private bool isInitialized;
 
     public void Initialize(PlayerInventory inventory, EquipmentManager equipment)
     {
         equipmentManager = equipment != null ? equipment : equipmentManager;
         playerInventory = inventory != null ? inventory : playerInventory;
-
-        if (autoWireDetailReferences)
-            AutoWireArmorDetailReferences();
 
         if (slotParent == null)
             slotParent = transform;
@@ -129,10 +109,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (slotPrefab != null && initialSlotCount > 0 && slots.Count == 0)
             EnsureSlots(initialSlotCount);
 
-        CachePlayerStats();
-        if (autoRefreshWallet)
-            RefreshWalletUI();
-
         if (isInitialized)
         {
             UpdateEquipButtonState();
@@ -147,13 +123,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     public void Cleanup()
     {
-        if (playerStats != null)
-        {
-            playerStats.OnBankCoinsChanged -= HandleBankCoinsChanged;
-            playerStats.OnRunCoinsChanged -= HandleRunCoinsChanged;
-            playerStats.OnKeysChanged -= HandleKeysChanged;
-        }
-
         CancelActiveDrag();
     }
 
@@ -195,22 +164,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (playerInventory == null)
             return;
         SetSourceItems(new List<InventoryItem>(playerInventory.Items));
-        if (autoRefreshWallet)
-            RefreshWalletUI();
-    }
-
-    public void RefreshWalletUI()
-    {
-        CachePlayerStats();
-        if (playerStats == null)
-            return;
-
-        if (walletSource == WalletSource.Bank)
-            SetWalletValue(playerStats.bankCoins);
-        else
-            SetWalletValue(playerStats.runCoins);
-
-        SetKeyValue(playerStats.currentKeys);
     }
 
     public void ShowWeaponsFilter()
@@ -950,211 +903,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         UpdateEquipButtonState();
     }
 
-    private void AutoWireArmorDetailReferences()
-    {
-        Transform root = transform.root;
-        if (root == null)
-            return;
-
-        Transform inventoryRoot = FindDeepChildByName(root, "invBackground");
-        if (inventoryRoot == null)
-            return;
-
-        if (weaponDetailRoot == null)
-            weaponDetailRoot = FindDeepChildByName(inventoryRoot, "DescWeapon")?.gameObject;
-
-        Transform detailRootTransform = weaponDetailRoot != null ? weaponDetailRoot.transform : null;
-        if (detailRootTransform == null)
-            return;
-
-        if (weaponImage == null)
-        {
-            Transform imageTf = FindDeepChildByName(detailRootTransform, "Image");
-            if (imageTf != null) weaponImage = imageTf.GetComponent<Image>();
-        }
-
-        if (weaponTitle == null)
-            weaponTitle = FindDeepTextByName(detailRootTransform, "Title");
-
-        if (weaponDesc == null)
-            weaponDesc = FindDeepTextByName(detailRootTransform, "Desc_Custom")
-                ?? FindDeepTextByName(detailRootTransform, "Desc");
-
-        if (weaponDescriptionRoot == null)
-            weaponDescriptionRoot = FindDeepChildByName(detailRootTransform, "WeaponColumn")?.gameObject
-                ?? FindDeepChildByName(detailRootTransform, "WeaponCollumn")?.gameObject;
-
-        if (shieldDescriptionRoot == null)
-            shieldDescriptionRoot = FindDeepChildByName(detailRootTransform, "ShieldColumn")?.gameObject
-                ?? FindDeepChildByName(detailRootTransform, "ShieldCollumn")?.gameObject;
-
-        if (shieldDescriptionRoot != null)
-        {
-            if (shieldTitle == null)
-                shieldTitle = FindDeepTextByName(shieldDescriptionRoot.transform, "TitleShield")
-                    ?? FindDeepTextByName(shieldDescriptionRoot.transform, "Title")
-                    ?? FindDeepTextByName(shieldDescriptionRoot.transform, "Name");
-            if (shieldDesc == null)
-                shieldDesc = FindDeepTextByName(shieldDescriptionRoot.transform, "DescShield")
-                    ?? FindDeepTextByName(shieldDescriptionRoot.transform, "Desc_Custom")
-                    ?? FindDeepTextByName(shieldDescriptionRoot.transform, "Desc")
-                    ?? FindDeepTextByName(shieldDescriptionRoot.transform, "Description");
-            if (shieldDamageText == null)
-                shieldDamageText = FindStatValueText(shieldDescriptionRoot.transform, "Damage");
-            if (shieldCriticalText == null)
-                shieldCriticalText = FindStatValueText(shieldDescriptionRoot.transform, "Critical");
-            if (shieldWeightText == null)
-                shieldWeightText = FindStatValueText(shieldDescriptionRoot.transform, "Weight");
-            if (shieldScalingText == null)
-                shieldScalingText = FindStatValueText(shieldDescriptionRoot.transform, "Scaling");
-            if (shieldRequirementsText == null)
-                shieldRequirementsText = FindStatValueText(shieldDescriptionRoot.transform, "Requirement");
-            if (weaponPhysicalDefenseText == null)
-                weaponPhysicalDefenseText = FindStatValueText(shieldDescriptionRoot.transform, "Def Phy");
-            if (weaponMagicDefenseText == null)
-                weaponMagicDefenseText = FindStatValueText(shieldDescriptionRoot.transform, "Def Mag");
-
-            if (shieldTitle == null)
-                shieldTitle = weaponTitle;
-            if (shieldDesc == null)
-                shieldDesc = weaponDesc;
-        }
-
-        Transform itemRootTransform = itemDetailRoot != null ? itemDetailRoot.transform : null;
-        if (itemRootTransform == null)
-        {
-            Transform explicitItemRoot = FindDeepChildByName(inventoryRoot, "DescItem");
-            if (explicitItemRoot != null)
-            {
-                itemDetailRoot = explicitItemRoot.gameObject;
-                itemRootTransform = explicitItemRoot;
-            }
-            else if (detailRoot != null)
-            {
-                itemDetailRoot = detailRoot;
-                itemRootTransform = detailRoot.transform;
-            }
-        }
-
-        if (itemRootTransform != null)
-        {
-            Transform itemFirstColumn = FindDeepChildByName(itemRootTransform, "FirstColumn")
-                ?? FindDeepChildByName(itemRootTransform, "FirstCollumn")
-                ?? FindDeepChildByName(itemRootTransform, "FirstCollumn (1)")
-                ?? FindDeepChildByName(itemRootTransform, "FirstCollumn (2)");
-            Transform itemSecondColumn = FindDeepChildByName(itemRootTransform, "SecondColumn")
-                ?? FindDeepChildByName(itemRootTransform, "SecondCollumn")
-                ?? FindDeepChildByName(itemRootTransform, "SecondCollumn (1)")
-                ?? FindDeepChildByName(itemRootTransform, "SecondCollumn (2)");
-
-            if (itemImage == null || itemImage == detailIcon)
-            {
-                Transform imageTf = itemFirstColumn != null
-                    ? FindDeepChildByName(itemFirstColumn, "Image")
-                    : FindDeepChildByName(itemRootTransform, "Image");
-                if (imageTf != null) itemImage = imageTf.GetComponent<Image>();
-            }
-
-            if (itemTitle == null || itemTitle == detailTitle)
-            {
-                itemTitle = itemFirstColumn != null
-                    ? FindDeepTextByName(itemFirstColumn, "Title")
-                        ?? FindDeepTextByName(itemFirstColumn, "Title desc")
-                        ?? FindDeepTextByName(itemFirstColumn, "Name")
-                    : null;
-
-                if (itemTitle == null)
-                    itemTitle = FindDeepTextByName(itemRootTransform, "Title")
-                        ?? FindDeepTextByName(itemRootTransform, "Title desc")
-                        ?? FindDeepTextByName(itemRootTransform, "Name");
-            }
-
-            if (itemDesc == null || itemDesc == detailDescription)
-            {
-                itemDesc = itemSecondColumn != null
-                    ? FindDeepTextByName(itemSecondColumn, "Desc_Custom")
-                        ?? FindDeepTextByName(itemSecondColumn, "DescCustom")
-                        ?? FindDeepTextByName(itemSecondColumn, "Desc")
-                        ?? FindDeepTextByName(itemSecondColumn, "Description")
-                    : null;
-
-                if (itemDesc == null)
-                    itemDesc = FindDeepTextByName(itemRootTransform, "Desc_Custom")
-                        ?? FindDeepTextByName(itemRootTransform, "DescCustom")
-                        ?? FindDeepTextByName(itemRootTransform, "Desc")
-                        ?? FindDeepTextByName(itemRootTransform, "Description");
-            }
-        }
-
-        if (armorDescriptionRoot == null)
-            armorDescriptionRoot = FindDeepChildByName(detailRootTransform, "ArmorColumn")?.gameObject
-                ?? FindDeepChildByName(detailRootTransform, "ArmorCollumn")?.gameObject;
-
-        if (armorDescriptionRoot == null)
-            return;
-
-        if (armorTitle == null)
-            armorTitle = FindDeepTextByName(armorDescriptionRoot.transform, "TitleArmor")
-                ?? FindDeepTextByName(armorDescriptionRoot.transform, "Title")
-                ?? FindDeepTextByName(armorDescriptionRoot.transform, "Name");
-
-        if (armorDesc == null)
-            armorDesc = FindDeepTextByName(armorDescriptionRoot.transform, "DescArmor")
-                ?? FindDeepTextByName(armorDescriptionRoot.transform, "Desc_Custom")
-                ?? FindDeepTextByName(armorDescriptionRoot.transform, "Desc")
-                ?? FindDeepTextByName(armorDescriptionRoot.transform, "Description");
-        if (armorWeightText == null)
-            armorWeightText = FindStatValueText(armorDescriptionRoot.transform, "Weight");
-        if (armorPhysicalDefenseText == null)
-            armorPhysicalDefenseText = FindStatValueText(armorDescriptionRoot.transform, "Def Phy");
-        if (armorMagicDefenseText == null)
-            armorMagicDefenseText = FindStatValueText(armorDescriptionRoot.transform, "Def Mag");
-
-        // Preserve existing UI behaviour when the armor panel has no dedicated description text yet.
-        if (armorTitle == null)
-            armorTitle = weaponTitle;
-        if (armorDesc == null)
-            armorDesc = weaponDesc;
-    }
-
-    private static TextMeshProUGUI FindStatValueText(Transform root, string statRootName)
-    {
-        Transform statRoot = FindDeepChildByName(root, statRootName);
-        if (statRoot == null)
-            return null;
-
-        var texts = statRoot.GetComponentsInChildren<TextMeshProUGUI>(true);
-        if (texts == null || texts.Length == 0)
-            return null;
-
-        return texts[texts.Length - 1];
-    }
-
-    private static Transform FindDeepChildByName(Transform root, string childName)
-    {
-        if (root == null || string.IsNullOrWhiteSpace(childName))
-            return null;
-
-        for (int i = 0; i < root.childCount; i++)
-        {
-            Transform child = root.GetChild(i);
-            if (child.name == childName)
-                return child;
-
-            Transform nested = FindDeepChildByName(child, childName);
-            if (nested != null)
-                return nested;
-        }
-
-        return null;
-    }
-
-    private static TextMeshProUGUI FindDeepTextByName(Transform root, string childName)
-    {
-        Transform tf = FindDeepChildByName(root, childName);
-        return tf != null ? tf.GetComponent<TextMeshProUGUI>() : null;
-    }
-
     private List<InventoryItem> NormalizeSourceItems(List<InventoryItem> data)
     {
         return data != null ? new List<InventoryItem>(data) : new List<InventoryItem>();
@@ -1391,17 +1139,10 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         RectTransform previewRoot = ResolveDragPreviewRoot(targetCanvas);
         if (previewRoot == null) return;
 
-        if (dragPreviewTemplate == null)
-        {
-            GameObject go = new GameObject("DragPreview", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-            go.transform.SetParent(previewRoot, false);
-            activeDragPreview = go.GetComponent<Image>();
-            activeDragPreview.raycastTarget = false;
-        }
-        else
-        {
-            activeDragPreview = Instantiate(dragPreviewTemplate, previewRoot);
-        }
+        GameObject go = new GameObject("DragPreview", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        go.transform.SetParent(previewRoot, false);
+        activeDragPreview = go.GetComponent<Image>();
+        activeDragPreview.raycastTarget = false;
 
         activeDragPreview.sprite = icon;
         activeDragPreview.color = Color.white;
@@ -1438,9 +1179,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private Canvas ResolveDragCanvas()
     {
-        if (dragCanvas != null && dragCanvas.isActiveAndEnabled)
-            return dragCanvas;
-
         Canvas parentCanvas = GetComponentInParent<Canvas>();
         if (parentCanvas != null && parentCanvas.isActiveAndEnabled)
             return parentCanvas;
@@ -1507,138 +1245,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (activeDragPreview == null) return;
         Destroy(activeDragPreview.gameObject);
         activeDragPreview = null;
-    }
-
-    private void CachePlayerStats()
-    {
-        if (playerStats != null) return;
-        playerStats = PlayerStats.instance;
-        if (playerStats != null)
-        {
-            playerStats.OnBankCoinsChanged += HandleBankCoinsChanged;
-            playerStats.OnRunCoinsChanged += HandleRunCoinsChanged;
-            playerStats.OnKeysChanged += HandleKeysChanged;
-        }
-    }
-
-    private void HandleBankCoinsChanged(int coins)
-    {
-        if (walletSource == WalletSource.Bank)
-            SetWalletValue(coins);
-    }
-
-    private void HandleRunCoinsChanged(int coins)
-    {
-        if (walletSource == WalletSource.Run)
-            SetWalletValue(coins);
-        SetKeyValue(playerStats != null ? playerStats.currentKeys : 0);
-    }
-
-    private void HandleKeysChanged(int keys)
-    {
-        SetKeyValue(keys);
-    }
-
-    private void SetWalletValue(int coins)
-    {
-        TextMeshProUGUI target = ResolveCoinValueText();
-        ApplyUnifiedWalletVisuals(target);
-
-        if (target != null)
-            target.text = Mathf.Max(0, coins).ToString();
-
-        ClearLegacyWalletText(goldValueText, target);
-        ClearLegacyWalletText(silverValueText, target);
-        ClearLegacyWalletText(copperValueText, target);
-    }
-
-    private TextMeshProUGUI ResolveCoinValueText()
-    {
-        if (coinValueText != null) return coinValueText;
-        if (goldValueText != null) return goldValueText;
-        if (copperValueText != null) return copperValueText;
-        return silverValueText;
-    }
-
-    private static void ClearLegacyWalletText(TextMeshProUGUI text, TextMeshProUGUI target)
-    {
-        if (text != null && text != target)
-            text.text = string.Empty;
-    }
-
-    private void ApplyUnifiedWalletVisuals(TextMeshProUGUI target)
-    {
-        SetWalletGroupActive(goldValueText, target);
-        SetWalletGroupActive(silverValueText, target);
-        SetWalletGroupActive(copperValueText, target);
-        RenameWalletLabel(target, "Coin");
-    }
-
-    private void SetWalletGroupActive(TextMeshProUGUI text, TextMeshProUGUI target)
-    {
-        if (text == null)
-            return;
-
-        Transform root = FindWalletRoot(text);
-        if (root == null)
-            return;
-
-        bool shouldBeActive = text == target || (target != null && target.transform.IsChildOf(root));
-        root.gameObject.SetActive(shouldBeActive);
-    }
-
-    private void RenameWalletLabel(TextMeshProUGUI target, string label)
-    {
-        if (target == null)
-            return;
-
-        Transform root = FindWalletRoot(target);
-        if (root == null)
-            return;
-
-        TextMeshProUGUI[] texts = root.GetComponentsInChildren<TextMeshProUGUI>(true);
-        for (int i = 0; i < texts.Length; i++)
-        {
-            TextMeshProUGUI candidate = texts[i];
-            if (candidate == null || candidate == target)
-                continue;
-
-            string value = candidate.text != null ? candidate.text.Trim() : string.Empty;
-            if (value == "Gold" || value == "Silver" || value == "Copper")
-            {
-                candidate.text = label;
-                return;
-            }
-        }
-    }
-
-    private Transform FindWalletRoot(TextMeshProUGUI text)
-    {
-        if (text == null)
-            return null;
-
-        Transform current = text.transform;
-        while (current != null && current != transform)
-        {
-            if (IsWalletRootName(current.name))
-                return current;
-            current = current.parent;
-        }
-
-        return text.transform.parent != null ? text.transform.parent : text.transform;
-    }
-
-    private static bool IsWalletRootName(string objectName)
-    {
-        return objectName == "Gold"
-            || objectName == "Silver"
-            || objectName == "Copper"
-            || objectName == "Coin";
-    }
-
-    private void SetKeyValue(int keys)
-    {
-        if (keyValueText != null) keyValueText.text = Mathf.Max(0, keys).ToString();
     }
 
     private bool TryEquipFocusedPadItem()

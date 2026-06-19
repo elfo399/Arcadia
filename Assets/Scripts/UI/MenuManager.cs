@@ -106,143 +106,6 @@ public class MenuManager : MonoBehaviour
         SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
-#if UNITY_EDITOR
-    private void OnValidate()
-    {
-        AutoAssignPageFlipSpritesInEditor();
-    }
-
-    private void AutoAssignPageFlipSpritesInEditor()
-    {
-        if (tabs == null)
-            return;
-
-        bool changed = false;
-        for (int i = 0; i < tabs.Length; i++)
-        {
-            MenuTabEntry tab = tabs[i];
-            if (tab == null || string.IsNullOrWhiteSpace(tab.key))
-                continue;
-
-            if (!HasCompletePageFlipSprites(tab.flipRightSprites, 9))
-            {
-                Sprite[] sprites = LoadPageFlipSpritesInEditor(tab.key, false);
-                if (sprites != null)
-                {
-                    tab.flipRightSprites = sprites;
-                    changed = true;
-                }
-            }
-
-            if (!HasCompletePageFlipSprites(tab.flipLeftSprites, 9))
-            {
-                Sprite[] sprites = LoadPageFlipSpritesInEditor(tab.key, true);
-                if (sprites != null)
-                {
-                    tab.flipLeftSprites = sprites;
-                    changed = true;
-                }
-            }
-        }
-
-        if (!changed)
-            return;
-
-        UnityEditor.EditorUtility.SetDirty(this);
-        if (gameObject != null && gameObject.scene.IsValid())
-            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
-    }
-
-    private static Sprite[] LoadPageFlipSpritesInEditor(string tabKey, bool flipLeft)
-    {
-        string directionFolder = flipLeft ? "Flip Left" : "Flip Right";
-        string[] folderCandidates = GetPageFlipFolderCandidates(tabKey, flipLeft);
-        for (int i = 0; i < folderCandidates.Length; i++)
-        {
-            string folder = folderCandidates[i];
-            if (string.IsNullOrWhiteSpace(folder))
-                continue;
-
-            Sprite[] sprites = LoadPageFlipSpritesFromFolderInEditor(directionFolder, folder);
-            if (sprites != null)
-                return sprites;
-        }
-
-        return null;
-    }
-
-    private static Sprite[] LoadPageFlipSpritesFromFolderInEditor(string directionFolder, string tabFolder)
-    {
-        const int frameCount = 9;
-        Sprite[] sprites = new Sprite[frameCount];
-        string basePath = "Assets/Sprites/UI/Animation/PauseBook/" + directionFolder + "/" + tabFolder;
-
-        for (int i = 0; i < frameCount; i++)
-        {
-            string path = basePath + "/" + (i + 1) + ".png";
-            Sprite sprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
-            if (sprite == null)
-                return null;
-
-            sprites[i] = sprite;
-        }
-
-        return sprites;
-    }
-
-    private static string[] GetPageFlipFolderCandidates(string tabKey, bool flipLeft)
-    {
-        if (string.Equals(tabKey, "Maps", System.StringComparison.OrdinalIgnoreCase)
-            || string.Equals(tabKey, "Map", System.StringComparison.OrdinalIgnoreCase))
-            return new[] { "Map", "Maps" };
-
-        if (string.Equals(tabKey, "Equipment", System.StringComparison.OrdinalIgnoreCase)
-            || string.Equals(tabKey, "Equip", System.StringComparison.OrdinalIgnoreCase))
-            return new[] { "Equip", "Equipment" };
-
-        if (string.Equals(tabKey, "Inventory", System.StringComparison.OrdinalIgnoreCase))
-            return flipLeft ? new[] { "Inventory", "inventory" } : new[] { "inventory", "Inventory" };
-
-        if (string.Equals(tabKey, "Magic", System.StringComparison.OrdinalIgnoreCase)
-            || string.Equals(tabKey, "MagicInventory", System.StringComparison.OrdinalIgnoreCase))
-            return new[] { "MagicInventory", "Magic" };
-
-        if (string.Equals(tabKey, "Attributes", System.StringComparison.OrdinalIgnoreCase)
-            || string.Equals(tabKey, "Skill", System.StringComparison.OrdinalIgnoreCase)
-            || string.Equals(tabKey, "Stats", System.StringComparison.OrdinalIgnoreCase))
-            return new[] { "Stats", "Attributes", "Skill" };
-
-        if (string.Equals(tabKey, "Journal", System.StringComparison.OrdinalIgnoreCase)
-            || string.Equals(tabKey, "Quest", System.StringComparison.OrdinalIgnoreCase)
-            || string.Equals(tabKey, "Quests", System.StringComparison.OrdinalIgnoreCase))
-            return new[] { "Quest", "Journal", "Quests" };
-
-        if (string.Equals(tabKey, "Setting", System.StringComparison.OrdinalIgnoreCase))
-            return new[] { "Setting" };
-
-        return new[] { tabKey };
-    }
-
-    private static bool HasCompletePageFlipSprites(Sprite[] sprites, int expectedFrameCount)
-    {
-        if (sprites == null || sprites.Length != expectedFrameCount)
-            return false;
-
-        for (int i = 0; i < sprites.Length; i++)
-        {
-            if (sprites[i] == null)
-                return false;
-        }
-
-        return true;
-    }
-#endif
-
-    public MenuTabEntry[] GetTabs()
-    {
-        return tabs;
-    }
-
     public void SetPadFocusVisible(bool visible)
     {
         ApplyPadFocusVisible(visible);
@@ -347,7 +210,6 @@ public class MenuManager : MonoBehaviour
         if (isInventoryTab)
         {
             inventoryUIManager?.RefreshSourceItemsFromPlayer();
-            inventoryUIManager?.RefreshWalletUI();
             inventoryUIManager?.ResetFilterToAll();
             inventoryUIManager?.FocusDefaultPadSlot();
         }
@@ -642,12 +504,6 @@ public class MenuManager : MonoBehaviour
             if (controls.Player.Jump.WasPerformedThisFrame())
                 questJournalUI?.ConfirmPadSelection(showPadFocus);
 
-            if (Gamepad.current != null)
-            {
-                Vector2 rightStick = Gamepad.current.rightStick.ReadValue();
-                questJournalUI?.ScrollDetailByPad(rightStick.y, Time.unscaledDeltaTime, true);
-            }
-
             return;
         }
 
@@ -941,7 +797,6 @@ public class MenuManager : MonoBehaviour
         if (currentPlayerInventory == null)
             currentPlayerInventory = scenePlayerInventory;
 
-        ResolveTabBackgroundImage();
         InitializeLinkedManagers();
     }
 
@@ -984,15 +839,6 @@ public class MenuManager : MonoBehaviour
                 cam.m_YAxis.m_InputAxisName = "";
             }
         }
-    }
-
-    private void ResolveTabBackgroundImage()
-    {
-        if (tabBackgroundImage != null)
-            return;
-
-        if (menuAnimator != null)
-            tabBackgroundImage = menuAnimator.GetComponent<Image>();
     }
 
     private bool IsQuestTabActive()
