@@ -366,8 +366,12 @@ public class MenuManager : MonoBehaviour
         if (isSkillTab)
         {
             attributesUIManager?.Initialize();
-            attributesUIManager?.RefreshUI();
+            attributesUIManager?.BeginAllocationSession();
             attributesUIManager?.FocusPadDefault(padFocusLockDuration);
+        }
+        else
+        {
+            attributesUIManager?.CancelPendingAllocation();
         }
     }
 
@@ -546,10 +550,18 @@ public class MenuManager : MonoBehaviour
 
         if (inAttributesTab)
         {
-            if (!attributesUIManager.HasAttributePointsToSpend())
+            if (!attributesUIManager.HasAttributePointsToSpend() && !attributesUIManager.HasPendingAllocation())
                 return;
 
             ForcePadFocusMode();
+
+            InputAction increaseAttributeAction = controls.asset.FindAction("Player/CycleRightEquip", throwIfNotFound: false);
+            InputAction decreaseAttributeAction = controls.asset.FindAction("Player/CycleLeftEquip", throwIfNotFound: false);
+            bool increasePressed = rightPressed || (increaseAttributeAction != null && increaseAttributeAction.WasPerformedThisFrame());
+            bool decreasePressed = leftPressed || (decreaseAttributeAction != null && decreaseAttributeAction.WasPerformedThisFrame());
+
+            if (increasePressed) attributesUIManager.IncreasePadSelection();
+            if (decreasePressed) attributesUIManager.DecreasePadSelection();
 
             if (downPressed) attributesUIManager.MovePadFocusVertical(1);
             if (upPressed) attributesUIManager.MovePadFocusVertical(-1);
@@ -557,14 +569,24 @@ public class MenuManager : MonoBehaviour
             Vector2 attrNav = controls.Player.Move.ReadValue<Vector2>();
             if (Time.time >= lastNavigationMoveTime + navigationRepeatCooldown)
             {
-                if (attrNav.y > 0.5f)
+                if (attrNav.y > 0.5f && !upPressed)
                 {
                     attributesUIManager.MovePadFocusVertical(-1);
                     lastNavigationMoveTime = Time.time;
                 }
-                else if (attrNav.y < -0.5f)
+                else if (attrNav.y < -0.5f && !downPressed)
                 {
                     attributesUIManager.MovePadFocusVertical(1);
+                    lastNavigationMoveTime = Time.time;
+                }
+                else if (attrNav.x > 0.5f && !increasePressed)
+                {
+                    attributesUIManager.IncreasePadSelection();
+                    lastNavigationMoveTime = Time.time;
+                }
+                else if (attrNav.x < -0.5f && !decreasePressed)
+                {
+                    attributesUIManager.DecreasePadSelection();
                     lastNavigationMoveTime = Time.time;
                 }
             }
@@ -755,6 +777,7 @@ public class MenuManager : MonoBehaviour
         SetInventoryPanelInteraction(false);
         SetInventorySlotInputEnabled(false);
         CancelActiveInventoryDrag();
+        attributesUIManager?.CancelPendingAllocation();
         if (EventSystem.current != null)
             EventSystem.current.SetSelectedGameObject(null);
 
@@ -791,6 +814,7 @@ public class MenuManager : MonoBehaviour
         isMenuPageFlipping = false;
         ResetMenuAnimatorPlayback();
         CancelActiveInventoryDrag();
+        attributesUIManager?.CancelPendingAllocation();
 
         // Il menu non deve attraversare il cambio scena in stato aperto.
         isMenuOpen = false;

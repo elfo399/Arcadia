@@ -14,10 +14,19 @@ public class AttributesUIManager : MonoBehaviour
         public TextMeshProUGUI labelText;
         public TextMeshProUGUI valueText;
         public TextMeshProUGUI descText;
-        public Button addButton;
+        [FormerlySerializedAs("increaseButton")]
+        [InspectorName("Decrease Button")]
+        [Tooltip("Freccia sinistra. Rimuove soltanto i livelli preparati e non ancora confermati.")]
+        public Button decreaseButtonReference;
+        [FormerlySerializedAs("decreaseButton")]
+        [FormerlySerializedAs("addButton")]
+        [InspectorName("Increase Button")]
+        [Tooltip("Freccia destra usata per preparare un livello da assegnare.")]
+        public Button increaseButtonReference;
     }
 
     [Header("Attributes UI")]
+    [Tooltip("Se disattivato, tutti i riferimenti UI devono essere assegnati manualmente nell'Inspector.")]
     [SerializeField] private bool autoWireAttributesUI = false;
     [SerializeField] private Transform attributesRoot;
     [SerializeField] private TextMeshProUGUI attributesLevelLabelText;
@@ -44,6 +53,8 @@ public class AttributesUIManager : MonoBehaviour
     [SerializeField] private Color attributesSelectedColor = new Color(1f, 0.85f, 0.2f, 1f);
     [SerializeField] private Color attributesNormalColor = Color.white;
     [SerializeField] private List<AttributeRowBinding> attributeRows = new();
+    [Tooltip("Pulsante che applica e salva tutte le modifiche preparate.")]
+    [SerializeField] private Button confirmButton;
     [SerializeField] private MenuManager menuManager;
     [SerializeField] private PlayerStats playerStats;
     [SerializeField] private PlayerController playerController;
@@ -55,6 +66,9 @@ public class AttributesUIManager : MonoBehaviour
     private string lastDisplayedCharacterId;
     private Sprite lastDisplayedPlayerPortrait;
     private string lastDisplayedPlayerName;
+    private readonly Dictionary<string, int> pendingAttributeLevels = new();
+    private bool allocationSessionActive;
+    private bool confirmPadFocused;
 
     public void Initialize()
     {
@@ -69,22 +83,24 @@ public class AttributesUIManager : MonoBehaviour
         {
             var row = attributeRows[i];
             if (row == null) continue;
-            if (row.root == null && !string.IsNullOrWhiteSpace(row.key) && attributesRoot != null)
+            if (autoWireAttributesUI && row.root == null && !string.IsNullOrWhiteSpace(row.key) && attributesRoot != null)
                 row.root = FindDeepChildByName(attributesRoot, row.key);
             if (row.root == null) continue;
 
             if (string.IsNullOrWhiteSpace(row.key)) row.key = row.root.name;
-            if (row.labelText == null) row.labelText = FindDeepTextByName(row.root, "Txt");
-            if (row.valueText == null) row.valueText = FindDeepTextByName(row.root, "Value");
-            if (row.descText == null) row.descText = FindDeepTextByName(row.root, "Desc");
-            if (row.addButton == null)
+            if (autoWireAttributesUI)
             {
-                var btnTf = FindDeepChildByName(row.root, "Button");
-                if (btnTf != null) row.addButton = btnTf.GetComponent<Button>();
+                if (row.labelText == null) row.labelText = FindDeepTextByName(row.root, "Txt");
+                if (row.valueText == null) row.valueText = FindDeepTextByName(row.root, "Value");
+                if (row.descText == null) row.descText = FindDeepTextByName(row.root, "Desc");
+                AutoWireAttributeRowButtons(row);
             }
         }
 
+        if (autoWireAttributesUI)
+            AutoWireConfirmButton();
         BindAttributeButtons();
+        BindConfirmButton();
         if (string.IsNullOrWhiteSpace(selectedAttributeKey))
             selectedAttributeKey = GetFirstAttributeKey();
 
@@ -97,9 +113,38 @@ public class AttributesUIManager : MonoBehaviour
         for (int i = 0; i < attributeRows.Count; i++)
         {
             var row = attributeRows[i];
-            if (row == null || row.addButton == null) continue;
-            row.addButton.onClick.RemoveAllListeners();
+            if (row == null) continue;
+            row.decreaseButtonReference?.onClick.RemoveAllListeners();
+            row.increaseButtonReference?.onClick.RemoveAllListeners();
         }
+
+        confirmButton?.onClick.RemoveAllListeners();
+        pendingAttributeLevels.Clear();
+        allocationSessionActive = false;
+        confirmPadFocused = false;
+    }
+
+    public void BeginAllocationSession()
+    {
+        pendingAttributeLevels.Clear();
+        allocationSessionActive = true;
+        confirmPadFocused = false;
+        RefreshUI();
+    }
+
+    public void CancelPendingAllocation()
+    {
+        if (!allocationSessionActive && pendingAttributeLevels.Count == 0) return;
+
+        pendingAttributeLevels.Clear();
+        allocationSessionActive = false;
+        confirmPadFocused = false;
+        RefreshUI();
+    }
+
+    public bool HasPendingAllocation()
+    {
+        return GetPendingAttributeLevelCount() > 0;
     }
 
     public void SetPadFocusVisible(bool visible)
@@ -125,14 +170,14 @@ public class AttributesUIManager : MonoBehaviour
     public bool HasAttributePointsToSpend()
     {
         CachePlayerStats();
-        if (playerStats == null || playerStats.unspentAttributePoints <= 0) return false;
+        if (playerStats == null || GetRemainingAttributePoints() <= 0) return false;
         if (attributeRows == null || attributeRows.Count == 0) return false;
 
         for (int i = 0; i < attributeRows.Count; i++)
         {
             var row = attributeRows[i];
             if (row == null || string.IsNullOrWhiteSpace(row.key)) continue;
-            if (CanAllocateAttributeKey(row.key)) return true;
+            if (CanIncreaseAttributeKey(row.key)) return true;
         }
 
         return false;
@@ -150,6 +195,7 @@ public class AttributesUIManager : MonoBehaviour
         }
 
         menuManager?.ForcePadFocusMode(lockDuration);
+        confirmPadFocused = false;
         attributesPadIndex = GetSelectedAttributeIndex();
         if (attributesPadIndex < 0) attributesPadIndex = 0;
         SyncAttributeSelectionFromPadIndex();
@@ -159,13 +205,43 @@ public class AttributesUIManager : MonoBehaviour
     public void MovePadFocusVertical(int direction)
     {
         Initialize();
-        if (!HasAttributePointsToSpend()) return;
+        if (!HasAttributePointsToSpend() && !HasPendingAllocation()) return;
         if (attributeRows == null || attributeRows.Count == 0) return;
 
         int dir = direction >= 0 ? 1 : -1;
+        if (confirmPadFocused)
+        {
+            if (dir < 0)
+            {
+                int lastIndex = GetLastNavigableAttributeIndex();
+                if (lastIndex >= 0)
+                {
+                    confirmPadFocused = false;
+                    attributesPadIndex = lastIndex;
+                    SyncAttributeSelectionFromPadIndex();
+                }
+            }
+
+            RefreshUI();
+            return;
+        }
+
         int count = attributeRows.Count;
         int guard = 0;
-        int idx = Mathf.Clamp(attributesPadIndex, 0, count - 1);
+        int idx = IsAttributeRowNavigable(attributesPadIndex)
+            ? attributesPadIndex
+            : GetSelectedAttributeIndex();
+        if (idx < 0) return;
+
+        int lastNavigableIndex = GetLastNavigableAttributeIndex();
+        if (dir > 0 && idx == lastNavigableIndex)
+        {
+            if (HasPendingAllocation() && confirmButton != null)
+                confirmPadFocused = true;
+
+            RefreshUI();
+            return;
+        }
 
         do
         {
@@ -181,15 +257,34 @@ public class AttributesUIManager : MonoBehaviour
 
     public void ConfirmPadSelection()
     {
+        if (confirmPadFocused)
+            ConfirmPendingAllocation();
+    }
+
+    public void IncreasePadSelection()
+    {
         Initialize();
-        if (!HasAttributePointsToSpend()) return;
+        if (confirmPadFocused) return;
         SyncAttributeSelectionFromPadIndex();
         if (attributeRows == null || attributeRows.Count == 0) return;
         if (attributesPadIndex < 0 || attributesPadIndex >= attributeRows.Count) return;
 
         var row = attributeRows[attributesPadIndex];
         if (row == null || string.IsNullOrWhiteSpace(row.key)) return;
-        OnAttributeAddClicked(row.key.Trim().ToLowerInvariant());
+        OnAttributeIncreaseClicked(row.key.Trim().ToLowerInvariant());
+    }
+
+    public void DecreasePadSelection()
+    {
+        Initialize();
+        if (confirmPadFocused) return;
+        SyncAttributeSelectionFromPadIndex();
+        if (attributeRows == null || attributeRows.Count == 0) return;
+        if (attributesPadIndex < 0 || attributesPadIndex >= attributeRows.Count) return;
+
+        var row = attributeRows[attributesPadIndex];
+        if (row == null || string.IsNullOrWhiteSpace(row.key)) return;
+        OnAttributeDecreaseClicked(row.key.Trim().ToLowerInvariant());
     }
 
     private void CachePlayerStats()
@@ -382,7 +477,7 @@ public class AttributesUIManager : MonoBehaviour
                     labelText = FindDeepTextByName(rowTf, "Txt"),
                     valueText = FindDeepTextByName(rowTf, "Value"),
                     descText = FindDeepTextByName(rowTf, "Desc"),
-                    addButton = FindDeepChildByName(rowTf, "Button") != null ? FindDeepChildByName(rowTf, "Button").GetComponent<Button>() : null
+                    increaseButtonReference = FindDeepChildByName(rowTf, "Button") != null ? FindDeepChildByName(rowTf, "Button").GetComponent<Button>() : null
                 });
             }
         }
@@ -395,33 +490,69 @@ public class AttributesUIManager : MonoBehaviour
         for (int i = 0; i < attributeRows.Count; i++)
         {
             var row = attributeRows[i];
-            if (row == null || row.addButton == null) continue;
+            if (row == null) continue;
 
             string key = string.IsNullOrWhiteSpace(row.key) ? row.root != null ? row.root.name : string.Empty : row.key;
             if (string.IsNullOrWhiteSpace(key)) continue;
             string capturedKey = key.Trim().ToLowerInvariant();
 
-            row.addButton.onClick.RemoveAllListeners();
-            row.addButton.onClick.AddListener(() => OnAttributeAddClicked(capturedKey));
+            if (row.decreaseButtonReference != null)
+            {
+                row.decreaseButtonReference.onClick.RemoveAllListeners();
+                row.decreaseButtonReference.onClick.AddListener(() => OnAttributeDecreaseClicked(capturedKey));
+            }
+
+            if (row.increaseButtonReference != null)
+            {
+                row.increaseButtonReference.onClick.RemoveAllListeners();
+                row.increaseButtonReference.onClick.AddListener(() => OnAttributeIncreaseClicked(capturedKey));
+            }
         }
+    }
+
+    private void BindConfirmButton()
+    {
+        if (confirmButton == null) return;
+
+        confirmButton.onClick.RemoveAllListeners();
+        confirmButton.onClick.AddListener(ConfirmPendingAllocation);
     }
 
     private void RefreshAttributeRowsValues()
     {
         if (attributeRows == null || playerStats == null) return;
-        bool canSpend = HasAttributePointsToSpend();
-
         for (int i = 0; i < attributeRows.Count; i++)
         {
             var row = attributeRows[i];
             if (row == null || string.IsNullOrWhiteSpace(row.key)) continue;
 
             string statName = MapAttributeKeyToStatName(row.key);
-            int value = playerStats.GetPersistentStat(statName);
+            int value = playerStats.GetPersistentStat(statName) + GetPendingAttributeLevels(statName);
             if (row.valueText != null) row.valueText.text = value.ToString();
             if (row.descText != null && string.IsNullOrWhiteSpace(row.descText.text))
                 row.descText.text = GetDefaultAttributeDescription(row.key);
-            if (row.addButton != null) row.addButton.gameObject.SetActive(canSpend && CanAllocateAttributeKey(row.key));
+
+            if (row.decreaseButtonReference != null)
+            {
+                row.decreaseButtonReference.gameObject.SetActive(true);
+                row.decreaseButtonReference.interactable = GetPendingAttributeLevels(statName) > 0;
+            }
+
+            if (row.increaseButtonReference != null)
+            {
+                row.increaseButtonReference.gameObject.SetActive(true);
+                row.increaseButtonReference.interactable = CanIncreaseAttributeKey(row.key);
+            }
+        }
+
+        if (confirmButton != null)
+        {
+            bool hasPendingAllocation = HasPendingAllocation();
+            if (!hasPendingAllocation)
+                confirmPadFocused = false;
+
+            confirmButton.gameObject.SetActive(hasPendingAllocation);
+            confirmButton.interactable = hasPendingAllocation;
         }
     }
 
@@ -485,21 +616,25 @@ public class AttributesUIManager : MonoBehaviour
         if (attributeRows == null) return;
         if (string.IsNullOrWhiteSpace(selectedAttributeKey))
             selectedAttributeKey = GetFirstAttributeKey();
-        bool canSpend = HasAttributePointsToSpend();
+        bool canInteract = HasAttributePointsToSpend() || HasPendingAllocation();
 
         for (int i = 0; i < attributeRows.Count; i++)
         {
             var row = attributeRows[i];
             if (row == null || string.IsNullOrWhiteSpace(row.key)) continue;
 
-            bool selected = canSpend && string.Equals(row.key, selectedAttributeKey, System.StringComparison.OrdinalIgnoreCase);
+            bool selected = !confirmPadFocused
+                            && canInteract
+                            && string.Equals(row.key, selectedAttributeKey, System.StringComparison.OrdinalIgnoreCase);
             Color color = selected && showPadFocus ? attributesSelectedColor : attributesNormalColor;
             if (row.labelText != null) row.labelText.color = color;
             if (row.valueText != null) row.valueText.color = color;
         }
+
+        RefreshConfirmPadFocusVisual();
     }
 
-    private void OnAttributeAddClicked(string key)
+    private void OnAttributeIncreaseClicked(string key)
     {
         CachePlayerStats();
         if (playerStats == null || string.IsNullOrWhiteSpace(key)) return;
@@ -507,9 +642,48 @@ public class AttributesUIManager : MonoBehaviour
         string statName = MapAttributeKeyToStatName(key);
         if (string.IsNullOrWhiteSpace(statName)) return;
         if (!IsAllocatableAttribute(statName)) return;
-        if (!playerStats.TrySpendAttributePoint(statName)) return;
+        if (!CanIncreaseAttributeKey(statName)) return;
+
+        if (!allocationSessionActive)
+            allocationSessionActive = true;
+
+        confirmPadFocused = false;
+        pendingAttributeLevels.TryGetValue(statName, out int pendingLevels);
+        pendingAttributeLevels[statName] = pendingLevels + 1;
 
         selectedAttributeKey = key;
+        RefreshUI();
+    }
+
+    private void OnAttributeDecreaseClicked(string key)
+    {
+        string statName = MapAttributeKeyToStatName(key);
+        if (string.IsNullOrWhiteSpace(statName)) return;
+        if (!pendingAttributeLevels.TryGetValue(statName, out int pendingLevels) || pendingLevels <= 0) return;
+
+        confirmPadFocused = false;
+        if (pendingLevels == 1)
+            pendingAttributeLevels.Remove(statName);
+        else
+            pendingAttributeLevels[statName] = pendingLevels - 1;
+
+        selectedAttributeKey = key;
+        RefreshUI();
+    }
+
+    private void ConfirmPendingAllocation()
+    {
+        CachePlayerStats();
+        if (playerStats == null || !HasPendingAllocation()) return;
+        if (!playerStats.TrySpendAttributePoints(pendingAttributeLevels))
+        {
+            RefreshUI();
+            return;
+        }
+
+        pendingAttributeLevels.Clear();
+        allocationSessionActive = true;
+        confirmPadFocused = false;
         RefreshUI();
     }
 
@@ -527,7 +701,8 @@ public class AttributesUIManager : MonoBehaviour
         {
             var row = attributeRows[i];
             if (row == null || string.IsNullOrWhiteSpace(row.key)) continue;
-            if (string.Equals(row.key.Trim(), selectedAttributeKey.Trim(), System.StringComparison.OrdinalIgnoreCase))
+            if (IsAttributeRowNavigable(i)
+                && string.Equals(row.key.Trim(), selectedAttributeKey.Trim(), System.StringComparison.OrdinalIgnoreCase))
                 return i;
         }
 
@@ -550,7 +725,43 @@ public class AttributesUIManager : MonoBehaviour
     {
         if (attributeRows == null || index < 0 || index >= attributeRows.Count) return false;
         var row = attributeRows[index];
-        return row != null && row.root != null && row.root.gameObject.activeInHierarchy && !string.IsNullOrWhiteSpace(row.key);
+        return row != null
+               && row.root != null
+               && row.root.gameObject.activeInHierarchy
+               && !string.IsNullOrWhiteSpace(row.key)
+               && IsAllocatableAttribute(row.key);
+    }
+
+    private int GetLastNavigableAttributeIndex()
+    {
+        if (attributeRows == null) return -1;
+
+        for (int i = attributeRows.Count - 1; i >= 0; i--)
+            if (IsAttributeRowNavigable(i)) return i;
+
+        return -1;
+    }
+
+    private void RefreshConfirmPadFocusVisual()
+    {
+        if (confirmButton == null) return;
+
+        var eventSystem = UnityEngine.EventSystems.EventSystem.current;
+        if (eventSystem == null) return;
+
+        bool shouldSelectConfirm = confirmPadFocused
+                                   && showPadFocus
+                                   && confirmButton.gameObject.activeInHierarchy
+                                   && confirmButton.interactable;
+        if (shouldSelectConfirm)
+        {
+            if (eventSystem.currentSelectedGameObject != confirmButton.gameObject)
+                eventSystem.SetSelectedGameObject(confirmButton.gameObject);
+        }
+        else if (eventSystem.currentSelectedGameObject == confirmButton.gameObject)
+        {
+            eventSystem.SetSelectedGameObject(null);
+        }
     }
 
     private string GetFirstAttributeKey()
@@ -598,6 +809,88 @@ public class AttributesUIManager : MonoBehaviour
         string statName = MapAttributeKeyToStatName(key);
         int current = playerStats.GetPersistentStat(statName);
         return current < PlayerStats.MaxAllocatableAttributeLevel;
+    }
+
+    private bool CanIncreaseAttributeKey(string key)
+    {
+        if (GetRemainingAttributePoints() <= 0 || !CanAllocateAttributeKey(key)) return false;
+
+        string statName = MapAttributeKeyToStatName(key);
+        int previewValue = playerStats.GetPersistentStat(statName) + GetPendingAttributeLevels(statName);
+        return previewValue < PlayerStats.MaxAllocatableAttributeLevel;
+    }
+
+    private int GetPendingAttributeLevels(string statName)
+    {
+        if (string.IsNullOrWhiteSpace(statName)) return 0;
+        return pendingAttributeLevels.TryGetValue(statName.Trim().ToLowerInvariant(), out int levels)
+            ? Mathf.Max(0, levels)
+            : 0;
+    }
+
+    private int GetPendingAttributeLevelCount()
+    {
+        int total = 0;
+        foreach (var entry in pendingAttributeLevels)
+            total += Mathf.Max(0, entry.Value);
+        return total;
+    }
+
+    private int GetRemainingAttributePoints()
+    {
+        CachePlayerStats();
+        if (playerStats == null) return 0;
+        return Mathf.Max(0, playerStats.unspentAttributePoints - GetPendingAttributeLevelCount());
+    }
+
+    private static void AutoWireAttributeRowButtons(AttributeRowBinding row)
+    {
+        if (row == null || row.root == null) return;
+
+        Button[] buttons = row.root.GetComponentsInChildren<Button>(true);
+        if (buttons == null || buttons.Length == 0) return;
+
+        if (buttons.Length == 1)
+        {
+            if (row.increaseButtonReference == null)
+                row.increaseButtonReference = buttons[0];
+            return;
+        }
+
+        System.Array.Sort(buttons, (a, b) =>
+        {
+            float aX = row.root.InverseTransformPoint(a.transform.position).x;
+            float bX = row.root.InverseTransformPoint(b.transform.position).x;
+            return aX.CompareTo(bX);
+        });
+
+        if (row.decreaseButtonReference == null)
+            row.decreaseButtonReference = buttons[0];
+        if (row.increaseButtonReference == null)
+            row.increaseButtonReference = buttons[buttons.Length - 1];
+    }
+
+    private void AutoWireConfirmButton()
+    {
+        if (confirmButton != null) return;
+
+        confirmButton = FindButtonByLabel(attributesRoot, "Confirm")
+                        ?? FindButtonByLabel(transform.root, "Confirm");
+    }
+
+    private static Button FindButtonByLabel(Transform root, string label)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(label)) return null;
+
+        Button[] buttons = root.GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            TextMeshProUGUI text = buttons[i].GetComponentInChildren<TextMeshProUGUI>(true);
+            if (text != null && string.Equals(text.text?.Trim(), label, System.StringComparison.OrdinalIgnoreCase))
+                return buttons[i];
+        }
+
+        return null;
     }
 
     private static string GetDefaultAttributeDescription(string key)

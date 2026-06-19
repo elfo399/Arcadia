@@ -890,6 +890,58 @@ public class PlayerStats : MonoBehaviour, IDamageable
         return true;
     }
 
+    public bool TrySpendAttributePoints(IDictionary<string, int> allocation)
+    {
+        if (allocation == null || allocation.Count == 0) return false;
+
+        var normalizedAllocation = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        int totalLevels = 0;
+
+        foreach (var entry in allocation)
+        {
+            string statName = string.IsNullOrWhiteSpace(entry.Key)
+                ? string.Empty
+                : entry.Key.Trim().ToLowerInvariant();
+            int levels = entry.Value;
+
+            if (!IsLevelBasedAttribute(statName) || levels <= 0) return false;
+            if (totalLevels > int.MaxValue - levels) return false;
+
+            normalizedAllocation.TryGetValue(statName, out int existingLevels);
+            if (existingLevels > int.MaxValue - levels) return false;
+            normalizedAllocation[statName] = existingLevels + levels;
+            totalLevels += levels;
+        }
+
+        if (totalLevels <= 0 || totalLevels > unspentAttributePoints) return false;
+
+        foreach (var entry in normalizedAllocation)
+        {
+            int currentValue = GetPersistentStat(entry.Key);
+            if (currentValue < 1 || entry.Value > MaxAllocatableAttributeLevel - currentValue)
+                return false;
+        }
+
+        foreach (var entry in normalizedAllocation)
+        {
+            switch (entry.Key.ToLowerInvariant())
+            {
+                case "vigor": vigor += entry.Value; break;
+                case "mind": mind += entry.Value; break;
+                case "endurance": endurance += entry.Value; break;
+                case "strength": strength += entry.Value; break;
+                case "dexterity": dexterity += entry.Value; break;
+                case "intelligence": intelligence += entry.Value; break;
+            }
+        }
+
+        unspentAttributePoints -= totalLevels;
+        RecalculateDerivedStats(keepCurrentRatio: true);
+        UpdateAllUI();
+        SaveStatsImmediate();
+        return true;
+    }
+
     public void AddExperience(int amount)
     {
         if (amount <= 0) return;
