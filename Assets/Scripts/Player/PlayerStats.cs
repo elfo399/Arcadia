@@ -9,6 +9,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public const int SilverCoinValue = 5;
     public const int GoldCoinValue = 10;
     public const int MaxAllocatableAttributeLevel = 99;
+    private const int FirstAttributeSoftCap = 40;
+    private const int SecondAttributeSoftCap = 60;
+    private const float MidAttributeGrowthMultiplier = 0.5f;
+    private const float HighAttributeGrowthMultiplier = 0.25f;
+    private const float PhysicalDefensePerEndurance = 0.5f;
+    private const float MagicDefensePerMind = 0.5f;
     public static PlayerStats instance;
 
     [Header("Health")]
@@ -28,9 +34,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
     [Header("Attribute Scaling")]
     [SerializeField] private float healthPerVigor = 5f;
     [SerializeField] private float manaPerMind = 3f;
-    [SerializeField] private float staminaPerEndurance = 4f;
-    [SerializeField] private float baseEquipLoad = 40f;
-    [SerializeField] private float equipLoadPerEndurance = 2f;
+    [SerializeField] private float staminaPerEndurance = 3f;
+    [SerializeField] private float baseEquipLoad = 20f;
+    [SerializeField] private float equipLoadPerEndurance = 1.5f;
 
     [Header("Flasks")]
     public int maxFlasks = 3;
@@ -275,11 +281,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         float preArmorAmount = amount;
         RefreshArmorTotals();
-        int armorDefense = GetArmorDefenseForDamageType(damageType);
+        int effectiveDefense = GetDefenseForDamageType(damageType);
         amount = ApplyArmorMitigation(amount, damageType);
         if (amount <= 0f) return;
 
-        Debug.Log($"[PlayerStats] Damage taken -> incoming:{incomingAmount:0.##}, afterBlockParry:{preArmorAmount:0.##}, type:{damageType}, armorDef:{armorDefense}, armorPhy:{totalArmorPhysicalDefense}, armorMag:{totalArmorMagicDefense}, final:{amount:0.##}");
+        Debug.Log($"[PlayerStats] Damage taken -> incoming:{incomingAmount:0.##}, afterBlockParry:{preArmorAmount:0.##}, type:{damageType}, defense:{effectiveDefense}, armorPhy:{totalArmorPhysicalDefense}, armorMag:{totalArmorMagicDefense}, final:{amount:0.##}");
 
         currentHealth -= amount;
         if (currentHealth < 0) currentHealth = 0;
@@ -565,6 +571,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             this.malefico = data.malefico;
             this.runCoins = Mathf.Max(0, data.runCoins);
             this.bankCoins = ResolveSavedBankCoins(data);
+            ApplyCharacterBaseResources(selectedCharacterId);
             SyncLegacyWalletFields();
             // Non applicare qui quest/inventory: se avviene prima degli Awake degli altri componenti
             // (es. PlayerInventory), il loro Awake può sovrascrivere i dati caricati.
@@ -628,6 +635,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         this.malefico = data.malefico;
         this.runCoins = Mathf.Max(0, data.runCoins);
         this.bankCoins = ResolveSavedBankCoins(data);
+        ApplyCharacterBaseResources(selectedCharacterId);
         SyncLegacyWalletFields();
     }
 
@@ -806,6 +814,23 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         PlayerCharacterDatabase database = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
         return database != null ? database.GetById(characterId) : null;
+    }
+
+    private void ApplyCharacterBaseResources(string characterId)
+    {
+        if (string.IsNullOrWhiteSpace(characterId))
+            return;
+
+        PlayerCharacterData character = ResolveCharacterDataById(characterId);
+        if (character == null)
+            return;
+
+        baseMaxHealth = Mathf.Max(1f, character.baseMaxHealth);
+        baseMaxStamina = Mathf.Max(1f, character.baseMaxStamina);
+        baseMaxMana = Mathf.Max(1f, character.baseMaxMana);
+        maxFlasks = Mathf.Max(0, character.maxFlasks);
+        currentFlasks = maxFlasks;
+        flaskHealAmount = Mathf.Max(0f, character.flaskHealAmount);
     }
 
 
@@ -1011,33 +1036,32 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public int GetBasePhysicalDamage()
     {
-        return GetBasePhysicalDamage(vigor, strength);
+        return GetBasePhysicalDamage(strength);
     }
 
-    public int GetBasePhysicalDamage(int vigorValue, int strengthValue)
+    public int GetBasePhysicalDamage(int strengthValue)
     {
-        // Richiesta design:
-        // Vigor + Strength -> base physical damage
-        return Mathf.Max(1, strengthValue + Mathf.RoundToInt(vigorValue * 0.5f));
+        return Mathf.Max(1, Mathf.FloorToInt(GetEffectiveAttributeValue(strengthValue)));
     }
 
     public int GetBaseMagicDamage()
     {
-        return GetBaseMagicDamage(mind, intelligence);
+        return GetBaseMagicDamage(intelligence);
     }
 
-    public int GetBaseMagicDamage(int mindValue, int intelligenceValue)
+    public int GetBaseMagicDamage(int intelligenceValue)
     {
-        // Richiesta design:
-        // Mind + Intelligence -> base magic damage
-        return Mathf.Max(0, intelligenceValue + Mathf.RoundToInt(mindValue * 0.5f));
+        return Mathf.Max(0, Mathf.FloorToInt(GetEffectiveAttributeValue(intelligenceValue)));
     }
 
     public int GetBaseRangedDamage()
     {
-        // Richiesta design:
-        // Dexterity -> ranged base damage
-        return Mathf.Max(1, dexterity);
+        return GetBaseRangedDamage(dexterity);
+    }
+
+    public int GetBaseRangedDamage(int dexterityValue)
+    {
+        return Mathf.Max(1, Mathf.FloorToInt(GetEffectiveAttributeValue(dexterityValue)));
     }
 
     public float GetCurrentEquipLoad()
@@ -1154,23 +1178,66 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public float GetMaxEquipLoad(int enduranceValue)
     {
-        float scaledLoad = baseEquipLoad + Mathf.Max(0, enduranceValue - 1) * equipLoadPerEndurance;
+        float scaledLoad = baseEquipLoad + GetSoftCappedAttributeGrowth(enduranceValue) * equipLoadPerEndurance;
         return Mathf.Max(1f, scaledLoad);
     }
 
     public float GetMaxHealth(int vigorValue)
     {
-        return Mathf.Max(1f, baseMaxHealth + Mathf.Max(0, vigorValue - 1) * healthPerVigor);
+        return Mathf.Max(1f, baseMaxHealth + GetSoftCappedAttributeGrowth(vigorValue) * healthPerVigor);
     }
 
     public float GetMaxMana(int mindValue)
     {
-        return Mathf.Max(1f, baseMaxMana + Mathf.Max(0, mindValue - 1) * manaPerMind);
+        return Mathf.Max(1f, baseMaxMana + GetSoftCappedAttributeGrowth(mindValue) * manaPerMind);
     }
 
     public float GetMaxStamina(int enduranceValue)
     {
-        return Mathf.Max(1f, baseMaxStamina + Mathf.Max(0, enduranceValue - 1) * staminaPerEndurance);
+        return Mathf.Max(1f, baseMaxStamina + GetSoftCappedAttributeGrowth(enduranceValue) * staminaPerEndurance);
+    }
+
+    public static float GetEffectiveAttributeValue(int attributeValue)
+    {
+        return 1f + GetSoftCappedAttributeGrowth(attributeValue);
+    }
+
+    private static float GetSoftCappedAttributeGrowth(int attributeValue)
+    {
+        int rawGrowth = Mathf.Max(0, attributeValue - 1);
+        int fullGrowthLimit = FirstAttributeSoftCap - 1;
+        int fullGrowth = Mathf.Min(rawGrowth, fullGrowthLimit);
+        int midGrowth = Mathf.Min(
+            Mathf.Max(0, rawGrowth - fullGrowthLimit),
+            SecondAttributeSoftCap - FirstAttributeSoftCap);
+        int highGrowth = Mathf.Max(0, rawGrowth - fullGrowthLimit - midGrowth);
+
+        return fullGrowth
+               + midGrowth * MidAttributeGrowthMultiplier
+               + highGrowth * HighAttributeGrowthMultiplier;
+    }
+
+    public int GetPhysicalDefense()
+    {
+        return GetPhysicalDefense(endurance);
+    }
+
+    public int GetPhysicalDefense(int enduranceValue)
+    {
+        int attributeDefense = Mathf.FloorToInt(GetEffectiveAttributeValue(enduranceValue) * PhysicalDefensePerEndurance);
+        return Mathf.Max(0, totalArmorPhysicalDefense + attributeDefense);
+    }
+
+    public int GetMagicDefense()
+    {
+        return GetMagicDefense(mind);
+    }
+
+    public int GetMagicDefense(int mindValue)
+    {
+        int mindDefense = Mathf.FloorToInt(GetEffectiveAttributeValue(mindValue) * MagicDefensePerMind);
+        int faithDefense = Mathf.FloorToInt(GetEffectiveAttributeValue(faith));
+        return Mathf.Max(0, totalArmorMagicDefense + mindDefense + faithDefense);
     }
 
     public void RecalculateDerivedStats(bool keepCurrentRatio)
@@ -1197,7 +1264,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (amount <= 0f)
             return 0f;
 
-        int defense = GetArmorDefenseForDamageType(damageType);
+        int defense = GetDefenseForDamageType(damageType);
 
         if (defense <= 0)
             return amount;
@@ -1206,11 +1273,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
         return Mathf.Max(0f, amount * multiplier);
     }
 
-    private int GetArmorDefenseForDamageType(WeaponItem.DamageType damageType)
+    private int GetDefenseForDamageType(WeaponItem.DamageType damageType)
     {
         return damageType == WeaponItem.DamageType.Magic
-            ? totalArmorMagicDefense
-            : totalArmorPhysicalDefense;
+            ? GetMagicDefense()
+            : GetPhysicalDefense();
     }
 
     // --- BANCA PERSISTENTE ---

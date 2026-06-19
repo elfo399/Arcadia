@@ -98,7 +98,15 @@ public class MagicProjectile : MonoBehaviour
 
         if (damageable != null)
         {
-            damageable.TakeDamage(damage);
+            if (damageable is PlayerStats playerStats)
+            {
+                Vector3? sourcePosition = owner != null ? owner.position : transform.position;
+                playerStats.TakeDamage(damage, WeaponItem.DamageType.Magic, sourcePosition, owner);
+            }
+            else
+            {
+                damageable.TakeDamage(damage);
+            }
             string ownerName = owner != null ? owner.name : "UnknownOwner";
             string targetName = other != null ? other.name : "UnknownTarget";
             string critTag = isCriticalHit ? " CRIT" : string.Empty;

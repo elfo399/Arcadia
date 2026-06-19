@@ -537,8 +537,12 @@ public class AttributesUIManager : MonoBehaviour
             string statName = MapAttributeKeyToStatName(row.key);
             int value = playerStats.GetPersistentStat(statName) + GetPendingAttributeLevels(statName);
             if (row.valueText != null) row.valueText.text = value.ToString();
-            if (row.descText != null && string.IsNullOrWhiteSpace(row.descText.text))
-                row.descText.text = GetDefaultAttributeDescription(row.key);
+            if (row.descText != null)
+            {
+                string description = GetDefaultAttributeDescription(row.key);
+                if (!string.IsNullOrWhiteSpace(description))
+                    row.descText.text = description;
+            }
 
             if (row.decreaseButtonReference != null)
             {
@@ -597,8 +601,8 @@ public class AttributesUIManager : MonoBehaviour
         int stamina = Mathf.RoundToInt(playerStats.maxStamina);
         int basePhyDamage = playerStats.GetBasePhysicalDamage();
         int magicDamage = playerStats.GetBaseMagicDamage();
-        int phyDef = Mathf.Max(0, playerStats.endurance + Mathf.RoundToInt(playerStats.vigor * 0.5f)) + playerStats.TotalArmorPhysicalDefense;
-        int magicDef = Mathf.Max(0, playerStats.intelligence + playerStats.faith) + playerStats.TotalArmorMagicDefense;
+        int phyDef = playerStats.GetPhysicalDefense();
+        int magicDef = playerStats.GetMagicDefense();
 
         int previewVigor = playerStats.vigor + GetPendingAttributeLevels("vigor");
         int previewMind = playerStats.mind + GetPendingAttributeLevels("mind");
@@ -609,10 +613,10 @@ public class AttributesUIManager : MonoBehaviour
         int previewHp = Mathf.RoundToInt(playerStats.GetMaxHealth(previewVigor));
         int previewMana = Mathf.RoundToInt(playerStats.GetMaxMana(previewMind));
         int previewStamina = Mathf.RoundToInt(playerStats.GetMaxStamina(previewEndurance));
-        int previewBasePhyDamage = playerStats.GetBasePhysicalDamage(previewVigor, previewStrength);
-        int previewMagicDamage = playerStats.GetBaseMagicDamage(previewMind, previewIntelligence);
-        int previewPhyDef = Mathf.Max(0, previewEndurance + Mathf.RoundToInt(previewVigor * 0.5f)) + playerStats.TotalArmorPhysicalDefense;
-        int previewMagicDef = Mathf.Max(0, previewIntelligence + playerStats.faith) + playerStats.TotalArmorMagicDefense;
+        int previewBasePhyDamage = playerStats.GetBasePhysicalDamage(previewStrength);
+        int previewMagicDamage = playerStats.GetBaseMagicDamage(previewIntelligence);
+        int previewPhyDef = playerStats.GetPhysicalDefense(previewEndurance);
+        int previewMagicDef = playerStats.GetMagicDefense(previewMind);
 
         float equipWeight = playerStats.GetCurrentEquipLoad();
         float maxLoad = playerStats.GetMaxEquipLoad();
@@ -949,13 +953,13 @@ public class AttributesUIManager : MonoBehaviour
         string k = string.IsNullOrWhiteSpace(key) ? string.Empty : key.Trim().ToLowerInvariant();
         switch (k)
         {
-            case "vigor": return "Increases max HP and base physical damage.";
-            case "mind": return "Increases mana and base magic damage.";
-            case "endurance": return "Increases stamina, defense and equip load.";
-            case "strength": return "Increases base physical damage and physical scaling.";
-            case "dexterity": return "Increases ranged (bow) damage.";
-            case "intelligence": return "Increases base magic damage and magic scaling.";
-            case "faith": return "Increases holy power and magic defense.";
+            case "vigor": return "Increases HP.";
+            case "mind": return "Increases Mana & Magic Resist.";
+            case "endurance": return "Increases Stamina, Load & Phy Def.";
+            case "strength": return "Increases Physical & STR Damage.";
+            case "dexterity": return "Increases Ranged & DEX Damage.";
+            case "intelligence": return "Increases Magic & INT Damage.";
+            case "faith": return "Increases Magic Resistance.";
             case "evil": return "Represents your dark alignment.";
             case "karma": return "Represents your moral balance.";
             default: return string.Empty;

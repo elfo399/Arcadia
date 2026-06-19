@@ -1056,16 +1056,20 @@ public class PlayerCombat : MonoBehaviour
         if (isRangedWeapon)
         {
             // Ranged: scala con DEX (archi e affini)
-            scalingBonus = Mathf.Max(0f, weapon.GetDexterityScalingFactor()) * Mathf.Max(0, stats.dexterity);
+            scalingBonus = Mathf.Max(0f, weapon.GetDexterityScalingFactor())
+                           * PlayerStats.GetEffectiveAttributeValue(stats.dexterity);
         }
         else if (isMagicWeapon)
         {
-            scalingBonus = Mathf.Max(0f, weapon.GetIntelligenceScalingFactor()) * Mathf.Max(0, stats.intelligence);
+            scalingBonus = Mathf.Max(0f, weapon.GetIntelligenceScalingFactor())
+                           * PlayerStats.GetEffectiveAttributeValue(stats.intelligence);
         }
         else
         {
-            scalingBonus = Mathf.Max(0f, weapon.GetStrengthScalingFactor()) * Mathf.Max(0, stats.strength)
-                           + Mathf.Max(0f, weapon.GetDexterityScalingFactor()) * Mathf.Max(0, stats.dexterity);
+            scalingBonus = Mathf.Max(0f, weapon.GetStrengthScalingFactor())
+                           * PlayerStats.GetEffectiveAttributeValue(stats.strength)
+                           + Mathf.Max(0f, weapon.GetDexterityScalingFactor())
+                           * PlayerStats.GetEffectiveAttributeValue(stats.dexterity);
         }
 
         float attackMultiplier = type == AttackType.Heavy
