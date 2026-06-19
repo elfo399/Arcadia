@@ -43,6 +43,11 @@ public class AttributesUIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI attributesMagicDefValueText;
     [SerializeField] private TextMeshProUGUI attributesLoadValueText;
     [SerializeField] private TextMeshProUGUI attributesLoadTierValueText;
+    [Header("Unspent Attribute Points")]
+    [Tooltip("Parent che contiene la scritta Point e il relativo valore. Viene nascosto quando non restano punti da assegnare.")]
+    [SerializeField] private GameObject txtPointParent;
+    [Tooltip("Testo che mostra il numero di punti attributo ancora disponibili.")]
+    [SerializeField] private TextMeshProUGUI txtPointValue;
     [SerializeField] private Image playerPortraitImage;
     [SerializeField] private TextMeshProUGUI playerNameText;
     [SerializeField] private string playerNameFormat = "{0}";
@@ -160,6 +165,7 @@ public class AttributesUIManager : MonoBehaviour
         CachePlayerController();
         if (playerStats == null) return;
 
+        RefreshUnspentAttributePoints();
         RefreshAttributeRowsValues();
         RefreshAttributeDerivedPanel();
         RefreshPlayerPortrait();
@@ -554,6 +560,18 @@ public class AttributesUIManager : MonoBehaviour
             confirmButton.gameObject.SetActive(hasPendingAllocation);
             confirmButton.interactable = hasPendingAllocation;
         }
+    }
+
+    private void RefreshUnspentAttributePoints()
+    {
+        int remainingPoints = GetRemainingAttributePoints();
+        bool hasUnspentPoints = remainingPoints > 0;
+
+        if (txtPointParent != null)
+            txtPointParent.SetActive(hasUnspentPoints);
+
+        if (txtPointValue != null)
+            txtPointValue.text = remainingPoints.ToString();
     }
 
     private void RefreshAttributeDerivedPanel()
