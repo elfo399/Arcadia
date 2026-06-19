@@ -1011,16 +1011,26 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public int GetBasePhysicalDamage()
     {
+        return GetBasePhysicalDamage(vigor, strength);
+    }
+
+    public int GetBasePhysicalDamage(int vigorValue, int strengthValue)
+    {
         // Richiesta design:
         // Vigor + Strength -> base physical damage
-        return Mathf.Max(1, strength + Mathf.RoundToInt(vigor * 0.5f));
+        return Mathf.Max(1, strengthValue + Mathf.RoundToInt(vigorValue * 0.5f));
     }
 
     public int GetBaseMagicDamage()
     {
+        return GetBaseMagicDamage(mind, intelligence);
+    }
+
+    public int GetBaseMagicDamage(int mindValue, int intelligenceValue)
+    {
         // Richiesta design:
         // Mind + Intelligence -> base magic damage
-        return Mathf.Max(0, intelligence + Mathf.RoundToInt(mind * 0.5f));
+        return Mathf.Max(0, intelligenceValue + Mathf.RoundToInt(mindValue * 0.5f));
     }
 
     public int GetBaseRangedDamage()
@@ -1139,8 +1149,28 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public float GetMaxEquipLoad()
     {
-        float scaledLoad = baseEquipLoad + Mathf.Max(0, endurance - 1) * equipLoadPerEndurance;
+        return GetMaxEquipLoad(endurance);
+    }
+
+    public float GetMaxEquipLoad(int enduranceValue)
+    {
+        float scaledLoad = baseEquipLoad + Mathf.Max(0, enduranceValue - 1) * equipLoadPerEndurance;
         return Mathf.Max(1f, scaledLoad);
+    }
+
+    public float GetMaxHealth(int vigorValue)
+    {
+        return Mathf.Max(1f, baseMaxHealth + Mathf.Max(0, vigorValue - 1) * healthPerVigor);
+    }
+
+    public float GetMaxMana(int mindValue)
+    {
+        return Mathf.Max(1f, baseMaxMana + Mathf.Max(0, mindValue - 1) * manaPerMind);
+    }
+
+    public float GetMaxStamina(int enduranceValue)
+    {
+        return Mathf.Max(1f, baseMaxStamina + Mathf.Max(0, enduranceValue - 1) * staminaPerEndurance);
     }
 
     public void RecalculateDerivedStats(bool keepCurrentRatio)
@@ -1153,9 +1183,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
         float manaRatio = keepCurrentRatio ? Mathf.Clamp01(currentMana / oldMaxMana) : 1f;
         float staminaRatio = keepCurrentRatio ? Mathf.Clamp01(currentStamina / oldMaxStamina) : 1f;
 
-        maxHealth = Mathf.Max(1f, baseMaxHealth + Mathf.Max(0, vigor - 1) * healthPerVigor);
-        maxMana = Mathf.Max(1f, baseMaxMana + Mathf.Max(0, mind - 1) * manaPerMind);
-        maxStamina = Mathf.Max(1f, baseMaxStamina + Mathf.Max(0, endurance - 1) * staminaPerEndurance);
+        maxHealth = GetMaxHealth(vigor);
+        maxMana = GetMaxMana(mind);
+        maxStamina = GetMaxStamina(endurance);
 
         currentHealth = Mathf.Clamp(maxHealth * healthRatio, 0f, maxHealth);
         currentMana = Mathf.Clamp(maxMana * manaRatio, 0f, maxMana);

@@ -57,6 +57,8 @@ public class AttributesUIManager : MonoBehaviour
     [SerializeField] private bool hidePlayerPortraitWhenMissing = true;
     [SerializeField] private Color attributesSelectedColor = new Color(1f, 0.85f, 0.2f, 1f);
     [SerializeField] private Color attributesNormalColor = Color.white;
+    [Tooltip("Colore del delta mostrato nei valori derivati durante l'assegnazione non ancora confermata.")]
+    [SerializeField] private Color pendingPreviewColor = new Color(1f, 0.82f, 0.15f, 1f);
     [SerializeField] private List<AttributeRowBinding> attributeRows = new();
     [Tooltip("Pulsante che applica e salva tutte le modifiche preparate.")]
     [SerializeField] private Button confirmButton;
@@ -598,22 +600,53 @@ public class AttributesUIManager : MonoBehaviour
         int phyDef = Mathf.Max(0, playerStats.endurance + Mathf.RoundToInt(playerStats.vigor * 0.5f)) + playerStats.TotalArmorPhysicalDefense;
         int magicDef = Mathf.Max(0, playerStats.intelligence + playerStats.faith) + playerStats.TotalArmorMagicDefense;
 
+        int previewVigor = playerStats.vigor + GetPendingAttributeLevels("vigor");
+        int previewMind = playerStats.mind + GetPendingAttributeLevels("mind");
+        int previewEndurance = playerStats.endurance + GetPendingAttributeLevels("endurance");
+        int previewStrength = playerStats.strength + GetPendingAttributeLevels("strength");
+        int previewIntelligence = playerStats.intelligence + GetPendingAttributeLevels("intelligence");
+
+        int previewHp = Mathf.RoundToInt(playerStats.GetMaxHealth(previewVigor));
+        int previewMana = Mathf.RoundToInt(playerStats.GetMaxMana(previewMind));
+        int previewStamina = Mathf.RoundToInt(playerStats.GetMaxStamina(previewEndurance));
+        int previewBasePhyDamage = playerStats.GetBasePhysicalDamage(previewVigor, previewStrength);
+        int previewMagicDamage = playerStats.GetBaseMagicDamage(previewMind, previewIntelligence);
+        int previewPhyDef = Mathf.Max(0, previewEndurance + Mathf.RoundToInt(previewVigor * 0.5f)) + playerStats.TotalArmorPhysicalDefense;
+        int previewMagicDef = Mathf.Max(0, previewIntelligence + playerStats.faith) + playerStats.TotalArmorMagicDefense;
+
         float equipWeight = playerStats.GetCurrentEquipLoad();
         float maxLoad = playerStats.GetMaxEquipLoad();
+        float previewMaxLoad = playerStats.GetMaxEquipLoad(previewEndurance);
         float loadRatio = Mathf.Clamp01(maxLoad > 0f ? equipWeight / maxLoad : 0f);
         string loadTierLabel = playerController != null ? playerController.GetEquipLoadTierLabel() : ResolveLoadTierLabelFallback(loadRatio);
 
-        if (attributesHpValueText != null) attributesHpValueText.text = hp.ToString();
-        if (attributesManaValueText != null) attributesManaValueText.text = mana.ToString();
-        if (attributesStaminaValueText != null) attributesStaminaValueText.text = stamina.ToString();
-        if (attributesBasePhyDamageValueText != null) attributesBasePhyDamageValueText.text = basePhyDamage.ToString();
-        if (attributesMagicDamageValueText != null) attributesMagicDamageValueText.text = magicDamage.ToString();
-        if (attributesPhyDefValueText != null) attributesPhyDefValueText.text = phyDef.ToString();
-        if (attributesMagicDefValueText != null) attributesMagicDefValueText.text = magicDef.ToString();
-        string loadText = equipWeight.ToString("0.0") + " / " + maxLoad.ToString("0.0");
+        if (attributesHpValueText != null) attributesHpValueText.text = FormatPreviewValue(hp, previewHp);
+        if (attributesManaValueText != null) attributesManaValueText.text = FormatPreviewValue(mana, previewMana);
+        if (attributesStaminaValueText != null) attributesStaminaValueText.text = FormatPreviewValue(stamina, previewStamina);
+        if (attributesBasePhyDamageValueText != null) attributesBasePhyDamageValueText.text = FormatPreviewValue(basePhyDamage, previewBasePhyDamage);
+        if (attributesMagicDamageValueText != null) attributesMagicDamageValueText.text = FormatPreviewValue(magicDamage, previewMagicDamage);
+        if (attributesPhyDefValueText != null) attributesPhyDefValueText.text = FormatPreviewValue(phyDef, previewPhyDef);
+        if (attributesMagicDefValueText != null) attributesMagicDefValueText.text = FormatPreviewValue(magicDef, previewMagicDef);
+        string loadText = equipWeight.ToString("0.0") + " / " + maxLoad.ToString("0.0")
+                          + FormatPreviewDelta(previewMaxLoad - maxLoad, "0.0");
         if (attributesLoadValueText != null) attributesLoadValueText.text = loadText;
         if (attributesLoadTierValueText != null) attributesLoadTierValueText.text = loadTierLabel;
         ApplyProgress(attributesLoadProgressBar, loadRatio, loadText);
+    }
+
+    private string FormatPreviewValue(int currentValue, int previewValue)
+    {
+        return currentValue + FormatPreviewDelta(previewValue - currentValue, "0");
+    }
+
+    private string FormatPreviewDelta(float delta, string numberFormat)
+    {
+        if (Mathf.Approximately(delta, 0f))
+            return string.Empty;
+
+        string sign = delta > 0f ? "+" : string.Empty;
+        string color = ColorUtility.ToHtmlStringRGB(pendingPreviewColor);
+        return $" <color=#{color}>({sign}{delta.ToString(numberFormat)})</color>";
     }
 
     private static string ResolveLoadTierLabelFallback(float loadRatio)
