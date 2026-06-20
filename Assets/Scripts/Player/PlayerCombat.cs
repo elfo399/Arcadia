@@ -200,21 +200,6 @@ public class PlayerCombat : MonoBehaviour
         return equipped != null && equipped.category == WeaponCategory.Shield && equipped.canParry;
     }
 
-    private bool IsShieldBlockHeld(Hand hand)
-    {
-        if (inventory == null || controller == null || controller.Controls == null)
-            return false;
-
-        WeaponItem equipped = inventory.GetWeaponForHand(hand);
-        if (equipped == null || equipped.category != WeaponCategory.Shield || !equipped.canBlock)
-            return false;
-
-        if (hand == Hand.Right)
-            return controller.Controls.Player.LightAttackRight.IsPressed();
-
-        return controller.Controls.Player.LightAttackLeft.IsPressed();
-    }
-
     public bool TryDefendIncomingDamage(ref float amount, WeaponItem.DamageType damageType = WeaponItem.DamageType.Physical, Vector3? sourcePosition = null, Transform attacker = null)
     {
         if (TryParryIncomingDamage(ref amount, sourcePosition, attacker))

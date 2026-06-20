@@ -252,20 +252,6 @@ public class PlayerInventory : MonoBehaviour
         return magicLoadout[currentMagicIndex];
     }
 
-    public ArmorItemData GetEquippedArmor(ArmorItemData.ArmorSlot slot)
-    {
-        EnsureLoadoutSize();
-        int index = ArmorSlotToIndex(slot);
-        return index >= 0 && index < armorLoadout.Length ? armorLoadout[index] : null;
-    }
-
-    public string GetEquippedArmorInstanceId(ArmorItemData.ArmorSlot slot)
-    {
-        EnsureLoadoutSize();
-        int index = ArmorSlotToIndex(slot);
-        return index >= 0 && index < armorInstanceIds.Length ? armorInstanceIds[index] : null;
-    }
-
     public bool TryPeekCurrentUsable(out UsableItemData usable, out int amount)
     {
         EnsureLoadoutSize();
@@ -485,8 +471,6 @@ public class PlayerInventory : MonoBehaviour
 
     // Inventory management
     public void AddItem(InventoryItem item) { if (item != null) items.Add(item); }
-    public bool RemoveItem(InventoryItem item) { return items.Remove(item); }
-    public void ClearItems() { items.Clear(); }
     public void AddWeaponLoot(WeaponItem weapon, int amount = 1)
     {
         if (weapon == null || amount <= 0)
@@ -1562,54 +1546,6 @@ public class PlayerInventory : MonoBehaviour
     private static bool HasSavedLoadoutSlots(SavedLoadoutSlotData[] source)
     {
         return source != null && source.Length > 0;
-    }
-
-    private static bool HasAnyValidWeaponSlot(SavedLoadoutSlotData[] source, Dictionary<string, WeaponItem> weaponLookup)
-    {
-        if (source == null || source.Length == 0 || weaponLookup == null) return false;
-        for (int i = 0; i < source.Length; i++)
-        {
-            var slot = source[i];
-            if (slot == null || string.IsNullOrWhiteSpace(slot.assetName)) continue;
-            if (ResolveWeapon(slot.assetName, weaponLookup) != null) return true;
-        }
-        return false;
-    }
-
-    private static bool HasAnyValidUsableSlot(SavedLoadoutSlotData[] source, Dictionary<string, UsableItemData> usableLookup)
-    {
-        if (source == null || source.Length == 0 || usableLookup == null) return false;
-        for (int i = 0; i < source.Length; i++)
-        {
-            var slot = source[i];
-            if (slot == null || string.IsNullOrWhiteSpace(slot.assetName)) continue;
-            if (ResolveUsable(slot.assetName, usableLookup) != null) return true;
-        }
-        return false;
-    }
-
-    private static bool HasAnyValidMagicSlot(SavedLoadoutSlotData[] source, Dictionary<string, MagicItemData> magicLookup)
-    {
-        if (source == null || source.Length == 0 || magicLookup == null) return false;
-        for (int i = 0; i < source.Length; i++)
-        {
-            var slot = source[i];
-            if (slot == null || string.IsNullOrWhiteSpace(slot.assetName)) continue;
-            if (ResolveMagic(slot.assetName, magicLookup) != null) return true;
-        }
-        return false;
-    }
-
-    private static bool HasAnyValidArmorSlot(SavedLoadoutSlotData[] source, Dictionary<string, ArmorItemData> armorLookup)
-    {
-        if (source == null || source.Length == 0 || armorLookup == null) return false;
-        for (int i = 0; i < source.Length; i++)
-        {
-            var slot = source[i];
-            if (slot == null || string.IsNullOrWhiteSpace(slot.assetName)) continue;
-            if (ResolveArmor(slot.assetName, armorLookup) != null) return true;
-        }
-        return false;
     }
 
     private void EnsureLoadoutInstancesInInventory()

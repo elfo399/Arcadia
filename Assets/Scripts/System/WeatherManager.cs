@@ -202,17 +202,6 @@ public class WeatherManager : MonoBehaviour
         isRunning = false;
     }
 
-    public void SetTimeMultiplier(float value)
-    {
-        timeMultiplier = Mathf.Max(0f, value);
-    }
-
-    public void SetDayPhase(DayPhase phase)
-    {
-        SetCycleToPhase(phase);
-        UpdateCurrentPhase(force: true);
-    }
-
     public void SetWeatherCondition(WeatherCondition condition)
     {
         if (currentCondition == condition)

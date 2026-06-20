@@ -147,16 +147,6 @@ public class MenuManager : MonoBehaviour
         RequestShowTabAtIndex(targetIndex);
     }
 
-    public void ShowTabByIndex(int targetIndex)
-    {
-        ResolveReferences();
-
-        if (!IsValidTabIndex(targetIndex))
-            return;
-
-        RequestShowTabAtIndex(targetIndex);
-    }
-
     private void RequestShowTabAtIndex(int targetIndex)
     {
         if (!IsValidTabIndex(targetIndex) || IsMenuTransitioning)

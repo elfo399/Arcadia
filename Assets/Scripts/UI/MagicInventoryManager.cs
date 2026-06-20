@@ -252,8 +252,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     public void OnEquipMagicButtonClick()
     {
-        EnsurePlayerInventory();
-
         int targetIndex = currentSelectedIndex;
         if (!HasItem(targetIndex) && HasItem(padFocusIndex))
             targetIndex = padFocusIndex;
@@ -287,7 +285,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     private void RefreshFromPlayer()
     {
-        EnsurePlayerInventory();
         currentItems.Clear();
         if (playerInventory != null)
         {
@@ -379,7 +376,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     private void PersistMagicSlotLayout()
     {
-        EnsurePlayerInventory();
         if (playerInventory == null)
             return;
 
@@ -496,7 +492,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     private bool IsItemEquipped(InventoryItem item)
     {
         if (item == null || string.IsNullOrEmpty(item.instanceId)) return false;
-        EnsurePlayerInventory();
         return playerInventory != null && playerInventory.IsInstanceEquipped(item.instanceId);
     }
 
@@ -632,10 +627,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         if (grid != null && grid.constraintCount > 0 && grid.constraint == GridLayoutGroup.Constraint.FixedColumnCount)
             return Mathf.Max(1, grid.constraintCount);
         return Mathf.Max(1, Mathf.CeilToInt(Mathf.Sqrt(Mathf.Max(1, slots.Count))));
-    }
-
-    private void EnsurePlayerInventory()
-    {
     }
 
 }

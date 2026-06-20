@@ -178,11 +178,6 @@ public class WeaponItem : ScriptableObject
         return RankToFactor(intelligenceScalingRank);
     }
 
-    public float GetFaithScalingFactor()
-    {
-        return RankToFactor(faithScalingRank);
-    }
-
     public string GetScalingLabel()
     {
         StringBuilder sb = new StringBuilder(48);

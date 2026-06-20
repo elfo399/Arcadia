@@ -26,7 +26,6 @@ public class AttributesUIManager : MonoBehaviour
     }
 
     [Header("Attributes UI")]
-    [SerializeField] private Transform attributesRoot;
     [SerializeField] private TextMeshProUGUI attributesLevelLabelText;
     [SerializeField] private TextMeshProUGUI attributesLevelValueText;
     [SerializeField] private TextMeshProUGUI attributesXpValueText;
@@ -148,7 +147,6 @@ public class AttributesUIManager : MonoBehaviour
     {
         Initialize();
         CachePlayerStats();
-        CachePlayerController();
         if (playerStats == null) return;
 
         RefreshUnspentAttributePoints();
@@ -283,10 +281,6 @@ public class AttributesUIManager : MonoBehaviour
     {
         if (playerStats != null) return;
         playerStats = PlayerStats.instance;
-    }
-
-    private void CachePlayerController()
-    {
     }
 
     private void RefreshPlayerPortrait()

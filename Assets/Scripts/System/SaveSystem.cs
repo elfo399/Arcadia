@@ -137,21 +137,6 @@ public static class SaveSystem
         return null;
     }
 
-    public static bool HasData(string characterId)
-    {
-        string normalizedId = NormalizeCharacterId(characterId);
-        if (string.IsNullOrWhiteSpace(normalizedId))
-            return false;
-
-        if (File.Exists(GetCharacterSaveFilePath(normalizedId)))
-            return true;
-
-        GameData legacyData = LoadLegacyData(logMissing: false);
-        return legacyData != null
-            && !string.IsNullOrWhiteSpace(legacyData.selectedCharacterId)
-            && string.Equals(legacyData.selectedCharacterId.Trim(), normalizedId, System.StringComparison.OrdinalIgnoreCase);
-    }
-
     public static string GetSaveFilePath()
     {
         string selectedCharacterId = GetSelectedCharacterId();

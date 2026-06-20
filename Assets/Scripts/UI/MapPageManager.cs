@@ -296,21 +296,6 @@ public class MapPageManager : MonoBehaviour
         }
     }
 
-    public void SetPlayerName(string value)
-    {
-        defaultPlayerName = string.IsNullOrWhiteSpace(value) ? defaultPlayerName : value.Trim();
-        if (PlayerStats.instance != null && !string.IsNullOrWhiteSpace(value))
-            PlayerStats.instance.SetCharacterName(value);
-
-        ApplyRunInfoTexts(forceRefresh: true);
-    }
-
-    public void SetCurrentWeather(string value)
-    {
-        currentWeather = value;
-        ApplyRunInfoTexts(forceRefresh: true);
-    }
-
     private void ResolveReferences()
     {
         if (generator == null)

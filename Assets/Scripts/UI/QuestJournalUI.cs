@@ -130,41 +130,6 @@ public class QuestJournalUI : MonoBehaviour
     public void SetQuestFilterActive() { SetQuestFilterAll(); }
     public void SetQuestFilterCompleted() { SetQuestFilterAll(); }
 
-    public void SetQuests(List<QuestEntryData> quests)
-    {
-        TryBindQuestManager();
-        if (!useQuestManager || questManager == null)
-            return;
-
-        var mapped = new List<QuestManager.QuestData>();
-        if (quests != null)
-        {
-            for (int i = 0; i < quests.Count; i++)
-            {
-                var entry = quests[i];
-                if (entry == null) continue;
-                mapped.Add(new QuestManager.QuestData
-                {
-                    questId = string.IsNullOrWhiteSpace(entry.questId) ? NormalizeQuestId(entry.questId, entry.title, entry.location) : entry.questId.Trim(),
-                    title = entry.title,
-                    location = entry.location,
-                    completed = entry.completed,
-                    rewardClaimed = entry.rewardClaimed,
-                    questTypeLabel = entry.questTypeLabel,
-                    recommendedLabel = entry.recommendedLabel,
-                    questImage = entry.questImage,
-                    loreTitle = entry.loreTitle,
-                    loreDescription = entry.loreDescription,
-                    loreAuthor = entry.loreAuthor,
-                    objectives = MapObjectives(entry.objectives),
-                    rewards = MapRewards(entry.rewards)
-                });
-            }
-        }
-
-        questManager.ReplaceAllQuests(mapped);
-    }
-
     public void AddOrUpdateQuest(string questId, string title, string location, bool completed)
     {
         TryBindQuestManager();
@@ -212,7 +177,6 @@ public class QuestJournalUI : MonoBehaviour
         if (questManager == null) return;
 
         string previousQuestId = questManager.SelectedJournalQuestId;
-        EnsurePlayerInventory();
         EnsurePlayerStats();
         bool claimed = questManager.ConfirmJournalSelection(playerInventory, playerStats, GetQuestRewardNormalCapacityValue(), GetQuestRewardMagicCapacityValue());
         if (claimed)
@@ -345,7 +309,6 @@ public class QuestJournalUI : MonoBehaviour
             return;
 
         bool readyToClaim = questManager.IsQuestReadyToClaim(quest);
-        EnsurePlayerInventory();
         EnsurePlayerStats();
 
         bool canClaim = questManager.CanClaimJournalQuest(quest, playerInventory, playerStats, GetQuestRewardNormalCapacityValue(), GetQuestRewardMagicCapacityValue(), out string failureReason);
@@ -396,7 +359,6 @@ public class QuestJournalUI : MonoBehaviour
             return;
         }
 
-        EnsurePlayerInventory();
         EnsurePlayerStats();
         bool canClaim = questManager.CanClaimJournalQuest(quest, playerInventory, playerStats, GetQuestRewardNormalCapacityValue(), GetQuestRewardMagicCapacityValue(), out string failureReason);
         questClaimRewardButton.interactable = canClaim;
@@ -415,7 +377,6 @@ public class QuestJournalUI : MonoBehaviour
             return;
         }
 
-        EnsurePlayerInventory();
         EnsurePlayerStats();
         var selectedQuest = questManager.GetSelectedVisibleJournalQuest();
         if (!questManager.TryClaimSelectedQuestRewards(playerInventory, playerStats, GetQuestRewardNormalCapacityValue(), GetQuestRewardMagicCapacityValue()))
@@ -630,10 +591,6 @@ public class QuestJournalUI : MonoBehaviour
         inventoryUIManager?.RefreshSourceItemsFromPlayer();
     }
 
-    private void EnsurePlayerInventory()
-    {
-    }
-
     private void EnsurePlayerStats()
     {
         if (playerStats == null)
@@ -642,7 +599,6 @@ public class QuestJournalUI : MonoBehaviour
 
     private void ResolveDependencies()
     {
-        EnsurePlayerInventory();
         EnsurePlayerStats();
     }
 
@@ -740,39 +696,5 @@ public class QuestJournalUI : MonoBehaviour
         };
     }
 
-    private static List<QuestManager.QuestObjectiveData> MapObjectives(List<QuestObjectiveEntryData> source)
-    {
-        var result = new List<QuestManager.QuestObjectiveData>();
-        if (source == null) return result;
-        for (int i = 0; i < source.Count; i++)
-        {
-            if (source[i] == null) continue;
-            result.Add(new QuestManager.QuestObjectiveData { title = source[i].title, description = source[i].description, completed = source[i].completed });
-        }
-        return result;
-    }
-
-    private static List<QuestManager.QuestRewardData> MapRewards(List<QuestRewardEntryData> source)
-    {
-        var result = new List<QuestManager.QuestRewardData>();
-        if (source == null) return result;
-        for (int i = 0; i < source.Count; i++)
-        {
-            if (source[i] == null) continue;
-            result.Add(new QuestManager.QuestRewardData
-            {
-                rewardType = source[i].rewardType,
-                type = string.IsNullOrWhiteSpace(source[i].type) ? source[i].rewardType.ToString() : source[i].type,
-                amount = source[i].amount,
-                itemName = source[i].itemName,
-                weaponAsset = source[i].weaponAsset,
-                usableAsset = source[i].usableAsset,
-                itemAsset = source[i].itemAsset,
-                magicAsset = source[i].magicAsset,
-                armorAsset = source[i].armorAsset
-            });
-        }
-        return result;
-    }
 }
 

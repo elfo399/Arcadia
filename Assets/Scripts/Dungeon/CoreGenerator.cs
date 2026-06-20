@@ -372,20 +372,6 @@ public class CoreGenerator : MonoBehaviour
         }
     }
 
-    private void RestoreRoom(VirtualRoom room, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
-    {
-        layout.Add(room);
-        for (int x = 0; x < room.size.x; x++)
-        {
-            for (int y = 0; y < room.size.y; y++)
-            {
-                Vector2Int cell = room.anchorPos + new Vector2Int(x, y);
-                occupied.Add(cell);
-                cellToRoomMap[cell] = room;
-            }
-        }
-    }
-    
     bool PlaceSpecialRoom(string type, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, List<VirtualRoom> replacementCandidates, List<Vector2Int> freeSockets, int minDistance, int bigRoomChance, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
     {
         var sizesToTry = GetSizesToTry(bigRoomChance, type);

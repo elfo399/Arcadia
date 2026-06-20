@@ -197,24 +197,6 @@ public partial class QuestManager : MonoBehaviour
         return true;
     }
 
-    public bool RemoveQuest(string questId, bool notify = true)
-    {
-        int index = FindQuestIndex(questId);
-        if (index < 0) return false;
-
-        quests.RemoveAt(index);
-        if (notify)
-            NotifyChanged();
-        return true;
-    }
-
-    public void ClearAll(bool notify = true)
-    {
-        quests.Clear();
-        if (notify)
-            NotifyChanged();
-    }
-
     public void SeedFromInventoryEntriesIfEmpty(List<QuestEntryData> sourceEntries, bool notify = true)
     {
         if (quests.Count > 0 || sourceEntries == null || sourceEntries.Count == 0)

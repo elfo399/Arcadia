@@ -122,7 +122,6 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 
     public void BeginEquipRight(int slot)
     {
-        EnsurePlayerInventory();
         CurrentEquipTarget = EquipTarget.Right;
         CurrentEquipSlot = Mathf.Clamp(slot, 0, 2);
         if (playerInventory != null)
@@ -132,7 +131,6 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 
     public void BeginEquipLeft(int slot)
     {
-        EnsurePlayerInventory();
         CurrentEquipTarget = EquipTarget.Left;
         CurrentEquipSlot = Mathf.Clamp(slot, 0, 2);
         if (playerInventory != null)
@@ -142,7 +140,6 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 
     public void BeginEquipBottom(int slot)
     {
-        EnsurePlayerInventory();
         CurrentEquipTarget = EquipTarget.Bottom;
         CurrentEquipSlot = Mathf.Clamp(slot, 0, 2);
         if (playerInventory != null)
@@ -152,7 +149,6 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 
     public void BeginEquipTop(int slot)
     {
-        EnsurePlayerInventory();
         CurrentEquipTarget = EquipTarget.Top;
         currentTopIndex = Mathf.Clamp(slot, 0, 2);
         if (playerInventory != null)
@@ -162,17 +158,11 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 
     public void BeginEquipArmor(ArmorItemData.ArmorSlot slot)
     {
-        EnsurePlayerInventory();
         CurrentEquipTarget = EquipTarget.Armor;
         CurrentArmorSlot = slot;
         currentArmorIndex = Mathf.Clamp((int)slot, 0, armorEquipSlots.Length - 1);
         inventoryUIManager?.PrepareArmorEquipSelectionView(slot);
     }
-
-    public void OnArmorHelmetClick() => BeginEquipArmor(ArmorItemData.ArmorSlot.Helmet);
-    public void OnArmorChestplateClick() => BeginEquipArmor(ArmorItemData.ArmorSlot.Chestplate);
-    public void OnArmorLeggingsClick() => BeginEquipArmor(ArmorItemData.ArmorSlot.Leggings);
-    public void OnArmorBootsClick() => BeginEquipArmor(ArmorItemData.ArmorSlot.Boots);
 
     public void CloseEquipGrid()
     {
@@ -196,7 +186,6 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 
     public void FocusEquipmentCrossDefault()
     {
-        EnsurePlayerInventory();
         int idx = playerInventory != null ? Mathf.Clamp(playerInventory.currentRightIndex, 0, 2) : 0;
         SetEquipmentCrossFocus(EquipCrossFocus.Right, idx);
     }
@@ -232,8 +221,6 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
     {
         BuildEquipSlotsIfNeeded();
         BuildHudSlotsIfNeeded();
-        EnsurePlayerInventory();
-
         if (playerInventory != null)
         {
             var rightEquipped = playerInventory.GetWeaponForHand(Hand.Right);
@@ -449,7 +436,6 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 
     private int GetCurrentCrossIndex(EquipCrossFocus focus)
     {
-        EnsurePlayerInventory();
         switch (focus)
         {
             case EquipCrossFocus.Right:
@@ -579,35 +565,9 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
         return new Vector2(center.x, center.y);
     }
 
-    private int FindClosestSlotIndexByVerticalDistance(InventorySlot referenceSlot, InventorySlot[] candidates)
-    {
-        if (referenceSlot == null || candidates == null || candidates.Length == 0)
-            return -1;
-
-        float referenceY = GetSlotCenter(referenceSlot).y;
-        int bestIndex = -1;
-        float bestDelta = float.PositiveInfinity;
-
-        for (int i = 0; i < candidates.Length; i++)
-        {
-            if (candidates[i] == null)
-                continue;
-
-            float delta = Mathf.Abs(GetSlotCenter(candidates[i]).y - referenceY);
-            if (delta < bestDelta)
-            {
-                bestDelta = delta;
-                bestIndex = i;
-            }
-        }
-
-        return bestIndex;
-    }
-
     private void SetEquipmentCrossFocus(EquipCrossFocus focus, int slotIndex)
     {
         BuildEquipSlotsIfNeeded();
-        EnsurePlayerInventory();
         equipCrossFocus = focus;
 
         if (playerInventory != null)
@@ -662,10 +622,6 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
             if (topEquipSlots[i] != null) topEquipSlots[i].SetFocused(showPadFocus && equipCrossFocus == EquipCrossFocus.Top && i == topIndex);
         for (int i = 0; i < armorEquipSlots.Length; i++)
             if (armorEquipSlots[i] != null) armorEquipSlots[i].SetFocused(showPadFocus && equipCrossFocus == EquipCrossFocus.Armor && i == armorIndex);
-    }
-
-    private void EnsurePlayerInventory()
-    {
     }
 
     private static Transform FindNamedChild(Transform root, string childName)

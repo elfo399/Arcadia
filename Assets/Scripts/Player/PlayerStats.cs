@@ -49,20 +49,15 @@ public class PlayerStats : MonoBehaviour, IDamageable
     [HideInInspector] public int runGold = 0;
     [HideInInspector] public int runSilver = 0;
     [HideInInspector] public int runCopper = 0;
-    public event Action<int> OnRunCoinsChanged;
-    public event Action<int, int, int> OnRunWalletChanged;
 
     [Header("Banca (Persistente)")]
     public int bankCoins = 0;
     [HideInInspector] public int bankGold = 0;
     [HideInInspector] public int bankSilver = 0;
     [HideInInspector] public int bankCopper = 0;
-    public event Action<int> OnBankCoinsChanged;
-    public event Action<int, int, int> OnBankChanged;
 
     [Header("Chiavi")]
     public int currentKeys = 0;
-    public event Action<int> OnKeysChanged;
 
     [Header("Statistiche Persistenti")]
     public int playerLevel = 1;
@@ -157,9 +152,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
         RecalculateDerivedStats(keepCurrentRatio: true);
         RefreshArmorTotals();
         UpdateAllUI();
-        NotifyBankChanged();
-        NotifyRunWalletChanged();
-        NotifyKeysChanged();
     }
 
     private void MarkPersistentRoot()
@@ -200,14 +192,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
         ApplyLoadedInventoryStateIfPossible();
 
         SyncLegacyWalletFields();
-        NotifyRunWalletChanged();
     }
 
     private void ResetRunWallet()
     {
         runCoins = 0;
         SyncLegacyWalletFields();
-        NotifyRunWalletChanged();
     }
 
 
@@ -225,7 +215,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         runCoins += Mathf.Max(0, coinAmount);
         SyncLegacyWalletFields();
-        NotifyRunWalletChanged();
         SaveStats();
     }
 
@@ -234,7 +223,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         currentKeys += amount;
         if (currentKeys < 0) currentKeys = 0;
-        NotifyKeysChanged();
     }
 
     public bool UseKey()
@@ -242,7 +230,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (currentKeys > 0)
         {
             currentKeys--;
-            NotifyKeysChanged();
             return true;
         }
         return false;
@@ -341,21 +328,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         currentFlasks = Mathf.Max(0, value);
         UpdateFlaskUI();
-    }
-
-    public void UseFlask()
-    {
-        if (currentFlasks <= 0 || flaskTimer > 0f) return;
-
-        currentFlasks--;
-        flaskTimer = flaskUseCooldown;
-
-        currentHealth += flaskHealAmount;
-        if (currentHealth > maxHealth) currentHealth = maxHealth;
-
-        UpdateFlaskUI();
-
-        if (animator != null) animator.SetTrigger("DrinkPotion");
     }
 
     public void SpendStamina(float amount)
@@ -657,9 +629,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
                 RecalculateDerivedStats(keepCurrentRatio: true);
                 RefreshArmorTotals();
                 UpdateAllUI();
-                NotifyBankChanged();
-                NotifyRunWalletChanged();
-                NotifyKeysChanged();
                 ApplyLoadedQuestStateIfPossible();
                 ApplyLoadedInventoryStateIfPossible();
                 return true;
@@ -762,9 +731,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         RefreshArmorTotals();
         UpdateAllUI();
-        NotifyRunWalletChanged();
-        NotifyBankChanged();
-        NotifyKeysChanged();
     }
 
     public void SetCharacterName(string value, bool save = true)
@@ -834,87 +800,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     }
 
 
-    public void AddPersistentStat(string statName, int amount)
-    {
-        if (amount == 0) return;
-
-        if (IsLevelBasedAttribute(statName))
-        {
-            // Gli attributi principali consumano punti livello (1 punto per click/livello).
-            bool spent = TrySpendAttributePoint(statName);
-            if (!spent)
-            {
-                Debug.Log("Nessun punto attributo disponibile.");
-                return;
-            }
-            return;
-        }
-
-        switch (statName)
-        {
-            case "karma":
-                karma += amount;
-                Debug.Log($"Karma modificato di {amount}. Nuovo valore: {karma}");
-                break;
-            case "benedetto":
-                benedetto += amount;
-                Debug.Log($"Benedetto modificato di {amount}. Nuovo valore: {benedetto}");
-                break;
-            case "malefico":
-                malefico += amount;
-                Debug.Log($"Malefico modificato di {amount}. Nuovo valore: {malefico}");
-                break;
-            default:
-                Debug.LogWarning($"Statistica persistente '{statName}' non trovata.");
-                return;
-        }
-
-        RecalculateDerivedStats(keepCurrentRatio: true);
-        UpdateAllUI();
-        SaveStats();
-    }
-
-    public bool TrySpendAttributePoint(string statName)
-    {
-        if (!IsLevelBasedAttribute(statName)) return false;
-        if (unspentAttributePoints <= 0) return false;
-
-        switch (statName)
-        {
-            case "vigor":
-                if (vigor >= MaxAllocatableAttributeLevel) return false;
-                vigor = Mathf.Clamp(vigor + 1, 1, MaxAllocatableAttributeLevel);
-                break;
-            case "mind":
-                if (mind >= MaxAllocatableAttributeLevel) return false;
-                mind = Mathf.Clamp(mind + 1, 1, MaxAllocatableAttributeLevel);
-                break;
-            case "endurance":
-                if (endurance >= MaxAllocatableAttributeLevel) return false;
-                endurance = Mathf.Clamp(endurance + 1, 1, MaxAllocatableAttributeLevel);
-                break;
-            case "strength":
-                if (strength >= MaxAllocatableAttributeLevel) return false;
-                strength = Mathf.Clamp(strength + 1, 1, MaxAllocatableAttributeLevel);
-                break;
-            case "dexterity":
-                if (dexterity >= MaxAllocatableAttributeLevel) return false;
-                dexterity = Mathf.Clamp(dexterity + 1, 1, MaxAllocatableAttributeLevel);
-                break;
-            case "intelligence":
-                if (intelligence >= MaxAllocatableAttributeLevel) return false;
-                intelligence = Mathf.Clamp(intelligence + 1, 1, MaxAllocatableAttributeLevel);
-                break;
-            default: return false;
-        }
-
-        unspentAttributePoints = Mathf.Max(0, unspentAttributePoints - 1);
-        RecalculateDerivedStats(keepCurrentRatio: true);
-        UpdateAllUI();
-        SaveStats();
-        return true;
-    }
-
     public bool TrySpendAttributePoints(IDictionary<string, int> allocation)
     {
         if (allocation == null || allocation.Count == 0) return false;
@@ -982,14 +867,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
             guard++;
         }
 
-        SaveStats();
-    }
-
-    public void GainLevels(int levels)
-    {
-        if (levels <= 0) return;
-        playerLevel += levels;
-        unspentAttributePoints += levels;
         SaveStats();
     }
 
@@ -1280,65 +1157,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
             : GetPhysicalDefense();
     }
 
-    // --- BANCA PERSISTENTE ---
-    public void DepositCoins(int amount)
-    {
-        amount = Mathf.Max(0, amount);
-        if (!SpendRunCoins(amount)) return;
-
-        bankCoins += amount;
-        SyncLegacyWalletFields();
-        SaveStats();
-        NotifyBankChanged();
-        NotifyRunWalletChanged();
-    }
-
-    public void Deposit(int gold, int silver, int copper)
-    {
-        DepositCoins(ConvertCoinTripletToCoins(gold, silver, copper));
-    }
-
-    public bool WithdrawCoins(int amount)
-    {
-        amount = Mathf.Max(0, amount);
-        if (!HasBankCoins(amount)) return false;
-
-        bankCoins -= amount;
-        runCoins += amount;
-        SyncLegacyWalletFields();
-        SaveStats();
-        NotifyBankChanged();
-        NotifyRunWalletChanged();
-        return true;
-    }
-
-    public bool Withdraw(int gold, int silver, int copper)
-    {
-        return WithdrawCoins(ConvertCoinTripletToCoins(gold, silver, copper));
-    }
-
-    public bool HasBankCoins(int amount)
-    {
-        return bankCoins >= Mathf.Max(0, amount);
-    }
-
-    public bool HasBankFunds(int gold, int silver, int copper)
-    {
-        return HasBankCoins(ConvertCoinTripletToCoins(gold, silver, copper));
-    }
-
-    private void NormalizeBank()
-    {
-        bankCoins = Mathf.Max(0, bankCoins);
-        SyncLegacyWalletFields();
-    }
-
-    private void NotifyBankChanged()
-    {
-        OnBankCoinsChanged?.Invoke(bankCoins);
-        OnBankChanged?.Invoke(bankGold, bankSilver, bankCopper);
-    }
-
     void OnApplicationQuit()
     {
         SaveStatsImmediate();
@@ -1350,50 +1168,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
         SaveStatsImmediate();
         Debug.Log("SEI MORTO! Ritorno all'Hub...");
         SceneManager.LoadScene("HubScene");
-    }
-
-    // --- WALLET DI RUN ---
-    public bool HasRunCoins(int amount)
-    {
-        return runCoins >= Mathf.Max(0, amount);
-    }
-
-    public bool HasRunFunds(int gold, int silver, int copper)
-    {
-        return HasRunCoins(ConvertCoinTripletToCoins(gold, silver, copper));
-    }
-
-    public bool SpendRunCoins(int amount)
-    {
-        amount = Mathf.Max(0, amount);
-        if (!HasRunCoins(amount)) return false;
-
-        runCoins -= amount;
-        SyncLegacyWalletFields();
-        NotifyRunWalletChanged();
-        return true;
-    }
-
-    public bool SpendRunFunds(int gold, int silver, int copper)
-    {
-        return SpendRunCoins(ConvertCoinTripletToCoins(gold, silver, copper));
-    }
-
-    private void NormalizeRunWallet()
-    {
-        runCoins = Mathf.Max(0, runCoins);
-        SyncLegacyWalletFields();
-    }
-
-    private void NotifyRunWalletChanged()
-    {
-        OnRunCoinsChanged?.Invoke(runCoins);
-        OnRunWalletChanged?.Invoke(runGold, runSilver, runCopper);
-    }
-
-    private void NotifyKeysChanged()
-    {
-        OnKeysChanged?.Invoke(currentKeys);
     }
 
     private void ApplyLoadedQuestStateIfPossible()

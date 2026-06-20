@@ -80,7 +80,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     private int padFocusIndex = -1;
     private bool showPadFocus;
     private Filter currentFilter = Filter.All;
-    private Filter lastFilter = Filter.All;
     private bool equipSelectionMode;
     private EquipmentManager.EquipTarget pendingEquipTarget = EquipmentManager.EquipTarget.None;
     private int pendingEquipSlot;
@@ -143,14 +142,8 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         ApplyPadFocusVisual(showPadFocus ? padFocusIndex : -1);
     }
 
-    public List<InventoryItem> GetCurrentItemsSnapshot() => new(currentItems);
     public List<InventoryItem> GetSourceItemsSnapshot() => new(sourceItems);
     public int GetCapacity() => initialSlotCount;
-
-    public void UpdateUI(List<InventoryItem> inventoryData)
-    {
-        SetSourceItems(inventoryData);
-    }
 
     public void SetSourceItems(List<InventoryItem> inventoryData)
     {
@@ -160,7 +153,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     public void RefreshSourceItemsFromPlayer()
     {
-        EnsurePlayerInventory();
         if (playerInventory == null)
             return;
         SetSourceItems(new List<InventoryItem>(playerInventory.Items));
@@ -169,40 +161,24 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     public void ShowWeaponsFilter()
     {
         activeArmorFilterSlot = null;
-        lastFilter = Filter.Weapons;
         ApplyFilterInternal(Filter.Weapons);
     }
 
     public void ShowUsablesFilter()
     {
         activeArmorFilterSlot = null;
-        lastFilter = Filter.Usables;
         ApplyFilterInternal(Filter.Usables);
     }
 
     public void ShowArmorsFilter(ArmorItemData.ArmorSlot slot)
     {
         activeArmorFilterSlot = slot;
-        lastFilter = Filter.Armors;
         ApplyFilterInternal(Filter.Armors);
-    }
-
-    public void ShowAllFilter()
-    {
-        activeArmorFilterSlot = null;
-        lastFilter = Filter.All;
-        ApplyFilterInternal(Filter.All);
-    }
-
-    public void ApplyLastFilter()
-    {
-        ApplyFilterInternal(lastFilter);
     }
 
     public void ResetFilterToAll()
     {
         activeArmorFilterSlot = null;
-        lastFilter = Filter.All;
         ApplyFilterInternal(Filter.All);
         ClearEquipSelectionContext();
         ResetEquipTarget();
@@ -230,23 +206,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         ClearDetailPanel();
         currentSelectedIndex = -1;
         selectedPadIndex = -1;
-    }
-
-    public void BuildSlots(int count)
-    {
-        if (slotParent == null) slotParent = transform;
-        if (slotPrefab == null || slotParent == null)
-        {
-            Debug.LogWarning("InventoryUIManager: slotPrefab o slotParent non assegnato.");
-            return;
-        }
-
-        for (int i = slotParent.childCount - 1; i >= 0; i--)
-            Destroy(slotParent.GetChild(i).gameObject);
-
-        slots.Clear();
-        EnsureSlots(count);
-        ClearAllSlots();
     }
 
     public void HandleSlotPointerDown(int index)
@@ -420,8 +379,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     public void OnEquipButtonClick()
     {
         if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex)) return;
-        EnsureEquipmentManager();
-
         var item = currentItems[currentSelectedIndex];
         if (item == null) return;
 
@@ -445,8 +402,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     public void OnEquipWeaponButtonClick()
     {
         if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex)) return;
-        EnsurePlayerInventory();
-        EnsureEquipmentManager();
         if (playerInventory == null) return;
 
         var target = GetEffectiveEquipTarget();
@@ -478,8 +433,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     public void OnEquipArmorButtonClick()
     {
         if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex)) return;
-        EnsurePlayerInventory();
-        EnsureEquipmentManager();
         if (playerInventory == null) return;
 
         var item = currentItems[currentSelectedIndex];
@@ -500,8 +453,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     public void OnEquipUsableButtonClick()
     {
         if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex)) return;
-        EnsurePlayerInventory();
-        EnsureEquipmentManager();
         if (playerInventory == null) return;
 
         var item = currentItems[currentSelectedIndex];
@@ -582,14 +533,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         return item != null && item.magicData != null;
     }
 
-    private void EnsurePlayerInventory()
-    {
-    }
-
-    private void EnsureEquipmentManager()
-    {
-    }
-
     private bool IsValidIndex(int index) => index >= 0 && index < slots.Count;
     private bool HasItem(int index) => index >= 0 && index < currentItems.Count && currentItems[index] != null;
 
@@ -620,7 +563,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private void PersistSourceItemsToPlayer()
     {
-        EnsurePlayerInventory();
         if (playerInventory == null)
             return;
 
@@ -910,8 +852,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private void PrepareEquipSelectionView(System.Action applyFilter)
     {
-        EnsurePlayerInventory();
-        EnsureEquipmentManager();
         CacheEquipSelectionContext();
         SwitchSlotContainer(inventorySlotParent != null ? inventorySlotParent : slotParent, inventoryInitialSlotCount);
         equipmentManager?.ShowInventoryPanel();
@@ -1025,7 +965,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private bool CanEquipCurrentSelection()
     {
-        EnsureEquipmentManager();
         if (currentSelectedIndex < 0 || !HasItem(currentSelectedIndex))
             return false;
 
@@ -1085,7 +1024,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     private bool IsItemEquipped(InventoryItem item)
     {
         if (item == null || string.IsNullOrEmpty(item.instanceId)) return false;
-        EnsurePlayerInventory();
         return playerInventory != null && playerInventory.IsInstanceEquipped(item.instanceId);
     }
 
@@ -1266,7 +1204,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private void CompleteEquipAction()
     {
-        EnsureEquipmentManager();
         RefreshSlot(currentSelectedIndex);
         RefreshDetailSelection();
         equipmentManager?.RefreshEquipmentCross();

@@ -269,19 +269,4 @@ public class TargetLockSystem : MonoBehaviour
         Gizmos.DrawWireSphere(transform.position, scanRadius);
     }
 
-    public void SetCameraInputActive(bool active)
-    {
-        if (freeLookCamera == null) return;
-
-        if (active)
-        {
-            freeLookCamera.m_XAxis.m_InputAxisName = "Mouse X";
-            freeLookCamera.m_YAxis.m_InputAxisName = "Mouse Y";
-        }
-        else
-        {
-            freeLookCamera.m_XAxis.m_InputAxisName = "";
-            freeLookCamera.m_YAxis.m_InputAxisName = "";
-        }
-    }
 }
