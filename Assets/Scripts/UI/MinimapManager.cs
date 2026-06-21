@@ -246,8 +246,9 @@ public class MinimapManager : MonoBehaviour
         float contentHeight = Mathf.Max(FullStep, bounds.height * FullStep);
         float availableWidth = Mathf.Max(1f, targetContainer.rect.width - padding * 2f);
         float availableHeight = Mathf.Max(1f, targetContainer.rect.height - padding * 2f);
-        float fitScale = Mathf.Min(maxScale, availableWidth / contentWidth, availableHeight / contentHeight);
-        fitScale = Mathf.Max(0.1f, fitScale);
+        float scaleLimit = maxScale > 0f ? maxScale : 1f;
+        float fitScale = Mathf.Min(scaleLimit, availableWidth / contentWidth, availableHeight / contentHeight);
+        fitScale = Mathf.Max(Mathf.Epsilon, fitScale);
 
         for (int i = 0; i < visibleAnchors.Count; i++)
         {

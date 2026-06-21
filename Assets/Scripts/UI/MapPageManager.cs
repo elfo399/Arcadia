@@ -15,7 +15,18 @@ public class MapPageManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI coinValueText;
     [SerializeField] private Image playerPortraitImage;
     [SerializeField] private TMP_InputField playerNameInput;
+
+    [Header("Map Layout")]
+    [Tooltip("Riquadro esterno che contiene sfondo, area della mappa e cornice.")]
     [SerializeField] private RectTransform mapContainer;
+    [Tooltip("Area interna nella quale vengono generate le stanze.")]
+    [SerializeField] private RectTransform mapContentContainer;
+    [Tooltip("Maschera applicata all'area interna della mappa.")]
+    [SerializeField] private RectMask2D mapContentMask;
+    [Tooltip("Immagine della sola cornice, renderizzata sopra le stanze.")]
+    [SerializeField] private Image mapFrameOverlayImage;
+
+    [Header("Player UI")]
     [SerializeField] private ProgressBarUI hpProgressBar;
     [SerializeField] private ProgressBarUI manaProgressBar;
     [SerializeField] private ProgressBarUI xpProgressBar;
@@ -28,8 +39,10 @@ public class MapPageManager : MonoBehaviour
     [SerializeField] private string missingThemeLabel = "-";
     [SerializeField] private string defaultPlayerName = "Player";
     [SerializeField] private string currentWeather = "Clear";
-    [SerializeField] private float mapPadding = 24f;
+    [SerializeField] private float mapPadding = 32f;
+    [SerializeField] private float mapInnerPadding = 4f;
     [SerializeField] private float mapMaxScale = 0.85f;
+    [SerializeField] private bool clipMapToContainer = true;
     [SerializeField] private bool showFullMapForTesting = true;
     [SerializeField] private bool matchBookPageRoomBackground = true;
     [SerializeField] private bool hidePlayerPortraitWhenMissing = true;
@@ -52,6 +65,10 @@ public class MapPageManager : MonoBehaviour
     private int lastDisplayedLevelExperience = int.MinValue;
     private int lastDisplayedExperienceToNextLevel = int.MinValue;
     private const int RunTimerStartSeconds = 0;
+    private const string MapContentName = "MapContent";
+    private const string MapFrameOverlayName = "MapFrameOverlay";
+
+    private bool mapLayersConfigured;
 
     private void Awake()
     {
@@ -135,13 +152,82 @@ public class MapPageManager : MonoBehaviour
         if (MinimapManager.instance == null || mapContainer == null)
             return;
 
+        RectTransform renderContainer = EnsureMapLayers();
+        if (renderContainer == null)
+            return;
+
         MinimapManager.instance.RenderExploredMap(
-            mapContainer,
-            mapPadding,
+            renderContainer,
+            mapInnerPadding,
             mapMaxScale,
             showFullMapForTesting,
             matchBookPageRoomBackground,
             bookPageRoomBackgroundColor);
+
+        if (mapFrameOverlayImage != null)
+            mapFrameOverlayImage.transform.SetAsLastSibling();
+    }
+
+    private RectTransform EnsureMapLayers()
+    {
+        if (mapLayersConfigured && mapContentContainer != null)
+            return mapContentContainer;
+
+        if (mapContentContainer == null)
+        {
+            Transform existingContent = mapContainer.Find(MapContentName);
+            mapContentContainer = existingContent as RectTransform;
+
+            if (mapContentContainer == null)
+            {
+                GameObject contentObject = new GameObject(MapContentName, typeof(RectTransform));
+                mapContentContainer = contentObject.GetComponent<RectTransform>();
+                mapContentContainer.SetParent(mapContainer, false);
+            }
+        }
+
+        float inset = Mathf.Max(0f, mapPadding);
+        mapContentContainer.anchorMin = Vector2.zero;
+        mapContentContainer.anchorMax = Vector2.one;
+        mapContentContainer.pivot = new Vector2(0.5f, 0.5f);
+        mapContentContainer.offsetMin = new Vector2(inset, inset);
+        mapContentContainer.offsetMax = new Vector2(-inset, -inset);
+        mapContentContainer.localScale = Vector3.one;
+        mapContentContainer.SetAsFirstSibling();
+
+        if (mapContentMask == null)
+            mapContentMask = mapContentContainer.GetComponent<RectMask2D>();
+        if (clipMapToContainer && mapContentMask == null)
+            mapContentMask = mapContentContainer.gameObject.AddComponent<RectMask2D>();
+        if (mapContentMask != null)
+            mapContentMask.enabled = clipMapToContainer;
+
+        EnsureMapFrameOverlay();
+        mapLayersConfigured = true;
+        return mapContentContainer;
+    }
+
+    private void EnsureMapFrameOverlay()
+    {
+        if (mapFrameOverlayImage == null)
+        {
+            Transform existingOverlay = mapContainer.Find(MapFrameOverlayName);
+            mapFrameOverlayImage = existingOverlay != null ? existingOverlay.GetComponent<Image>() : null;
+        }
+
+        if (mapFrameOverlayImage == null)
+            return;
+
+        RectTransform overlayRect = mapFrameOverlayImage.rectTransform;
+        overlayRect.anchorMin = Vector2.zero;
+        overlayRect.anchorMax = Vector2.one;
+        overlayRect.offsetMin = Vector2.zero;
+        overlayRect.offsetMax = Vector2.zero;
+        overlayRect.localScale = Vector3.one;
+        mapFrameOverlayImage.type = Image.Type.Simple;
+        mapFrameOverlayImage.preserveAspect = false;
+        mapFrameOverlayImage.raycastTarget = false;
+        mapFrameOverlayImage.transform.SetAsLastSibling();
     }
 
     private void ApplyTexts(int floor, string themeName)
