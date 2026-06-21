@@ -305,9 +305,9 @@ public class MenuManager : MonoBehaviour
         int startIndex = IsValidTabIndex(currentTabIndex) ? currentTabIndex : FindFirstValidTabIndex();
         if (!IsValidTabIndex(startIndex)) return;
 
-        for (int offset = 1; offset <= tabs.Length; offset++)
+        for (int offset = 1; startIndex + offset < tabs.Length; offset++)
         {
-            int next = (startIndex + offset) % tabs.Length;
+            int next = startIndex + offset;
             if (!IsValidTabIndex(next)) continue;
             ChangeTabAfterPageFlip(next, menuFlipLeftStateName, offset);
             return;
@@ -321,9 +321,9 @@ public class MenuManager : MonoBehaviour
         int startIndex = IsValidTabIndex(currentTabIndex) ? currentTabIndex : FindFirstValidTabIndex();
         if (!IsValidTabIndex(startIndex)) return;
 
-        for (int offset = 1; offset <= tabs.Length; offset++)
+        for (int offset = 1; startIndex - offset >= 0; offset++)
         {
-            int prev = (startIndex - offset + tabs.Length) % tabs.Length;
+            int prev = startIndex - offset;
             if (!IsValidTabIndex(prev)) continue;
             ChangeTabAfterPageFlip(prev, menuFlipRightStateName, offset);
             return;
