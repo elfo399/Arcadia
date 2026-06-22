@@ -9,6 +9,10 @@ public class Room : MonoBehaviour
     public RoomData roomData;
     [HideInInspector] public string internalRoomType = "Normal";
 
+    [Header("Quest Events")]
+    [SerializeField] private string questTargetId;
+    [SerializeField] private string questTargetTag;
+
     [System.Serializable]
     public struct DoorEntry 
     {
@@ -152,6 +156,8 @@ public class Room : MonoBehaviour
 
         if (other.CompareTag("Player") && !playerEntered && !roomCleared && !isLocked)
         {
+            QuestEvents.Raise(QuestObjectiveEventType.EnterRoom, ResolveQuestTargetId(), ResolveQuestTargetTag());
+
             if (activeEnemies.Count > 0)
             {
                 LockRoomBattle(); 
@@ -159,7 +165,8 @@ public class Room : MonoBehaviour
             }
             else
             {
-                roomCleared = true; 
+                roomCleared = true;
+                QuestEvents.Raise(QuestObjectiveEventType.ClearRoom, ResolveQuestTargetId(), ResolveQuestTargetTag());
             }
             playerEntered = true;
         }
@@ -225,8 +232,31 @@ public class Room : MonoBehaviour
         {
             SpawnRewards();
         }
+
+        QuestEvents.Raise(QuestObjectiveEventType.ClearRoom, ResolveQuestTargetId(), ResolveQuestTargetTag());
         
         Debug.Log("STANZA PULITA!");
+    }
+
+    private string ResolveQuestTargetId()
+    {
+        if (!string.IsNullOrWhiteSpace(questTargetId))
+            return questTargetId.Trim();
+        if (roomData != null)
+        {
+            if (!string.IsNullOrWhiteSpace(roomData.roomName))
+                return roomData.roomName;
+            if (!string.IsNullOrWhiteSpace(roomData.name))
+                return roomData.name;
+        }
+        return gameObject.name;
+    }
+
+    private string ResolveQuestTargetTag()
+    {
+        if (!string.IsNullOrWhiteSpace(questTargetTag))
+            return questTargetTag.Trim();
+        return string.IsNullOrWhiteSpace(internalRoomType) ? "room" : internalRoomType;
     }
 
     void WakeUpEnemies()

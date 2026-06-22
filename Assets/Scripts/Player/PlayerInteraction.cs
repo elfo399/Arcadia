@@ -83,6 +83,8 @@ public class PlayerInteraction : MonoBehaviour
         if (closestInteractable != null)
         {
             closestInteractable.Interact(gameObject);
+            if (closestInteractable is Component component)
+                QuestEvents.Raise(QuestObjectiveEventType.Interact, component.gameObject.name, component.gameObject.tag);
         }
     }
 

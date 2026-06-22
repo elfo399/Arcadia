@@ -205,6 +205,7 @@ public class PlayerInventory : MonoBehaviour
         var restored = new InventoryItem(weapon, 1);
         restored.instanceId = instanceId;
         items.Add(restored);
+        RaiseCollectItemEvent(weapon.name, "weapon", 1);
     }
 
     private void ClearWeaponInstanceFromLoadouts(string instanceId)
@@ -478,6 +479,8 @@ public class PlayerInventory : MonoBehaviour
 
         for (int i = 0; i < amount; i++)
             items.Add(new InventoryItem(weapon, 1));
+
+        RaiseCollectItemEvent(weapon.name, "weapon", amount);
     }
 
     public void AddArmorLoot(ArmorItemData armor, int amount = 1)
@@ -487,6 +490,8 @@ public class PlayerInventory : MonoBehaviour
 
         for (int i = 0; i < amount; i++)
             items.Add(new InventoryItem(armor, 1));
+
+        RaiseCollectItemEvent(armor.name, "armor", amount);
     }
 
     public void AddMagicLoot(MagicItemData magic, int amount = 1)
@@ -498,10 +503,12 @@ public class PlayerInventory : MonoBehaviour
         if (existing != null)
         {
             existing.amount += amount;
+            RaiseCollectItemEvent(magic.name, "magic", amount);
             return;
         }
 
         items.Add(new InventoryItem(magic, amount));
+        RaiseCollectItemEvent(magic.name, "magic", amount);
     }
 
     public void AddUsableLoot(UsableItemData usable, int amount = 1)
@@ -513,10 +520,12 @@ public class PlayerInventory : MonoBehaviour
         if (existing != null)
         {
             existing.amount += amount;
+            RaiseCollectItemEvent(usable.name, "usable", amount);
             return;
         }
 
         items.Add(new InventoryItem(usable, amount));
+        RaiseCollectItemEvent(usable.name, "usable", amount);
     }
 
     public void AddGenericItemLoot(ItemData item, int amount = 1)
@@ -528,10 +537,17 @@ public class PlayerInventory : MonoBehaviour
         if (existing != null)
         {
             existing.amount += amount;
+            RaiseCollectItemEvent(item.name, "item", amount);
             return;
         }
 
         items.Add(new InventoryItem(item, amount));
+        RaiseCollectItemEvent(item.name, "item", amount);
+    }
+
+    private static void RaiseCollectItemEvent(string targetId, string targetTag, int amount)
+    {
+        QuestEvents.Raise(QuestObjectiveEventType.CollectItem, targetId, targetTag, Mathf.Max(1, amount));
     }
 
     public void ReplaceAllItems(List<InventoryItem> newItems)

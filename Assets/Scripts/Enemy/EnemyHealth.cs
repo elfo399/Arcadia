@@ -7,6 +7,10 @@ public class EnemyHealth : MonoBehaviour, IDamageable
     public int currentHealth;
     [Min(0)] public int experienceReward = 0;
 
+    [Header("Quest Events")]
+    [SerializeField] private string questTargetId;
+    [SerializeField] private string questTargetTag = "enemy";
+
     [Header("UI")]
     public EnemyHealthBar healthBar;
 
@@ -41,6 +45,13 @@ public class EnemyHealth : MonoBehaviour, IDamageable
 
         Room room = GetComponentInParent<Room>();
         if (room != null) room.EnemyDied(gameObject);
+
+        QuestEvents.Raise(QuestObjectiveEventType.KillEnemy, ResolveQuestTargetId(), questTargetTag);
         Destroy(gameObject);
+    }
+
+    private string ResolveQuestTargetId()
+    {
+        return string.IsNullOrWhiteSpace(questTargetId) ? gameObject.name : questTargetId.Trim();
     }
 }

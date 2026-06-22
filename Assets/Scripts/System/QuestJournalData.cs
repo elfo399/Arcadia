@@ -8,6 +8,12 @@ public class QuestObjectiveEntryData
 {
     public string title;
     public string description;
+    public QuestObjectiveEventType eventType = QuestObjectiveEventType.None;
+    public UnityEngine.Object targetObject;
+    public string targetId;
+    public string targetTag;
+    [Min(1)] public int requiredAmount = 1;
+    [Min(0)] public int currentAmount = 0;
     public bool completed;
 }
 

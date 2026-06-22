@@ -22,6 +22,7 @@ public class CoinPickup : MonoBehaviour
             if (stats != null)
             {
                 stats.AddCoins(coinValue);
+                QuestEvents.Raise(QuestObjectiveEventType.CollectItem, gameObject.name, "coin", Mathf.Max(1, coinValue));
                 Destroy(gameObject);
             }
         }

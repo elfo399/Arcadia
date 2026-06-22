@@ -20,6 +20,7 @@ public class KeyPickup : MonoBehaviour
             if (stats != null)
             {
                 stats.AddKeys(1);
+                QuestEvents.Raise(QuestObjectiveEventType.CollectItem, gameObject.name, "key");
                 // Qui puoi mettere un suono: AudioManager.Play("KeyPickup");
                 Destroy(gameObject);
             }

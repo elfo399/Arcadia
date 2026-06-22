@@ -49,6 +49,12 @@ public class QuestDefinition : ScriptableObject
             {
                 title = objective.title,
                 description = objective.description,
+                eventType = objective.eventType,
+                targetObject = objective.targetObject,
+                targetId = objective.targetId,
+                targetTag = objective.targetTag,
+                requiredAmount = Mathf.Max(1, objective.requiredAmount),
+                currentAmount = Mathf.Max(0, objective.currentAmount),
                 completed = objective.completed
             });
         }

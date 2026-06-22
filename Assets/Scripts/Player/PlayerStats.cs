@@ -1246,6 +1246,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
             {
                 title = obj.title,
                 description = obj.description,
+                eventType = obj.eventType.ToString(),
+                targetId = obj.targetId,
+                targetTag = obj.targetTag,
+                requiredAmount = Mathf.Max(1, obj.requiredAmount),
+                currentAmount = Mathf.Max(0, obj.currentAmount),
                 completed = obj.completed
             };
         }
@@ -1356,6 +1361,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         {
             if (definitions[i] == null || saved[i] == null)
                 continue;
+            definitions[i].currentAmount = Mathf.Max(0, saved[i].currentAmount);
             definitions[i].completed = saved[i].completed;
         }
     }
@@ -1373,11 +1379,26 @@ public class PlayerStats : MonoBehaviour, IDamageable
             {
                 title = obj.title,
                 description = obj.description,
+                eventType = ParseSavedQuestObjectiveEventType(obj.eventType),
+                targetId = obj.targetId,
+                targetTag = obj.targetTag,
+                requiredAmount = Mathf.Max(1, obj.requiredAmount),
+                currentAmount = Mathf.Max(0, obj.currentAmount),
                 completed = obj.completed
             });
         }
 
         return result;
+    }
+
+    private static QuestObjectiveEventType ParseSavedQuestObjectiveEventType(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return QuestObjectiveEventType.None;
+
+        return Enum.TryParse(raw.Trim(), true, out QuestObjectiveEventType parsed)
+            ? parsed
+            : QuestObjectiveEventType.None;
     }
 
     private static List<QuestManager.QuestRewardData> DeserializeRewards(SavedQuestRewardData[] source)

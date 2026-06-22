@@ -7,6 +7,9 @@ public class FloorPortal : MonoBehaviour
     public string playerTag = "Player";
     [Tooltip("Se true, il portale si disattiva dopo l'uso per evitare doppi trigger.")]
     public bool disableAfterUse = true;
+    [Header("Quest Events")]
+    [SerializeField] private string questTargetId = "next_floor";
+    [SerializeField] private string questTargetTag = "floor";
 
     private bool used = false;
 
@@ -30,9 +33,15 @@ public class FloorPortal : MonoBehaviour
         if (CoreGenerator.Instance != null)
         {
             used = true;
+            QuestEvents.Raise(QuestObjectiveEventType.ReachFloor, ResolveQuestTargetId(), questTargetTag);
             CoreGenerator.Instance.NextFloor();
         }
 
         if (disableAfterUse) gameObject.SetActive(false);
+    }
+
+    private string ResolveQuestTargetId()
+    {
+        return string.IsNullOrWhiteSpace(questTargetId) ? "next_floor" : questTargetId.Trim();
     }
 }

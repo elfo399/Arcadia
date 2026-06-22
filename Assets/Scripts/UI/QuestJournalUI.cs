@@ -416,7 +416,7 @@ public class QuestJournalUI : MonoBehaviour
             if (obj == null) continue;
             var row = Instantiate(questObjectivePrefab, questObjectivesContainer);
             row.gameObject.SetActive(true);
-            row.SetData(obj.title, obj.description, obj.completed);
+            row.SetData(obj.title, FormatQuestObjectiveDescription(obj), obj.completed);
             spawnedObjectiveRows.Add(row);
         }
     }
@@ -706,6 +706,19 @@ public class QuestJournalUI : MonoBehaviour
             QuestRewardType.Armor => reward.armorAsset != null ? reward.armorAsset.itemName : string.Empty,
             _ => string.Empty
         };
+    }
+
+    private static string FormatQuestObjectiveDescription(QuestObjectiveEntryData objective)
+    {
+        if (objective == null)
+            return string.Empty;
+
+        string description = objective.description ?? string.Empty;
+        if (objective.requiredAmount <= 1)
+            return description;
+
+        string progress = $"{Mathf.Clamp(objective.currentAmount, 0, objective.requiredAmount)}/{objective.requiredAmount}";
+        return string.IsNullOrWhiteSpace(description) ? progress : description + " (" + progress + ")";
     }
 
 }

@@ -29,6 +29,12 @@ public partial class QuestManager : MonoBehaviour
     {
         public string title;
         public string description;
+        public QuestObjectiveEventType eventType = QuestObjectiveEventType.None;
+        public UnityEngine.Object targetObject;
+        public string targetId;
+        public string targetTag;
+        [Min(1)] public int requiredAmount = 1;
+        [Min(0)] public int currentAmount = 0;
         public bool completed;
     }
 
@@ -129,6 +135,8 @@ public partial class QuestManager : MonoBehaviour
             }
         }
 
+        RebuildQuestObjectiveEventIndex();
+
         if (notify)
             NotifyChanged();
     }
@@ -211,6 +219,8 @@ public partial class QuestManager : MonoBehaviour
             return false;
 
         objective.completed = completed;
+        objective.requiredAmount = Mathf.Max(1, objective.requiredAmount);
+        objective.currentAmount = completed ? objective.requiredAmount : Mathf.Min(objective.currentAmount, objective.requiredAmount - 1);
         SyncQuestCompletionFromObjectives(quest);
 
         if (!quest.completed)
@@ -241,6 +251,8 @@ public partial class QuestManager : MonoBehaviour
                 continue;
 
             objective.completed = completed;
+            objective.requiredAmount = Mathf.Max(1, objective.requiredAmount);
+            objective.currentAmount = completed ? objective.requiredAmount : Mathf.Min(objective.currentAmount, objective.requiredAmount - 1);
             SyncQuestCompletionFromObjectives(quest);
 
             if (!quest.completed)
@@ -316,8 +328,12 @@ public partial class QuestManager : MonoBehaviour
             changed |= FillIfEmpty(ref target.loreAuthor, source.loreAuthor);
         }
 
-        if (changed && notify)
-            NotifyChanged();
+        if (changed)
+        {
+            RebuildQuestObjectiveEventIndex();
+            if (notify)
+                NotifyChanged();
+        }
     }
 
     private int FindQuestIndex(string questId)
@@ -406,6 +422,12 @@ public partial class QuestManager : MonoBehaviour
             {
                 title = entry.title,
                 description = entry.description,
+                eventType = entry.eventType,
+                targetObject = entry.targetObject,
+                targetId = entry.targetId,
+                targetTag = entry.targetTag,
+                requiredAmount = Mathf.Max(1, entry.requiredAmount),
+                currentAmount = Mathf.Max(0, entry.currentAmount),
                 completed = entry.completed
             });
         }
@@ -504,6 +526,12 @@ public partial class QuestManager : MonoBehaviour
             {
                 title = objective.title,
                 description = objective.description,
+                eventType = objective.eventType,
+                targetObject = objective.targetObject,
+                targetId = objective.targetId,
+                targetTag = objective.targetTag,
+                requiredAmount = Mathf.Max(1, objective.requiredAmount),
+                currentAmount = Mathf.Max(0, objective.currentAmount),
                 completed = objective.completed
             });
         }
@@ -550,6 +578,12 @@ public partial class QuestManager : MonoBehaviour
             {
                 title = objective.title,
                 description = objective.description,
+                eventType = objective.eventType,
+                targetObject = objective.targetObject,
+                targetId = objective.targetId,
+                targetTag = objective.targetTag,
+                requiredAmount = Mathf.Max(1, objective.requiredAmount),
+                currentAmount = Mathf.Max(0, objective.currentAmount),
                 completed = objective.completed
             });
         }

@@ -3,6 +3,11 @@ public class SavedQuestObjectiveData
 {
     public string title;
     public string description;
+    public string eventType;
+    public string targetId;
+    public string targetTag;
+    public int requiredAmount;
+    public int currentAmount;
     public bool completed;
 }
 

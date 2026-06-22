@@ -11,6 +11,10 @@ public class TreasureChest : MonoBehaviour, IInteractable
     [SerializeField] private string prompt = "Apri cassa";
     [SerializeField] private bool consumeOnlyOnce = true;
 
+    [Header("Quest Events")]
+    [SerializeField] private string questTargetId;
+    [SerializeField] private string questTargetTag = "chest";
+
     [Header("Visuals")]
     [SerializeField] private Animator animator;
     [SerializeField] private string openTriggerName = "Open";
@@ -135,6 +139,12 @@ public class TreasureChest : MonoBehaviour, IInteractable
         openingInProgress = false;
         pendingInventory = null;
         openRoutine = null;
+        QuestEvents.Raise(QuestObjectiveEventType.OpenChest, ResolveQuestTargetId(), questTargetTag);
+    }
+
+    private string ResolveQuestTargetId()
+    {
+        return string.IsNullOrWhiteSpace(questTargetId) ? gameObject.name : questTargetId.Trim();
     }
 
     private void ApplyInitialVisualState()
