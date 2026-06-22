@@ -47,6 +47,7 @@ public class QuestDefinition : ScriptableObject
             if (objective == null) continue;
             result.Add(new QuestManager.QuestObjectiveData
             {
+                phase = Mathf.Max(1, objective.phase),
                 title = objective.title,
                 description = objective.description,
                 eventType = objective.eventType,

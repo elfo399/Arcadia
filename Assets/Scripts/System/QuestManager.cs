@@ -4,6 +4,8 @@ using UnityEngine;
 
 public partial class QuestManager : MonoBehaviour
 {
+    public const int MaxObjectivesPerPhase = 5;
+
     public static QuestManager Instance { get; private set; }
 
     [Serializable]
@@ -27,6 +29,7 @@ public partial class QuestManager : MonoBehaviour
     [Serializable]
     public class QuestObjectiveData
     {
+        [Min(1)] public int phase = 1;
         public string title;
         public string description;
         public QuestObjectiveEventType eventType = QuestObjectiveEventType.None;
@@ -218,6 +221,9 @@ public partial class QuestManager : MonoBehaviour
         if (objective == null)
             return false;
 
+        if (completed && objective.phase != GetCurrentPhaseNumber(quest))
+            return false;
+
         objective.completed = completed;
         objective.requiredAmount = Mathf.Max(1, objective.requiredAmount);
         objective.currentAmount = completed ? objective.requiredAmount : Mathf.Min(objective.currentAmount, objective.requiredAmount - 1);
@@ -249,6 +255,9 @@ public partial class QuestManager : MonoBehaviour
 
             if (!string.Equals(objective.title.Trim(), normalizedTitle, StringComparison.OrdinalIgnoreCase))
                 continue;
+
+            if (completed && objective.phase != GetCurrentPhaseNumber(quest))
+                return false;
 
             objective.completed = completed;
             objective.requiredAmount = Mathf.Max(1, objective.requiredAmount);
@@ -369,6 +378,58 @@ public partial class QuestManager : MonoBehaviour
         quest.completed = allCompleted;
     }
 
+    public static int GetCurrentPhaseNumber(QuestData quest)
+    {
+        if (quest == null || quest.objectives == null || quest.objectives.Count == 0)
+            return 1;
+
+        int lastPhase = 1;
+        for (int i = 0; i < quest.objectives.Count; i++)
+        {
+            var objective = quest.objectives[i];
+            if (objective == null) continue;
+            lastPhase = Mathf.Max(lastPhase, objective.phase);
+            if (!objective.completed)
+                return Mathf.Max(1, objective.phase);
+        }
+
+        return lastPhase;
+    }
+
+    public static int GetCurrentPhaseNumber(QuestEntryData quest)
+    {
+        if (quest == null || quest.objectives == null || quest.objectives.Count == 0)
+            return 1;
+
+        int lastPhase = 1;
+        for (int i = 0; i < quest.objectives.Count; i++)
+        {
+            var objective = quest.objectives[i];
+            if (objective == null) continue;
+            lastPhase = Mathf.Max(lastPhase, objective.phase);
+            if (!objective.completed)
+                return Mathf.Max(1, objective.phase);
+        }
+
+        return lastPhase;
+    }
+
+    public static int GetPhaseCount(QuestEntryData quest)
+    {
+        int count = 1;
+        if (quest == null || quest.objectives == null)
+            return count;
+
+        for (int i = 0; i < quest.objectives.Count; i++)
+        {
+            var objective = quest.objectives[i];
+            if (objective != null)
+                count = Mathf.Max(count, objective.phase);
+        }
+
+        return count;
+    }
+
     private void NotifyChanged()
     {
         OnQuestListChanged?.Invoke(GetQuestsSnapshot());
@@ -420,6 +481,7 @@ public partial class QuestManager : MonoBehaviour
             if (entry == null) continue;
             result.Add(new QuestObjectiveData
             {
+                phase = Mathf.Max(1, entry.phase),
                 title = entry.title,
                 description = entry.description,
                 eventType = entry.eventType,
@@ -432,7 +494,43 @@ public partial class QuestManager : MonoBehaviour
             });
         }
 
+        NormalizeObjectivePhases(result);
         return result;
+    }
+
+    private static void NormalizeObjectivePhases(List<QuestObjectiveData> objectives)
+    {
+        if (objectives == null || objectives.Count == 0)
+            return;
+
+        int normalizedPhase = 1;
+        int objectivesInPhase = 0;
+        int previousDeclaredPhase = 1;
+        bool hasPrevious = false;
+
+        for (int i = 0; i < objectives.Count; i++)
+        {
+            var objective = objectives[i];
+            if (objective == null) continue;
+
+            int declaredPhase = Mathf.Max(1, objective.phase);
+            if (hasPrevious && declaredPhase != previousDeclaredPhase)
+            {
+                normalizedPhase++;
+                objectivesInPhase = 0;
+            }
+
+            if (objectivesInPhase >= MaxObjectivesPerPhase)
+            {
+                normalizedPhase++;
+                objectivesInPhase = 0;
+            }
+
+            objective.phase = normalizedPhase;
+            objectivesInPhase++;
+            previousDeclaredPhase = declaredPhase;
+            hasPrevious = true;
+        }
     }
 
     private static List<QuestRewardData> CloneRewards(List<QuestRewardData> source)
@@ -524,6 +622,7 @@ public partial class QuestManager : MonoBehaviour
             if (objective == null) continue;
             result.Add(new QuestObjectiveEntryData
             {
+                phase = Mathf.Max(1, objective.phase),
                 title = objective.title,
                 description = objective.description,
                 eventType = objective.eventType,
@@ -576,6 +675,7 @@ public partial class QuestManager : MonoBehaviour
             if (objective == null) continue;
             result.Add(new QuestObjectiveData
             {
+                phase = Mathf.Max(1, objective.phase),
                 title = objective.title,
                 description = objective.description,
                 eventType = objective.eventType,
@@ -588,6 +688,7 @@ public partial class QuestManager : MonoBehaviour
             });
         }
 
+        NormalizeObjectivePhases(result);
         return result;
     }
 

@@ -1244,6 +1244,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             if (obj == null) continue;
             result[i] = new SavedQuestObjectiveData
             {
+                phase = Mathf.Max(1, obj.phase),
                 title = obj.title,
                 description = obj.description,
                 eventType = obj.eventType.ToString(),
@@ -1377,6 +1378,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             if (obj == null) continue;
             result.Add(new QuestManager.QuestObjectiveData
             {
+                phase = Mathf.Max(1, obj.phase),
                 title = obj.title,
                 description = obj.description,
                 eventType = ParseSavedQuestObjectiveEventType(obj.eventType),

@@ -6,6 +6,7 @@ using UnityEngine.Scripting.APIUpdating;
 [MovedFrom(true, sourceNamespace: "", sourceAssembly: "Assembly-CSharp", sourceClassName: "InventoryUI")]
 public class QuestObjectiveEntryData
 {
+    [Min(1)] public int phase = 1;
     public string title;
     public string description;
     public QuestObjectiveEventType eventType = QuestObjectiveEventType.None;

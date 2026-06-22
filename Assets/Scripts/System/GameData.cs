@@ -1,6 +1,7 @@
 [System.Serializable]
 public class SavedQuestObjectiveData
 {
+    public int phase;
     public string title;
     public string description;
     public string eventType;

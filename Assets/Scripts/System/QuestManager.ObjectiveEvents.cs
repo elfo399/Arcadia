@@ -78,6 +78,7 @@ public partial class QuestManager
 
         string normalizedEventTargetId = NormalizeQuestTargetValue(questEvent.TargetId);
         string normalizedEventTargetTag = NormalizeQuestTargetValue(questEvent.TargetTag);
+        var activePhaseByQuest = new Dictionary<QuestData, int>();
         bool changed = false;
         for (int i = 0; i < handles.Count; i++)
         {
@@ -87,6 +88,15 @@ public partial class QuestManager
 
             var objective = handle.Objective;
             if (objective.completed)
+                continue;
+
+            if (!activePhaseByQuest.TryGetValue(handle.Quest, out int activePhase))
+            {
+                activePhase = GetCurrentPhaseNumber(handle.Quest);
+                activePhaseByQuest.Add(handle.Quest, activePhase);
+            }
+
+            if (objective.phase != activePhase)
                 continue;
 
             if (!QuestObjectiveMatchesEvent(objective, questEvent.Type, normalizedEventTargetId, normalizedEventTargetTag))

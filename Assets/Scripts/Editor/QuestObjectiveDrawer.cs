@@ -27,7 +27,7 @@ public class QuestObjectiveDrawerBase : PropertyDrawer
 
     public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
     {
-        return 10 * (Line + Gap);
+        return 11 * (Line + Gap);
     }
 
     public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
@@ -37,6 +37,7 @@ public class QuestObjectiveDrawerBase : PropertyDrawer
         Rect row = new Rect(position.x, position.y, position.width, Line);
         EditorGUI.PrefixLabel(row, label);
 
+        DrawNext(ref row, property.FindPropertyRelative("phase"), "Phase");
         DrawNext(ref row, property.FindPropertyRelative("title"), "Title");
         DrawNext(ref row, property.FindPropertyRelative("description"), "Description");
 

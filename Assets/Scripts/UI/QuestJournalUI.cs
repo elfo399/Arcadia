@@ -8,6 +8,9 @@ using UnityEngine.UI;
 
 public class QuestJournalUI : MonoBehaviour
 {
+    private const float ObjectiveRowHeight = 34f;
+    private const float ObjectiveRowSpacing = 2f;
+
     [Header("Dependencies")]
     [SerializeField] private MenuManager menuManager;
     [SerializeField] private InventoryUIManager inventoryUIManager;
@@ -39,6 +42,12 @@ public class QuestJournalUI : MonoBehaviour
     [SerializeField] private Button questClaimRewardButton;
     [SerializeField] private int questRewardInventoryCapacity = -1;
     [SerializeField] private int questRewardMagicCapacity = -1;
+
+    [Header("Quest Phase UI")]
+    [SerializeField] private TextMeshProUGUI questPhaseText;
+    [SerializeField] private Button questPreviousPhaseButton;
+    [SerializeField] private Button questNextPhaseButton;
+
     [SerializeField] private Color questPadFocusBorderColor = new Color(1f, 0.85f, 0.2f, 1f);
     [SerializeField] private Vector2 questPadFocusBorderThickness = new Vector2(3f, 3f);
 
@@ -47,6 +56,9 @@ public class QuestJournalUI : MonoBehaviour
     private bool questManagerSubscribed;
     private Transform questFocusedTransform;
     private Outline questFocusOutline;
+    private string viewedPhaseQuestId;
+    private int viewedPhase = 1;
+    private int lastCurrentPhase = 1;
     private readonly List<QuestItemUI> spawnedQuestRows = new();
     private readonly List<QuestObjectiveItemUI> spawnedObjectiveRows = new();
     private readonly List<QuestRewardItemUI> spawnedRewardRows = new();
@@ -73,11 +85,15 @@ public class QuestJournalUI : MonoBehaviour
     public Button QuestClaimRewardButton { get => questClaimRewardButton; set => questClaimRewardButton = value; }
     public int QuestRewardInventoryCapacity { get => questRewardInventoryCapacity; set => questRewardInventoryCapacity = value; }
     public int QuestRewardMagicCapacity { get => questRewardMagicCapacity; set => questRewardMagicCapacity = value; }
+    public TextMeshProUGUI QuestPhaseText { get => questPhaseText; set => questPhaseText = value; }
+    public Button QuestPreviousPhaseButton { get => questPreviousPhaseButton; set => questPreviousPhaseButton = value; }
+    public Button QuestNextPhaseButton { get => questNextPhaseButton; set => questNextPhaseButton = value; }
     public Color QuestPadFocusBorderColor { get => questPadFocusBorderColor; set => questPadFocusBorderColor = value; }
     public Vector2 QuestPadFocusBorderThickness { get => questPadFocusBorderThickness; set => questPadFocusBorderThickness = value; }
 
     private void OnDestroy()
     {
+        UnbindQuestPhaseButtons();
         UnbindQuestManager();
     }
 
@@ -89,6 +105,7 @@ public class QuestJournalUI : MonoBehaviour
         initialized = true;
 
         ResolveDependencies();
+        BindQuestPhaseButtons();
 
         if (questListContainer != null)
         {
@@ -98,6 +115,7 @@ public class QuestJournalUI : MonoBehaviour
 
         if (questObjectivesContainer != null && questObjectivePrefab != null && questObjectivePrefab.transform.parent == questObjectivesContainer)
             questObjectivePrefab.gameObject.SetActive(false);
+        EnsureObjectiveLayoutCapacity();
         if (questRewardsContainer != null && questRewardPrefab != null && questRewardPrefab.transform.parent == questRewardsContainer)
             questRewardPrefab.gameObject.SetActive(false);
 
@@ -172,6 +190,14 @@ public class QuestJournalUI : MonoBehaviour
     {
         TryBindQuestManager();
         if (questManager == null) return;
+
+        if (ChangeViewedPhase(direction))
+        {
+            RefreshSelectedQuestDetails();
+            ApplyPadFocusVisual(showPadFocus);
+            return;
+        }
+
         questManager.MoveJournalPadFocusHorizontal(direction);
         ApplyPadFocusVisual(showPadFocus);
     }
@@ -333,11 +359,16 @@ public class QuestJournalUI : MonoBehaviour
 
     private void UpdateQuestDetailPanel(QuestEntryData quest)
     {
+        int displayedPhase = ResolveDisplayedPhase(quest);
         if (questDetailPanelRoot != null && showQuestDetailOnlyOnSelection)
             questDetailPanelRoot.gameObject.SetActive(quest != null);
 
         if (questDetailTypeText != null) questDetailTypeText.text = quest != null ? (quest.questTypeLabel ?? string.Empty) : string.Empty;
-        if (questDetailRecommendedText != null) questDetailRecommendedText.text = quest != null ? (quest.recommendedLabel ?? string.Empty) : string.Empty;
+        if (questDetailRecommendedText != null)
+            questDetailRecommendedText.text = questPhaseText != null
+                ? (quest != null ? quest.recommendedLabel ?? string.Empty : string.Empty)
+                : FormatRecommendedAndPhase(quest, displayedPhase);
+        UpdateQuestPhaseUI(quest, displayedPhase);
         if (questDetailImage != null)
         {
             Sprite image = quest != null ? quest.questImage : null;
@@ -351,7 +382,7 @@ public class QuestJournalUI : MonoBehaviour
         if (questDetailLoreAuthorText != null) questDetailLoreAuthorText.text = quest != null ? (quest.loreAuthor ?? string.Empty) : string.Empty;
 
         UpdateQuestClaimButtonState(quest);
-        RebuildQuestObjectiveRows(quest);
+        RebuildQuestObjectiveRows(quest, displayedPhase);
         RebuildQuestRewardRows(quest);
     }
 
@@ -408,20 +439,149 @@ public class QuestJournalUI : MonoBehaviour
         RefreshUI(IsPadFocusVisible());
         Debug.Log("[QuestJournalUI] Claim reward completed.", this);
     }
-    private void RebuildQuestObjectiveRows(QuestEntryData quest)
+    private void RebuildQuestObjectiveRows(QuestEntryData quest, int displayedPhase)
     {
         ClearSpawnedRows(spawnedObjectiveRows, questObjectivesContainer, questObjectivePrefab);
         if (questObjectivesContainer == null || questObjectivePrefab == null || quest == null || quest.objectives == null) return;
 
+        EnsureObjectiveLayoutCapacity();
         for (int i = 0; i < quest.objectives.Count; i++)
         {
             var obj = quest.objectives[i];
-            if (obj == null) continue;
+            if (obj == null || obj.phase != displayedPhase) continue;
             var row = Instantiate(questObjectivePrefab, questObjectivesContainer);
             row.gameObject.SetActive(true);
             row.SetData(obj.title, FormatQuestObjectiveDescription(obj), obj.completed);
             spawnedObjectiveRows.Add(row);
         }
+    }
+
+    private int ResolveDisplayedPhase(QuestEntryData quest)
+    {
+        if (quest == null)
+        {
+            viewedPhaseQuestId = null;
+            viewedPhase = 1;
+            lastCurrentPhase = 1;
+            return 1;
+        }
+
+        int currentPhase = QuestManager.GetCurrentPhaseNumber(quest);
+        bool questChanged = !string.Equals(viewedPhaseQuestId, quest.questId, StringComparison.OrdinalIgnoreCase);
+        if (questChanged)
+        {
+            viewedPhaseQuestId = quest.questId;
+            viewedPhase = currentPhase;
+        }
+        else if (currentPhase != lastCurrentPhase && viewedPhase == lastCurrentPhase)
+        {
+            viewedPhase = currentPhase;
+        }
+
+        lastCurrentPhase = currentPhase;
+        viewedPhase = Mathf.Clamp(viewedPhase, 1, currentPhase);
+        return viewedPhase;
+    }
+
+    private bool ChangeViewedPhase(int direction)
+    {
+        var quest = questManager != null ? questManager.GetSelectedVisibleJournalQuest() : null;
+        if (quest == null)
+            return false;
+
+        int currentPhase = QuestManager.GetCurrentPhaseNumber(quest);
+        ResolveDisplayedPhase(quest);
+        int nextPhase = Mathf.Clamp(viewedPhase + (direction >= 0 ? 1 : -1), 1, currentPhase);
+        if (nextPhase == viewedPhase)
+            return false;
+
+        viewedPhase = nextPhase;
+        return true;
+    }
+
+    private void BindQuestPhaseButtons()
+    {
+        if (questPreviousPhaseButton != null)
+        {
+            questPreviousPhaseButton.onClick.RemoveListener(ShowPreviousQuestPhase);
+            questPreviousPhaseButton.onClick.AddListener(ShowPreviousQuestPhase);
+        }
+
+        if (questNextPhaseButton != null)
+        {
+            questNextPhaseButton.onClick.RemoveListener(ShowNextQuestPhase);
+            questNextPhaseButton.onClick.AddListener(ShowNextQuestPhase);
+        }
+    }
+
+    private void UnbindQuestPhaseButtons()
+    {
+        if (questPreviousPhaseButton != null)
+            questPreviousPhaseButton.onClick.RemoveListener(ShowPreviousQuestPhase);
+        if (questNextPhaseButton != null)
+            questNextPhaseButton.onClick.RemoveListener(ShowNextQuestPhase);
+    }
+
+    private void ShowPreviousQuestPhase()
+    {
+        if (ChangeViewedPhase(-1))
+            RefreshSelectedQuestDetails();
+    }
+
+    private void ShowNextQuestPhase()
+    {
+        if (ChangeViewedPhase(1))
+            RefreshSelectedQuestDetails();
+    }
+
+    private void UpdateQuestPhaseUI(QuestEntryData quest, int displayedPhase)
+    {
+        bool hasQuest = quest != null && quest.objectives != null && quest.objectives.Count > 0;
+        int currentPhase = hasQuest ? QuestManager.GetCurrentPhaseNumber(quest) : 1;
+        int phaseCount = hasQuest ? QuestManager.GetPhaseCount(quest) : 1;
+
+        if (questPhaseText != null)
+        {
+            questPhaseText.text = hasQuest ? FormatPhaseLabel(displayedPhase, phaseCount) : string.Empty;
+            questPhaseText.gameObject.SetActive(hasQuest);
+        }
+
+        if (questPreviousPhaseButton != null)
+        {
+            questPreviousPhaseButton.gameObject.SetActive(hasQuest && phaseCount > 1);
+            questPreviousPhaseButton.interactable = hasQuest && displayedPhase > 1;
+        }
+
+        if (questNextPhaseButton != null)
+        {
+            questNextPhaseButton.gameObject.SetActive(hasQuest && phaseCount > 1);
+            questNextPhaseButton.interactable = hasQuest && displayedPhase < currentPhase;
+        }
+    }
+
+    private void EnsureObjectiveLayoutCapacity()
+    {
+        if (questObjectivesContainer == null || questObjectivePrefab == null)
+            return;
+
+        if (questObjectivePrefab.transform is RectTransform prefabRect)
+            prefabRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, ObjectiveRowHeight);
+
+        var layout = questObjectivesContainer.GetComponent<VerticalLayoutGroup>();
+        if (layout != null)
+        {
+            layout.spacing = ObjectiveRowSpacing;
+            layout.childControlHeight = false;
+            layout.childForceExpandHeight = false;
+        }
+
+        if (!(questObjectivesContainer is RectTransform containerRect))
+            return;
+
+        float minimumHeight = QuestManager.MaxObjectivesPerPhase * ObjectiveRowHeight
+                              + (QuestManager.MaxObjectivesPerPhase - 1) * ObjectiveRowSpacing;
+        if (containerRect.rect.height < minimumHeight)
+            containerRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, minimumHeight);
     }
 
     private void RebuildQuestRewardRows(QuestEntryData quest)
@@ -722,6 +882,24 @@ public class QuestJournalUI : MonoBehaviour
 
         string progress = $"{Mathf.Clamp(objective.currentAmount, 0, objective.requiredAmount)}/{objective.requiredAmount}";
         return string.IsNullOrWhiteSpace(description) ? progress : description + " (" + progress + ")";
+    }
+
+    private static string FormatRecommendedAndPhase(QuestEntryData quest, int displayedPhase)
+    {
+        if (quest == null)
+            return string.Empty;
+
+        int currentPhase = QuestManager.GetCurrentPhaseNumber(quest);
+        string phase = $"FASE {displayedPhase}/{QuestManager.GetPhaseCount(quest)}";
+        if (displayedPhase < currentPhase)
+            phase += " (COMPLETATA)";
+        string recommended = quest.recommendedLabel ?? string.Empty;
+        return string.IsNullOrWhiteSpace(recommended) ? phase : recommended + "  |  " + phase;
+    }
+
+    private static string FormatPhaseLabel(int displayedPhase, int phaseCount)
+    {
+        return $"FASE {displayedPhase}/{phaseCount}";
     }
 
 }
