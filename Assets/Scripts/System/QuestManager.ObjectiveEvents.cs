@@ -76,6 +76,8 @@ public partial class QuestManager
         if (!objectiveHandlesByEventType.TryGetValue(questEvent.Type, out var handles) || handles == null || handles.Count == 0)
             return;
 
+        string normalizedEventTargetId = NormalizeQuestTargetValue(questEvent.TargetId);
+        string normalizedEventTargetTag = NormalizeQuestTargetValue(questEvent.TargetTag);
         bool changed = false;
         for (int i = 0; i < handles.Count; i++)
         {
@@ -87,13 +89,17 @@ public partial class QuestManager
             if (objective.completed)
                 continue;
 
-            if (!QuestObjectiveMatchesEvent(objective, questEvent))
+            if (!QuestObjectiveMatchesEvent(objective, questEvent.Type, normalizedEventTargetId, normalizedEventTargetTag))
                 continue;
 
             objective.requiredAmount = Mathf.Max(1, objective.requiredAmount);
+            int previousAmount = objective.currentAmount;
+            bool wasCompleted = objective.completed;
             objective.currentAmount = Mathf.Min(objective.requiredAmount, Mathf.Max(0, objective.currentAmount) + questEvent.Amount);
-            if (objective.currentAmount >= objective.requiredAmount)
-                objective.completed = true;
+            objective.completed = objective.currentAmount >= objective.requiredAmount;
+
+            if (previousAmount == objective.currentAmount && wasCompleted == objective.completed)
+                continue;
 
             SyncQuestCompletionFromObjectives(handle.Quest);
             if (!handle.Quest.completed)
@@ -106,9 +112,9 @@ public partial class QuestManager
             NotifyChanged();
     }
 
-    private static bool QuestObjectiveMatchesEvent(QuestObjectiveData objective, QuestEvent questEvent)
+    private static bool QuestObjectiveMatchesEvent(QuestObjectiveData objective, QuestObjectiveEventType eventType, string normalizedEventTargetId, string normalizedEventTargetTag)
     {
-        if (objective == null || objective.eventType != questEvent.Type)
+        if (objective == null || objective.eventType != eventType)
             return false;
 
         string resolvedTargetId = ResolveQuestObjectiveTargetId(objective);
@@ -118,10 +124,10 @@ public partial class QuestManager
         if (!hasTargetId && !hasTargetTag)
             return true;
 
-        if (hasTargetId && QuestTargetEquals(resolvedTargetId, questEvent.TargetId))
+        if (hasTargetId && QuestTargetEqualsNormalized(resolvedTargetId, normalizedEventTargetId))
             return true;
 
-        return hasTargetTag && QuestTargetEquals(objective.targetTag, questEvent.TargetTag);
+        return hasTargetTag && QuestTargetEqualsNormalized(objective.targetTag, normalizedEventTargetTag);
     }
 
     private static string ResolveQuestObjectiveTargetId(QuestObjectiveData objective)
@@ -161,13 +167,12 @@ public partial class QuestManager
         }
     }
 
-    private static bool QuestTargetEquals(string configuredValue, string eventValue)
+    private static bool QuestTargetEqualsNormalized(string configuredValue, string normalizedEventValue)
     {
         string configured = NormalizeQuestTargetValue(configuredValue);
-        string raised = NormalizeQuestTargetValue(eventValue);
         return !string.IsNullOrEmpty(configured)
-               && !string.IsNullOrEmpty(raised)
-               && string.Equals(configured, raised, StringComparison.OrdinalIgnoreCase);
+               && !string.IsNullOrEmpty(normalizedEventValue)
+               && string.Equals(configured, normalizedEventValue, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizeQuestTargetValue(string value)

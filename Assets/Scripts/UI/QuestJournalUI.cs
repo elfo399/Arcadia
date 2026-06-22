@@ -284,6 +284,9 @@ public class QuestJournalUI : MonoBehaviour
 
     private void HandleQuestManagerListChanged(List<QuestManager.QuestData> _)
     {
+        if (!isActiveAndEnabled || !IsQuestTabVisualActive())
+            return;
+
         RefreshUI(IsPadFocusVisible());
     }
 
