@@ -197,6 +197,63 @@ public partial class QuestManager : MonoBehaviour
         return true;
     }
 
+    public bool SetQuestObjectiveCompleted(string questId, int objectiveIndex, bool completed = true, bool notify = true)
+    {
+        int questIndex = FindQuestIndex(questId);
+        if (questIndex < 0) return false;
+
+        var quest = quests[questIndex];
+        if (quest == null || quest.objectives == null || objectiveIndex < 0 || objectiveIndex >= quest.objectives.Count)
+            return false;
+
+        var objective = quest.objectives[objectiveIndex];
+        if (objective == null)
+            return false;
+
+        objective.completed = completed;
+        SyncQuestCompletionFromObjectives(quest);
+
+        if (!quest.completed)
+            quest.rewardClaimed = false;
+
+        if (notify)
+            NotifyChanged();
+        return true;
+    }
+
+    public bool SetQuestObjectiveCompleted(string questId, string objectiveTitle, bool completed = true, bool notify = true)
+    {
+        int questIndex = FindQuestIndex(questId);
+        if (questIndex < 0 || string.IsNullOrWhiteSpace(objectiveTitle)) return false;
+
+        var quest = quests[questIndex];
+        if (quest == null || quest.objectives == null)
+            return false;
+
+        string normalizedTitle = objectiveTitle.Trim();
+        for (int i = 0; i < quest.objectives.Count; i++)
+        {
+            var objective = quest.objectives[i];
+            if (objective == null || string.IsNullOrWhiteSpace(objective.title))
+                continue;
+
+            if (!string.Equals(objective.title.Trim(), normalizedTitle, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            objective.completed = completed;
+            SyncQuestCompletionFromObjectives(quest);
+
+            if (!quest.completed)
+                quest.rewardClaimed = false;
+
+            if (notify)
+                NotifyChanged();
+            return true;
+        }
+
+        return false;
+    }
+
     public void SeedFromInventoryEntriesIfEmpty(List<QuestEntryData> sourceEntries, bool notify = true)
     {
         if (quests.Count > 0 || sourceEntries == null || sourceEntries.Count == 0)
@@ -275,6 +332,25 @@ public partial class QuestManager : MonoBehaviour
                 return i;
         }
         return -1;
+    }
+
+    private static void SyncQuestCompletionFromObjectives(QuestData quest)
+    {
+        if (quest == null || quest.objectives == null || quest.objectives.Count == 0)
+            return;
+
+        bool allCompleted = true;
+        for (int i = 0; i < quest.objectives.Count; i++)
+        {
+            var objective = quest.objectives[i];
+            if (objective == null || objective.completed)
+                continue;
+
+            allCompleted = false;
+            break;
+        }
+
+        quest.completed = allCompleted;
     }
 
     private void NotifyChanged()

@@ -23,8 +23,10 @@ public class QuestObjectiveItemUI : MonoBehaviour
 
         if (completedToggle != null)
         {
+            completedToggle.enabled = true;
             completedToggle.SetIsOnWithoutNotify(completed);
-            completedToggle.interactable = false;
+            completedToggle.interactable = true;
+            completedToggle.enabled = false;
         }
 
         if (checkImage != null)
@@ -43,6 +45,13 @@ public class QuestObjectiveItemUI : MonoBehaviour
 
         if (completedToggle == null)
             completedToggle = GetComponentInChildren<Toggle>(true);
+
+        if (completedToggle != null && completedToggle.graphic is Image toggleGraphic)
+        {
+            string currentName = checkImage != null ? checkImage.gameObject.name.ToLowerInvariant() : string.Empty;
+            if (checkImage == null || !currentName.Contains("check"))
+                checkImage = toggleGraphic;
+        }
 
         if (checkImage == null)
         {

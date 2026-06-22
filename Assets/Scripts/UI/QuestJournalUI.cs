@@ -143,6 +143,18 @@ public class QuestJournalUI : MonoBehaviour
         return questManager != null && questManager.SetQuestCompleted(questId, completed);
     }
 
+    public bool SetQuestObjectiveCompleted(string questId, int objectiveIndex, bool completed = true)
+    {
+        TryBindQuestManager();
+        return questManager != null && questManager.SetQuestObjectiveCompleted(questId, objectiveIndex, completed);
+    }
+
+    public bool SetQuestObjectiveCompleted(string questId, string objectiveTitle, bool completed = true)
+    {
+        TryBindQuestManager();
+        return questManager != null && questManager.SetQuestObjectiveCompleted(questId, objectiveTitle, completed);
+    }
+
     public void FocusPadDefault(bool showPadFocus)
     {
         TryBindQuestManager();
