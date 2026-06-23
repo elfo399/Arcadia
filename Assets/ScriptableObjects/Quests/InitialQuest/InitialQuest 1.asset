@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9d2f30d9d6784ab4a4e8a0f94f84f9b6, type: 3}
-  m_Name: InitialQuest
+  m_Name: InitialQuest 1
   m_EditorClassIdentifier: 
-  questId: initial_quest
-  title: Primi passi
+  questId: initial_quest1
+  title: Primi passi1
   location: Arcadia
   questTypeLabel: Main Quest
   recommendedLabel: Livello 1
@@ -26,14 +26,44 @@ MonoBehaviour:
   - phase: 1
     title: Esplora l'area iniziale
     description: Avanza nella prima area e orientati con i comandi base.
-    eventType: 1
-    targetObject: {fileID: 8858051749441068820, guid: 4c67ed6c086451b4db54ac4d24b626bb, type: 3}
+    eventType: 0
+    targetObject: {fileID: 0}
     targetId: 
-    targetTag: enemy
+    targetTag: 
     requiredAmount: 1
     currentAmount: 0
     completed: 0
   - phase: 1
+    title: Esplora l'area iniziale
+    description: Avanza nella prima area e orientati con i comandi base.
+    eventType: 0
+    targetObject: {fileID: 0}
+    targetId: 
+    targetTag: 
+    requiredAmount: 1
+    currentAmount: 0
+    completed: 0
+  - phase: 1
+    title: Esplora l'area iniziale
+    description: Avanza nella prima area e orientati con i comandi base.
+    eventType: 0
+    targetObject: {fileID: 0}
+    targetId: 
+    targetTag: 
+    requiredAmount: 1
+    currentAmount: 0
+    completed: 0
+  - phase: 2
+    title: Esplora l'area iniziale
+    description: Avanza nella prima area e orientati con i comandi base.
+    eventType: 0
+    targetObject: {fileID: 0}
+    targetId: 
+    targetTag: 
+    requiredAmount: 1
+    currentAmount: 0
+    completed: 0
+  - phase: 2
     title: Esplora l'area iniziale
     description: Avanza nella prima area e orientati con i comandi base.
     eventType: 0

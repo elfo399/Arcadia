@@ -130,11 +130,22 @@ public partial class QuestManager : MonoBehaviour
         quests.Clear();
         if (newQuests != null)
         {
+            var seenQuestIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < newQuests.Count; i++)
             {
                 var q = newQuests[i];
                 if (q == null) continue;
-                quests.Add(CloneQuestData(q));
+
+                string normalizedId = NormalizeQuestId(q.questId, q.title, q.location);
+                if (!seenQuestIds.Add(normalizedId))
+                {
+                    MergeDuplicateQuestState(FindQuestIndex(normalizedId), q);
+                    continue;
+                }
+
+                var clone = CloneQuestData(q);
+                clone.questId = normalizedId;
+                quests.Add(clone);
             }
         }
 
@@ -152,6 +163,7 @@ public partial class QuestManager : MonoBehaviour
     private List<QuestData> BuildInitialQuests()
     {
         var result = new List<QuestData>();
+        var seenQuestIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         if (initialQuestDefinitions != null)
         {
@@ -159,7 +171,17 @@ public partial class QuestManager : MonoBehaviour
             {
                 var definition = initialQuestDefinitions[i];
                 if (definition == null) continue;
-                result.Add(definition.CreateRuntimeData());
+
+                var quest = definition.CreateRuntimeData();
+                string normalizedId = NormalizeQuestId(quest.questId, quest.title, quest.location);
+                if (!seenQuestIds.Add(normalizedId))
+                {
+                    Debug.LogWarning($"[QuestManager] Quest iniziale duplicata ignorata: {normalizedId}.", this);
+                    continue;
+                }
+
+                quest.questId = normalizedId;
+                result.Add(quest);
             }
         }
 
@@ -357,6 +379,40 @@ public partial class QuestManager : MonoBehaviour
                 return i;
         }
         return -1;
+    }
+
+    private void MergeDuplicateQuestState(int targetIndex, QuestData duplicate)
+    {
+        if (targetIndex < 0 || targetIndex >= quests.Count || duplicate == null)
+            return;
+
+        var target = quests[targetIndex];
+        if (target == null)
+            return;
+
+        target.completed |= duplicate.completed || duplicate.rewardClaimed;
+        target.rewardClaimed |= duplicate.rewardClaimed;
+        MergeDuplicateObjectiveState(target.objectives, duplicate.objectives);
+        SyncQuestCompletionFromObjectives(target);
+    }
+
+    private static void MergeDuplicateObjectiveState(List<QuestObjectiveData> target, List<QuestObjectiveData> duplicate)
+    {
+        if (target == null || duplicate == null)
+            return;
+
+        int count = Mathf.Min(target.Count, duplicate.Count);
+        for (int i = 0; i < count; i++)
+        {
+            var targetObjective = target[i];
+            var duplicateObjective = duplicate[i];
+            if (targetObjective == null || duplicateObjective == null)
+                continue;
+
+            targetObjective.requiredAmount = Mathf.Max(1, Mathf.Max(targetObjective.requiredAmount, duplicateObjective.requiredAmount));
+            targetObjective.currentAmount = Mathf.Max(targetObjective.currentAmount, duplicateObjective.currentAmount);
+            targetObjective.completed |= duplicateObjective.completed;
+        }
     }
 
     private static void SyncQuestCompletionFromObjectives(QuestData quest)

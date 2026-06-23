@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public class QuestJournalUI : MonoBehaviour
@@ -50,7 +51,8 @@ public class QuestJournalUI : MonoBehaviour
     [SerializeField] private int questRewardMagicCapacity = -1;
 
     [Header("Quest Phase UI")]
-    [SerializeField] private TextMeshProUGUI questPhaseText;
+    [FormerlySerializedAs("questPhaseText")]
+    [SerializeField] private TextMeshProUGUI questDetailPhaseText;
     [SerializeField] private Button questPreviousPhaseButton;
     [SerializeField] private Button questNextPhaseButton;
 
@@ -95,7 +97,7 @@ public class QuestJournalUI : MonoBehaviour
     public Button QuestClaimRewardButton { get => questClaimRewardButton; set => questClaimRewardButton = value; }
     public int QuestRewardInventoryCapacity { get => questRewardInventoryCapacity; set => questRewardInventoryCapacity = value; }
     public int QuestRewardMagicCapacity { get => questRewardMagicCapacity; set => questRewardMagicCapacity = value; }
-    public TextMeshProUGUI QuestPhaseText { get => questPhaseText; set => questPhaseText = value; }
+    public TextMeshProUGUI QuestPhaseText { get => questDetailPhaseText; set => questDetailPhaseText = value; }
     public Button QuestPreviousPhaseButton { get => questPreviousPhaseButton; set => questPreviousPhaseButton = value; }
     public Button QuestNextPhaseButton { get => questNextPhaseButton; set => questNextPhaseButton = value; }
     public Color QuestPadFocusBorderColor { get => questPadFocusBorderColor; set => questPadFocusBorderColor = value; }
@@ -409,9 +411,7 @@ public class QuestJournalUI : MonoBehaviour
 
         if (questDetailTypeText != null) questDetailTypeText.text = quest != null ? (quest.questTypeLabel ?? string.Empty) : string.Empty;
         if (questDetailRecommendedText != null)
-            questDetailRecommendedText.text = questPhaseText != null
-                ? (quest != null ? quest.recommendedLabel ?? string.Empty : string.Empty)
-                : FormatRecommendedAndPhase(quest, displayedPhase);
+            questDetailRecommendedText.text = quest != null ? quest.recommendedLabel ?? string.Empty : string.Empty;
         UpdateQuestPhaseUI(quest, displayedPhase);
         if (questDetailImage != null)
         {
@@ -584,10 +584,10 @@ public class QuestJournalUI : MonoBehaviour
         int currentPhase = hasQuest ? QuestManager.GetCurrentPhaseNumber(quest) : 1;
         int phaseCount = hasQuest ? QuestManager.GetPhaseCount(quest) : 1;
 
-        if (questPhaseText != null)
+        if (questDetailPhaseText != null)
         {
-            questPhaseText.text = hasQuest ? FormatPhaseLabel(displayedPhase, phaseCount) : string.Empty;
-            questPhaseText.gameObject.SetActive(hasQuest);
+            questDetailPhaseText.text = hasQuest ? FormatPhaseLabel(displayedPhase, phaseCount) : string.Empty;
+            questDetailPhaseText.gameObject.SetActive(hasQuest);
         }
 
         if (questPreviousPhaseButton != null)
@@ -1036,22 +1036,9 @@ public class QuestJournalUI : MonoBehaviour
         return string.IsNullOrWhiteSpace(description) ? progress : description + " (" + progress + ")";
     }
 
-    private static string FormatRecommendedAndPhase(QuestEntryData quest, int displayedPhase)
-    {
-        if (quest == null)
-            return string.Empty;
-
-        int currentPhase = QuestManager.GetCurrentPhaseNumber(quest);
-        string phase = $"FASE {displayedPhase}/{QuestManager.GetPhaseCount(quest)}";
-        if (displayedPhase < currentPhase)
-            phase += " (COMPLETATA)";
-        string recommended = quest.recommendedLabel ?? string.Empty;
-        return string.IsNullOrWhiteSpace(recommended) ? phase : recommended + "  |  " + phase;
-    }
-
     private static string FormatPhaseLabel(int displayedPhase, int phaseCount)
     {
-        return $"FASE {displayedPhase}/{phaseCount}";
+        return $"{displayedPhase}/{phaseCount}";
     }
 
 }

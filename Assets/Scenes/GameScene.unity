@@ -2886,7 +2886,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2565751162758324320, guid: 2b1e40ac8c72f834c9d80c5a44f46d6f, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 26.865
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2565751162758324320, guid: 2b1e40ac8c72f834c9d80c5a44f46d6f, type: 3}
       propertyPath: m_LocalPosition.x
@@ -12527,25 +12527,16 @@ MonoBehaviour:
   autoNotifyOnStart: 1
   initialQuestDefinitions:
   - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
-  - {fileID: 11400000, guid: 48af7f6c9d27446799ae9d73821a6f36, type: 2}
+  - {fileID: 11400000, guid: 16154db7873bbe640a6fddceb75fdf5e, type: 2}
+  - {fileID: 11400000, guid: e0e8b23b496a51e44991a0bc6c164c96, type: 2}
+  - {fileID: 11400000, guid: 986d461aef397a04ca31edd1bf20b3ae, type: 2}
+  - {fileID: 11400000, guid: 23b9b4a96c3af644da5104985ab4de4f, type: 2}
+  - {fileID: 11400000, guid: c6eb1d0d8442bd4489d959376986e3af, type: 2}
+  - {fileID: 11400000, guid: 9cd6e820a92d83c41b6b4b7954eed095, type: 2}
+  - {fileID: 11400000, guid: c3b758a7d7dd419439de04519652b942, type: 2}
+  - {fileID: 11400000, guid: ce73dbcf25c15954581ece27ca1f81c6, type: 2}
+  - {fileID: 11400000, guid: 5d548333c5e37e9478a4d10545b54d67, type: 2}
+  - {fileID: 11400000, guid: 96118829dc871934398e7e7e1f920f4c, type: 2}
 --- !u!1 &648361017
 GameObject:
   m_ObjectHideFlags: 0
@@ -19422,6 +19413,7 @@ MonoBehaviour:
   questListViewport: {fileID: 2147000002}
   questListLayout: {fileID: 1671610944}
   questListContentSizeFitter: {fileID: 2147000006}
+  questListMouseWheelPixels: 48
   startingQuests:
   - questId: 1
     title: Tony
@@ -19472,7 +19464,7 @@ MonoBehaviour:
   questClaimRewardButton: {fileID: 407606909}
   questRewardInventoryCapacity: -1
   questRewardMagicCapacity: -1
-  questPhaseText: {fileID: 0}
+  questDetailPhaseText: {fileID: 1475866040}
   questPreviousPhaseButton: {fileID: 0}
   questNextPhaseButton: {fileID: 0}
   questPadFocusBorderColor: {r: 1, g: 0.85, b: 0.2, a: 1}
@@ -31333,7 +31325,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2512974732852580259, guid: 2b1e40ac8c72f834c9d80c5a44f46d6f, type: 3}
       propertyPath: m_hasFontAssetChanged
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2565751162758324320, guid: 2b1e40ac8c72f834c9d80c5a44f46d6f, type: 3}
       propertyPath: m_Pivot.x
@@ -31365,7 +31357,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2565751162758324320, guid: 2b1e40ac8c72f834c9d80c5a44f46d6f, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 26.865
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2565751162758324320, guid: 2b1e40ac8c72f834c9d80c5a44f46d6f, type: 3}
       propertyPath: m_LocalPosition.x
@@ -34031,7 +34023,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2565751162758324320, guid: 2b1e40ac8c72f834c9d80c5a44f46d6f, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 26.865
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2565751162758324320, guid: 2b1e40ac8c72f834c9d80c5a44f46d6f, type: 3}
       propertyPath: m_LocalPosition.x

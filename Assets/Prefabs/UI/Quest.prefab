@@ -136,8 +136,9 @@ MonoBehaviour:
   questLocationText: {fileID: 0}
   backgroundImage: {fileID: 3941783516757015213}
   completedIndicator: {fileID: 2660582834561692078}
-  selectedBackgroundColor: {r: 1, g: 0.85, b: 0.25, a: 0.2}
-  normalBackgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  selectionOutline: {fileID: 3941783516757015214}
+  selectionBorderColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+  selectionBorderThickness: {x: 3, y: 3}
 --- !u!114 &3941783516757015215
 MonoBehaviour:
   m_ObjectHideFlags: 0

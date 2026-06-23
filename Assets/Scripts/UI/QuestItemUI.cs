@@ -8,8 +8,12 @@ public class QuestItemUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI questLocationText;
     [SerializeField] private Image backgroundImage;
     [SerializeField] private GameObject completedIndicator;
-    [SerializeField] private Color selectedBackgroundColor = new Color(1f, 0.85f, 0.25f, 0.2f);
-    [SerializeField] private Color normalBackgroundColor = Color.clear;
+    [SerializeField] private Outline selectionOutline;
+    [SerializeField] private Color selectionBorderColor = new Color(1f, 0.85f, 0.2f, 1f);
+    [SerializeField] private Vector2 selectionBorderThickness = new Vector2(3f, 3f);
+
+    private Color defaultBackgroundColor = Color.clear;
+    private bool hasDefaultBackgroundColor;
 
     public Graphic SelectionGraphic
     {
@@ -23,6 +27,9 @@ public class QuestItemUI : MonoBehaviour
     private void Awake()
     {
         ResolveReferences();
+        CacheDefaultBackgroundColor();
+        EnsureSelectionOutline();
+        SetSelected(false);
     }
 
     public void SetData(string title, string location, bool completed)
@@ -42,8 +49,14 @@ public class QuestItemUI : MonoBehaviour
     public void SetSelected(bool selected)
     {
         ResolveReferences();
-        if (backgroundImage != null)
-            backgroundImage.color = selected ? selectedBackgroundColor : normalBackgroundColor;
+        CacheDefaultBackgroundColor();
+        EnsureSelectionOutline();
+
+        if (backgroundImage != null && hasDefaultBackgroundColor)
+            backgroundImage.color = defaultBackgroundColor;
+
+        if (selectionOutline != null)
+            selectionOutline.enabled = selected;
     }
 
     private void ResolveReferences()
@@ -57,6 +70,9 @@ public class QuestItemUI : MonoBehaviour
             if (panel != null)
                 backgroundImage = panel.GetComponent<Image>();
         }
+
+        if (selectionOutline == null && backgroundImage != null)
+            selectionOutline = backgroundImage.GetComponent<Outline>();
 
         if (questNameText == null)
         {
@@ -137,5 +153,29 @@ public class QuestItemUI : MonoBehaviour
                 if (questLocationText == null && (n.Contains("location") || n.Contains("loction"))) questLocationText = allTexts[i];
             }
         }
+    }
+
+    private void CacheDefaultBackgroundColor()
+    {
+        if (hasDefaultBackgroundColor || backgroundImage == null)
+            return;
+
+        defaultBackgroundColor = backgroundImage.color;
+        hasDefaultBackgroundColor = true;
+    }
+
+    private void EnsureSelectionOutline()
+    {
+        if (backgroundImage == null)
+            return;
+
+        if (selectionOutline == null)
+            selectionOutline = backgroundImage.GetComponent<Outline>();
+        if (selectionOutline == null)
+            selectionOutline = backgroundImage.gameObject.AddComponent<Outline>();
+
+        selectionOutline.effectColor = selectionBorderColor;
+        selectionOutline.effectDistance = selectionBorderThickness;
+        selectionOutline.useGraphicAlpha = true;
     }
 }
