@@ -64,6 +64,7 @@ public class QuestJournalUI : MonoBehaviour
     private bool questManagerSubscribed;
     private Transform questFocusedTransform;
     private Outline questFocusOutline;
+    private QuestItemUI questFocusedRow;
     private string viewedPhaseQuestId;
     private int viewedPhase = 1;
     private int lastCurrentPhase = 1;
@@ -328,8 +329,11 @@ public class QuestJournalUI : MonoBehaviour
 
     public void ClearPadFocusVisual()
     {
+        if (questFocusedRow != null)
+            questFocusedRow.SetFocused(false);
         if (questFocusOutline != null)
             questFocusOutline.enabled = false;
+        questFocusedRow = null;
         questFocusedTransform = null;
         questFocusOutline = null;
     }
@@ -820,6 +824,18 @@ public class QuestJournalUI : MonoBehaviour
 
     private void SetQuestPadFocusVisualTarget(GameObject target)
     {
+        var focusedRow = target != null ? target.GetComponentInParent<QuestItemUI>() : null;
+        if (focusedRow != null)
+        {
+            if (questFocusedRow != focusedRow)
+                ClearPadFocusVisual();
+
+            questFocusedRow = focusedRow;
+            questFocusedTransform = focusedRow.transform;
+            focusedRow.SetFocused(true);
+            return;
+        }
+
         target = ResolveQuestFocusGraphicTarget(target);
         if (target != null && target.transform == questFocusedTransform && questFocusOutline != null)
         {

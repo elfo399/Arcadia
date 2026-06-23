@@ -393,7 +393,8 @@ public class MenuManager : MonoBehaviour
         // anche direttamente dal D-Pad per non processare due volte la stessa pressione.
         bool rightPressed = Keyboard.current != null && Keyboard.current.rightArrowKey.wasPressedThisFrame;
         bool leftPressed = Keyboard.current != null && Keyboard.current.leftArrowKey.wasPressedThisFrame;
-        bool downPressed = Keyboard.current != null && Keyboard.current.downArrowKey.wasPressedThisFrame;
+        bool downPressed = (Keyboard.current != null && Keyboard.current.downArrowKey.wasPressedThisFrame)
+            || (Gamepad.current != null && Gamepad.current.dpad.down.wasPressedThisFrame);
         bool upPressed = (Keyboard.current != null && Keyboard.current.upArrowKey.wasPressedThisFrame)
             || (Gamepad.current != null && Gamepad.current.dpad.up.wasPressedThisFrame);
 
@@ -479,12 +480,12 @@ public class MenuManager : MonoBehaviour
                     questJournalUI?.MovePadFocusHorizontal(-1, showPadFocus);
                     lastNavigationMoveTime = Time.time;
                 }
-                else if (questNav.y > 0.5f)
+                else if (questNav.y > 0.5f && !upPressed)
                 {
                     questJournalUI?.MovePadFocusVertical(-1, showPadFocus);
                     lastNavigationMoveTime = Time.time;
                 }
-                else if (questNav.y < -0.5f)
+                else if (questNav.y < -0.5f && !downPressed)
                 {
                     questJournalUI?.MovePadFocusVertical(1, showPadFocus);
                     lastNavigationMoveTime = Time.time;

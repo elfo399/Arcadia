@@ -14,6 +14,9 @@ public class QuestItemUI : MonoBehaviour
 
     private Color defaultBackgroundColor = Color.clear;
     private bool hasDefaultBackgroundColor;
+    private QuestSelectionFrameEffect[] selectionFrameEffects;
+    private bool isSelected;
+    private bool isFocused;
 
     public Graphic SelectionGraphic
     {
@@ -48,15 +51,35 @@ public class QuestItemUI : MonoBehaviour
 
     public void SetSelected(bool selected)
     {
+        isSelected = selected;
+        RefreshSelectionVisual();
+    }
+
+    public void SetFocused(bool focused)
+    {
+        isFocused = focused;
+        RefreshSelectionVisual();
+    }
+
+    private void RefreshSelectionVisual()
+    {
         ResolveReferences();
         CacheDefaultBackgroundColor();
         EnsureSelectionOutline();
+        bool highlighted = isSelected || isFocused;
 
         if (backgroundImage != null && hasDefaultBackgroundColor)
             backgroundImage.color = defaultBackgroundColor;
 
+        EnsureSelectionFrameEffects();
+        for (int i = 0; i < selectionFrameEffects.Length; i++)
+        {
+            if (selectionFrameEffects[i] != null)
+                selectionFrameEffects[i].enabled = highlighted;
+        }
+
         if (selectionOutline != null)
-            selectionOutline.enabled = selected;
+            selectionOutline.enabled = false;
     }
 
     private void ResolveReferences()
@@ -162,6 +185,50 @@ public class QuestItemUI : MonoBehaviour
 
         defaultBackgroundColor = backgroundImage.color;
         hasDefaultBackgroundColor = true;
+    }
+
+    private void EnsureSelectionFrameEffects()
+    {
+        if (selectionFrameEffects != null)
+            return;
+
+        var childImages = GetComponentsInChildren<Image>(true);
+        var effects = new System.Collections.Generic.List<QuestSelectionFrameEffect>();
+        float horizontalThickness = Mathf.Max(1f, selectionBorderThickness.x);
+        float verticalThickness = Mathf.Max(1f, selectionBorderThickness.y);
+
+        for (int i = 0; i < childImages.Length; i++)
+        {
+            var image = childImages[i];
+            if (image == null || image.transform.parent != transform)
+                continue;
+            if (image == backgroundImage || image.sprite == null)
+                continue;
+            if (completedIndicator != null && image.gameObject == completedIndicator)
+                continue;
+
+            RectTransform rect = image.rectTransform;
+            float horizontalOffset;
+            if (rect.anchorMax.x - rect.anchorMin.x > 0.5f)
+                horizontalOffset = 0f;
+            else if (rect.anchorMin.x >= 0.5f)
+                horizontalOffset = horizontalThickness;
+            else
+                horizontalOffset = -horizontalThickness;
+
+            var effect = image.GetComponent<QuestSelectionFrameEffect>();
+            if (effect == null)
+                effect = image.gameObject.AddComponent<QuestSelectionFrameEffect>();
+
+            effect.Configure(
+                selectionBorderColor,
+                new Vector2(horizontalOffset, -verticalThickness),
+                new Vector2(horizontalOffset, verticalThickness));
+            effect.enabled = false;
+            effects.Add(effect);
+        }
+
+        selectionFrameEffects = effects.ToArray();
     }
 
     private void EnsureSelectionOutline()
