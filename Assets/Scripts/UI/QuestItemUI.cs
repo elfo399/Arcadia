@@ -8,8 +8,17 @@ public class QuestItemUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI questLocationText;
     [SerializeField] private Image backgroundImage;
     [SerializeField] private GameObject completedIndicator;
-    [SerializeField] private Color selectedBackgroundColor = new Color(0.34f, 0.34f, 0.34f, 0.95f);
-    [SerializeField] private Color normalBackgroundColor = new Color(0.22f, 0.22f, 0.22f, 0.88f);
+    [SerializeField] private Color selectedBackgroundColor = new Color(1f, 0.85f, 0.25f, 0.2f);
+    [SerializeField] private Color normalBackgroundColor = Color.clear;
+
+    public Graphic SelectionGraphic
+    {
+        get
+        {
+            ResolveReferences();
+            return backgroundImage;
+        }
+    }
 
     private void Awake()
     {

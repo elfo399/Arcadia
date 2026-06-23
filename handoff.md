@@ -1,8 +1,13 @@
   # Arcadia - Handoff Dettagliato
 
-  Data: 2026-03-20
+  Data ultimo audit completo: 2026-06-23
   Workspace: `d:\Unity\Arcadia`
   Documento pensato per riprendere il lavoro su un altro PC senza dover riaprire questa chat.
+
+  Versione Unity verificata: `2022.3.62f3`
+  Baseline Git verificata: `main` / `origin/main` a `18b3da5`
+
+  > Nota di validita': le sezioni 38-45 contengono l'audit del 2026-06-23 e prevalgono sulle note storiche precedenti quando descrivono sistemi cambiati dopo marzo 2026.
 
   ## 1. Obiettivo del refactor fatto finora
 
@@ -44,21 +49,17 @@
   - armor che influisce sul danno ricevuto
   - chest treasure con loot table ScriptableObject e apertura via interazione
 
-  ## 2.1 Ultima commit letta
+  ## 2.1 Baseline Git verificata
 
-  Ultima commit letta:
+  Stato verificato il 2026-06-23:
 
-  - `143563f` - `Create loot chest system and fix pad command invetory`
+  - branch: `main`
+  - `HEAD`: `18b3da5` - `align repo`
+  - tracking: `origin/main`
+  - commit locali avanti rispetto a origin: nessuna
+  - sono presenti modifiche non committate alla lista quest e a questo handoff; vedi sezione 44
 
-  Impatto reale della commit:
-
-  - aggiunto sistema chest loot runtime
-  - aggiunta loot table dedicata per treasure chest
-  - aggiunto drawer custom per rendere pulito l'inspector della loot table
-  - aggiunta integrazione con `PlayerInventory` per assegnare reward direttamente in inventario
-  - aggiornati prefab treasure rooms di `Forest` e `DarkForest` con chest / loot setup
-  - aggiornato prefab della chest animata
-  - fix parziale ai salti input pad nel menu equipment/inventory
+  Il vecchio riferimento `143563f` resta utile solo come punto storico del sistema chest. Dal precedente aggiornamento dell'handoff (`e81bcc5`) al commit corrente sono cambiati in modo sostanziale UI, player stats, salvataggi, quest, scene e tool editor.
 
   ## 2.2 Treasure chest system
 
@@ -227,7 +228,8 @@
 
   - `Assets/Scripts/UI/QuestJournalUI.cs`
     - journal
-    - filtri quest
+    - lista quest e scroll
+    - fasi quest
     - details quest
     - rewards/objectives
 
@@ -240,11 +242,11 @@
       - key count
       - slot armi in HUD
 
-  - `Assets/Scripts/UI/StatBarManager.cs`
-    - ormai legacy
-    - e' marcato `[Obsolete]`
-    - in `Awake()` si disabilita da solo
-    - le barre reali sono gestite da `PlayerUI`
+  - `Assets/Scripts/UI/DynamicBar.cs`
+  - `Assets/Scripts/UI/PlayerStatDynamicBar.cs`
+  - `Assets/Scripts/UI/ProgressBarUI.cs`
+    - componenti visuali per le diverse barre correnti
+    - i valori player sono coordinati da `PlayerUI` / `PlayerStats`
 
   - `Assets/Scripts/UI/MinimapManager.cs`
     - minimappa
@@ -902,7 +904,7 @@
 
   Importante:
 
-  - `StatBarManager` e' legacy
+  - `StatBarManager` e' stato rimosso
   - il sistema attuale delle barre sta in `PlayerUI`
 
   `PlayerUI`:
@@ -947,8 +949,6 @@
 
   Non `QuestUiManager`.
 
-  Campi principali:
-
   ### Dependencies
 
   - `menuManager`
@@ -960,33 +960,29 @@
   ### Quest UI
 
   - `useQuestManager`
-  - `autoWireQuestUI`
   - `questListContainer`
   - `questItemPrefab`
-  - `questActiveFilterButton`
-  - `questCompletedFilterButton`
-  - `questActiveCountText`
-  - `questCompletedCountText`
-  - `questActiveFilterLabelText`
-  - `questCompletedFilterLabelText`
-  - `questFilterSelectedColor`
+  - `questListScrollRect`
+  - `questListViewport`
+  - `questListLayout`
+  - `questListContentSizeFitter`
+  - `questListMouseWheelPixels`
   - `startingQuests`
+
+  I vecchi filtri Active/Completed non sono piu' presenti: i tre metodi filtro pubblici inoltrano tutti alla lista completa.
 
   ### Quest Detail UI
 
   - `questDetailTypeText`
   - `questDetailRecommendedText`
+  - `questDetailImage`
   - `questDetailTitleText`
   - `questDetailLocationText`
   - `questDetailLoreTitleText`
   - `questDetailLoreDescriptionText`
   - `questDetailLoreAuthorText`
-  - `questDetailLoreRoot`
-  - `questObjectivesSectionRoot`
   - `questDetailPanelRoot`
   - `showQuestDetailOnlyOnSelection`
-  - `collapseQuestLoreWhenEmpty`
-  - `questObjectivesLiftWhenNoLore`
   - `questObjectivesContainer`
   - `questObjectivePrefab`
   - `questRewardsContainer`
@@ -994,13 +990,24 @@
   - `questClaimRewardButton`
   - `questRewardInventoryCapacity`
   - `questRewardMagicCapacity`
-  - `questDetailScrollRect`
-  - `smoothQuestMouseWheel`
-  - `questMouseWheelStepNormalized`
-  - `questMouseWheelSmoothSpeed`
-  - `questPadRightStickScrollSpeed`
+
+  ### Quest Phase UI
+
+  - `questPhaseText`
+  - `questPreviousPhaseButton`
+  - `questNextPhaseButton`
   - `questPadFocusBorderColor`
   - `questPadFocusBorderThickness`
+
+  Regole correnti:
+
+  - ogni obiettivo ha `phase >= 1`
+  - il runtime normalizza l'ordine e limita ogni fase a massimo 5 obiettivi
+  - progrediscono solo gli obiettivi della fase corrente
+  - la UI mostra solo gli obiettivi della fase visualizzata
+  - la UI puo' tornare alle fasi completate, ma non avanzare oltre la fase runtime corrente
+  - il formato del campo dedicato e' `FASE 1/2`
+  - se `questPhaseText` non e' collegato, la fase viene accodata a `questDetailRecommendedText`
 
   ## 11. Setup Unity da controllare quando apri il progetto sull'altro PC
 
@@ -1284,7 +1291,7 @@
   Situazione attuale:
 
   - la gestione vera e' in `PlayerUI`
-  - `StatBarManager` non e' piu' il punto corretto
+  - `StatBarManager` non esiste piu'; usare `PlayerUI` e i componenti barra correnti
 
   ## 14. Debito tecnico ancora aperto
 
@@ -1300,7 +1307,7 @@
 
   - non riportare nuova logica dentro `InventoryUI.cs`
   - non creare di nuovo duplicazione tra manager UI
-  - non usare `StatBarManager` come sistema principale delle barre
+  - non reintrodurre `StatBarManager`
   - non rimettere fallback opachi nel dungeon generator senza capire se il set tema e' realmente configurato
   - non cambiare nomi UI tipo `ShieldCollumn`, `ArmorCollumn`, `helmet`, `chestplate`, ecc. senza aggiornare anche l'auto-wire
 
@@ -1554,18 +1561,14 @@
     - `targetIcon`
   - `StopLockOn()` viene chiamato anche per reset camera/rotazione
 
-  ### 18.6 `CameraInputBlocker`
+  ### 18.6 Blocco input camera durante il menu
 
-  File:
+  `CameraInputBlocker` e' stato rimosso. La responsabilita' corrente e' in `MenuManager`:
 
-  - `Assets/Scripts/System/CameraInputBlocker.cs`
-
-  Responsabilita':
-
-  - utility statica per abilitare/disabilitare input sulle `CinemachineFreeLook`
-  - cerca tutte le free look in scena
-  - se c'e' `CinemachineInputProvider`, abilita/disabilita quello
-  - altrimenti svuota/rimette i nomi raw axis
+  - usa `cameraInputProviders` come lista primaria
+  - usa `cameraInputFallbacks` quando serve
+  - disabilita l'input camera all'apertura del menu
+  - lo riabilita alla chiusura
 
   ## 19. Interaction, porte, room flow
 
@@ -2065,14 +2068,21 @@
 
   Responsabilita':
 
-  - salva/carica `GameData` come JSON in:
-    - `Application.persistentDataPath/gamedata.json`
+  - salva/carica un JSON separato per personaggio in:
+    - `Application.persistentDataPath/gamedata_<characterId>.json`
+  - conserva il personaggio selezionato in `PlayerPrefs`, chiave `SelectedCharacterId`
+  - mantiene il fallback legacy `Application.persistentDataPath/gamedata.json`
+  - migra il vecchio wallet oro/argento/rame verso `bankCoins`
 
   Metodi:
 
   - `SaveData(GameData data)`
   - `LoadData()`
+  - `LoadData(string characterId, bool allowLegacyFallback)`
+  - `SelectCharacter(string characterId)`
+  - `EnsureCharacterData(string characterId, string characterName)`
   - `GetSaveFilePath()`
+  - `GetSaveFilePath(string characterId)`
 
   ### 22.2 `GameData`
 
@@ -2081,6 +2091,11 @@
   - `Assets/Scripts/System/GameData.cs`
 
   Struttura del salvataggio:
+
+  - personaggio:
+    - `selectedCharacterId`
+    - `characterName`
+    - `selectedCharacterStartApplied`
 
   - leveling:
     - `playerLevel`
@@ -2099,10 +2114,11 @@
     - `karma`
     - `benedetto`
     - `malefico`
-  - banca:
-    - `bankGold`
-    - `bankSilver`
-    - `bankCopper`
+  - monete correnti:
+    - `usesUnifiedCoins`
+    - `bankCoins`
+    - `runCoins`
+  - i campi legacy `bankGold`, `bankSilver`, `bankCopper` sono solo dati di migrazione non serializzati dal nuovo modello
   - quest:
     - `quests`
   - inventory:
@@ -2130,8 +2146,9 @@
 
   Nota:
 
-  - `PlayerStats` resetta il run wallet quando entra in `GameScene`
+  - `PlayerStats` resetta il run wallet alla morte prima di tornare in `HubScene`
   - la banca resta persistente
+  - `PlayerStats` applica quest e inventory caricati in `Start()` / `OnSceneLoaded()`, non durante il primo `Awake()`
 
   ## 23. Quest system runtime
 
@@ -2141,25 +2158,45 @@
 
   - `Assets/Scripts/System/QuestManager.cs`
   - `Assets/Scripts/System/QuestManager.JournalRuntime.cs`
+  - `Assets/Scripts/System/QuestManager.ObjectiveEvents.cs`
+  - `Assets/Scripts/System/QuestDefinition.cs`
+  - `Assets/Scripts/System/QuestEvents.cs`
 
   Responsabilita':
 
   - mantiene la lista runtime delle quest
-  - seed iniziale / merge da inventory quest entries
+  - crea le quest iniziali da asset `QuestDefinition`
+  - seed / merge compatibile da `QuestEntryData` della UI
   - notifica cambi alla UI
   - puo' persistere cross-scene
+  - indicizza gli obiettivi per tipo evento
+  - aggiorna quantita' e completamento solo nella fase attiva
+  - valida capacita' inventory prima del claim reward
+  - applica reward item, weapon, usable, magic, armor ed experience
 
   Campi principali:
 
   - `persistAcrossScenes`
   - `autoNotifyOnStart`
-  - `initialQuests`
+  - `initialQuestDefinitions`
 
   Nested types:
 
   - `QuestData`
   - `QuestObjectiveData`
   - `QuestRewardData`
+
+  Eventi obiettivo supportati:
+
+  - `KillEnemy`
+  - `CollectItem`
+  - `Interact`
+  - `EnterRoom`
+  - `ClearRoom`
+  - `OpenChest`
+  - `ReachFloor`
+
+  Gli emitter reali sono collegati a `EnemyHealth`, `PlayerInventory`, `CoinPickup`, `KeyPickup`, `PlayerInteraction`, `Room`, `TreasureChest` e `FloorPortal`.
 
   ## 24. Combat projectiles e damage helpers
 
@@ -2201,26 +2238,21 @@
   - esiste nel progetto, ma non e' stato un punto centrale del refactor recente
   - se si rimettono mano hitbox melee, controllare anche questo file
 
-  ## 25. File legacy / residui da conoscere
+  ## 25. File legacy rimossi e componenti ancora attivi
 
-  ### 25.1 `StatBarManager`
+  Dal refactor di giugno 2026 sono stati rimossi:
 
-  - legacy
-  - obsoleto
-  - si disabilita in `Awake()`
-  - non usarlo come sistema principale barre
+  - `StatBarManager.cs`
+  - `SimpleDungeonGenerator.cs`
+  - `RandomProp.cs`
+  - `CameraInputBlocker.cs`
 
-  ### 25.2 `SimpleDungeonGenerator`
+  Non cercare di ripristinarli come dipendenze. I sostituti correnti sono:
 
-  - vecchio generator
-  - ancora presente nel progetto
-  - non e' il sistema corretto attuale
-  - il sistema attuale e' `CoreGenerator`
-
-  ### 25.3 `DynamicBar`
-
-  - utility generica per barra con resize
-  - presente ma non e' il cuore attuale del player HUD
+  - dungeon: `CoreGenerator`
+  - blocco camera menu: `MenuManager` agisce direttamente sui provider configurati
+  - barre HUD: `PlayerUI` coordina i valori; `DynamicBar` e' ancora un componente attivo nelle scene
+  - prop placement: tool editor `PrefabScatterToolWindow`
 
   ## 26. File e comportamenti che meritano attenzione se qualcosa si rompe
 
@@ -2745,26 +2777,9 @@
   - `lastHitWasCritical`
   - `lastAttackType`
 
-  ### 32.3 `RandomProp`
+  ### 32.3 Prop placement
 
-  File:
-
-  - `Assets/Scripts/Rooms/RandomProp.cs`
-
-  Responsabilita':
-
-  - placeholder/spawner deterministico di prop di stanza
-  - usa seed locale basato su:
-    - `CoreGenerator.currentMasterSeed`
-    - posizione
-  - puo' randomizzare rotazione
-  - puo' anche spawnare nemici e registrarli nella `Room`
-
-  Campi:
-
-  - `props`
-  - `spawnChance`
-  - `randomRotation`
+  `RandomProp` e' stato rimosso. Il placement assistito corrente e' editor-only tramite `PrefabScatterToolWindow`; lo spawn nemici runtime resta responsabilita' di `EnemySpawner` / `Room`.
 
   ### 32.4 `EnemySetup`
 
@@ -2962,17 +2977,40 @@
 
   Nota:
 
-  - nel set di file letto non e' emersa la classe runtime `TreasureChestLootTable`, quindi se questo drawer non viene usato da nessun asset attuale puo' essere residuo o parte di un sistema non ancora collegato
+  - la classe runtime `TreasureChestLootTable` esiste ed e' usata dal sistema chest
+
+  ### 33.4 `QuestObjectiveDrawer`
+
+  File:
+
+  - `Assets/Scripts/Editor/QuestObjectiveDrawer.cs`
+
+  Responsabilita':
+
+  - drawer per `QuestManager.QuestObjectiveData` e `QuestObjectiveEntryData`
+  - espone fase, tipo evento, target, quantita' e stato in modo compatto
+
+  ### 33.5 Tool UI e level design
+
+  File:
+
+  - `Assets/Scripts/Editor/AttributeProgressBarPrefabReplacer.cs`
+  - `Assets/Scripts/Editor/PrefabScatterToolWindow.cs`
+  - `Assets/Scripts/Editor/ProBuilderFloorDeformerWindow.cs`
+
+  Menu:
+
+  - `Tools/Arcadia/UI/Replace Attribute Bars With Prefab`
+  - `Tools/Arcadia/Prefab Scatter Tool`
+  - `Tools/Arcadia/ProBuilder Floor Deformer`
+
+  Questi script sono editor-only e non devono essere referenziati dal runtime.
 
   ## 34. File legacy / residui / da verificare
 
-  ### 34.1 `SimpleDungeonGenerator`
+  ### 34.1 Generator legacy
 
-  Gia' detto sopra ma va ribadito:
-
-  - e' il vecchio generator
-  - non e' il sistema attuale
-  - non continuare a lavorare li'
+  `SimpleDungeonGenerator` e' stato eliminato. Il solo generator runtime attuale e' `CoreGenerator`.
 
   ### 34.2 `DynamicBar`
 
@@ -2987,7 +3025,8 @@
 
   Nota:
 
-  - presente ma non e' la soluzione corrente del player HUD
+  - presente e usato nelle scene per le barre HUD
+  - i valori e i binding restano coordinati da `PlayerUI` / `PlayerStats`
 
   ### 34.3 `SceneLoader`
 
@@ -2996,10 +3035,7 @@
 
   ### 34.4 `TreasureChestLootTableDrawer`
 
-  Da ricontrollare in futuro:
-
-  - se il relativo sistema runtime esiste davvero
-  - se no, e' candidato a cleanup
+  Non e' residuo: il relativo runtime esiste in `Assets/Scripts/Items/TreasureChestLootTable.cs` ed e' consumato da `TreasureChest`.
 
   ## 35. Problemi noti / gotcha pratici
 
@@ -3049,13 +3085,9 @@
   - se compare il log "uso i pool legacy", non assumerlo vero
   - controllare la config tema, non il fallback
 
-  ### 35.5 `StatBarManager` non e' da usare
+  ### 35.5 `StatBarManager` e' stato rimosso
 
-  Se vedi il file e pensi che controlli le barre:
-
-  - no
-  - si auto-disabilita
-  - le barre reali sono gestite da `PlayerUI`
+  Le barre reali sono gestite da `PlayerUI`, con componenti `DynamicBar`, `PlayerStatDynamicBar` e `ProgressBarUI` a seconda del pannello.
 
   ## 36. Checklist finale prima di cambiare PC / prima build
 
@@ -3105,20 +3137,25 @@
   Questo file ora copre:
 
   - architettura generale
+  - versione Unity, pacchetti e scene di build
   - manager UI
   - player systems
+  - personaggi selezionabili e salvataggi separati
   - combat
   - inventory/loadout/save
   - dungeon generator
   - room flow
   - enemy system
   - items/database/pickup
-  - quest/journal
+  - quest/journal, fasi ed event bus
+  - meteo e pagina mappa
+  - limiter e display FPS
   - auto-wire names
   - scene hierarchy aspettata
   - editor scripts
   - file legacy/residui
   - gotcha pratici
+  - modifiche locali non committate e risultato compilazione
 
   Se in futuro si aggiungono sistemi grossi nuovi, aggiornare questo file nelle sezioni:
 
@@ -3126,3 +3163,343 @@
   - setup Unity
   - gotcha
   - smoke tests
+
+  ## 38. Audit completo del progetto - 2026-06-23
+
+  ### 38.1 Perimetro verificato
+
+  Sono stati controllati:
+
+  - stato Git e cronologia dal precedente handoff
+  - tutti i 91 script C# sotto `Assets/Scripts`
+  - le due scene incluse nei Build Settings
+  - componenti custom collegati nelle scene
+  - prefab e asset ScriptableObject rilevanti
+  - `Packages/manifest.json`
+  - compilazione Unity batch
+
+  Dimensioni indicative del progetto:
+
+  - 4.675 file sotto `Assets`
+  - 91 script C# totali, di cui 7 editor-only
+  - 299 prefab
+  - 96 asset `.asset`
+  - 7 scene totali, ma solo 2 scene applicative in build
+
+  ### 38.2 Versione e pacchetti chiave
+
+  - Unity `2022.3.62f3`
+  - URP `14.0.12`
+  - Input System `1.14.2`
+  - Cinemachine `2.10.5`
+  - AI Navigation `1.1.7`
+  - ProBuilder `5.2.4`
+  - TextMeshPro `3.0.9`
+  - Post Processing `3.4.0`
+
+  ### 38.3 Scene di build
+
+  Ordine corrente:
+
+  1. `Assets/Scenes/HubScene.unity`
+  2. `Assets/Scenes/GameScene.unity`
+
+  Le altre cinque scene sono demo di asset importati e non fanno parte del flusso applicativo.
+
+  ## 39. Architettura runtime corrente
+
+  ### 39.1 HubScene
+
+  Sistemi principali collegati:
+
+  - player completo con controller, combat, interaction, inventory, stats, visuals e target lock
+  - `MenuManager` e manager UI separati
+  - `QuestManager` persistente
+  - `QuestJournalUI`
+  - HUD, minimap e compass
+  - `SceneLoader` sul portale verso il dungeon
+
+  ### 39.2 GameScene
+
+  Contiene gli stessi sistemi player/UI e in piu':
+
+  - `CoreGenerator`
+  - `WeatherManager`
+  - `MapPageManager`
+  - contenuto dungeon generato e minimappa associata
+
+  ### 39.3 Persistenza e duplicati di scena
+
+  - `PlayerStats` mantiene persistente il root del player
+  - `QuestManager` puo' essere `DontDestroyOnLoad`
+  - i duplicati incontrati dopo il cambio scena vengono eliminati dai singleton
+  - modificare solo la copia di `GameScene` di un manager persistente puo' non avere effetto quando il gioco parte da `HubScene`
+  - per test attendibili verificare sia avvio diretto di `GameScene` sia transizione `HubScene -> GameScene`
+
+  ## 40. Personaggi selezionabili e salvataggi
+
+  ### 40.1 Asset personaggio
+
+  Sistema basato su:
+
+  - `PlayerCharacterData`
+  - `PlayerCharacterDatabase`
+  - `PlayerCharacterSelection`
+  - `PlayerCharacterBootstrapper`
+  - `PlayerCharacterSelectionButton`
+
+  Database runtime:
+
+  - `Assets/Resources/PlayerCharacterDatabase.asset`
+  - caricato tramite `Resources.Load("PlayerCharacterDatabase")`
+  - personaggio default: `Warrior`
+
+  Personaggi configurati:
+
+  - `warrior` / Guerriero
+  - `mage` / Maga
+  - `assassin` / Robert
+  - `archer` / Arciere
+
+  Ogni asset definisce attributi, risorse base, flask, alignment, loadout e backpack iniziale. `previewPrefab` e `playerPrefab` risultano attualmente non assegnati nei quattro asset.
+
+  ### 40.2 Regola di bootstrap
+
+  Il pacchetto iniziale del personaggio viene applicato una sola volta e poi il salvataggio diventa autorevole tramite `selectedCharacterStartApplied`.
+
+  `PlayerStats` puo' usare anche `inspectorStartingCharacter` come override. Questo rende importante non lasciare flag di test attivi in produzione.
+
+  ### 40.3 Save per personaggio
+
+  Il file corrente e':
+
+  - `gamedata_<characterId>.json`
+
+  `gamedata.json` e' solo fallback legacy. Il sistema conserva e ripristina:
+
+  - identita' personaggio
+  - livello, esperienza e attributi
+  - monete banca/run
+  - quest incluse fase, progresso e reward claimato
+  - inventory e tutti i loadout con instance ID
+
+  ## 41. Menu, mappa e meteo
+
+  ### 41.1 Menu libro
+
+  `MenuManager` ora gestisce:
+
+  - apertura e chiusura animate
+  - animazioni pre/post contenuto
+  - flip pagina destro/sinistro con frame sprite per tab
+  - accelerazione quando si saltano piu' pagine
+  - scelta automatica mouse/tastiera o pad
+  - routing della navigazione ai manager della tab attiva
+  - blocco dei provider camera configurati mentre il menu e' aperto
+
+  Tab configurate:
+
+  - Hub: Equipment, Inventory, Magic, Attributes, Journal, Setting
+  - Game: Maps, Equipment, Inventory, Magic, Attributes, Journal, Setting
+
+  La tab iniziale e' Equipment in Hub e Maps in Game.
+
+  ### 41.2 MapPageManager
+
+  La pagina Maps mostra:
+
+  - piano e tema del dungeon
+  - minimappa
+  - nome e ritratto personaggio
+  - meteo corrente
+  - timer run
+  - monete run
+  - progress bar HP, mana e XP
+
+  Si aggiorna dagli eventi di `CoreGenerator` e `MinimapManager`, oltre a leggere `PlayerStats` e `WeatherManager`.
+
+  ### 41.3 WeatherManager
+
+  In `GameScene` il ciclo configurato e':
+
+  - Alba: 45 s
+  - Giorno: 90 s
+  - Tramonto: 60 s
+  - Notte: 75 s
+
+  Il meteo viene rilanciato ogni 30 s e al cambio fase. Pesi correnti:
+
+  - Clear: 60
+  - Rain: 25
+  - Storm: 15
+
+  Il manager pilota Animator, directional light e ambient light, con transizione luce progressiva.
+
+  ### 41.4 FPS
+
+  - `FrameRateLimiter` disattiva VSync e imposta `Application.targetFrameRate = 120` prima del caricamento scene
+  - `FpsDisplay` crea un overlay persistente a runtime e aggiorna il valore ogni 0,25 s
+
+  ## 42. Quest system corrente
+
+  ### 42.1 Flusso dati
+
+  - authoring: `QuestDefinition` ScriptableObject
+  - runtime autorevole: `QuestManager`
+  - eventi gameplay: `QuestEvents`
+  - presentazione: `QuestJournalUI`
+  - persistenza: `SavedQuestData` dentro `GameData`
+
+  L'asset configurato e' `Assets/ScriptableObjects/Quests/InitialQuest/InitialQuest.asset`.
+
+  ### 42.2 Fasi
+
+  - gli obiettivi devono essere ordinati e raggruppati per fase nell'asset
+  - `NormalizeObjectivePhases` rende le fasi contigue
+  - ogni fase contiene al massimo 5 obiettivi
+  - al sesto obiettivo il runtime crea automaticamente una fase successiva
+  - eventi e completamento manuale agiscono solo sulla fase corrente
+  - completata una fase, il primo obiettivo incompleto della fase seguente diventa attivo
+  - la quest e' completata solo quando tutti gli obiettivi sono completati
+
+  L'asset `InitialQuest` contiene attualmente 5 obiettivi placeholder: 3 dichiarati in fase 1 e 2 in fase 2. Tutti hanno `eventType = None`, quindi non progrediscono automaticamente.
+
+  ### 42.3 Event bus
+
+  Target matching:
+
+  - per `targetObject`, risolve ID da `EnemyData`, `RoomData` o asset item
+  - in alternativa usa `targetId`
+  - puo' fare match anche su `targetTag`
+  - rimuove il suffisso `(Clone)` prima del confronto
+  - se ID e tag non sono configurati, qualsiasi evento dello stesso tipo e' valido
+
+  ### 42.4 Reward
+
+  Tipi supportati:
+
+  - Item
+  - Weapon
+  - Usable
+  - Magic
+  - Armor
+  - Experience
+
+  Prima del claim il manager verifica dipendenze, asset reward e capacita' di inventory/magic inventory. Item, usable e magic possono stackare; weapon e armor occupano entry separate.
+
+  ### 42.5 UI Journal
+
+  - la lista crea una row dal prefab `Quest.prefab` per ogni quest runtime
+  - il dettaglio mostra immagine, lore, obiettivi della fase visualizzata e reward
+  - il focus pad e la selezione quest sono mantenuti dal manager
+  - le fasi precedenti possono essere consultate
+  - la fase futura non e' consultabile prima di essere sbloccata
+
+  Regola critica: ogni `QuestDefinition.questId` deve essere univoco. Inserire lo stesso asset molte volte produce row indistinguibili e tutte le operazioni per ID colpiscono la prima quest corrispondente.
+
+  ## 43. Audit configurazione scene e debito attivo
+
+  ### 43.1 Flag e dati di test
+
+  Prima di una build reale verificare:
+
+  - `forceStartDataIgnoreSave = true` su `PlayerStats` in entrambe le scene
+  - `GameScene.PlayerStats.vigor = 1000`
+  - `MapPageManager.showFullMapForTesting = true`
+  - `MapPageManager.defaultPlayerName` contiene un placeholder di test
+  - `QuestJournalUI.startingQuests` contiene dati placeholder nelle due scene
+  - `InitialQuest` usa obiettivi duplicati con `eventType = None`
+
+  ### 43.2 Divergenze Quest UI tra scene
+
+  `GameScene`:
+
+  - ha viewport e riferimenti scroll collegati nella working tree locale
+  - `questPhaseText`, `questPreviousPhaseButton` e `questNextPhaseButton` sono ancora null
+  - la label fase usa quindi il fallback dentro `questDetailRecommendedText`
+
+  `HubScene`:
+
+  - non ha il nuovo viewport della lista collegato
+  - conserva nel YAML campi serializzati rimossi dal codice, per esempio vecchi auto-wire e detail scroll
+  - va salvata da Unity dopo una verifica manuale solo quando si decide di allinearne davvero la UI
+
+  ### 43.3 Duplicati quest usati per il test scroll
+
+  Nella modifica locale di `GameScene`:
+
+  - `initialQuestDefinitions` contiene 20 volte lo stesso asset `InitialQuest`
+  - sono presenti 3 istanze scene del prefab Quest contro 1 nella baseline
+
+  Questo setup e' utile solo per stressare lo scroll. Non e' una configurazione dati valida perche' tutte le quest hanno `questId = initial_quest`.
+
+  ### 43.4 Integrita' asset animazioni libro
+
+  Unity segnala 14 `.anim.meta` sotto:
+
+  - `Assets/Animations/UI/BookPause/FlipLeftPage`
+  - `Assets/Animations/UI/BookPause/FlipRightPage`
+
+  Il parser YAML non estrae direttamente il GUID e usa il fallback testuale. La compilazione continua, ma prima di rinominare, rigenerare o spostare quelle animazioni verificare i `.meta` e le reference del controller.
+
+  ### 43.5 Debito strutturale
+
+  - non esistono assembly definition custom
+  - non esistono test automatici di progetto
+  - diversi manager UI hanno ancora fallback `FindObjectOfType` / ricerca per nome
+  - alcuni manager creano componenti o preview UI a runtime; non assumere che tutta la UI sia scene-authored
+  - sono presenti numerosi log diagnostici nel runtime
+  - la validazione funzionale resta manuale per menu, scene change, quest, save e combat
+
+  ## 44. Modifiche locali non committate al momento dell'audit
+
+  La branch non ha commit locali da pushare. Le modifiche funzionali in working tree sono:
+
+  - `Assets/Prefabs/UI/Quest.prefab`
+    - row alta 32 px
+    - `Button` permanente sul root
+    - `SelectionOverlay` full-row con `Outline`
+    - graphic decorative senza raycast
+  - `Assets/Scripts/UI/QuestItemUI.cs`
+    - espone la graphic di selezione
+    - selezione dorata trasparente sull'intera row
+  - `Assets/Scripts/UI/QuestJournalUI.cs`
+    - riferimenti scroll espliciti
+    - rotellina mouse con clamp
+    - calcolo altezza contenuto dalle row attive
+    - auto-scroll della quest focalizzata col pad
+    - niente aggiunta runtime di `Button` / `Outline` alle row quest
+  - `Assets/Scenes/GameScene.unity`
+    - `QuestListViewport` con `RectMask2D`
+    - `ScrollRect`, layout e content collegati
+    - dati duplicati per stress test della lista
+  - `handoff.md`
+    - aggiornamento documentazione corrente
+
+  `Assets/Scenes/HubScene.unity` appare modificata nello status, ma `git diff` non mostra differenze di contenuto; e' verosimilmente una differenza di working-tree/line ending.
+
+  `git diff --check` segnala inoltre whitespace nelle nuove righe YAML di `Quest.prefab` e `GameScene.unity`. Sono righe serializzate da Unity, ma vanno considerate se la pipeline applica controlli whitespace rigidi.
+
+  Prima del commit della lista quest:
+
+  1. sostituire le 20 quest duplicate con definizioni aventi ID univoci oppure ridurre il test a una sola quest
+  2. rimuovere le 2 istanze Quest aggiuntive dalla scena se non sono template intenzionali
+  3. decidere se creare e collegare davvero testo/pulsanti fase oppure mantenere il fallback sulla label recommended
+  4. fare test con avvio diretto Game e transizione da Hub
+  5. verificare mouse, pad, selezione, scroll fino all'ultima row e claim reward
+
+  ## 45. Verifica eseguita durante l'audit
+
+  Comando equivalente eseguito:
+
+  - Unity `2022.3.62f3` in batch mode, `-nographics -quit`
+
+  Risultato:
+
+  - compilazione script completata
+  - nessun errore `CSxxxx`
+  - nessun warning `CSxxxx`
+  - uscita Unity con codice 0
+  - 14 warning non bloccanti sui GUID dei `.anim.meta` del page flip
+
+  Non sono stati eseguiti Play Mode test automatici perche' il progetto non contiene test assembly. Lo smoke test manuale resta obbligatorio.

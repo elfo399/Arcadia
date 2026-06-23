@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public class QuestJournalUI : MonoBehaviour
@@ -22,6 +23,11 @@ public class QuestJournalUI : MonoBehaviour
     [SerializeField] private bool useQuestManager = true;
     [SerializeField] private Transform questListContainer;
     [SerializeField] private QuestItemUI questItemPrefab;
+    [SerializeField] private ScrollRect questListScrollRect;
+    [SerializeField] private RectTransform questListViewport;
+    [SerializeField] private VerticalLayoutGroup questListLayout;
+    [SerializeField] private ContentSizeFitter questListContentSizeFitter;
+    [SerializeField, Min(1f)] private float questListMouseWheelPixels = 48f;
     [SerializeField] private List<QuestEntryData> startingQuests = new();
 
     [Header("Quest Detail UI")]
@@ -67,6 +73,10 @@ public class QuestJournalUI : MonoBehaviour
     public bool UseQuestManager { get => useQuestManager; set => useQuestManager = value; }
     public Transform QuestListContainer { get => questListContainer; set => questListContainer = value; }
     public QuestItemUI QuestItemPrefab { get => questItemPrefab; set => questItemPrefab = value; }
+    public ScrollRect QuestListScrollRect { get => questListScrollRect; set => questListScrollRect = value; }
+    public RectTransform QuestListViewport { get => questListViewport; set => questListViewport = value; }
+    public VerticalLayoutGroup QuestListLayout { get => questListLayout; set => questListLayout = value; }
+    public ContentSizeFitter QuestListContentSizeFitter { get => questListContentSizeFitter; set => questListContentSizeFitter = value; }
     public List<QuestEntryData> StartingQuests => startingQuests;
     public TextMeshProUGUI QuestDetailTypeText { get => questDetailTypeText; set => questDetailTypeText = value; }
     public TextMeshProUGUI QuestDetailRecommendedText { get => questDetailRecommendedText; set => questDetailRecommendedText = value; }
@@ -97,6 +107,37 @@ public class QuestJournalUI : MonoBehaviour
         UnbindQuestManager();
     }
 
+    private void Update()
+    {
+        HandleQuestListMouseWheel();
+    }
+
+    private void HandleQuestListMouseWheel()
+    {
+        if (questListScrollRect == null || questListViewport == null || Mouse.current == null
+            || !(questListContainer is RectTransform content)
+            || !questListViewport.gameObject.activeInHierarchy)
+            return;
+
+        Vector2 pointerPosition = Mouse.current.position.ReadValue();
+        Canvas canvas = questListViewport.GetComponentInParent<Canvas>();
+        Camera eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+            ? canvas.worldCamera
+            : null;
+        if (!RectTransformUtility.RectangleContainsScreenPoint(questListViewport, pointerPosition, eventCamera))
+            return;
+
+        float wheel = Mouse.current.scroll.ReadValue().y;
+        if (Mathf.Abs(wheel) < 0.01f)
+            return;
+
+        float maxOffset = Mathf.Max(0f, content.rect.height - questListViewport.rect.height);
+        Vector2 position = content.anchoredPosition;
+        position.y = Mathf.Clamp(position.y + (wheel < 0f ? questListMouseWheelPixels : -questListMouseWheelPixels), 0f, maxOffset);
+        content.anchoredPosition = position;
+        questListScrollRect.StopMovement();
+    }
+
     public void InitializeIfNeeded()
     {
         if (initialized)
@@ -106,6 +147,7 @@ public class QuestJournalUI : MonoBehaviour
 
         ResolveDependencies();
         BindQuestPhaseButtons();
+        EnsureQuestListScrolling();
 
         if (questListContainer != null)
         {
@@ -259,6 +301,8 @@ public class QuestJournalUI : MonoBehaviour
                 var rowButton = GetVisibleQuestRowAt(questManager != null ? questManager.JournalPadListIndex : 0);
                 selectedTarget = rowButton != null ? rowButton.gameObject : null;
                 visualTarget = selectedTarget;
+                if (rowButton != null)
+                    ScrollQuestRowIntoView(rowButton.transform as RectTransform);
                 break;
             case QuestManager.JournalPadSection.Detail:
                 selectedTarget = questClaimRewardButton != null && questClaimRewardButton.gameObject.activeInHierarchy ? questClaimRewardButton.gameObject : null;
@@ -619,6 +663,8 @@ public class QuestJournalUI : MonoBehaviour
             var rowButton = EnsureButton(row.gameObject);
             if (rowButton != null)
             {
+                rowButton.targetGraphic = row.SelectionGraphic;
+                rowButton.transition = Selectable.Transition.None;
                 rowButton.onClick.RemoveAllListeners();
                 rowButton.onClick.AddListener(() => OnQuestRowClicked(capturedQuestId));
             }
@@ -626,8 +672,104 @@ public class QuestJournalUI : MonoBehaviour
             spawnedQuestRows.Add(row);
         }
 
+        RefreshQuestListScrollLayout();
+
         if (showPadFocus)
             ApplyPadFocusVisual(true);
+    }
+
+    private void RefreshQuestListScrollLayout()
+    {
+        if (questListScrollRect == null || questListViewport == null
+            || !(questListContainer is RectTransform content))
+            return;
+
+        if (questListContentSizeFitter != null)
+            questListContentSizeFitter.enabled = false;
+
+        float requiredHeight = 0f;
+        int activeRows = 0;
+        for (int i = 0; i < spawnedQuestRows.Count; i++)
+        {
+            var row = spawnedQuestRows[i];
+            if (row == null || !row.gameObject.activeSelf || !(row.transform is RectTransform rowRect))
+                continue;
+
+            requiredHeight += Mathf.Max(1f, rowRect.rect.height);
+            activeRows++;
+        }
+
+        if (questListLayout != null)
+        {
+            requiredHeight += questListLayout.padding.top + questListLayout.padding.bottom;
+            if (activeRows > 1)
+                requiredHeight += questListLayout.spacing * (activeRows - 1);
+        }
+
+        requiredHeight = Mathf.Max(questListViewport.rect.height, requiredHeight);
+        content.anchoredPosition = Vector2.zero;
+        content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, requiredHeight);
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+        Canvas.ForceUpdateCanvases();
+        questListScrollRect.verticalNormalizedPosition = 1f;
+        questListScrollRect.StopMovement();
+    }
+
+    private void EnsureQuestListScrolling()
+    {
+        if (!(questListContainer is RectTransform content))
+            return;
+
+        bool hasScrollConfiguration = questListScrollRect != null
+                                      || questListViewport != null
+                                      || questListLayout != null
+                                      || questListContentSizeFitter != null;
+        if (!hasScrollConfiguration)
+            return;
+
+        if (questListScrollRect == null || questListViewport == null)
+        {
+            Debug.LogWarning("[QuestJournalUI] Collega Quest List Scroll Rect e Quest List Viewport nell'Inspector.", this);
+            return;
+        }
+
+        if (questListViewport.GetComponent<RectMask2D>() == null)
+            Debug.LogWarning("[QuestJournalUI] Il Quest List Viewport deve avere un componente Rect Mask 2D.", questListViewport);
+
+        if (questListLayout == null)
+            Debug.LogWarning("[QuestJournalUI] Collega il Vertical Layout Group del Content.", this);
+        if (questListContentSizeFitter == null)
+            Debug.LogWarning("[QuestJournalUI] Collega il Content Size Fitter del Content.", this);
+
+        questListScrollRect.content = content;
+        questListScrollRect.viewport = questListViewport;
+        questListScrollRect.horizontal = false;
+        questListScrollRect.vertical = true;
+        questListScrollRect.movementType = ScrollRect.MovementType.Clamped;
+        questListScrollRect.scrollSensitivity = 24f;
+    }
+
+    private void ScrollQuestRowIntoView(RectTransform row)
+    {
+        if (row == null || questListScrollRect == null || questListViewport == null
+            || !(questListContainer is RectTransform content))
+            return;
+
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+
+        Bounds rowBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(questListViewport, row);
+        Rect viewportRect = questListViewport.rect;
+        Vector2 position = content.anchoredPosition;
+
+        if (rowBounds.min.y < viewportRect.yMin)
+            position.y += viewportRect.yMin - rowBounds.min.y;
+        else if (rowBounds.max.y > viewportRect.yMax)
+            position.y -= rowBounds.max.y - viewportRect.yMax;
+
+        content.anchoredPosition = position;
+        questListScrollRect.StopMovement();
     }
 
     private void RefreshQuestRowsSelection()
@@ -653,7 +795,10 @@ public class QuestJournalUI : MonoBehaviour
         for (int i = 0; i < spawnedQuestRows.Count; i++)
         {
             if (spawnedQuestRows[i] != null)
+            {
+                spawnedQuestRows[i].gameObject.SetActive(false);
                 Destroy(spawnedQuestRows[i].gameObject);
+            }
         }
 
         if (questListContainer == null)
@@ -666,6 +811,7 @@ public class QuestJournalUI : MonoBehaviour
         {
             var child = questListContainer.GetChild(i).gameObject;
             if (questItemPrefab != null && child == questItemPrefab.gameObject) continue;
+            child.SetActive(false);
             Destroy(child);
         }
 
@@ -687,11 +833,10 @@ public class QuestJournalUI : MonoBehaviour
         if (target == null) return;
 
         var outline = target.GetComponent<Outline>();
-        bool created = false;
         if (outline == null)
         {
-            outline = target.AddComponent<Outline>();
-            created = true;
+            Debug.LogWarning("[QuestJournalUI] Il prefab Quest deve avere un componente Outline sul root.", target);
+            return;
         }
 
         outline.effectColor = questPadFocusBorderColor;
@@ -699,8 +844,6 @@ public class QuestJournalUI : MonoBehaviour
         outline.enabled = true;
         questFocusedTransform = target.transform;
         questFocusOutline = outline;
-        if (created && outline.useGraphicAlpha == false)
-            outline.useGraphicAlpha = true;
     }
     private Button GetVisibleQuestRowAt(int index)
     {
@@ -783,7 +926,11 @@ public class QuestJournalUI : MonoBehaviour
         {
             for (int i = 0; i < spawned.Count; i++)
             {
-                if (spawned[i] != null) Destroy(spawned[i].gameObject);
+                if (spawned[i] != null)
+                {
+                    spawned[i].gameObject.SetActive(false);
+                    Destroy(spawned[i].gameObject);
+                }
             }
             spawned.Clear();
         }
@@ -793,6 +940,7 @@ public class QuestJournalUI : MonoBehaviour
         {
             var child = container.GetChild(i).gameObject;
             if (prefabRef != null && child == prefabRef.gameObject) continue;
+            child.SetActive(false);
             Destroy(child);
         }
     }
@@ -801,7 +949,11 @@ public class QuestJournalUI : MonoBehaviour
     {
         if (target == null) return null;
         var button = target.GetComponent<Button>();
-        if (button == null) button = target.AddComponent<Button>();
+        if (button == null)
+        {
+            Debug.LogWarning("[QuestJournalUI] Il prefab Quest deve avere un componente Button sul root.", target);
+            return null;
+        }
         if (button.targetGraphic == null)
         {
             var graphic = target.GetComponent<Graphic>();
