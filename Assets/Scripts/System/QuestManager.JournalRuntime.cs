@@ -22,10 +22,17 @@ public partial class QuestManager
 
     public void MoveJournalPadFocusHorizontal(int direction)
     {
-        if (currentJournalPadSection == JournalPadSection.Detail)
-            return;
-
         int dir = direction >= 0 ? 1 : -1;
+        if (currentJournalPadSection == JournalPadSection.Detail)
+        {
+            if (dir > 0)
+            {
+                currentJournalPadSection = JournalPadSection.List;
+                SyncJournalPadListIndexToSelection();
+            }
+            return;
+        }
+
         if (dir > 0 && HasVisibleJournalQuests())
             currentJournalPadSection = JournalPadSection.List;
     }

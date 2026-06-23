@@ -236,6 +236,13 @@ public class QuestJournalUI : MonoBehaviour
         TryBindQuestManager();
         if (questManager == null) return;
 
+        if (questManager.CurrentJournalPadSection == QuestManager.JournalPadSection.Detail && direction >= 0)
+        {
+            questManager.MoveJournalPadFocusHorizontal(direction);
+            ApplyPadFocusVisual(showPadFocus);
+            return;
+        }
+
         if (ChangeViewedPhase(direction))
         {
             RefreshSelectedQuestDetails();
@@ -296,6 +303,13 @@ public class QuestJournalUI : MonoBehaviour
             return;
         }
 
+        if (questManager != null
+            && questManager.CurrentJournalPadSection == QuestManager.JournalPadSection.Detail
+            && !CanFocusClaimButton())
+        {
+            questManager.HandleJournalBack();
+        }
+
         GameObject selectedTarget = null;
         GameObject visualTarget = null;
         switch (questManager != null ? questManager.CurrentJournalPadSection : QuestManager.JournalPadSection.List)
@@ -308,7 +322,7 @@ public class QuestJournalUI : MonoBehaviour
                     ScrollQuestRowIntoView(rowButton.transform as RectTransform);
                 break;
             case QuestManager.JournalPadSection.Detail:
-                selectedTarget = questClaimRewardButton != null && questClaimRewardButton.gameObject.activeInHierarchy ? questClaimRewardButton.gameObject : null;
+                selectedTarget = CanFocusClaimButton() ? questClaimRewardButton.gameObject : null;
                 visualTarget = selectedTarget;
                 break;
         }
@@ -850,10 +864,7 @@ public class QuestJournalUI : MonoBehaviour
 
         var outline = target.GetComponent<Outline>();
         if (outline == null)
-        {
-            Debug.LogWarning("[QuestJournalUI] Il prefab Quest deve avere un componente Outline sul root.", target);
-            return;
-        }
+            outline = target.AddComponent<Outline>();
 
         outline.effectColor = questPadFocusBorderColor;
         outline.effectDistance = questPadFocusBorderThickness;
@@ -861,6 +872,15 @@ public class QuestJournalUI : MonoBehaviour
         questFocusedTransform = target.transform;
         questFocusOutline = outline;
     }
+
+    private bool CanFocusClaimButton()
+    {
+        return questClaimRewardButton != null
+               && questClaimRewardButton.gameObject.activeInHierarchy
+               && questClaimRewardButton.interactable
+               && questClaimRewardButton.IsInteractable();
+    }
+
     private Button GetVisibleQuestRowAt(int index)
     {
         if (index < 0) return null;
