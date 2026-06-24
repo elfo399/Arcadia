@@ -86,6 +86,7 @@ public class CoreGenerator : MonoBehaviour
     private DungeonRoomSet activeRoomSet;
 
     public event Action<int, string> FloorThemeChanged;
+    public event Action<int> FloorGenerated;
     public int CurrentFloor => currentFloor;
     public DungeonThemeDefinition ActiveThemeDefinition => activeThemeDefinition;
     public string ActiveThemeDisplayName => GetThemeDisplayName(activeThemeDefinition);
@@ -196,6 +197,7 @@ public class CoreGenerator : MonoBehaviour
             if (navMeshSurface != null) navMeshSurface.BuildNavMesh();
             InitializeMinimap();
             RespawnPlayerAtStart();
+            FloorGenerated?.Invoke(currentFloor);
         }
         else
         {
