@@ -8,6 +8,8 @@ public class QuestItemUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI questLocationText;
     [SerializeField] private Image backgroundImage;
     [SerializeField] private GameObject completedIndicator;
+    [Tooltip("Sprite shown on the right when this quest's reward can be claimed.")]
+    [SerializeField] private GameObject claimableRewardIndicator;
     [SerializeField] private Outline selectionOutline;
     [SerializeField] private Color selectionBorderColor = new Color(1f, 0.85f, 0.2f, 1f);
     [SerializeField] private Vector2 selectionBorderThickness = new Vector2(3f, 3f);
@@ -35,7 +37,7 @@ public class QuestItemUI : MonoBehaviour
         SetSelected(false);
     }
 
-    public void SetData(string title, string location, bool completed)
+    public void SetData(string title, string location, bool completed, bool rewardClaimable = false)
     {
         ResolveReferences();
 
@@ -47,6 +49,9 @@ public class QuestItemUI : MonoBehaviour
 
         if (completedIndicator != null)
             completedIndicator.SetActive(completed);
+
+        if (claimableRewardIndicator != null)
+            claimableRewardIndicator.SetActive(rewardClaimable);
     }
 
     public void SetSelected(bool selected)
@@ -205,6 +210,8 @@ public class QuestItemUI : MonoBehaviour
             if (image == backgroundImage || image.sprite == null)
                 continue;
             if (completedIndicator != null && image.gameObject == completedIndicator)
+                continue;
+            if (claimableRewardIndicator != null && image.gameObject == claimableRewardIndicator)
                 continue;
 
             RectTransform rect = image.rectTransform;

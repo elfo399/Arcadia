@@ -14,6 +14,10 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Transform slotParent;
     [SerializeField] private int initialSlotCount = 0;
 
+    [Header("Inventory Empty State")]
+    [Tooltip("Banner shown when the normal inventory contains no objects.")]
+    [SerializeField] private GameObject noItemsBanner;
+
     [Header("Detail Panel - Shared")]
     [SerializeField] private GameObject detailRoot;
     [SerializeField] private Image detailIcon;
@@ -117,6 +121,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         ClearAllSlots();
         ClearDetailPanel();
         UpdateEquipButtonState();
+        UpdateInventoryEmptyState();
         isInitialized = true;
     }
 
@@ -129,6 +134,27 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     {
         ClearDetailPanel();
         UpdateEquipButtonState();
+        UpdateInventoryEmptyState();
+    }
+
+    private void UpdateInventoryEmptyState()
+    {
+        if (noItemsBanner == null)
+            return;
+
+        bool hasNormalItem = false;
+        for (int i = 0; i < sourceItems.Count; i++)
+        {
+            InventoryItem item = sourceItems[i];
+            if (item != null && !IsMagicInventoryItem(item))
+            {
+                hasNormalItem = true;
+                break;
+            }
+        }
+
+        if (noItemsBanner.activeSelf == hasNormalItem)
+            noItemsBanner.SetActive(!hasNormalItem);
     }
 
     public void SetPlayerInventory(PlayerInventory inventory)
@@ -511,6 +537,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         ApplyPadFocusVisual(-1);
         ClearDetailPanel();
         UpdateEquipButtonState();
+        UpdateInventoryEmptyState();
     }
 
     private bool MatchesFilter(InventoryItem item, Filter filter)

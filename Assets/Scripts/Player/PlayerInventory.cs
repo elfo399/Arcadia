@@ -1074,8 +1074,9 @@ public class PlayerInventory : MonoBehaviour
         EnsureItemDatabaseAssigned();
         var lookups = BuildAssetLookups();
 
-        bool hasSavedItems = data.items != null && data.items.Length > 0;
-        if (hasSavedItems)
+        // null = vecchio salvataggio senza il campo inventario: mantieni il fallback iniziale.
+        // Array vuoto = inventario realmente vuoto: deve cancellare lo startingLoadout.
+        if (data.items != null)
         {
             var fallbackItems = new List<InventoryItem>(items);
             items.Clear();
@@ -1088,13 +1089,13 @@ public class PlayerInventory : MonoBehaviour
                 if (restored != null) items.Add(restored);
             }
 
-            if (items.Count == 0 && fallbackItems.Count > 0)
+            if (data.items.Length > 0 && items.Count == 0 && fallbackItems.Count > 0)
             {
                 items.AddRange(fallbackItems);
                 Debug.LogWarning("[PlayerInventory] Save inventory presente ma non ripristinabile con i lookup correnti. Mantengo lo startingLoadout runtime.");
             }
         }
-        // Fallback: se il save non contiene item, mantieni quelli iniziali (startingLoadout).
+        // Fallback solo per salvataggi legacy con data.items == null.
 
         // Se il save contiene slot, questi sovrascrivono lo startingLoadout anche quando sono vuoti.
         if (HasSavedLoadoutSlots(data.rightLoadout))

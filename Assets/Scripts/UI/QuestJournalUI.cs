@@ -29,6 +29,8 @@ public class QuestJournalUI : MonoBehaviour
     [SerializeField] private VerticalLayoutGroup questListLayout;
     [SerializeField] private ContentSizeFitter questListContentSizeFitter;
     [SerializeField, Min(1f)] private float questListMouseWheelPixels = 48f;
+    [Tooltip("Banner shown when there are no quests to display.")]
+    [SerializeField] private GameObject noQuestBanner;
     [SerializeField] private List<QuestEntryData> startingQuests = new();
 
     [Header("Quest Detail UI")]
@@ -80,6 +82,7 @@ public class QuestJournalUI : MonoBehaviour
     public RectTransform QuestListViewport { get => questListViewport; set => questListViewport = value; }
     public VerticalLayoutGroup QuestListLayout { get => questListLayout; set => questListLayout = value; }
     public ContentSizeFitter QuestListContentSizeFitter { get => questListContentSizeFitter; set => questListContentSizeFitter = value; }
+    public GameObject NoQuestBanner { get => noQuestBanner; set => noQuestBanner = value; }
     public List<QuestEntryData> StartingQuests => startingQuests;
     public TextMeshProUGUI QuestDetailTypeText { get => questDetailTypeText; set => questDetailTypeText = value; }
     public TextMeshProUGUI QuestDetailRecommendedText { get => questDetailRecommendedText; set => questDetailRecommendedText = value; }
@@ -664,17 +667,33 @@ public class QuestJournalUI : MonoBehaviour
 
     private void RebuildQuestRows(bool showPadFocus)
     {
-        if (questListContainer == null || questItemPrefab == null || questManager == null) return;
+        if (questListContainer == null || questItemPrefab == null || questManager == null)
+        {
+            SetNoQuestBannerVisible(false);
+            return;
+        }
         ClearSpawnedQuestRows();
 
         var visible = questManager.GetVisibleJournalQuestEntriesSnapshot();
+        EnsurePlayerStats();
         for (int i = 0; i < visible.Count; i++)
         {
             var quest = visible[i];
             if (quest == null) continue;
             var row = Instantiate(questItemPrefab, questListContainer);
             row.gameObject.SetActive(true);
-            row.SetData(quest.title, quest.location, quest.completed || questManager.IsQuestReadyToClaim(quest));
+            bool canClaimReward = questManager.CanClaimJournalQuest(
+                quest,
+                playerInventory,
+                playerStats,
+                GetQuestRewardNormalCapacityValue(),
+                GetQuestRewardMagicCapacityValue(),
+                out _);
+            row.SetData(
+                quest.title,
+                quest.location,
+                quest.completed || questManager.IsQuestReadyToClaim(quest),
+                canClaimReward);
             row.SetSelected(questManager.IsJournalQuestSelected(quest.questId));
 
             string capturedQuestId = quest.questId;
@@ -690,10 +709,18 @@ public class QuestJournalUI : MonoBehaviour
             spawnedQuestRows.Add(row);
         }
 
+        SetNoQuestBannerVisible(spawnedQuestRows.Count == 0);
+
         RefreshQuestListScrollLayout();
 
         if (showPadFocus)
             ApplyPadFocusVisual(true);
+    }
+
+    private void SetNoQuestBannerVisible(bool visible)
+    {
+        if (noQuestBanner != null && noQuestBanner.activeSelf != visible)
+            noQuestBanner.SetActive(visible);
     }
 
     private void RefreshQuestListScrollLayout()

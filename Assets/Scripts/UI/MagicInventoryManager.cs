@@ -12,6 +12,12 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Transform magicSlotParent;
     [SerializeField] private int magicInitialSlotCount = 12;
 
+    [Header("Magic Empty State")]
+    [Tooltip("Object shown when the player does not own any magic.")]
+    [SerializeField] private GameObject noMagicBanner;
+    [Tooltip("Grid hidden while the magic inventory is empty. If omitted, Magic Slot Parent is used.")]
+    [SerializeField] private GameObject magicGridRoot;
+
     [Header("Magic Detail")]
     [SerializeField] private GameObject magicDetailRoot;
     [SerializeField] private Image magicImage;
@@ -63,6 +69,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         ClearSlots();
         ClearDetail();
         UpdateEquipButtonState();
+        UpdateMagicEmptyState(false);
         isInitialized = true;
     }
 
@@ -291,6 +298,9 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
             currentItems.AddRange(playerInventory.GetMagicInventorySlotLayout(magicInitialSlotCount));
         }
 
+        // Attiva prima la griglia: al primo ingresso questo permette ad Awake degli
+        // InventorySlot di terminare prima che Setup assegni le icone.
+        UpdateMagicEmptyState(HasAnyMagic());
         RefreshSlotsFromCurrentItems();
 
         currentSelectedIndex = -1;
@@ -356,6 +366,29 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     private bool IsValidSlotIndex(int index) => index >= 0 && index < slots.Count;
     private bool HasItem(int index) => index >= 0 && index < currentItems.Count && currentItems[index] != null;
+
+    private bool HasAnyMagic()
+    {
+        for (int i = 0; i < currentItems.Count; i++)
+        {
+            if (currentItems[i]?.magicData != null)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void UpdateMagicEmptyState(bool hasMagic)
+    {
+        GameObject gridRoot = magicGridRoot != null
+            ? magicGridRoot
+            : magicSlotParent != null ? magicSlotParent.gameObject : null;
+
+        if (gridRoot != null && gridRoot.activeSelf != hasMagic)
+            gridRoot.SetActive(hasMagic);
+        if (noMagicBanner != null && noMagicBanner.activeSelf == hasMagic)
+            noMagicBanner.SetActive(!hasMagic);
+    }
 
     private void SwapItems(int a, int b)
     {
