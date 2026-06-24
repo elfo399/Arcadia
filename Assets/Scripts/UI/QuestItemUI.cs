@@ -10,7 +10,6 @@ public class QuestItemUI : MonoBehaviour
     [SerializeField] private GameObject completedIndicator;
     [Tooltip("Sprite shown on the right when this quest's reward can be claimed.")]
     [SerializeField] private GameObject claimableRewardIndicator;
-    [SerializeField] private Outline selectionOutline;
     [SerializeField] private Color selectionBorderColor = new Color(1f, 0.85f, 0.2f, 1f);
     [SerializeField] private Vector2 selectionBorderThickness = new Vector2(3f, 3f);
 
@@ -33,7 +32,6 @@ public class QuestItemUI : MonoBehaviour
     {
         ResolveReferences();
         CacheDefaultBackgroundColor();
-        EnsureSelectionOutline();
         SetSelected(false);
     }
 
@@ -70,7 +68,6 @@ public class QuestItemUI : MonoBehaviour
     {
         ResolveReferences();
         CacheDefaultBackgroundColor();
-        EnsureSelectionOutline();
         bool highlighted = isSelected || isFocused;
 
         if (backgroundImage != null && hasDefaultBackgroundColor)
@@ -83,8 +80,6 @@ public class QuestItemUI : MonoBehaviour
                 selectionFrameEffects[i].enabled = highlighted;
         }
 
-        if (selectionOutline != null)
-            selectionOutline.enabled = false;
     }
 
     private void ResolveReferences()
@@ -98,9 +93,6 @@ public class QuestItemUI : MonoBehaviour
             if (panel != null)
                 backgroundImage = panel.GetComponent<Image>();
         }
-
-        if (selectionOutline == null && backgroundImage != null)
-            selectionOutline = backgroundImage.GetComponent<Outline>();
 
         if (questNameText == null)
         {
@@ -238,18 +230,4 @@ public class QuestItemUI : MonoBehaviour
         selectionFrameEffects = effects.ToArray();
     }
 
-    private void EnsureSelectionOutline()
-    {
-        if (backgroundImage == null)
-            return;
-
-        if (selectionOutline == null)
-            selectionOutline = backgroundImage.GetComponent<Outline>();
-        if (selectionOutline == null)
-            selectionOutline = backgroundImage.gameObject.AddComponent<Outline>();
-
-        selectionOutline.effectColor = selectionBorderColor;
-        selectionOutline.effectDistance = selectionBorderThickness;
-        selectionOutline.useGraphicAlpha = true;
-    }
 }

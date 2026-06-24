@@ -709,13 +709,17 @@ public class AttributesUIManager : MonoBehaviour
     {
         if (confirmButton == null) return;
 
-        var eventSystem = UnityEngine.EventSystems.EventSystem.current;
-        if (eventSystem == null) return;
-
         bool shouldSelectConfirm = confirmPadFocused
                                    && showPadFocus
                                    && confirmButton.gameObject.activeInHierarchy
                                    && confirmButton.interactable;
+        var segmentedVisual = confirmButton.GetComponent<SegmentedButtonSelectionUI>();
+        if (segmentedVisual != null)
+            segmentedVisual.SetFocused(shouldSelectConfirm);
+
+        var eventSystem = UnityEngine.EventSystems.EventSystem.current;
+        if (eventSystem == null) return;
+
         if (shouldSelectConfirm)
         {
             if (eventSystem.currentSelectedGameObject != confirmButton.gameObject)

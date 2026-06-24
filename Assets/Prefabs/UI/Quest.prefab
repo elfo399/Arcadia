@@ -213,7 +213,6 @@ MonoBehaviour:
   backgroundImage: {fileID: 3941783516757015213}
   completedIndicator: {fileID: 2660582834561692078}
   claimableRewardIndicator: {fileID: 42239756810670948}
-  selectionOutline: {fileID: 3941783516757015214}
   selectionBorderColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   selectionBorderThickness: {x: 3, y: 3}
 --- !u!222 &3941783516757015203
@@ -525,7 +524,6 @@ GameObject:
   - component: {fileID: 3941783516757015211}
   - component: {fileID: 3941783516757015212}
   - component: {fileID: 3941783516757015213}
-  - component: {fileID: 3941783516757015214}
   m_Layer: 0
   m_Name: SelectionOverlay
   m_TagString: Untagged
@@ -590,21 +588,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &3941783516757015214
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3941783516757015210}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_EffectColor: {r: 1, g: 0.85, b: 0.2, a: 1}
-  m_EffectDistance: {x: 3, y: 3}
-  m_UseGraphicAlpha: 1
 --- !u!1 &4214584438157054897
 GameObject:
   m_ObjectHideFlags: 0

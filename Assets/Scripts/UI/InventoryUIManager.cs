@@ -134,7 +134,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     {
         ClearDetailPanel();
         UpdateEquipButtonState();
-        UpdateInventoryEmptyState();
     }
 
     private void UpdateInventoryEmptyState()

@@ -67,6 +67,7 @@ public class QuestJournalUI : MonoBehaviour
     private Transform questFocusedTransform;
     private Outline questFocusOutline;
     private QuestItemUI questFocusedRow;
+    private SegmentedButtonSelectionUI questFocusedSegmentedButton;
     private string viewedPhaseQuestId;
     private int viewedPhase = 1;
     private int lastCurrentPhase = 1;
@@ -192,10 +193,6 @@ public class QuestJournalUI : MonoBehaviour
         ClearPadFocusVisual();
     }
 
-    public void SetQuestFilterAll() { RefreshUI(IsPadFocusVisible()); }
-    public void SetQuestFilterActive() { SetQuestFilterAll(); }
-    public void SetQuestFilterCompleted() { SetQuestFilterAll(); }
-
     public void AddOrUpdateQuest(string questId, string title, string location, bool completed)
     {
         TryBindQuestManager();
@@ -227,11 +224,6 @@ public class QuestJournalUI : MonoBehaviour
         if (questManager == null) return;
         questManager.FocusJournalPadDefault();
         ApplyPadFocusVisual(showPadFocus);
-    }
-
-    public void FocusPadFilters(bool showPadFocus)
-    {
-        FocusPadDefault(showPadFocus);
     }
 
     public void MovePadFocusHorizontal(int direction, bool showPadFocus)
@@ -269,7 +261,6 @@ public class QuestJournalUI : MonoBehaviour
         TryBindQuestManager();
         if (questManager == null) return;
 
-        string previousQuestId = questManager.SelectedJournalQuestId;
         EnsurePlayerStats();
         bool claimed = questManager.ConfirmJournalSelection(playerInventory, playerStats, GetQuestRewardNormalCapacityValue(), GetQuestRewardMagicCapacityValue());
         if (claimed)
@@ -278,9 +269,6 @@ public class QuestJournalUI : MonoBehaviour
             RefreshUI(showPadFocus);
             return;
         }
-
-        if (!string.Equals(previousQuestId, questManager.SelectedJournalQuestId, StringComparison.OrdinalIgnoreCase))
-            LogSelectedQuestCompletionState();
 
         RefreshQuestRowsSelection();
         RefreshSelectedQuestDetails();
@@ -313,35 +301,24 @@ public class QuestJournalUI : MonoBehaviour
             questManager.HandleJournalBack();
         }
 
-        GameObject selectedTarget = null;
-        GameObject visualTarget = null;
+        GameObject focusTarget = null;
         switch (questManager != null ? questManager.CurrentJournalPadSection : QuestManager.JournalPadSection.List)
         {
             case QuestManager.JournalPadSection.List:
                 var rowButton = GetVisibleQuestRowAt(questManager != null ? questManager.JournalPadListIndex : 0);
-                selectedTarget = rowButton != null ? rowButton.gameObject : null;
-                visualTarget = selectedTarget;
+                focusTarget = rowButton != null ? rowButton.gameObject : null;
                 if (rowButton != null)
                     ScrollQuestRowIntoView(rowButton.transform as RectTransform);
                 break;
             case QuestManager.JournalPadSection.Detail:
-                selectedTarget = CanFocusClaimButton() ? questClaimRewardButton.gameObject : null;
-                visualTarget = selectedTarget;
+                focusTarget = CanFocusClaimButton() ? questClaimRewardButton.gameObject : null;
                 break;
         }
 
-        if (selectedTarget == null) selectedTarget = visualTarget;
-        if (visualTarget == null) visualTarget = selectedTarget;
-
         if (EventSystem.current != null)
-        {
-            if (selectedTarget != null)
-                EventSystem.current.SetSelectedGameObject(selectedTarget);
-            else
-                EventSystem.current.SetSelectedGameObject(null);
-        }
+            EventSystem.current.SetSelectedGameObject(focusTarget);
 
-        SetQuestPadFocusVisualTarget(showPadFocus ? visualTarget : null);
+        SetQuestPadFocusVisualTarget(showPadFocus ? focusTarget : null);
     }
 
     public void ClearPadFocusVisual()
@@ -350,9 +327,12 @@ public class QuestJournalUI : MonoBehaviour
             questFocusedRow.SetFocused(false);
         if (questFocusOutline != null)
             questFocusOutline.enabled = false;
+        if (questFocusedSegmentedButton != null)
+            questFocusedSegmentedButton.SetFocused(false);
         questFocusedRow = null;
         questFocusedTransform = null;
         questFocusOutline = null;
+        questFocusedSegmentedButton = null;
     }
 
     private void TryBindQuestManager()
@@ -393,7 +373,6 @@ public class QuestJournalUI : MonoBehaviour
             return;
 
         questManager.SelectJournalQuest(questId);
-        LogSelectedQuestCompletionState();
         RefreshQuestRowsSelection();
         RefreshSelectedQuestDetails();
 
@@ -405,23 +384,6 @@ public class QuestJournalUI : MonoBehaviour
     private void RefreshSelectedQuestDetails()
     {
         UpdateQuestDetailPanel(questManager != null ? questManager.GetSelectedVisibleJournalQuest() : null);
-    }
-
-    private void LogSelectedQuestCompletionState()
-    {
-        if (questManager == null)
-            return;
-
-        var quest = questManager.GetSelectedVisibleJournalQuest();
-        if (quest == null)
-            return;
-
-        bool readyToClaim = questManager.IsQuestReadyToClaim(quest);
-        EnsurePlayerStats();
-
-        bool canClaim = questManager.CanClaimJournalQuest(quest, playerInventory, playerStats, GetQuestRewardNormalCapacityValue(), GetQuestRewardMagicCapacityValue(), out string failureReason);
-        string claimDetails = canClaim ? "claim=si" : $"claim=no, reason={failureReason}";
-        Debug.Log($"[QuestJournalUI] Quest selezionata '{quest.questId}' ({quest.title}): completedFlag={(quest.completed ? "si" : "no")}, readyToClaim={(readyToClaim ? "si" : "no")}, {claimDetails}.", this);
     }
 
     private void UpdateQuestDetailPanel(QuestEntryData quest)
@@ -471,17 +433,12 @@ public class QuestJournalUI : MonoBehaviour
         }
 
         EnsurePlayerStats();
-        bool canClaim = questManager.CanClaimJournalQuest(quest, playerInventory, playerStats, GetQuestRewardNormalCapacityValue(), GetQuestRewardMagicCapacityValue(), out string failureReason);
+        bool canClaim = questManager.CanClaimJournalQuest(quest, playerInventory, playerStats, GetQuestRewardNormalCapacityValue(), GetQuestRewardMagicCapacityValue(), out _);
         questClaimRewardButton.interactable = canClaim;
-
-        string questId = quest != null ? quest.questId : "none";
-        Debug.Log($"[QuestJournalUI] Claim button state: quest='{questId}', canClaim={(canClaim ? "si" : "no")}, interactable={(questClaimRewardButton.interactable ? "si" : "no")}, isInteractable={(questClaimRewardButton.IsInteractable() ? "si" : "no")}, activeInHierarchy={(questClaimRewardButton.gameObject.activeInHierarchy ? "si" : "no")}{(canClaim ? string.Empty : ", reason=" + failureReason)}.", this);
     }
 
     public void OnQuestClaimRewardButtonClicked()
     {
-        Debug.Log("[QuestJournalUI] Claim button clicked.", this);
-
         if (questManager == null)
         {
             Debug.LogWarning("[QuestJournalUI] Claim reward failed: QuestManager non assegnato.", this);
@@ -502,7 +459,6 @@ public class QuestJournalUI : MonoBehaviour
 
         RefreshQuestSourcesFromPlayer();
         RefreshUI(IsPadFocusVisible());
-        Debug.Log("[QuestJournalUI] Claim reward completed.", this);
     }
     private void RebuildQuestObjectiveRows(QuestEntryData quest, int displayedPhase)
     {
@@ -877,6 +833,18 @@ public class QuestJournalUI : MonoBehaviour
             return;
         }
 
+        var segmentedButton = target != null ? target.GetComponentInParent<SegmentedButtonSelectionUI>() : null;
+        if (segmentedButton != null)
+        {
+            if (questFocusedSegmentedButton != segmentedButton)
+                ClearPadFocusVisual();
+
+            questFocusedSegmentedButton = segmentedButton;
+            questFocusedTransform = segmentedButton.transform;
+            segmentedButton.SetFocused(true);
+            return;
+        }
+
         target = ResolveQuestFocusGraphicTarget(target);
         if (target != null && target.transform == questFocusedTransform && questFocusOutline != null)
         {
@@ -1036,14 +1004,6 @@ public class QuestJournalUI : MonoBehaviour
         var nestedGraphic = target.GetComponentInChildren<Graphic>(true);
         if (nestedGraphic != null) return nestedGraphic.gameObject;
         return target;
-    }
-
-    private static string NormalizeQuestId(string questId, string title, string location)
-    {
-        if (!string.IsNullOrWhiteSpace(questId)) return questId.Trim();
-        string safeTitle = string.IsNullOrWhiteSpace(title) ? "Quest" : title.Trim();
-        string safeLocation = string.IsNullOrWhiteSpace(location) ? "Unknown" : location.Trim();
-        return safeTitle + "|" + safeLocation;
     }
 
     private static Sprite ResolveRewardIcon(QuestRewardEntryData reward)

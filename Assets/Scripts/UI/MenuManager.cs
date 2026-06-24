@@ -452,16 +452,6 @@ public class MenuManager : MonoBehaviour
 
         if (inQuestTab)
         {
-            bool trianglePressed = controls.Player.Interact.WasPerformedThisFrame()
-                || (Gamepad.current != null && Gamepad.current.buttonNorth.wasPressedThisFrame);
-            if (trianglePressed)
-            {
-                ForcePadFocusMode();
-                questJournalUI?.FocusPadFilters(showPadFocus);
-                lastNavigationMoveTime = Time.time;
-                return;
-            }
-
             if (rightPressed) questJournalUI?.MovePadFocusHorizontal(1, showPadFocus);
             if (leftPressed) questJournalUI?.MovePadFocusHorizontal(-1, showPadFocus);
             if (downPressed) questJournalUI?.MovePadFocusVertical(1, showPadFocus);
