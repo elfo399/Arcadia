@@ -93,6 +93,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private string selectedCharacterId;
     private string characterName;
     private bool selectedCharacterStartApplied;
+    private bool dungeonCheckpointActive;
+    private int dungeonCheckpointFloor = 1;
+    private string dungeonCheckpointSeed = string.Empty;
     private bool loadedQuestStateApplied = false;
     private bool loadedInventoryStateApplied = false;
     private float baseMaxHealth;
@@ -120,6 +123,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public string SelectedCharacterId => selectedCharacterId;
     public string CharacterName => ResolveCharacterName();
     public bool HasInspectorStartingCharacter => useInspectorStartingCharacter && inspectorStartingCharacter != null;
+    public bool HasActiveDungeonCheckpoint => dungeonCheckpointActive;
 
     void Awake()
     {
@@ -401,6 +405,27 @@ public class PlayerStats : MonoBehaviour, IDamageable
         RequestSave(immediate: true);
     }
 
+    public void SetDungeonCheckpoint(int floor, string seed)
+    {
+        dungeonCheckpointActive = true;
+        dungeonCheckpointFloor = Mathf.Max(1, floor);
+        dungeonCheckpointSeed = seed ?? string.Empty;
+    }
+
+    public bool TryGetDungeonCheckpoint(out int floor, out string seed)
+    {
+        floor = Mathf.Max(1, dungeonCheckpointFloor);
+        seed = dungeonCheckpointSeed ?? string.Empty;
+        return dungeonCheckpointActive;
+    }
+
+    public void ClearDungeonCheckpoint()
+    {
+        dungeonCheckpointActive = false;
+        dungeonCheckpointFloor = 1;
+        dungeonCheckpointSeed = string.Empty;
+    }
+
     private void RequestSave(bool immediate)
     {
         if (immediate)
@@ -446,6 +471,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         GameData data = new GameData
         {
+            saveVersion = SaveSystem.CurrentSaveVersion,
             selectedCharacterId = this.selectedCharacterId,
             characterName = ResolveCharacterName(),
             selectedCharacterStartApplied = this.selectedCharacterStartApplied,
@@ -466,6 +492,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
             usesUnifiedCoins = true,
             bankCoins = this.bankCoins,
             runCoins = this.runCoins,
+            dungeonCheckpointActive = this.dungeonCheckpointActive,
+            dungeonFloor = this.dungeonCheckpointFloor,
+            dungeonSeed = this.dungeonCheckpointSeed,
             bankGold = this.bankGold,
             bankSilver = this.bankSilver,
             bankCopper = this.bankCopper
@@ -543,6 +572,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             this.malefico = data.malefico;
             this.runCoins = Mathf.Max(0, data.runCoins);
             this.bankCoins = ResolveSavedBankCoins(data);
+            ApplyLoadedDungeonCheckpoint(data);
             ApplyCharacterBaseResources(selectedCharacterId);
             SyncLegacyWalletFields();
             // Non applicare qui quest/inventory: se avviene prima degli Awake degli altri componenti
@@ -557,6 +587,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             selectedCharacterId = string.Empty;
             characterName = string.Empty;
             selectedCharacterStartApplied = false;
+            ClearDungeonCheckpoint();
             Debug.Log("Nessun file di salvataggio trovato. Verranno usati i valori correnti (da Inspector alla prima esecuzione).");
         }
     }
@@ -607,8 +638,22 @@ public class PlayerStats : MonoBehaviour, IDamageable
         this.malefico = data.malefico;
         this.runCoins = Mathf.Max(0, data.runCoins);
         this.bankCoins = ResolveSavedBankCoins(data);
+        ApplyLoadedDungeonCheckpoint(data);
         ApplyCharacterBaseResources(selectedCharacterId);
         SyncLegacyWalletFields();
+    }
+
+    private void ApplyLoadedDungeonCheckpoint(GameData data)
+    {
+        if (data == null || !data.dungeonCheckpointActive)
+        {
+            ClearDungeonCheckpoint();
+            return;
+        }
+
+        dungeonCheckpointActive = true;
+        dungeonCheckpointFloor = Mathf.Max(1, data.dungeonFloor);
+        dungeonCheckpointSeed = data.dungeonSeed ?? string.Empty;
     }
 
     public bool TryApplySelectedCharacterStart(PlayerCharacterDatabase database)
@@ -1165,6 +1210,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     void Die()
     {
         ResetRunWallet();
+        ClearDungeonCheckpoint();
         SaveStatsImmediate();
         Debug.Log("SEI MORTO! Ritorno all'Hub...");
         SceneManager.LoadScene("HubScene");

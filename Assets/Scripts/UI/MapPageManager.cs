@@ -9,6 +9,7 @@ public class MapPageManager : MonoBehaviour
     [SerializeField] private WeatherManager weatherManager;
     [SerializeField] private TextMeshProUGUI floorText;
     [SerializeField] private TextMeshProUGUI themeText;
+    [SerializeField] private TextMeshProUGUI seedText;
     [SerializeField] private TextMeshProUGUI playerNameText;
     [SerializeField] private TextMeshProUGUI weatherText;
     [SerializeField] private TextMeshProUGUI runTimerText;
@@ -33,6 +34,7 @@ public class MapPageManager : MonoBehaviour
     [SerializeField] private PlayerCharacterDatabase playerCharacterDatabase;
     [SerializeField] private string floorFormat = "Floor {0}";
     [SerializeField] private string themeFormat = "{0}";
+    [SerializeField] private string seedFormat = "{0}";
     [SerializeField] private string playerNameFormat = "{0}";
     [SerializeField] private string weatherFormat = "{0}";
     [SerializeField] private string runTimerFormat = "{0}";
@@ -239,6 +241,12 @@ public class MapPageManager : MonoBehaviour
         {
             string resolvedTheme = string.IsNullOrWhiteSpace(themeName) ? missingThemeLabel : themeName;
             themeText.text = FormatText(themeFormat, resolvedTheme);
+        }
+
+        if (seedText != null)
+        {
+            string seed = generator != null ? generator.gameSeedString : string.Empty;
+            seedText.text = string.IsNullOrWhiteSpace(seed) ? string.Empty : FormatText(seedFormat, seed);
         }
     }
 

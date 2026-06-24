@@ -77,6 +77,9 @@ public class SavedPlayerInventoryData
 [System.Serializable]
 public class GameData
 {
+    // Incrementato quando cambia la struttura persistente del salvataggio.
+    public int saveVersion;
+
     // Selected character archetype. The start package is applied once, then the
     // normal runtime stats/inventory become authoritative.
     public string selectedCharacterId;
@@ -106,6 +109,11 @@ public class GameData
     public bool usesUnifiedCoins;
     public int bankCoins;
     public int runCoins;
+
+    // Checkpoint della run: permette di ricostruire lo stesso piano dal suo ingresso.
+    public bool dungeonCheckpointActive;
+    public int dungeonFloor;
+    public string dungeonSeed;
 
     // Legacy currency fields, kept only in memory to migrate older saves.
     [System.NonSerialized]

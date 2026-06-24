@@ -82,6 +82,7 @@ public class CoreGenerator : MonoBehaviour
     private Room startRoomInstance;
     private System.Random prng;
     private PlayerStats playerStats;
+    private bool savedCheckpointApplied;
     private DungeonThemeDefinition activeThemeDefinition;
     private DungeonRoomSet activeRoomSet;
 
@@ -111,11 +112,17 @@ public class CoreGenerator : MonoBehaviour
         Instance = this;
         ResolvePlayerTransform();
         CachePlayerStats();
+        ApplySavedCheckpointIfAvailable();
         if (playerStats == null) Debug.LogWarning("[CoreGenerator] PlayerStats non trovato! La generazione di stanze speciali (Curch/EvilCurch) non funzionerà.");
         
     }
     
-    void Start() { Generate(); }
+    void Start()
+    {
+        CachePlayerStats();
+        ApplySavedCheckpointIfAvailable();
+        Generate();
+    }
     
     void Update() 
     { 
@@ -137,6 +144,25 @@ public class CoreGenerator : MonoBehaviour
     {
         if (playerStats == null)
             playerStats = PlayerStats.instance;
+    }
+
+    private void ApplySavedCheckpointIfAvailable()
+    {
+        if (savedCheckpointApplied)
+            return;
+
+        if (playerStats == null || !playerStats.TryGetDungeonCheckpoint(out int savedFloor, out string savedSeed))
+            return;
+
+        savedCheckpointApplied = true;
+        currentFloor = Mathf.Clamp(savedFloor, 1, Mathf.Max(1, maxFloors));
+        if (!string.IsNullOrWhiteSpace(savedSeed))
+        {
+            gameSeedString = savedSeed;
+            useRandomSeed = false;
+        }
+
+        Debug.Log($"[CoreGenerator] Ripristino checkpoint: piano {currentFloor}, seed '{gameSeedString}'.");
     }
 
     public void Generate()
@@ -209,6 +235,13 @@ public class CoreGenerator : MonoBehaviour
     {
         if (currentFloor >= maxFloors)
         {
+            CachePlayerStats();
+            if (playerStats != null)
+            {
+                playerStats.ClearDungeonCheckpoint();
+                playerStats.SaveStatsImmediate();
+            }
+
             SceneManager.LoadScene(hubSceneName);
         }
         else

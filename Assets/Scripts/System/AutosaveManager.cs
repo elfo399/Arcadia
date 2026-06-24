@@ -81,6 +81,10 @@ public sealed class AutosaveManager : MonoBehaviour
     private void HandleFloorGenerated(int floor)
     {
         activeGameplaySeconds = 0f;
+
+        if (PlayerStats.instance != null && subscribedGenerator != null)
+            PlayerStats.instance.SetDungeonCheckpoint(floor, subscribedGenerator.gameSeedString);
+
         RequestAutosave(floorEntryDelaySeconds);
     }
 

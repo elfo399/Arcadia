@@ -3,6 +3,8 @@ using System.IO;
 
 public static class SaveSystem
 {
+    public const int CurrentSaveVersion = 1;
+
     private const string LegacySaveFileName = "gamedata.json";
     private const string CharacterSavePrefix = "gamedata_";
     private const string CharacterSaveExtension = ".json";
@@ -34,6 +36,7 @@ public static class SaveSystem
 
         GameData newData = new GameData
         {
+            saveVersion = CurrentSaveVersion,
             selectedCharacterId = normalizedId,
             characterName = resolvedName,
             selectedCharacterStartApplied = false,
@@ -47,7 +50,10 @@ public static class SaveSystem
     public static void SaveData(GameData data)
     {
         if (data != null)
+        {
+            data.saveVersion = CurrentSaveVersion;
             data.usesUnifiedCoins = true;
+        }
 
         string path = GetSaveFilePath(data != null ? data.selectedCharacterId : string.Empty);
         string json = JsonUtility.ToJson(data, true); // 'true' per formattare il JSON in modo leggibile
@@ -173,6 +179,7 @@ public static class SaveSystem
             string json = File.ReadAllText(path);
             GameData data = JsonUtility.FromJson<GameData>(json);
             MigrateLegacyCurrencyFields(data, json);
+            MigrateSaveVersion(data);
             Debug.Log($"Dati caricati con successo da: {path}");
             return data;
         }
@@ -246,6 +253,38 @@ public static class SaveSystem
 
         data.bankCoins = migratedCoins > int.MaxValue ? int.MaxValue : (int)migratedCoins;
         data.usesUnifiedCoins = true;
+    }
+
+    private static void MigrateSaveVersion(GameData data)
+    {
+        if (data == null)
+            return;
+
+        if (data.saveVersion > CurrentSaveVersion)
+        {
+            Debug.LogWarning(
+                $"Il salvataggio usa una versione futura ({data.saveVersion}); "
+                + $"la versione supportata e' {CurrentSaveVersion}.");
+            return;
+        }
+
+        while (data.saveVersion < CurrentSaveVersion)
+        {
+            switch (data.saveVersion)
+            {
+                case 0:
+                    // I salvataggi precedenti non contenevano checkpoint di run.
+                    data.dungeonCheckpointActive = false;
+                    data.dungeonFloor = 1;
+                    data.dungeonSeed = string.Empty;
+                    data.saveVersion = 1;
+                    break;
+
+                default:
+                    Debug.LogWarning($"Migrazione non disponibile dalla versione {data.saveVersion}.");
+                    return;
+            }
+        }
     }
 
     private static int ReadJsonInt(string json, string fieldName)
