@@ -134,8 +134,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         }
         else if (instance != this)
         {
-            GameObject duplicateRoot = transform.root != null ? transform.root.gameObject : gameObject;
-            Destroy(duplicateRoot);
+            Destroy(gameObject);
             return; 
         }
 
@@ -160,11 +159,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     private void MarkPersistentRoot()
     {
-        Transform root = transform.root;
-        if (root == null)
-            return;
-
-        DontDestroyOnLoad(root.gameObject);
+        DontDestroyOnLoad(gameObject);
     }
 
     void OnEnable()

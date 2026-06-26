@@ -573,7 +573,7 @@ public class MenuManager : MonoBehaviour
             HideAllTabBackgrounds();
             StartOpenMenuAnimation();
         }
-        if (playerHudPanel != null)
+        if (playerHudPanel != null && ShouldHidePlayerHudPanelWhenMenuOpen())
             playerHudPanel.SetActive(false);
 
         ApplyPadFocusVisible(false);
@@ -831,6 +831,11 @@ public class MenuManager : MonoBehaviour
     {
         return !string.IsNullOrWhiteSpace(pauseMenuTabKey)
                && string.Equals(CurrentTabKey, pauseMenuTabKey, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool ShouldHidePlayerHudPanelWhenMenuOpen()
+    {
+        return playerHudPanel != null && playerHudPanel.name != "HUD_Canvas";
     }
 
     private static bool IsQuestTabKey(string tabKey)

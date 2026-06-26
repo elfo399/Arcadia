@@ -29,6 +29,7 @@ public class MinimapManager : MonoBehaviour
     [Header("Settings")]
     public float iconBaseSize = 20f; 
     public float iconSpacing = 0f;   
+    [SerializeField] private bool hideInHubScene = false;
 
     // --- STRUTTURE DATI PER FOG OF WAR ---
     private Dictionary<Vector2Int, GameObject> _roomIconObjects = new Dictionary<Vector2Int, GameObject>();
@@ -76,7 +77,8 @@ public class MinimapManager : MonoBehaviour
         if (mapContainer == null)
             return;
 
-        mapContainer.gameObject.SetActive(sceneName != "HubScene");
+        bool shouldShowMap = !hideInHubScene || sceneName != "HubScene";
+        mapContainer.gameObject.SetActive(shouldShowMap);
     }
 
     public void ClearMap()
