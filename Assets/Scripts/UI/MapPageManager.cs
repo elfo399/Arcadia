@@ -1,6 +1,7 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class MapPageManager : MonoBehaviour
@@ -39,6 +40,12 @@ public class MapPageManager : MonoBehaviour
     [SerializeField] private string weatherFormat = "{0}";
     [SerializeField] private string runTimerFormat = "{0}";
     [SerializeField] private string missingThemeLabel = "-";
+
+    [Header("Hub Labels")]
+    [SerializeField] private string hubSceneName = "HubScene";
+    [SerializeField] private string hubFloorLabel = "HUB";
+    [SerializeField] private string hubLocationName = "Arcadia";
+
     [SerializeField] private string defaultPlayerName = "Player";
     [SerializeField] private string currentWeather = "Clear";
     [SerializeField] private float mapPadding = 32f;
@@ -120,6 +127,17 @@ public class MapPageManager : MonoBehaviour
     {
         ResolveReferences();
 
+        if (IsHubScene())
+        {
+            ApplyHubTexts();
+            ApplyRunInfoTexts(forceRefresh: true);
+            ApplyCoinText(forceRefresh: true);
+            ApplyPlayerPortrait(forceRefresh: true);
+            ApplyPlayerProgressBars(forceRefresh: true);
+            RefreshMap();
+            return;
+        }
+
         if (generator == null)
         {
             ApplyTexts(0, string.Empty);
@@ -141,6 +159,12 @@ public class MapPageManager : MonoBehaviour
 
     private void HandleFloorThemeChanged(int floor, string themeName)
     {
+        if (IsHubScene())
+        {
+            ApplyHubTexts();
+            return;
+        }
+
         ApplyTexts(floor, themeName);
     }
 
@@ -248,6 +272,18 @@ public class MapPageManager : MonoBehaviour
             string seed = generator != null ? generator.gameSeedString : string.Empty;
             seedText.text = string.IsNullOrWhiteSpace(seed) ? string.Empty : FormatText(seedFormat, seed);
         }
+    }
+
+    private void ApplyHubTexts()
+    {
+        if (floorText != null)
+            floorText.text = string.IsNullOrWhiteSpace(hubFloorLabel) ? "HUB" : hubFloorLabel.Trim();
+
+        if (themeText != null)
+            themeText.text = string.IsNullOrWhiteSpace(hubLocationName) ? "Arcadia" : hubLocationName.Trim();
+
+        if (seedText != null)
+            seedText.text = string.Empty;
     }
 
     private void ApplyRunInfoTexts(bool forceRefresh = false)
@@ -501,6 +537,12 @@ public class MapPageManager : MonoBehaviour
 
     private void SubscribeToGenerator()
     {
+        if (IsHubScene())
+        {
+            UnsubscribeFromGenerator();
+            return;
+        }
+
         if (subscribedGenerator == generator)
             return;
 
@@ -594,6 +636,13 @@ public class MapPageManager : MonoBehaviour
         {
             return value?.ToString() ?? string.Empty;
         }
+    }
+
+    private bool IsHubScene()
+    {
+        string sceneName = SceneManager.GetActiveScene().name;
+        string resolvedHubSceneName = string.IsNullOrWhiteSpace(hubSceneName) ? "HubScene" : hubSceneName.Trim();
+        return string.Equals(sceneName, resolvedHubSceneName, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void ApplyProgress(ProgressBarUI bar, float normalized, string displayText)
