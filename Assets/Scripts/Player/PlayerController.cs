@@ -77,6 +77,8 @@ public class PlayerController : MonoBehaviour
     private bool actionButtonHeld = false;
     private float sprintThreshold = 0.25f;
     private bool controlsInitialized = false;
+    private float inventoryInputReadyTime;
+    private const float InventoryInputEnableDelay = 0.25f;
 
     public bool IsGrounded => controller != null && controller.isGrounded;
 
@@ -119,6 +121,7 @@ public class PlayerController : MonoBehaviour
         CurrentPlayerTransform = transform;
         EnsureControlsInitialized();
         if (Controls != null) Controls.Player.Enable();
+        inventoryInputReadyTime = Time.unscaledTime + InventoryInputEnableDelay;
         canMove = menuManager == null || !menuManager.IsMenuOpen;
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
@@ -218,6 +221,7 @@ public class PlayerController : MonoBehaviour
         if (menuManager != null)
             menuManager.RefreshEquipmentUI();
 
+        inventoryInputReadyTime = Time.unscaledTime + InventoryInputEnableDelay;
         canMove = menuManager == null || !menuManager.IsMenuOpen;
     }
 
@@ -270,8 +274,13 @@ public class PlayerController : MonoBehaviour
         float equipLoadMultiplier = GetEquipLoadSpeedMultiplier();
         float targetSpeed = moveSpeed * equipLoadMultiplier * (isSprinting ? sprintMultiplier : 1f);
         
-        Vector3 camForward = cam.forward; camForward.y = 0f; camForward.Normalize();
-        Vector3 camRight = cam.right; camRight.y = 0f; camRight.Normalize();
+        Vector3 camForward = cam != null ? cam.forward : transform.forward;
+        camForward.y = 0f;
+        camForward.Normalize();
+
+        Vector3 camRight = cam != null ? cam.right : transform.right;
+        camRight.y = 0f;
+        camRight.Normalize();
         Vector3 moveDir = camForward * moveInput.y + camRight * moveInput.x;
         moveDir.Normalize();
 
@@ -493,6 +502,9 @@ public class PlayerController : MonoBehaviour
 
     private void OnInventoryPerformed(InputAction.CallbackContext ctx)
     {
+        if (Time.unscaledTime < inventoryInputReadyTime)
+            return;
+
         ToggleInventory();
     }
 
