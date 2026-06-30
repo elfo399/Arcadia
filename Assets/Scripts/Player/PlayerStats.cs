@@ -159,6 +159,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     private void MarkPersistentRoot()
     {
+        if (transform.parent != null)
+            transform.SetParent(null, true);
+
         DontDestroyOnLoad(gameObject);
     }
 

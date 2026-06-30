@@ -63,7 +63,8 @@ public static class CleanHubSceneBuilder
 
         CleanHubCopies(copiedRoots);
         CreateHubFloor(hubScene);
-        CreateDungeonPortal(hubScene);
+        GameObject dungeonPortal = CreateDungeonPortal(hubScene);
+        CreateHubMapZone(hubScene, dungeonPortal != null ? dungeonPortal.transform : null);
         AddSceneToBuildSettings(HubScenePath);
         AddSceneToBuildSettings(GameScenePath);
 
@@ -115,6 +116,7 @@ public static class CleanHubSceneBuilder
         if (systemRoot != null)
         {
             DestroyChildIfPresent(systemRoot.transform, "GeneratorManager");
+            DestroyChildIfPresent(systemRoot.transform, "MinimapManager");
             systemRoot.transform.position = Vector3.zero;
         }
 
@@ -156,7 +158,7 @@ public static class CleanHubSceneBuilder
         GameObjectUtility.SetStaticEditorFlags(floor, StaticEditorFlags.BatchingStatic);
     }
 
-    private static void CreateDungeonPortal(Scene scene)
+    private static GameObject CreateDungeonPortal(Scene scene)
     {
         GameObject portal = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         portal.name = "DungeonPortal";
@@ -170,6 +172,15 @@ public static class CleanHubSceneBuilder
         SceneLoader loader = portal.AddComponent<SceneLoader>();
         loader.sceneToLoad = "GameScene";
         SceneManager.MoveGameObjectToScene(portal, scene);
+        return portal;
+    }
+
+    private static void CreateHubMapZone(Scene scene, Transform portalTarget)
+    {
+        GameObject mapZoneObject = new GameObject("HubMapZone");
+        HubMapZone mapZone = mapZoneObject.AddComponent<HubMapZone>();
+        mapZone.Configure(Vector2.zero, new Vector2(80f, 80f), portalTarget);
+        SceneManager.MoveGameObjectToScene(mapZoneObject, scene);
     }
 
     private static GameObject FindRootObject(Scene scene, string rootName)

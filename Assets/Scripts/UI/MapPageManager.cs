@@ -182,13 +182,20 @@ public class MapPageManager : MonoBehaviour
         if (renderContainer == null)
             return;
 
-        MinimapManager.instance.RenderExploredMap(
-            renderContainer,
-            mapInnerPadding,
-            mapMaxScale,
-            showFullMapForTesting,
-            matchBookPageRoomBackground,
-            bookPageRoomBackgroundColor);
+        if (IsHubScene())
+        {
+            MinimapManager.instance.RenderHubOverviewMap(renderContainer, mapInnerPadding);
+        }
+        else
+        {
+            MinimapManager.instance.RenderExploredMap(
+                renderContainer,
+                mapInnerPadding,
+                mapMaxScale,
+                showFullMapForTesting,
+                matchBookPageRoomBackground,
+                bookPageRoomBackgroundColor);
+        }
 
         if (mapFrameOverlayImage != null)
             mapFrameOverlayImage.transform.SetAsLastSibling();

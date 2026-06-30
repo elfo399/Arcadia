@@ -6,6 +6,12 @@ using System.Linq;
 
 public class MinimapManager : MonoBehaviour
 {
+    private enum MapMode
+    {
+        Dungeon,
+        Hub
+    }
+
     public static MinimapManager instance;
     public event System.Action MapStateChanged;
 
@@ -31,6 +37,20 @@ public class MinimapManager : MonoBehaviour
     public float iconSpacing = 0f;   
     [SerializeField] private bool hideInHubScene = false;
 
+    [Header("Hub Map")]
+    [SerializeField] private string hubSceneName = "HubScene";
+    [SerializeField] private HubMapZone hubMapZone;
+    [SerializeField] private Color hubMapBackgroundColor = new Color(0.12f, 0.15f, 0.15f, 0.9f);
+    [SerializeField] private Color hubMapBorderColor = new Color(0.82f, 0.70f, 0.48f, 1f);
+    [SerializeField] private Color hubPlayerMarkerColor = new Color(0.25f, 0.75f, 1f, 1f);
+    [SerializeField] private Color hubPortalMarkerColor = new Color(0.72f, 0.36f, 1f, 1f);
+    [SerializeField] private Vector2 hubPlayerMarkerSize = new Vector2(14f, 14f);
+    [SerializeField] private Vector2 hubPortalMarkerSize = new Vector2(12f, 12f);
+    [SerializeField, Min(1f)] private float hubMinimapWorldViewSize = 28f;
+    [SerializeField] private bool createDefaultHubZoneIfMissing = true;
+    [SerializeField] private Vector2 defaultHubMapCenterXZ = Vector2.zero;
+    [SerializeField] private Vector2 defaultHubMapSizeXZ = new Vector2(80f, 80f);
+
     // --- STRUTTURE DATI PER FOG OF WAR ---
     private Dictionary<Vector2Int, GameObject> _roomIconObjects = new Dictionary<Vector2Int, GameObject>();
     private Dictionary<Vector2Int, RoomData> _roomData = new Dictionary<Vector2Int, RoomData>();
@@ -38,6 +58,18 @@ public class MinimapManager : MonoBehaviour
     private HashSet<Vector2Int> _revealedRoomAnchors = new HashSet<Vector2Int>(); // Stanze da mostrare permanentemente
     private Vector2Int _lastPlayerRoomAnchor = new Vector2Int(-999, -999);
     private const string RenderedMenuMapIconPrefix = "MenuMapRoomIcon_";
+    private const string HubMapBackgroundName = "HubMap_Background";
+    private const string HubMapPlayerMarkerName = "HubMap_PlayerMarker";
+    private const string HubMapPortalMarkerName = "HubMap_PortalMarker";
+    private const string RenderedHubMapPrefix = "MenuHubMap_";
+
+    private MapMode currentMode = MapMode.Dungeon;
+    private RectTransform hubMapRoot;
+    private RectTransform hubPlayerMarker;
+    private RectTransform hubPortalMarker;
+    private Image hubMapBackgroundImage;
+    private Transform hubPlayerTarget;
+    private Transform hubPortalTarget;
     
     private float FullStep => iconBaseSize + iconSpacing;
 
@@ -45,6 +77,13 @@ public class MinimapManager : MonoBehaviour
     { 
         if (instance != null && instance != this)
         {
+            if (instance.mapContainer == null && mapContainer != null)
+            {
+                Destroy(instance.gameObject);
+                instance = this;
+                return;
+            }
+
             Destroy(gameObject);
             return;
         }
@@ -67,6 +106,12 @@ public class MinimapManager : MonoBehaviour
         UpdateMapVisibilityForScene(SceneManager.GetActiveScene().name);
     }
 
+    private void Update()
+    {
+        if (currentMode == MapMode.Hub)
+            UpdateHubMapRuntime();
+    }
+
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         UpdateMapVisibilityForScene(scene.name);
@@ -77,8 +122,276 @@ public class MinimapManager : MonoBehaviour
         if (mapContainer == null)
             return;
 
-        bool shouldShowMap = !hideInHubScene || sceneName != "HubScene";
+        bool shouldShowMap = !hideInHubScene || !IsHubScene(sceneName);
         mapContainer.gameObject.SetActive(shouldShowMap);
+
+        bool shouldUseHubMap = IsHubScene(sceneName);
+        SetMapMode(shouldUseHubMap ? MapMode.Hub : MapMode.Dungeon);
+    }
+
+    private bool IsHubScene(string sceneName)
+    {
+        string resolvedHubSceneName = string.IsNullOrWhiteSpace(hubSceneName) ? "HubScene" : hubSceneName.Trim();
+        return string.Equals(sceneName, resolvedHubSceneName, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void SetMapMode(MapMode mode)
+    {
+        if (currentMode == mode)
+        {
+            if (currentMode == MapMode.Hub)
+                EnsureHubMapRuntime();
+            return;
+        }
+
+        currentMode = mode;
+
+        if (mode == MapMode.Hub)
+        {
+            HideDungeonRoomIcons();
+            EnsureHubMapRuntime();
+        }
+        else
+        {
+            if (hubMapRoot != null)
+                hubMapRoot.gameObject.SetActive(false);
+            if (hubPlayerMarker != null)
+                hubPlayerMarker.gameObject.SetActive(false);
+        }
+
+        MapStateChanged?.Invoke();
+    }
+
+    private void HideDungeonRoomIcons()
+    {
+        foreach (GameObject roomIcon in _roomIconObjects.Values)
+        {
+            if (roomIcon != null)
+                roomIcon.SetActive(false);
+        }
+    }
+
+    private void EnsureHubMapRuntime()
+    {
+        if (mapContainer == null || !ResolveHubMapZone())
+            return;
+
+        hubPlayerTarget = ResolveHubPlayerTarget();
+        hubPortalTarget = ResolveHubPortalTarget();
+        hubMapRoot = EnsureRectChild(mapContainer, "HubMap_RuntimeRoot");
+        hubMapRoot.SetAsFirstSibling();
+        hubMapRoot.gameObject.SetActive(true);
+        ConfigureHubRuntimeContentSize();
+
+        RectTransform background = EnsureRectChild(hubMapRoot, HubMapBackgroundName);
+        StretchToParent(background);
+        hubMapBackgroundImage = EnsureImage(background, hubMapBackgroundColor);
+        hubMapBackgroundImage.sprite = hubMapZone.MapSprite;
+        hubMapBackgroundImage.type = Image.Type.Simple;
+        hubMapBackgroundImage.preserveAspect = hubMapZone.MapSprite != null;
+
+        EnsureOutline(background, hubMapBorderColor, new Vector2(2f, -2f));
+
+        hubPortalMarker = EnsureRectChild(hubMapRoot, HubMapPortalMarkerName);
+        hubPortalMarker.sizeDelta = hubPortalMarkerSize;
+        EnsureImage(hubPortalMarker, hubPortalMarkerColor).raycastTarget = false;
+        hubPortalMarker.gameObject.SetActive(hubPortalTarget != null);
+
+        hubPlayerMarker = EnsureRectChild(mapContainer, HubMapPlayerMarkerName);
+        hubPlayerMarker.SetAsLastSibling();
+        hubPlayerMarker.anchorMin = new Vector2(0.5f, 0.5f);
+        hubPlayerMarker.anchorMax = new Vector2(0.5f, 0.5f);
+        hubPlayerMarker.pivot = new Vector2(0.5f, 0.5f);
+        hubPlayerMarker.anchoredPosition = Vector2.zero;
+        hubPlayerMarker.sizeDelta = hubPlayerMarkerSize;
+        EnsureImage(hubPlayerMarker, hubPlayerMarkerColor).raycastTarget = false;
+
+        UpdateHubMapRuntime();
+    }
+
+    private void UpdateHubMapRuntime()
+    {
+        if (hubMapRoot == null || !ResolveHubMapZone())
+            EnsureHubMapRuntime();
+
+        if (hubMapRoot == null || hubMapZone == null)
+            return;
+
+        if (hubPlayerTarget == null)
+            hubPlayerTarget = ResolveHubPlayerTarget();
+        if (hubPortalTarget == null)
+            hubPortalTarget = ResolveHubPortalTarget();
+
+        ConfigureHubRuntimeContentSize();
+        FollowHubPlayer();
+        PositionHubWorldMarker(hubPortalMarker, hubPortalTarget, false);
+        PositionHubCenteredPlayerMarker();
+    }
+
+    private bool ResolveHubMapZone()
+    {
+        if (hubMapZone != null)
+            return true;
+
+#if UNITY_2023_1_OR_NEWER
+        hubMapZone = FindFirstObjectByType<HubMapZone>();
+#else
+        hubMapZone = FindObjectOfType<HubMapZone>();
+#endif
+        if (hubMapZone == null && createDefaultHubZoneIfMissing && IsHubScene(SceneManager.GetActiveScene().name))
+        {
+            GameObject zoneObject = new GameObject("HubMapZone_Runtime");
+            hubMapZone = zoneObject.AddComponent<HubMapZone>();
+            hubMapZone.Configure(defaultHubMapCenterXZ, defaultHubMapSizeXZ, ResolveHubPortalTarget());
+        }
+
+        return hubMapZone != null;
+    }
+
+    private Transform ResolveHubPlayerTarget()
+    {
+        if (PlayerController.CurrentPlayerTransform != null)
+            return PlayerController.CurrentPlayerTransform;
+
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+            return player.transform;
+
+        GameObject namedPlayer = GameObject.Find("Player");
+        return namedPlayer != null ? namedPlayer.transform : null;
+    }
+
+    private Transform ResolveHubPortalTarget()
+    {
+        if (hubMapZone != null && hubMapZone.PortalMarkerTarget != null)
+            return hubMapZone.PortalMarkerTarget;
+
+        GameObject portal = GameObject.Find("DungeonPortal");
+        return portal != null ? portal.transform : null;
+    }
+
+    private void ConfigureHubRuntimeContentSize()
+    {
+        if (hubMapRoot == null || mapContainer == null || hubMapZone == null)
+            return;
+
+        Rect containerRect = mapContainer.rect;
+        if (containerRect.width <= 1f || containerRect.height <= 1f)
+            return;
+
+        Vector2 worldSize = hubMapZone.WorldSizeXZ;
+        float viewSize = Mathf.Max(1f, hubMinimapWorldViewSize);
+        float pixelsPerWorldUnit = Mathf.Min(containerRect.width, containerRect.height) / viewSize;
+        Vector2 contentSize = new Vector2(
+            Mathf.Max(containerRect.width, worldSize.x * pixelsPerWorldUnit),
+            Mathf.Max(containerRect.height, worldSize.y * pixelsPerWorldUnit));
+
+        hubMapRoot.anchorMin = new Vector2(0.5f, 0.5f);
+        hubMapRoot.anchorMax = new Vector2(0.5f, 0.5f);
+        hubMapRoot.pivot = new Vector2(0.5f, 0.5f);
+        hubMapRoot.sizeDelta = contentSize;
+        hubMapRoot.localScale = Vector3.one;
+    }
+
+    private void FollowHubPlayer()
+    {
+        if (hubMapRoot == null || mapContainer == null || hubMapZone == null || hubPlayerTarget == null)
+            return;
+
+        Vector2 normalized = hubMapZone.WorldToNormalized(hubPlayerTarget.position);
+        Vector2 rootSize = hubMapRoot.rect.size;
+        Vector2 containerSize = mapContainer.rect.size;
+        Vector2 targetPosition = new Vector2(
+            (0.5f - normalized.x) * rootSize.x,
+            (0.5f - normalized.y) * rootSize.y);
+
+        float maxX = Mathf.Max(0f, (rootSize.x - containerSize.x) * 0.5f);
+        float maxY = Mathf.Max(0f, (rootSize.y - containerSize.y) * 0.5f);
+        hubMapRoot.anchoredPosition = new Vector2(
+            Mathf.Clamp(targetPosition.x, -maxX, maxX),
+            Mathf.Clamp(targetPosition.y, -maxY, maxY));
+    }
+
+    private void PositionHubCenteredPlayerMarker()
+    {
+        if (hubPlayerMarker == null)
+            return;
+
+        if (hubPlayerTarget == null)
+        {
+            hubPlayerMarker.gameObject.SetActive(false);
+            return;
+        }
+
+        hubPlayerMarker.gameObject.SetActive(true);
+        hubPlayerMarker.anchoredPosition = Vector2.zero;
+        hubPlayerMarker.localRotation = Quaternion.Euler(0f, 0f, -hubPlayerTarget.eulerAngles.y);
+    }
+
+    private void PositionHubWorldMarker(RectTransform marker, Transform target, bool rotateWithTarget)
+    {
+        if (marker == null)
+            return;
+
+        if (target == null)
+        {
+            marker.gameObject.SetActive(false);
+            return;
+        }
+
+        marker.gameObject.SetActive(true);
+        Vector2 normalized = hubMapZone.WorldToNormalized(target.position);
+        Rect rect = hubMapRoot.rect;
+        marker.anchoredPosition = new Vector2(
+            (normalized.x - 0.5f) * rect.width,
+            (normalized.y - 0.5f) * rect.height);
+        marker.localRotation = rotateWithTarget
+            ? Quaternion.Euler(0f, 0f, -target.eulerAngles.y)
+            : Quaternion.identity;
+    }
+
+    private static RectTransform EnsureRectChild(Transform parent, string objectName)
+    {
+        Transform existing = parent.Find(objectName);
+        if (existing != null)
+            return existing as RectTransform ?? existing.gameObject.AddComponent<RectTransform>();
+
+        GameObject child = new GameObject(objectName, typeof(RectTransform));
+        RectTransform rect = child.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        return rect;
+    }
+
+    private static Image EnsureImage(RectTransform rect, Color color)
+    {
+        Image image = rect.GetComponent<Image>();
+        if (image == null)
+            image = rect.gameObject.AddComponent<Image>();
+
+        image.color = color;
+        image.raycastTarget = false;
+        return image;
+    }
+
+    private static Outline EnsureOutline(RectTransform rect, Color color, Vector2 distance)
+    {
+        Outline outline = rect.GetComponent<Outline>();
+        if (outline == null)
+            outline = rect.gameObject.AddComponent<Outline>();
+
+        outline.effectColor = color;
+        outline.effectDistance = distance;
+        return outline;
+    }
+
+    private static void StretchToParent(RectTransform rect)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = Vector2.zero;
+        rect.localScale = Vector3.one;
     }
 
     public void ClearMap()
@@ -88,6 +401,10 @@ public class MinimapManager : MonoBehaviour
             foreach (Transform child in mapContainer) Destroy(child.gameObject);
         }
 
+        hubMapRoot = null;
+        hubMapBackgroundImage = null;
+        hubPlayerMarker = null;
+        hubPortalMarker = null;
         _roomIconObjects.Clear();
         _visitedRoomAnchors.Clear();
         _revealedRoomAnchors.Clear();
@@ -98,6 +415,9 @@ public class MinimapManager : MonoBehaviour
 
     public void RegisterRoom(Vector2Int gridPos, RoomData data)
     {
+        if (currentMode == MapMode.Hub)
+            return;
+
         if (data == null || _roomData.ContainsKey(gridPos) || mapContainer == null || roomIconPrefab == null) return;
 
         GameObject newIconObj = Instantiate(roomIconPrefab, mapContainer);
@@ -143,12 +463,18 @@ public class MinimapManager : MonoBehaviour
     
     public void RevealStartingArea(Vector2Int startPosAnchor)
     {
+        if (currentMode == MapMode.Hub)
+            return;
+
         _lastPlayerRoomAnchor = startPosAnchor;
         UpdateMapVisibility(startPosAnchor);
     }
 
     public void UpdatePlayerPosition(Vector3 worldPos, float roomSize)
     {
+        if (currentMode == MapMode.Hub)
+            return;
+
         if (mapContainer == null)
             return;
 
@@ -232,6 +558,12 @@ public class MinimapManager : MonoBehaviour
 
         ClearRenderedMenuMap(targetContainer);
 
+        if ((currentMode == MapMode.Hub || IsHubScene(SceneManager.GetActiveScene().name)) && ResolveHubMapZone())
+        {
+            RenderHubMap(targetContainer, padding);
+            return;
+        }
+
         if (roomIconPrefab == null || _roomData.Count == 0)
             return;
 
@@ -282,12 +614,88 @@ public class MinimapManager : MonoBehaviour
         }
     }
 
+    public bool RenderHubOverviewMap(RectTransform targetContainer, float padding = 12f)
+    {
+        if (targetContainer == null)
+            return false;
+
+        ClearRenderedMenuMap(targetContainer);
+        if (!ResolveHubMapZone())
+            return false;
+
+        RenderHubMap(targetContainer, padding);
+        return true;
+    }
+
+    private void RenderHubMap(
+        RectTransform targetContainer,
+        float padding)
+    {
+        RectTransform root = EnsureRectChild(targetContainer, RenderedHubMapPrefix + "Root");
+        StretchToParent(root);
+        root.SetAsLastSibling();
+
+        RectTransform background = EnsureRectChild(root, RenderedHubMapPrefix + "Background");
+        StretchToParent(background);
+        background.SetAsFirstSibling();
+        Image backgroundImage = EnsureImage(background, hubMapBackgroundColor);
+        backgroundImage.sprite = hubMapZone.MapSprite;
+        backgroundImage.preserveAspect = hubMapZone.MapSprite != null;
+
+        EnsureOutline(background, hubMapBorderColor, new Vector2(2f, -2f));
+
+        Transform playerTarget = ResolveHubPlayerTarget();
+        Transform portalTarget = ResolveHubPortalTarget();
+
+        RectTransform portalMarker = EnsureRectChild(root, RenderedHubMapPrefix + "PortalMarker");
+        portalMarker.sizeDelta = hubPortalMarkerSize;
+        EnsureImage(portalMarker, hubPortalMarkerColor);
+        PositionHubMarkerForContainer(root, portalMarker, portalTarget, false, padding);
+
+        RectTransform playerMarker = EnsureRectChild(root, RenderedHubMapPrefix + "PlayerMarker");
+        playerMarker.sizeDelta = hubPlayerMarkerSize;
+        EnsureImage(playerMarker, hubPlayerMarkerColor);
+        PositionHubMarkerForContainer(root, playerMarker, playerTarget, true, padding);
+    }
+
+    private void PositionHubMarkerForContainer(
+        RectTransform container,
+        RectTransform marker,
+        Transform target,
+        bool rotateWithTarget,
+        float padding)
+    {
+        if (marker == null)
+            return;
+
+        if (target == null)
+        {
+            marker.gameObject.SetActive(false);
+            return;
+        }
+
+        marker.gameObject.SetActive(true);
+        Vector2 normalized = hubMapZone.WorldToNormalized(target.position);
+        Rect rect = container.rect;
+        float inset = Mathf.Max(0f, padding);
+        float width = Mathf.Max(1f, rect.width - inset * 2f);
+        float height = Mathf.Max(1f, rect.height - inset * 2f);
+        marker.anchoredPosition = new Vector2(
+            (normalized.x - 0.5f) * width,
+            (normalized.y - 0.5f) * height);
+        marker.localRotation = rotateWithTarget
+            ? Quaternion.Euler(0f, 0f, -target.eulerAngles.y)
+            : Quaternion.identity;
+    }
+
     private void ClearRenderedMenuMap(RectTransform targetContainer)
     {
         for (int i = targetContainer.childCount - 1; i >= 0; i--)
         {
             Transform child = targetContainer.GetChild(i);
-            if (child != null && child.name.StartsWith(RenderedMenuMapIconPrefix, System.StringComparison.Ordinal))
+            if (child != null
+                && (child.name.StartsWith(RenderedMenuMapIconPrefix, System.StringComparison.Ordinal)
+                    || child.name.StartsWith(RenderedHubMapPrefix, System.StringComparison.Ordinal)))
                 Destroy(child.gameObject);
         }
     }
