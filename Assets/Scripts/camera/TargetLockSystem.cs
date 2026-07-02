@@ -33,6 +33,8 @@ public class TargetLockSystem : MonoBehaviour
     private Camera mainCam;
     private float lastSwitchTime;
     private PlayerController playerController;
+    private const string LockOnCameraName = "CM_LockOn";
+    private const string CameraTargetName = "CamTarget";
 
     void Awake()
     {
@@ -48,8 +50,11 @@ public class TargetLockSystem : MonoBehaviour
             playerController.Controls.Player.LockOn.performed += HandleLockOnInput;
         }
 
-        freeLookCamera.Priority = 10;
-        lockOnCamera.Priority = 0;
+        ResolveSceneCameraReferences();
+        if (freeLookCamera != null)
+            freeLookCamera.Priority = 10;
+        if (lockOnCamera != null)
+            lockOnCamera.Priority = 0;
         if (targetIcon != null) targetIcon.gameObject.SetActive(false);
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
@@ -93,7 +98,72 @@ public class TargetLockSystem : MonoBehaviour
     {
         mainCam = Camera.main;
         playerController = GetComponentInParent<PlayerController>();
+        ResolveSceneCameraReferences();
         StopLockOn();
+    }
+
+    private void ResolveSceneCameraReferences()
+    {
+        if (playerController == null)
+            playerController = GetComponentInParent<PlayerController>();
+
+        Transform followTarget = playerController != null ? playerController.transform : transform;
+        Transform lookAtTarget = ResolveLookAtTarget(followTarget);
+
+        if (freeLookCamera == null)
+            freeLookCamera = FindObjectOfType<CinemachineFreeLook>();
+
+        if (lockOnCamera == null)
+            lockOnCamera = FindVirtualCamera(LockOnCameraName);
+
+        if (freeLookCamera != null)
+        {
+            freeLookCamera.Follow = followTarget;
+            freeLookCamera.LookAt = lookAtTarget != null ? lookAtTarget : followTarget;
+        }
+
+        if (lockOnCamera != null)
+        {
+            lockOnCamera.Follow = followTarget;
+            if (!isLockedOn)
+                lockOnCamera.LookAt = null;
+        }
+    }
+
+    private Transform ResolveLookAtTarget(Transform followTarget)
+    {
+        if (followTarget == null)
+            return null;
+
+        Transform[] children = followTarget.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            if (children[i].name == CameraTargetName)
+                return children[i];
+        }
+
+        return followTarget;
+    }
+
+    private CinemachineVirtualCamera FindVirtualCamera(string preferredName)
+    {
+        CinemachineVirtualCamera[] cameras = FindObjectsOfType<CinemachineVirtualCamera>();
+        CinemachineVirtualCamera fallback = null;
+
+        for (int i = 0; i < cameras.Length; i++)
+        {
+            CinemachineVirtualCamera camera = cameras[i];
+            if (camera == null)
+                continue;
+
+            if (fallback == null)
+                fallback = camera;
+
+            if (camera.name == preferredName)
+                return camera;
+        }
+
+        return fallback;
     }
 
     // --- LOGICA SWITCHING ---
@@ -166,6 +236,12 @@ public class TargetLockSystem : MonoBehaviour
 
     void FindAndLockTarget()
     {
+        if (mainCam == null)
+            mainCam = Camera.main;
+
+        if (mainCam == null)
+            return;
+
         Collider[] colliders = Physics.OverlapSphere(transform.position, scanRadius, enemyLayer);
         float shortestDistance = Mathf.Infinity;
         Transform nearestTarget = null;
@@ -196,6 +272,10 @@ public class TargetLockSystem : MonoBehaviour
 
     void StartLockOn(Transform target)
     {
+        ResolveSceneCameraReferences();
+        if (lockOnCamera == null)
+            return;
+
         currentTarget = target;
         isLockedOn = true;
         lockOnCamera.LookAt = currentTarget;
@@ -215,8 +295,11 @@ public class TargetLockSystem : MonoBehaviour
             freeLookCamera.m_YAxis.Value = 0.5f; 
         }
 
-        lockOnCamera.Priority = 0;
-        lockOnCamera.LookAt = null;
+        if (lockOnCamera != null)
+        {
+            lockOnCamera.Priority = 0;
+            lockOnCamera.LookAt = null;
+        }
         if (targetIcon != null) targetIcon.gameObject.SetActive(false);
         
         // FIX ROTAZIONE (Mantenuto)
