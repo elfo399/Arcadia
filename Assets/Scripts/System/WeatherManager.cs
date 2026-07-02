@@ -1,5 +1,8 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class WeatherManager : MonoBehaviour
 {
@@ -101,6 +104,8 @@ public class WeatherManager : MonoBehaviour
     [SerializeField, Min(1f)] private float weatherChangeIntervalSeconds = 45f;
     [SerializeField] private bool rerollWeatherOnPhaseChange = true;
     [SerializeField] private bool avoidRepeatingWeather = true;
+    [SerializeField] private bool suppressWorldWeatherEffectsInIndoorScenes = true;
+    [SerializeField] private string[] indoorSceneNames = { "GameScene" };
     [SerializeField] private WeatherConditionSettings[] weatherConditions =
     {
         new WeatherConditionSettings
@@ -134,6 +139,29 @@ public class WeatherManager : MonoBehaviour
     [SerializeField] private bool driveAmbientLight = true;
     [SerializeField] private bool smoothPhaseLighting = true;
 
+    [Header("World Effects")]
+    [SerializeField] private string rainEffectObjectName = "RainFX";
+    [SerializeField] private Transform rainEffectRoot;
+    [SerializeField] private ParticleSystem[] rainParticleSystems;
+
+    [Header("World Lightning")]
+    [SerializeField] private bool enableLightningEffects = true;
+    [SerializeField] private string lightningEffectObjectName = "LightningFX";
+    [SerializeField] private Transform lightningRoot;
+    [SerializeField] private LineRenderer lightningLine;
+    [SerializeField] private Light lightningFlashLight;
+    [SerializeField, Min(0.1f)] private float lightningMinIntervalSeconds = 2.5f;
+    [SerializeField, Min(0.1f)] private float lightningMaxIntervalSeconds = 7f;
+    [SerializeField, Min(0.02f)] private float lightningBoltDurationSeconds = 0.12f;
+    [SerializeField, Min(1f)] private float lightningSpawnRadius = 28f;
+    [SerializeField] private float lightningSkyHeight = 28f;
+    [SerializeField] private float lightningGroundHeight = 1.5f;
+    [SerializeField, Min(2)] private int lightningSegmentCount = 9;
+    [SerializeField, Min(0.01f)] private float lightningWidth = 0.08f;
+    [SerializeField] private Color lightningColor = new Color(0.62f, 0.82f, 1f, 1f);
+    [SerializeField, Min(0f)] private float lightningFlashIntensity = 4f;
+    [SerializeField, Min(1f)] private float lightningFlashRange = 65f;
+
     private bool isRunning;
     private float cycleTimeSeconds;
     private int currentPhaseIndex = -1;
@@ -141,6 +169,9 @@ public class WeatherManager : MonoBehaviour
     private string currentDisplayName = string.Empty;
     private WeatherCondition lastAppliedCondition = (WeatherCondition)(-1);
     private float weatherTimerSeconds;
+    private Coroutine lightningRoutine;
+    private int lastRainResolveSceneHandle = -1;
+    private int lastLightningResolveSceneHandle = -1;
 
     public event Action<DayPhase, string> DayPhaseChanged;
     public event Action<WeatherCondition, string> WeatherChanged;
@@ -176,6 +207,8 @@ public class WeatherManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        StopLightningEffect();
+
         if (Instance == this)
             Instance = null;
     }
@@ -190,6 +223,7 @@ public class WeatherManager : MonoBehaviour
         AdvanceCycle(scaledDeltaTime);
         AdvanceWeather(scaledDeltaTime);
         ApplyPhaseLighting();
+        ApplyWorldEffects();
     }
 
     public void Play()
@@ -267,6 +301,7 @@ public class WeatherManager : MonoBehaviour
             PlayAnimatorState(GetAnimatorStateName());
 
         ApplyPhaseLighting();
+        ApplyWorldEffects();
 
         if (force || displayChanged)
             DisplayNameChanged?.Invoke(currentDisplayName);
@@ -334,6 +369,26 @@ public class WeatherManager : MonoBehaviour
         return currentCondition.ToString();
     }
 
+    private bool ShouldSuppressWorldWeatherEffects()
+    {
+        if (!suppressWorldWeatherEffectsInIndoorScenes || indoorSceneNames == null || indoorSceneNames.Length == 0)
+            return false;
+
+        string activeSceneName = SceneManager.GetActiveScene().name;
+        if (string.IsNullOrWhiteSpace(activeSceneName))
+            return false;
+
+        for (int i = 0; i < indoorSceneNames.Length; i++)
+        {
+            string sceneName = indoorSceneNames[i];
+            if (!string.IsNullOrWhiteSpace(sceneName)
+                && string.Equals(activeSceneName, sceneName.Trim(), StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
     private void PlayAnimatorState(string stateName)
     {
         ResolveReferences();
@@ -345,6 +400,322 @@ public class WeatherManager : MonoBehaviour
             return;
 
         weatherAnimator.Play(stateName, 0, 0f);
+    }
+
+    private void ApplyWorldEffects()
+    {
+        bool suppressWorldEffects = ShouldSuppressWorldWeatherEffects();
+        ApplyRainEffect(suppressWorldEffects);
+        ApplyLightningEffect(suppressWorldEffects);
+    }
+
+    private void ApplyRainEffect(bool suppressWorldEffects)
+    {
+        ResolveRainReferences();
+
+        bool raining = (currentCondition == WeatherCondition.Raining || currentCondition == WeatherCondition.Lightning2) && !suppressWorldEffects;
+        if (!raining)
+        {
+            StopRainEffect();
+            return;
+        }
+
+        if (rainEffectRoot != null && !rainEffectRoot.gameObject.activeSelf)
+            rainEffectRoot.gameObject.SetActive(true);
+
+        if (rainParticleSystems == null)
+            return;
+
+        for (int i = 0; i < rainParticleSystems.Length; i++)
+        {
+            ParticleSystem particles = rainParticleSystems[i];
+            if (particles == null)
+                continue;
+
+            if (!particles.isPlaying)
+                particles.Play(true);
+        }
+    }
+
+    private void ApplyLightningEffect(bool suppressWorldEffects)
+    {
+        bool storming = currentCondition == WeatherCondition.Lightning2 && !suppressWorldEffects;
+        if (!storming || !enableLightningEffects)
+        {
+            StopLightningEffect();
+            return;
+        }
+
+        ResolveLightningReferences();
+        if (lightningLine == null || lightningFlashLight == null)
+            return;
+
+        if (lightningRoutine == null)
+            lightningRoutine = StartCoroutine(LightningRoutine());
+    }
+
+    private void ResolveRainReferences()
+    {
+        if (rainEffectRoot != null && HasValidRainParticleSystem())
+            return;
+
+        if (rainEffectRoot == null && string.IsNullOrWhiteSpace(rainEffectObjectName))
+            return;
+
+        int activeSceneHandle = SceneManager.GetActiveScene().handle;
+        if (rainEffectRoot == null && rainParticleSystems != null && rainParticleSystems.Length == 0 && lastRainResolveSceneHandle == activeSceneHandle)
+            return;
+
+        lastRainResolveSceneHandle = activeSceneHandle;
+
+        string targetName = string.IsNullOrWhiteSpace(rainEffectObjectName) ? string.Empty : rainEffectObjectName.Trim();
+
+        if (rainEffectRoot == null && !string.IsNullOrWhiteSpace(targetName))
+        {
+            Transform[] transforms = FindObjectsOfType<Transform>(true);
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                Transform candidate = transforms[i];
+                if (candidate != null && string.Equals(candidate.name, targetName, StringComparison.OrdinalIgnoreCase))
+                {
+                    rainEffectRoot = candidate;
+                    break;
+                }
+            }
+        }
+
+        if (rainEffectRoot != null)
+        {
+            rainParticleSystems = rainEffectRoot.GetComponentsInChildren<ParticleSystem>(true);
+            return;
+        }
+
+        ParticleSystem[] allParticles = FindObjectsOfType<ParticleSystem>(true);
+        var matches = new List<ParticleSystem>();
+        Transform matchedRoot = null;
+
+        for (int i = 0; i < allParticles.Length; i++)
+        {
+            ParticleSystem particles = allParticles[i];
+            if (particles == null)
+                continue;
+
+            Transform current = particles.transform;
+            while (current != null)
+            {
+                if (string.Equals(current.name, targetName, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (matchedRoot == null)
+                        matchedRoot = current;
+
+                    matches.Add(particles);
+                    break;
+                }
+
+                current = current.parent;
+            }
+        }
+
+        rainEffectRoot = matchedRoot;
+        rainParticleSystems = matches.ToArray();
+    }
+
+    private void StopRainEffect()
+    {
+        if (rainParticleSystems != null)
+        {
+            for (int i = 0; i < rainParticleSystems.Length; i++)
+            {
+                ParticleSystem particles = rainParticleSystems[i];
+                if (particles == null)
+                    continue;
+
+                if (particles.isPlaying || particles.particleCount > 0)
+                    particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            }
+        }
+
+        if (rainEffectRoot != null && rainEffectRoot.gameObject.activeSelf)
+            rainEffectRoot.gameObject.SetActive(false);
+    }
+
+    private bool HasValidRainParticleSystem()
+    {
+        if (rainParticleSystems == null || rainParticleSystems.Length == 0)
+            return false;
+
+        for (int i = 0; i < rainParticleSystems.Length; i++)
+        {
+            if (rainParticleSystems[i] != null)
+                return true;
+        }
+
+        return false;
+    }
+
+    private IEnumerator LightningRoutine()
+    {
+        ResolveLightningReferences();
+
+        while (currentCondition == WeatherCondition.Lightning2 && !ShouldSuppressWorldWeatherEffects())
+        {
+            float minInterval = Mathf.Max(0.1f, lightningMinIntervalSeconds);
+            float maxInterval = Mathf.Max(minInterval, lightningMaxIntervalSeconds);
+            yield return new WaitForSeconds(UnityEngine.Random.Range(minInterval, maxInterval));
+
+            if (currentCondition != WeatherCondition.Lightning2 || ShouldSuppressWorldWeatherEffects())
+                break;
+
+            yield return PlayLightningStrike();
+        }
+
+        lightningRoutine = null;
+        HideLightningRuntimeObjects();
+    }
+
+    private IEnumerator PlayLightningStrike()
+    {
+        ResolveLightningReferences();
+        if (lightningLine == null || lightningFlashLight == null)
+            yield break;
+
+        Vector3 origin = ResolveWorldEffectOrigin();
+        Vector2 offset = UnityEngine.Random.insideUnitCircle * lightningSpawnRadius;
+        Vector3 start = origin + new Vector3(offset.x, lightningSkyHeight, offset.y);
+        Vector3 end = new Vector3(start.x + UnityEngine.Random.Range(-3f, 3f), lightningGroundHeight, start.z + UnityEngine.Random.Range(-3f, 3f));
+
+        int segmentCount = Mathf.Max(2, lightningSegmentCount);
+        lightningLine.positionCount = segmentCount + 1;
+        for (int i = 0; i <= segmentCount; i++)
+        {
+            float t = i / (float)segmentCount;
+            Vector3 point = Vector3.Lerp(start, end, t);
+            float jitter = Mathf.Lerp(2.2f, 0.35f, t);
+            if (i > 0 && i < segmentCount)
+            {
+                point.x += UnityEngine.Random.Range(-jitter, jitter);
+                point.z += UnityEngine.Random.Range(-jitter, jitter);
+            }
+
+            lightningLine.SetPosition(i, point);
+        }
+
+        if (lightningRoot != null && !lightningRoot.gameObject.activeSelf)
+            lightningRoot.gameObject.SetActive(true);
+
+        lightningLine.startWidth = lightningWidth;
+        lightningLine.endWidth = lightningWidth * 0.35f;
+        lightningLine.startColor = lightningColor;
+        lightningLine.endColor = new Color(lightningColor.r, lightningColor.g, lightningColor.b, 0.15f);
+        lightningLine.enabled = true;
+        lightningFlashLight.transform.position = Vector3.Lerp(start, end, 0.35f);
+        lightningFlashLight.color = lightningColor;
+        lightningFlashLight.range = lightningFlashRange;
+        lightningFlashLight.intensity = lightningFlashIntensity;
+        lightningFlashLight.enabled = true;
+
+        yield return new WaitForSeconds(lightningBoltDurationSeconds);
+        HideLightningRuntimeObjects();
+    }
+
+    private void ResolveLightningReferences()
+    {
+        if (lightningLine != null && lightningFlashLight != null)
+        {
+            ConfigureLightningReferences();
+            return;
+        }
+
+        int activeSceneHandle = SceneManager.GetActiveScene().handle;
+        if (lastLightningResolveSceneHandle == activeSceneHandle && lightningRoot == null)
+            return;
+
+        lastLightningResolveSceneHandle = activeSceneHandle;
+
+        if (lightningRoot == null && !string.IsNullOrWhiteSpace(lightningEffectObjectName))
+        {
+            string targetName = lightningEffectObjectName.Trim();
+            Transform[] transforms = FindObjectsOfType<Transform>(true);
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                Transform candidate = transforms[i];
+                if (candidate != null && string.Equals(candidate.name, targetName, StringComparison.OrdinalIgnoreCase))
+                {
+                    lightningRoot = candidate;
+                    break;
+                }
+            }
+        }
+
+        if (lightningRoot == null)
+            return;
+
+        if (lightningLine == null)
+            lightningLine = lightningRoot.GetComponentInChildren<LineRenderer>(true);
+
+        if (lightningFlashLight == null)
+            lightningFlashLight = lightningRoot.GetComponentInChildren<Light>(true);
+
+        ConfigureLightningReferences();
+        HideLightningRuntimeObjects();
+    }
+
+    private void ConfigureLightningReferences()
+    {
+        if (lightningLine != null)
+        {
+            lightningLine.useWorldSpace = true;
+            lightningLine.textureMode = LineTextureMode.Stretch;
+            lightningLine.alignment = LineAlignment.View;
+            lightningLine.startWidth = lightningWidth;
+            lightningLine.endWidth = lightningWidth * 0.35f;
+            lightningLine.startColor = lightningColor;
+            lightningLine.endColor = new Color(lightningColor.r, lightningColor.g, lightningColor.b, 0.15f);
+        }
+
+        if (lightningFlashLight != null)
+        {
+            lightningFlashLight.type = LightType.Point;
+            lightningFlashLight.shadows = LightShadows.None;
+            lightningFlashLight.color = lightningColor;
+            lightningFlashLight.range = lightningFlashRange;
+            lightningFlashLight.intensity = lightningFlashIntensity;
+        }
+    }
+
+    private Vector3 ResolveWorldEffectOrigin()
+    {
+        if (PlayerStats.instance != null)
+            return PlayerStats.instance.transform.position;
+
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null)
+            return mainCamera.transform.position;
+
+        return transform.position;
+    }
+
+    private void StopLightningEffect()
+    {
+        if (lightningRoutine != null)
+        {
+            StopCoroutine(lightningRoutine);
+            lightningRoutine = null;
+        }
+
+        HideLightningRuntimeObjects();
+    }
+
+    private void HideLightningRuntimeObjects()
+    {
+        if (lightningLine != null)
+            lightningLine.enabled = false;
+
+        if (lightningFlashLight != null)
+            lightningFlashLight.enabled = false;
+
+        if (lightningRoot != null && lightningRoot.gameObject.activeSelf)
+            lightningRoot.gameObject.SetActive(false);
     }
 
     private void SetCycleToPhase(DayPhase phase)
