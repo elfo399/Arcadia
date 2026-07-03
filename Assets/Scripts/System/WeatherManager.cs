@@ -180,6 +180,10 @@ public class WeatherManager : MonoBehaviour
     [SerializeField] private Vector2 wetSurfaceSize = new Vector2(3.2f, 1.5f);
     [SerializeField, Min(0.01f)] private float wetSurfaceLineWidth = 0.22f;
     [SerializeField, Min(8)] private int wetSurfaceSegments = 28;
+    [SerializeField, Range(0f, 1f)] private float wetSurfaceShapeIrregularity = 0.65f;
+    [SerializeField, Min(0f)] private float wetSurfaceDryDelaySeconds = 8f;
+    [SerializeField, Min(0.1f)] private float wetSurfaceDryFadeSeconds = 12f;
+    [SerializeField, Range(0.05f, 1f)] private float wetSurfaceMinimumDryScale = 0.2f;
 
     private bool isRunning;
     private float cycleTimeSeconds;
@@ -190,7 +194,15 @@ public class WeatherManager : MonoBehaviour
     private float weatherTimerSeconds;
     private Coroutine lightningRoutine;
     private float rainEffectIntensity;
+    private float wetSurfaceIntensity;
+    private float wetSurfaceDryTimerSeconds;
     private Vector2 rainWindCurrentVelocity;
+    private Mesh wetSurfaceMesh;
+    private MeshFilter wetSurfaceMeshFilter;
+    private MeshRenderer wetSurfaceMeshRenderer;
+    private Material wetSurfaceMaterial;
+    private bool wetSurfaceBaseScaleInitialized;
+    private Vector3 wetSurfaceBaseLocalScale = Vector3.one;
     private int lastRainResolveSceneHandle = -1;
     private int lastLightningResolveSceneHandle = -1;
 
@@ -229,8 +241,12 @@ public class WeatherManager : MonoBehaviour
     private void OnDestroy()
     {
         rainEffectIntensity = 0f;
+        wetSurfaceIntensity = 0f;
+        wetSurfaceDryTimerSeconds = 0f;
         StopRainEffect();
-        ApplyWetSurfaceEffect();
+        ApplyWetSurfaceEffect(suppressWorldEffects: false);
+        RestoreWetSurfaceScale();
+        DestroyRuntimeWetSurface();
         StopLightningEffect();
 
         if (Instance == this)
@@ -430,7 +446,7 @@ public class WeatherManager : MonoBehaviour
     {
         bool suppressWorldEffects = ShouldSuppressWorldWeatherEffects();
         ApplyRainEffect(suppressWorldEffects);
-        ApplyWetSurfaceEffect();
+        ApplyWetSurfaceEffect(suppressWorldEffects);
         ApplyLightningEffect(suppressWorldEffects);
     }
 
@@ -614,15 +630,18 @@ public class WeatherManager : MonoBehaviour
             rainEffectRoot.gameObject.SetActive(false);
     }
 
-    private void ApplyWetSurfaceEffect()
+    private void ApplyWetSurfaceEffect(bool suppressWorldEffects)
     {
         ResolveWetSurfaceReferences();
 
-        float wetIntensity = Mathf.Clamp01(rainEffectIntensity);
+        float wetIntensity = UpdateWetSurfaceIntensity(suppressWorldEffects);
         bool visible = wetIntensity > 0.001f;
 
         if (wetSurfaceRoot != null && wetSurfaceRoot.gameObject.activeSelf != visible)
             wetSurfaceRoot.gameObject.SetActive(visible);
+
+        ApplyWetSurfaceScale(wetIntensity, visible);
+        ConfigureWetSurfaceMesh(wetIntensity, visible);
 
         if (wetSurfaceLineRenderers == null)
             return;
@@ -635,6 +654,37 @@ public class WeatherManager : MonoBehaviour
 
             ConfigureWetSurfaceLine(puddle, wetIntensity);
         }
+    }
+
+    private float UpdateWetSurfaceIntensity(bool suppressWorldEffects)
+    {
+        if (suppressWorldEffects)
+        {
+            wetSurfaceIntensity = 0f;
+            wetSurfaceDryTimerSeconds = 0f;
+            return wetSurfaceIntensity;
+        }
+
+        float deltaTime = GetWeatherEffectDeltaTime();
+        bool wetWeatherActive = currentCondition == WeatherCondition.Raining || currentCondition == WeatherCondition.Lightning2;
+        float rainWetness = Mathf.Clamp01(rainEffectIntensity);
+
+        if (wetWeatherActive || rainWetness > wetSurfaceIntensity)
+        {
+            wetSurfaceIntensity = Mathf.Max(wetSurfaceIntensity, rainWetness);
+            wetSurfaceDryTimerSeconds = wetSurfaceDryDelaySeconds;
+            return wetSurfaceIntensity;
+        }
+
+        if (wetSurfaceDryTimerSeconds > 0f)
+        {
+            wetSurfaceDryTimerSeconds = Mathf.Max(0f, wetSurfaceDryTimerSeconds - deltaTime);
+            return wetSurfaceIntensity;
+        }
+
+        float dryStep = deltaTime / Mathf.Max(0.1f, wetSurfaceDryFadeSeconds);
+        wetSurfaceIntensity = Mathf.MoveTowards(wetSurfaceIntensity, 0f, dryStep);
+        return wetSurfaceIntensity;
     }
 
     private void ResolveWetSurfaceReferences()
@@ -654,24 +704,235 @@ public class WeatherManager : MonoBehaviour
         puddle.useWorldSpace = false;
         puddle.loop = true;
         puddle.positionCount = segmentCount;
-        puddle.startWidth = wetSurfaceLineWidth;
-        puddle.endWidth = wetSurfaceLineWidth;
+        puddle.textureMode = LineTextureMode.Stretch;
+        puddle.numCornerVertices = 4;
+        puddle.numCapVertices = 4;
+        float dryScale = GetWetSurfaceDryScale(intensity);
+        float lineWidth = wetSurfaceLineWidth * Mathf.Lerp(0.18f, 0.55f, dryScale);
+        puddle.startWidth = lineWidth;
+        puddle.endWidth = lineWidth;
 
         Color color = wetSurfaceColor;
-        color.a *= intensity;
+        color.a *= intensity * 0.85f;
         puddle.startColor = color;
         puddle.endColor = color;
         puddle.enabled = intensity > 0.001f;
 
         for (int i = 0; i < segmentCount; i++)
+            puddle.SetPosition(i, GenerateWetSurfacePoint(i, segmentCount, 0.015f));
+    }
+
+    private void ConfigureWetSurfaceMesh(float intensity, bool visible)
+    {
+        if (wetSurfaceRoot == null)
+            return;
+
+        if (!visible)
         {
-            float angle = (i / (float)segmentCount) * Mathf.PI * 2f;
-            float wobble = 1f + Mathf.Sin(angle * 3f + 0.65f) * 0.08f;
-            Vector3 point = new Vector3(
-                Mathf.Cos(angle) * wetSurfaceSize.x * 0.5f * wobble,
-                0f,
-                Mathf.Sin(angle) * wetSurfaceSize.y * 0.5f * wobble);
-            puddle.SetPosition(i, point);
+            if (wetSurfaceMeshRenderer != null)
+                wetSurfaceMeshRenderer.enabled = false;
+
+            return;
+        }
+
+        EnsureWetSurfaceMeshRuntime();
+
+        if (wetSurfaceMeshRenderer != null)
+            wetSurfaceMeshRenderer.enabled = true;
+
+        if (wetSurfaceMesh == null)
+            return;
+
+        int segmentCount = Mathf.Max(8, wetSurfaceSegments);
+        Vector3[] vertices = new Vector3[segmentCount + 1];
+        int[] triangles = new int[segmentCount * 3];
+
+        vertices[0] = Vector3.zero;
+        for (int i = 0; i < segmentCount; i++)
+            vertices[i + 1] = GenerateWetSurfacePoint(i, segmentCount, 0f);
+
+        for (int i = 0; i < segmentCount; i++)
+        {
+            int next = (i + 1) % segmentCount;
+            int triangleIndex = i * 3;
+            triangles[triangleIndex] = 0;
+            triangles[triangleIndex + 1] = next + 1;
+            triangles[triangleIndex + 2] = i + 1;
+        }
+
+        wetSurfaceMesh.Clear();
+        wetSurfaceMesh.vertices = vertices;
+        wetSurfaceMesh.triangles = triangles;
+        wetSurfaceMesh.RecalculateBounds();
+        wetSurfaceMesh.RecalculateNormals();
+
+        if (wetSurfaceMaterial != null)
+        {
+            Color fillColor = wetSurfaceColor;
+            fillColor.a *= intensity * 0.6f;
+            SetMaterialColor(wetSurfaceMaterial, fillColor);
+        }
+    }
+
+    private void ApplyWetSurfaceScale(float intensity, bool visible)
+    {
+        if (wetSurfaceRoot == null)
+            return;
+
+        EnsureWetSurfaceBaseScale();
+
+        if (!visible)
+        {
+            wetSurfaceRoot.localScale = wetSurfaceBaseLocalScale;
+            return;
+        }
+
+        wetSurfaceRoot.localScale = wetSurfaceBaseLocalScale * GetWetSurfaceDryScale(intensity);
+    }
+
+    private float GetWetSurfaceDryScale(float intensity)
+    {
+        float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(intensity));
+        return Mathf.Lerp(wetSurfaceMinimumDryScale, 1f, t);
+    }
+
+    private void EnsureWetSurfaceBaseScale()
+    {
+        if (wetSurfaceBaseScaleInitialized || wetSurfaceRoot == null)
+            return;
+
+        wetSurfaceBaseLocalScale = wetSurfaceRoot.localScale;
+        wetSurfaceBaseScaleInitialized = true;
+    }
+
+    private void RestoreWetSurfaceScale()
+    {
+        if (wetSurfaceRoot != null && wetSurfaceBaseScaleInitialized)
+            wetSurfaceRoot.localScale = wetSurfaceBaseLocalScale;
+    }
+
+    private void EnsureWetSurfaceMeshRuntime()
+    {
+        if (wetSurfaceRoot == null)
+            return;
+
+        if (wetSurfaceMeshFilter == null)
+            wetSurfaceMeshFilter = wetSurfaceRoot.GetComponent<MeshFilter>();
+
+        if (wetSurfaceMeshFilter == null)
+            wetSurfaceMeshFilter = wetSurfaceRoot.gameObject.AddComponent<MeshFilter>();
+
+        if (wetSurfaceMeshRenderer == null)
+            wetSurfaceMeshRenderer = wetSurfaceRoot.GetComponent<MeshRenderer>();
+
+        if (wetSurfaceMeshRenderer == null)
+            wetSurfaceMeshRenderer = wetSurfaceRoot.gameObject.AddComponent<MeshRenderer>();
+
+        if (wetSurfaceMesh == null)
+        {
+            wetSurfaceMesh = new Mesh
+            {
+                name = "Runtime Wet Surface Mesh",
+                hideFlags = HideFlags.DontSave
+            };
+        }
+
+        if (wetSurfaceMeshFilter == null || wetSurfaceMeshRenderer == null)
+            return;
+
+        wetSurfaceMeshFilter.sharedMesh = wetSurfaceMesh;
+
+        if (wetSurfaceMaterial == null)
+            wetSurfaceMaterial = CreateWetSurfaceMaterial();
+
+        wetSurfaceMeshRenderer.sharedMaterial = wetSurfaceMaterial;
+        wetSurfaceMeshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        wetSurfaceMeshRenderer.receiveShadows = false;
+    }
+
+    private Material CreateWetSurfaceMaterial()
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null)
+            shader = Shader.Find("Sprites/Default");
+        if (shader == null)
+            shader = Shader.Find("Standard");
+
+        Material material = new Material(shader)
+        {
+            name = "Runtime Wet Surface Material",
+            hideFlags = HideFlags.DontSave,
+            renderQueue = 3000
+        };
+
+        ConfigureTransparentMaterial(material);
+        SetMaterialColor(material, wetSurfaceColor);
+        return material;
+    }
+
+    private static void ConfigureTransparentMaterial(Material material)
+    {
+        if (material == null)
+            return;
+
+        if (material.HasProperty("_Surface"))
+            material.SetFloat("_Surface", 1f);
+        if (material.HasProperty("_Blend"))
+            material.SetFloat("_Blend", 0f);
+        if (material.HasProperty("_SrcBlend"))
+            material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        if (material.HasProperty("_DstBlend"))
+            material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        if (material.HasProperty("_ZWrite"))
+            material.SetFloat("_ZWrite", 0f);
+
+        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        material.EnableKeyword("_ALPHABLEND_ON");
+    }
+
+    private static void SetMaterialColor(Material material, Color color)
+    {
+        if (material == null)
+            return;
+
+        if (material.HasProperty("_BaseColor"))
+            material.SetColor("_BaseColor", color);
+        if (material.HasProperty("_Color"))
+            material.SetColor("_Color", color);
+    }
+
+    private Vector3 GenerateWetSurfacePoint(int index, int segmentCount, float y)
+    {
+        float angle = (index / (float)segmentCount) * Mathf.PI * 2f;
+        float irregularity = Mathf.Clamp01(wetSurfaceShapeIrregularity);
+        float lobe =
+            Mathf.Sin(angle * 2f + 0.45f) * 0.18f +
+            Mathf.Sin(angle * 3f + 2.1f) * 0.12f +
+            Mathf.Sin(angle * 5f + 1.35f) * 0.08f +
+            Mathf.Sin(angle * 7f + 3.8f) * 0.05f;
+        float edge = Mathf.Max(0.55f, 1f + lobe * irregularity * 1.7f);
+
+        float x = Mathf.Cos(angle) * wetSurfaceSize.x * 0.5f * edge;
+        float z = Mathf.Sin(angle) * wetSurfaceSize.y * 0.5f * edge;
+
+        x += Mathf.Sin(angle * 1.5f + 2.4f) * wetSurfaceSize.x * 0.035f * irregularity;
+        z += Mathf.Sin(angle * 2.5f + 0.9f) * wetSurfaceSize.y * 0.03f * irregularity;
+
+        return new Vector3(x, y, z);
+    }
+
+    private void DestroyRuntimeWetSurface()
+    {
+        if (wetSurfaceMesh != null)
+        {
+            Destroy(wetSurfaceMesh);
+            wetSurfaceMesh = null;
+        }
+
+        if (wetSurfaceMaterial != null)
+        {
+            Destroy(wetSurfaceMaterial);
+            wetSurfaceMaterial = null;
         }
     }
 
