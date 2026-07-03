@@ -139,10 +139,21 @@ public class WeatherManager : MonoBehaviour
     [SerializeField] private bool driveAmbientLight = true;
     [SerializeField] private bool smoothPhaseLighting = true;
 
+    [Header("Weather Transitions")]
+    [SerializeField, Min(0.05f)] private float weatherEffectFadeInSeconds = 2.5f;
+    [SerializeField, Min(0.05f)] private float weatherEffectFadeOutSeconds = 4f;
+
     [Header("World Effects")]
     [SerializeField] private string rainEffectObjectName = "RainFX";
     [SerializeField] private Transform rainEffectRoot;
     [SerializeField] private ParticleSystem[] rainParticleSystems;
+    [SerializeField, Min(1f)] private float rainBaseEmissionRate = 1400f;
+    [SerializeField, Min(0f)] private float rainingEmissionMultiplier = 1f;
+    [SerializeField, Min(0f)] private float stormEmissionMultiplier = 1.35f;
+
+    [Header("World Wind")]
+    [SerializeField] private Vector2 rainWindVelocity = new Vector2(1.4f, 0.35f);
+    [SerializeField] private Vector2 stormWindVelocity = new Vector2(4.5f, 1.2f);
 
     [Header("World Lightning")]
     [SerializeField] private bool enableLightningEffects = true;
@@ -162,6 +173,14 @@ public class WeatherManager : MonoBehaviour
     [SerializeField, Min(0f)] private float lightningFlashIntensity = 4f;
     [SerializeField, Min(1f)] private float lightningFlashRange = 65f;
 
+    [Header("Wet Surface Example")]
+    [SerializeField] private Transform wetSurfaceRoot;
+    [SerializeField] private LineRenderer[] wetSurfaceLineRenderers;
+    [SerializeField] private Color wetSurfaceColor = new Color(0.23f, 0.42f, 0.55f, 0.42f);
+    [SerializeField] private Vector2 wetSurfaceSize = new Vector2(3.2f, 1.5f);
+    [SerializeField, Min(0.01f)] private float wetSurfaceLineWidth = 0.22f;
+    [SerializeField, Min(8)] private int wetSurfaceSegments = 28;
+
     private bool isRunning;
     private float cycleTimeSeconds;
     private int currentPhaseIndex = -1;
@@ -170,6 +189,8 @@ public class WeatherManager : MonoBehaviour
     private WeatherCondition lastAppliedCondition = (WeatherCondition)(-1);
     private float weatherTimerSeconds;
     private Coroutine lightningRoutine;
+    private float rainEffectIntensity;
+    private Vector2 rainWindCurrentVelocity;
     private int lastRainResolveSceneHandle = -1;
     private int lastLightningResolveSceneHandle = -1;
 
@@ -207,6 +228,9 @@ public class WeatherManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        rainEffectIntensity = 0f;
+        StopRainEffect();
+        ApplyWetSurfaceEffect();
         StopLightningEffect();
 
         if (Instance == this)
@@ -406,6 +430,7 @@ public class WeatherManager : MonoBehaviour
     {
         bool suppressWorldEffects = ShouldSuppressWorldWeatherEffects();
         ApplyRainEffect(suppressWorldEffects);
+        ApplyWetSurfaceEffect();
         ApplyLightningEffect(suppressWorldEffects);
     }
 
@@ -413,8 +438,16 @@ public class WeatherManager : MonoBehaviour
     {
         ResolveRainReferences();
 
-        bool raining = (currentCondition == WeatherCondition.Raining || currentCondition == WeatherCondition.Lightning2) && !suppressWorldEffects;
-        if (!raining)
+        float targetIntensity = suppressWorldEffects ? 0f : GetRainTargetIntensity();
+        float transitionSeconds = targetIntensity > rainEffectIntensity ? weatherEffectFadeInSeconds : weatherEffectFadeOutSeconds;
+        float transitionStep = GetWeatherEffectDeltaTime() / Mathf.Max(0.05f, transitionSeconds) * Mathf.Max(1f, targetIntensity);
+        rainEffectIntensity = Mathf.MoveTowards(rainEffectIntensity, targetIntensity, transitionStep);
+
+        Vector2 targetWind = suppressWorldEffects ? Vector2.zero : GetRainTargetWindVelocity();
+        float windStep = GetWeatherEffectDeltaTime() / Mathf.Max(0.05f, transitionSeconds) * Mathf.Max(1f, targetWind.magnitude);
+        rainWindCurrentVelocity = Vector2.MoveTowards(rainWindCurrentVelocity, targetWind, windStep);
+
+        if (rainEffectIntensity <= 0.001f)
         {
             StopRainEffect();
             return;
@@ -432,9 +465,51 @@ public class WeatherManager : MonoBehaviour
             if (particles == null)
                 continue;
 
+            ConfigureRainParticleSystem(particles);
             if (!particles.isPlaying)
                 particles.Play(true);
         }
+    }
+
+    private float GetWeatherEffectDeltaTime()
+    {
+        float deltaTime = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+        return Mathf.Max(deltaTime, 0f);
+    }
+
+    private float GetRainTargetIntensity()
+    {
+        if (currentCondition == WeatherCondition.Raining)
+            return rainingEmissionMultiplier;
+
+        if (currentCondition == WeatherCondition.Lightning2)
+            return stormEmissionMultiplier;
+
+        return 0f;
+    }
+
+    private Vector2 GetRainTargetWindVelocity()
+    {
+        if (currentCondition == WeatherCondition.Raining)
+            return rainWindVelocity;
+
+        if (currentCondition == WeatherCondition.Lightning2)
+            return stormWindVelocity;
+
+        return Vector2.zero;
+    }
+
+    private void ConfigureRainParticleSystem(ParticleSystem particles)
+    {
+        ParticleSystem.EmissionModule emission = particles.emission;
+        emission.enabled = true;
+        emission.rateOverTime = new ParticleSystem.MinMaxCurve(rainBaseEmissionRate * rainEffectIntensity);
+
+        ParticleSystem.VelocityOverLifetimeModule velocity = particles.velocityOverLifetime;
+        velocity.enabled = true;
+        velocity.space = ParticleSystemSimulationSpace.World;
+        velocity.x = new ParticleSystem.MinMaxCurve(rainWindCurrentVelocity.x);
+        velocity.z = new ParticleSystem.MinMaxCurve(rainWindCurrentVelocity.y);
     }
 
     private void ApplyLightningEffect(bool suppressWorldEffects)
@@ -537,6 +612,67 @@ public class WeatherManager : MonoBehaviour
 
         if (rainEffectRoot != null && rainEffectRoot.gameObject.activeSelf)
             rainEffectRoot.gameObject.SetActive(false);
+    }
+
+    private void ApplyWetSurfaceEffect()
+    {
+        ResolveWetSurfaceReferences();
+
+        float wetIntensity = Mathf.Clamp01(rainEffectIntensity);
+        bool visible = wetIntensity > 0.001f;
+
+        if (wetSurfaceRoot != null && wetSurfaceRoot.gameObject.activeSelf != visible)
+            wetSurfaceRoot.gameObject.SetActive(visible);
+
+        if (wetSurfaceLineRenderers == null)
+            return;
+
+        for (int i = 0; i < wetSurfaceLineRenderers.Length; i++)
+        {
+            LineRenderer puddle = wetSurfaceLineRenderers[i];
+            if (puddle == null)
+                continue;
+
+            ConfigureWetSurfaceLine(puddle, wetIntensity);
+        }
+    }
+
+    private void ResolveWetSurfaceReferences()
+    {
+        if (wetSurfaceLineRenderers != null && wetSurfaceLineRenderers.Length > 0)
+            return;
+
+        if (wetSurfaceRoot == null)
+            return;
+
+        wetSurfaceLineRenderers = wetSurfaceRoot.GetComponentsInChildren<LineRenderer>(true);
+    }
+
+    private void ConfigureWetSurfaceLine(LineRenderer puddle, float intensity)
+    {
+        int segmentCount = Mathf.Max(8, wetSurfaceSegments);
+        puddle.useWorldSpace = false;
+        puddle.loop = true;
+        puddle.positionCount = segmentCount;
+        puddle.startWidth = wetSurfaceLineWidth;
+        puddle.endWidth = wetSurfaceLineWidth;
+
+        Color color = wetSurfaceColor;
+        color.a *= intensity;
+        puddle.startColor = color;
+        puddle.endColor = color;
+        puddle.enabled = intensity > 0.001f;
+
+        for (int i = 0; i < segmentCount; i++)
+        {
+            float angle = (i / (float)segmentCount) * Mathf.PI * 2f;
+            float wobble = 1f + Mathf.Sin(angle * 3f + 0.65f) * 0.08f;
+            Vector3 point = new Vector3(
+                Mathf.Cos(angle) * wetSurfaceSize.x * 0.5f * wobble,
+                0f,
+                Mathf.Sin(angle) * wetSurfaceSize.y * 0.5f * wobble);
+            puddle.SetPosition(i, point);
+        }
     }
 
     private bool HasValidRainParticleSystem()
