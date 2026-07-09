@@ -4243,7 +4243,6 @@ RectTransform:
   - {fileID: 862986410}
   - {fileID: 213484799}
   - {fileID: 780874913}
-  - {fileID: 554504568}
   m_Father: {fileID: 2033984392}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -15894,81 +15893,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 547111753}
   m_CullTransparentMesh: 1
---- !u!1 &554504567
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 554504568}
-  - component: {fileID: 554504570}
-  - component: {fileID: 554504569}
-  m_Layer: 0
-  m_Name: targetLock
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &554504568
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 554504567}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 209919238}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 25, y: 25}
-  m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &554504569
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 554504567}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_Material: {fileID: 0}
-  m_Color: {r: 0.9372549, g: 0.7411765, b: 0.5372549, a: 1}
-  m_RaycastTarget: 1
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 981c59da71faecd429a32e95d9ca638b, type: 3}
-  m_Type: 0
-  m_PreserveAspect: 0
-  m_FillCenter: 1
-  m_FillMethod: 4
-  m_FillAmount: 1
-  m_FillClockwise: 1
-  m_FillOrigin: 0
-  m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
---- !u!222 &554504570
-CanvasRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 554504567}
-  m_CullTransparentMesh: 1
 --- !u!1 &555243400
 GameObject:
   m_ObjectHideFlags: 0
@@ -23048,7 +22972,7 @@ Transform:
   m_GameObject: {fileID: 911776033}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 5.591, z: -40.9}
+  m_LocalPosition: {x: 0, y: 5.591, z: -14}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -23474,7 +23398,7 @@ Transform:
   m_GameObject: {fileID: 919607531}
   serializedVersion: 2
   m_LocalRotation: {x: 0.14105178, y: 0.000000014755551, z: -0.000000002102315, w: 0.9900022}
-  m_LocalPosition: {x: 0, y: 5.591, z: -40.9}
+  m_LocalPosition: {x: 0, y: 5.591, z: -14}
   m_LocalScale: {x: 1, y: 1.0287156, z: 0.95186365}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -24134,7 +24058,7 @@ Transform:
   m_GameObject: {fileID: 950411487}
   serializedVersion: 2
   m_LocalRotation: {x: -0.04670207, y: 0.9525622, z: -0.19259796, w: -0.23097676}
-  m_LocalPosition: {x: 2.9543486, y: 6.81048, z: -29.666222}
+  m_LocalPosition: {x: 2.954349, y: 6.8104806, z: -2.76622}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -28551,7 +28475,7 @@ Transform:
   m_GameObject: {fileID: 1149146430}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 3.091, z: -35.4}
+  m_LocalPosition: {x: 0, y: 3.091, z: -8.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -28614,7 +28538,8 @@ MonoBehaviour:
   switchCooldown: 0.3
   switchThreshold: 0.5
   rotationSpeed: 20
-  targetIcon: {fileID: 554504568}
+  fallbackLockPointOffset: 0
+  fallbackLockPointBoundsHeight: 0.55
   isLockedOn: 0
   currentTarget: {fileID: 0}
 --- !u!114 &1149146435
