@@ -61,7 +61,7 @@ public class WeatherManager : MonoBehaviour
             ambientLightColor = new Color(0.55f, 0.45f, 0.42f, 1f),
             directionalLightColor = new Color(1f, 0.73f, 0.55f, 1f),
             directionalLightIntensity = 0.55f,
-            directionalLightEulerAngles = new Vector3(15f, -30f, 0f),
+            directionalLightEulerAngles = new Vector3(5f, -30f, 0f),
             animatorStateName = "Dawn"
         },
         new DayPhaseSettings
@@ -72,7 +72,7 @@ public class WeatherManager : MonoBehaviour
             ambientLightColor = new Color(0.78f, 0.78f, 0.74f, 1f),
             directionalLightColor = new Color(1f, 0.96f, 0.84f, 1f),
             directionalLightIntensity = 1f,
-            directionalLightEulerAngles = new Vector3(45f, -30f, 0f),
+            directionalLightEulerAngles = new Vector3(75f, -30f, 0f),
             animatorStateName = "Day"
         },
         new DayPhaseSettings
@@ -83,7 +83,7 @@ public class WeatherManager : MonoBehaviour
             ambientLightColor = new Color(0.5f, 0.34f, 0.36f, 1f),
             directionalLightColor = new Color(1f, 0.48f, 0.32f, 1f),
             directionalLightIntensity = 0.45f,
-            directionalLightEulerAngles = new Vector3(115f, -30f, 0f),
+            directionalLightEulerAngles = new Vector3(170f, -30f, 0f),
             animatorStateName = "Noon"
         },
         new DayPhaseSettings
@@ -94,7 +94,7 @@ public class WeatherManager : MonoBehaviour
             ambientLightColor = new Color(0.2f, 0.24f, 0.36f, 1f),
             directionalLightColor = new Color(0.46f, 0.56f, 0.9f, 1f),
             directionalLightIntensity = 0.2f,
-            directionalLightEulerAngles = new Vector3(135f, -30f, 0f),
+            directionalLightEulerAngles = new Vector3(260f, -30f, 0f),
             animatorStateName = "Night"
         }
     };
@@ -138,6 +138,18 @@ public class WeatherManager : MonoBehaviour
     [SerializeField] private bool driveDirectionalLight = true;
     [SerializeField] private bool driveAmbientLight = true;
     [SerializeField] private bool smoothPhaseLighting = true;
+
+    [Header("Moon")]
+    [SerializeField] private bool autoCreateMoon = true;
+    [SerializeField] private bool driveMoonLight = true;
+    [SerializeField] private bool driveMoonVisual = true;
+    [SerializeField] private string moonObjectName = "Moon";
+    [SerializeField] private Light moonLight;
+    [SerializeField, Range(0f, 1f)] private float moonLightIntensity = 0.22f;
+    [SerializeField] private Color moonLightColor = new Color(0.55f, 0.65f, 1f, 1f);
+    [SerializeField, Min(5f)] private float moonOrbitDistance = 250f;
+    [SerializeField, Min(0.1f)] private float moonVisualSize = 18f;
+    [SerializeField] private Color moonVisualColor = new Color(0.82f, 0.88f, 1f, 1f);
 
     [Header("Weather Transitions")]
     [SerializeField, Min(0.05f)] private float weatherEffectFadeInSeconds = 2.5f;
@@ -205,6 +217,13 @@ public class WeatherManager : MonoBehaviour
     private Vector3 wetSurfaceBaseLocalScale = Vector3.one;
     private int lastRainResolveSceneHandle = -1;
     private int lastLightningResolveSceneHandle = -1;
+    private Transform moonVisualTransform;
+    private MeshFilter moonVisualMeshFilter;
+    private MeshRenderer moonVisualRenderer;
+    private Mesh moonVisualMesh;
+    private Material moonVisualMaterial;
+    private bool createdRuntimeMoonLight;
+    private bool createdRuntimeMoonVisual;
 
     public event Action<DayPhase, string> DayPhaseChanged;
     public event Action<WeatherCondition, string> WeatherChanged;
@@ -247,6 +266,7 @@ public class WeatherManager : MonoBehaviour
         ApplyWetSurfaceEffect(suppressWorldEffects: false);
         RestoreWetSurfaceScale();
         DestroyRuntimeWetSurface();
+        DestroyMoonRuntime();
         StopLightningEffect();
 
         if (Instance == this)
@@ -362,6 +382,7 @@ public class WeatherManager : MonoBehaviour
 
         DayPhaseSettings nextPhaseSettings = smoothPhaseLighting ? GetNextPhaseSettings() : currentPhaseSettings;
         float phaseProgress = smoothPhaseLighting ? GetCurrentPhaseProgress() : 0f;
+        Quaternion sunRotation = Quaternion.Euler(InterpolateSunEuler(currentPhaseSettings.directionalLightEulerAngles, nextPhaseSettings.directionalLightEulerAngles, phaseProgress));
 
         if (driveAmbientLight)
             RenderSettings.ambientLight = Color.Lerp(currentPhaseSettings.ambientLightColor, nextPhaseSettings.ambientLightColor, phaseProgress);
@@ -370,8 +391,92 @@ public class WeatherManager : MonoBehaviour
         {
             directionalLight.color = Color.Lerp(currentPhaseSettings.directionalLightColor, nextPhaseSettings.directionalLightColor, phaseProgress);
             directionalLight.intensity = Mathf.Lerp(currentPhaseSettings.directionalLightIntensity, nextPhaseSettings.directionalLightIntensity, phaseProgress);
-            directionalLight.transform.rotation = Quaternion.Euler(InterpolateSunEuler(currentPhaseSettings.directionalLightEulerAngles, nextPhaseSettings.directionalLightEulerAngles, phaseProgress));
+            directionalLight.transform.rotation = sunRotation;
+
+            if (RenderSettings.sun != directionalLight)
+                RenderSettings.sun = directionalLight;
         }
+
+        ApplyMoonState(GetLightSourceDirection(sunRotation));
+    }
+
+    private void ApplyMoonState(Vector3 sunSourceDirection)
+    {
+        if (!driveMoonLight && !driveMoonVisual)
+            return;
+
+        ResolveMoonReferences();
+
+        Vector3 moonSourceDirection = -sunSourceDirection.normalized;
+        float visibility = GetMoonVisibility(moonSourceDirection);
+
+        if (driveMoonLight && moonLight != null)
+        {
+            moonLight.type = LightType.Directional;
+            moonLight.shadows = LightShadows.None;
+            moonLight.color = moonLightColor;
+            moonLight.intensity = moonLightIntensity * visibility;
+            moonLight.enabled = visibility > 0.001f;
+            moonLight.transform.rotation = GetStableLookRotation(-moonSourceDirection);
+        }
+
+        if (driveMoonVisual)
+            ApplyMoonVisual(moonSourceDirection, visibility);
+    }
+
+    private void ApplyMoonVisual(Vector3 moonSourceDirection, float visibility)
+    {
+        if (moonVisualTransform == null)
+            return;
+
+        bool visible = visibility > 0.001f;
+        if (moonVisualRenderer != null)
+            moonVisualRenderer.enabled = visible;
+
+        if (!visible)
+            return;
+
+        Camera mainCamera = Camera.main;
+        Vector3 origin = mainCamera != null ? mainCamera.transform.position : ResolveWorldEffectOrigin();
+        float distance = mainCamera != null
+            ? Mathf.Clamp(moonOrbitDistance, mainCamera.nearClipPlane + 5f, mainCamera.farClipPlane * 0.8f)
+            : moonOrbitDistance;
+
+        moonVisualTransform.position = origin + moonSourceDirection.normalized * distance;
+        moonVisualTransform.localScale = Vector3.one * moonVisualSize;
+
+        Vector3 forward = mainCamera != null
+            ? mainCamera.transform.position - moonVisualTransform.position
+            : -moonSourceDirection;
+        moonVisualTransform.rotation = GetStableLookRotation(forward);
+
+        if (moonVisualMaterial != null)
+        {
+            Color visualColor = moonVisualColor;
+            visualColor.a *= visibility;
+            SetMaterialColor(moonVisualMaterial, visualColor);
+        }
+    }
+
+    private float GetMoonVisibility(Vector3 moonSourceDirection)
+    {
+        float height = moonSourceDirection.normalized.y;
+        return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.02f, 0.35f, height));
+    }
+
+    private static Vector3 GetLightSourceDirection(Quaternion lightRotation)
+    {
+        return -(lightRotation * Vector3.forward).normalized;
+    }
+
+    private static Quaternion GetStableLookRotation(Vector3 forward)
+    {
+        if (forward.sqrMagnitude < 0.0001f)
+            return Quaternion.identity;
+
+        forward.Normalize();
+        Vector3 up = Mathf.Abs(Vector3.Dot(forward, Vector3.up)) > 0.95f ? Vector3.forward : Vector3.up;
+        return Quaternion.LookRotation(forward, up);
     }
 
     private string BuildDisplayName()
@@ -1303,10 +1408,10 @@ public class WeatherManager : MonoBehaviour
     {
         return new[]
         {
-            new DayPhaseSettings { phase = DayPhase.Dawn, displayName = "Alba", animatorStateName = "Dawn" },
-            new DayPhaseSettings { phase = DayPhase.Day, displayName = "Giorno", animatorStateName = "Day" },
-            new DayPhaseSettings { phase = DayPhase.Sunset, displayName = "Tramonto", animatorStateName = "Noon" },
-            new DayPhaseSettings { phase = DayPhase.Night, displayName = "Notte", animatorStateName = "Night" }
+            new DayPhaseSettings { phase = DayPhase.Dawn, displayName = "Alba", directionalLightEulerAngles = new Vector3(5f, -30f, 0f), animatorStateName = "Dawn" },
+            new DayPhaseSettings { phase = DayPhase.Day, displayName = "Giorno", directionalLightEulerAngles = new Vector3(75f, -30f, 0f), animatorStateName = "Day" },
+            new DayPhaseSettings { phase = DayPhase.Sunset, displayName = "Tramonto", directionalLightEulerAngles = new Vector3(170f, -30f, 0f), animatorStateName = "Noon" },
+            new DayPhaseSettings { phase = DayPhase.Night, displayName = "Notte", directionalLightEulerAngles = new Vector3(260f, -30f, 0f), animatorStateName = "Night" }
         };
     }
 
@@ -1314,5 +1419,196 @@ public class WeatherManager : MonoBehaviour
     {
         if (directionalLight == null)
             directionalLight = RenderSettings.sun;
+
+        if (directionalLight != null && RenderSettings.sun != directionalLight)
+            RenderSettings.sun = directionalLight;
+
+        ResolveMoonReferences();
+    }
+
+    private void ResolveMoonReferences()
+    {
+        if (!autoCreateMoon && moonLight == null && moonVisualTransform == null)
+            return;
+
+        if (moonLight != null && moonVisualTransform != null)
+        {
+            ConfigureMoonReferences();
+            return;
+        }
+
+        Transform moonRoot = FindMoonRoot();
+        if (moonRoot != null)
+        {
+            if (moonLight == null)
+                moonLight = moonRoot.GetComponentInChildren<Light>(true);
+
+            if (moonVisualTransform == null)
+                moonVisualTransform = moonRoot;
+        }
+
+        if (moonLight == null && autoCreateMoon)
+        {
+            GameObject moonLightObject = new GameObject("Moon Light_Runtime");
+            moonLightObject.hideFlags = HideFlags.DontSave;
+            moonLightObject.transform.SetParent(transform, false);
+            moonLight = moonLightObject.AddComponent<Light>();
+            createdRuntimeMoonLight = true;
+        }
+
+        if (moonVisualTransform == null && autoCreateMoon)
+            CreateRuntimeMoonVisual();
+
+        ConfigureMoonReferences();
+    }
+
+    private void ConfigureMoonReferences()
+    {
+        if (moonLight != null)
+        {
+            moonLight.type = LightType.Directional;
+            moonLight.shadows = LightShadows.None;
+            moonLight.color = moonLightColor;
+            moonLight.intensity = 0f;
+            moonLight.enabled = false;
+        }
+
+        if (moonVisualTransform != null && moonVisualRenderer == null)
+        {
+            moonVisualMeshFilter = moonVisualTransform.GetComponentInChildren<MeshFilter>(true);
+            moonVisualRenderer = moonVisualTransform.GetComponentInChildren<MeshRenderer>(true);
+        }
+
+        if (moonVisualMeshFilter != null && moonVisualMeshFilter.sharedMesh == null)
+        {
+            moonVisualMesh = CreateMoonDiscMesh();
+            moonVisualMeshFilter.sharedMesh = moonVisualMesh;
+        }
+
+        if (moonVisualRenderer != null && moonVisualMaterial == null)
+        {
+            moonVisualMaterial = CreateMoonVisualMaterial();
+            moonVisualRenderer.sharedMaterial = moonVisualMaterial;
+            moonVisualRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            moonVisualRenderer.receiveShadows = false;
+            moonVisualRenderer.enabled = false;
+        }
+    }
+
+    private Transform FindMoonRoot()
+    {
+        if (string.IsNullOrWhiteSpace(moonObjectName))
+            return null;
+
+        string targetName = moonObjectName.Trim();
+        Transform[] transforms = FindObjectsOfType<Transform>(true);
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            Transform candidate = transforms[i];
+            if (candidate != null && string.Equals(candidate.name, targetName, StringComparison.OrdinalIgnoreCase))
+                return candidate;
+        }
+
+        return null;
+    }
+
+    private void CreateRuntimeMoonVisual()
+    {
+        GameObject moonObject = new GameObject(string.IsNullOrWhiteSpace(moonObjectName) ? "Moon" : moonObjectName.Trim());
+        moonObject.hideFlags = HideFlags.DontSave;
+        moonObject.transform.SetParent(transform, false);
+
+        moonVisualMeshFilter = moonObject.AddComponent<MeshFilter>();
+        moonVisualRenderer = moonObject.AddComponent<MeshRenderer>();
+        moonVisualMesh = CreateMoonDiscMesh();
+        moonVisualMeshFilter.sharedMesh = moonVisualMesh;
+
+        moonVisualTransform = moonObject.transform;
+        createdRuntimeMoonVisual = true;
+    }
+
+    private Mesh CreateMoonDiscMesh()
+    {
+        const int segments = 48;
+        Vector3[] vertices = new Vector3[segments + 1];
+        int[] triangles = new int[segments * 3];
+
+        vertices[0] = Vector3.zero;
+        for (int i = 0; i < segments; i++)
+        {
+            float angle = i / (float)segments * Mathf.PI * 2f;
+            vertices[i + 1] = new Vector3(Mathf.Cos(angle) * 0.5f, Mathf.Sin(angle) * 0.5f, 0f);
+        }
+
+        for (int i = 0; i < segments; i++)
+        {
+            int next = (i + 1) % segments;
+            int triangleIndex = i * 3;
+            triangles[triangleIndex] = 0;
+            triangles[triangleIndex + 1] = i + 1;
+            triangles[triangleIndex + 2] = next + 1;
+        }
+
+        Mesh mesh = new Mesh
+        {
+            name = "Runtime Moon Disc Mesh",
+            hideFlags = HideFlags.DontSave
+        };
+        mesh.vertices = vertices;
+        mesh.triangles = triangles;
+        mesh.RecalculateBounds();
+        mesh.RecalculateNormals();
+        return mesh;
+    }
+
+    private Material CreateMoonVisualMaterial()
+    {
+        Shader shader = Shader.Find("Arcadia/SkyDiscUnlit");
+        if (shader == null)
+            shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null)
+            shader = Shader.Find("Sprites/Default");
+        if (shader == null)
+            shader = Shader.Find("Standard");
+
+        Material material = new Material(shader)
+        {
+            name = "Runtime Moon Material",
+            hideFlags = HideFlags.DontSave,
+            renderQueue = 3000
+        };
+
+        ConfigureTransparentMaterial(material);
+        SetMaterialColor(material, moonVisualColor);
+        return material;
+    }
+
+    private void DestroyMoonRuntime()
+    {
+        if (moonVisualMaterial != null)
+        {
+            Destroy(moonVisualMaterial);
+            moonVisualMaterial = null;
+        }
+
+        if (moonVisualMesh != null)
+        {
+            Destroy(moonVisualMesh);
+            moonVisualMesh = null;
+        }
+
+        if (createdRuntimeMoonVisual && moonVisualTransform != null)
+        {
+            Destroy(moonVisualTransform.gameObject);
+            moonVisualTransform = null;
+            moonVisualMeshFilter = null;
+            moonVisualRenderer = null;
+        }
+
+        if (createdRuntimeMoonLight && moonLight != null)
+        {
+            Destroy(moonLight.gameObject);
+            moonLight = null;
+        }
     }
 }

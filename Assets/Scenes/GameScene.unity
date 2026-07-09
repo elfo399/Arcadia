@@ -37,7 +37,7 @@ RenderSettings:
   m_ReflectionBounces: 1
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
-  m_Sun: {fileID: 0}
+  m_Sun: {fileID: 705507994}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -10722,7 +10722,7 @@ MonoBehaviour:
     ambientLightColor: {r: 0.55, g: 0.45, b: 0.42, a: 1}
     directionalLightColor: {r: 1, g: 0.73, b: 0.55, a: 1}
     directionalLightIntensity: 0.55
-    directionalLightEulerAngles: {x: 15, y: -30, z: 0}
+    directionalLightEulerAngles: {x: 5, y: -30, z: 0}
     animatorStateName: Dawn
   - phase: 1
     displayName: Giorno
@@ -10730,7 +10730,7 @@ MonoBehaviour:
     ambientLightColor: {r: 0.78, g: 0.78, b: 0.74, a: 1}
     directionalLightColor: {r: 1, g: 0.96, b: 0.84, a: 1}
     directionalLightIntensity: 1
-    directionalLightEulerAngles: {x: 45, y: -30, z: 0}
+    directionalLightEulerAngles: {x: 75, y: -30, z: 0}
     animatorStateName: Day
   - phase: 2
     displayName: Tramonto
@@ -10738,7 +10738,7 @@ MonoBehaviour:
     ambientLightColor: {r: 0.5, g: 0.34, b: 0.36, a: 1}
     directionalLightColor: {r: 1, g: 0.48, b: 0.32, a: 1}
     directionalLightIntensity: 0.45
-    directionalLightEulerAngles: {x: 115, y: -30, z: 0}
+    directionalLightEulerAngles: {x: 170, y: -30, z: 0}
     animatorStateName: Noon
   - phase: 3
     displayName: Notte
@@ -10746,7 +10746,7 @@ MonoBehaviour:
     ambientLightColor: {r: 0.2, g: 0.24, b: 0.36, a: 1}
     directionalLightColor: {r: 0.46, g: 0.56, b: 0.9, a: 1}
     directionalLightIntensity: 0.2
-    directionalLightEulerAngles: {x: 135, y: -30, z: 0}
+    directionalLightEulerAngles: {x: 260, y: -30, z: 0}
     animatorStateName: Night
   autoChangeWeather: 1
   weatherChangeIntervalSeconds: 30
