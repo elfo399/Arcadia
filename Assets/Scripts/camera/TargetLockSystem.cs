@@ -3,7 +3,6 @@ using Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
 
 public class TargetLockSystem : MonoBehaviour
 {
@@ -24,10 +23,9 @@ public class TargetLockSystem : MonoBehaviour
     [Header("Parametri Movimento")]
     public float rotationSpeed = 20f;
 
-    [Header("UI")]
-    public RectTransform targetIcon;
-    [SerializeField] private float targetIconHeadOffset = 0f;
-    [SerializeField, Range(0.35f, 1f)] private float targetIconBoundsHeight = 0.55f;
+    [Header("Fallback Lock Point")]
+    [SerializeField] private float fallbackLockPointOffset = 0f;
+    [SerializeField, Range(0.35f, 1f)] private float fallbackLockPointBoundsHeight = 0.55f;
 
     [Header("Debug")]
     public bool isLockedOn = false;
@@ -38,12 +36,6 @@ public class TargetLockSystem : MonoBehaviour
 
     private Camera mainCam;
     private Transform currentLookTarget;
-    private Canvas targetIconCanvas;
-    private Canvas runtimeOverlayCanvas;
-    private Graphic[] targetIconGraphics;
-    private CanvasRenderer[] targetIconRenderers;
-    private RectTransform runtimeTargetIcon;
-    private RawImage runtimeTargetIconImage;
     private Texture2D runtimeDotTexture;
     private GameObject worldTargetIcon;
     private SpriteRenderer worldTargetIconRenderer;
@@ -69,9 +61,6 @@ public class TargetLockSystem : MonoBehaviour
 
     void OnEnable()
     {
-        Canvas.willRenderCanvases -= UpdateTargetUI;
-        Canvas.willRenderCanvases += UpdateTargetUI;
-
         if (!isLockedOn)
             HideTargetIcon();
     }
@@ -94,17 +83,17 @@ public class TargetLockSystem : MonoBehaviour
 
     void OnDisable()
     {
-        Canvas.willRenderCanvases -= UpdateTargetUI;
         HideTargetIcon(false);
     }
 
     void OnDestroy()
     {
-        Canvas.willRenderCanvases -= UpdateTargetUI;
         SceneManager.sceneLoaded -= OnSceneLoaded;
 
         if (playerController != null && playerController.Controls != null)
             playerController.Controls.Player.LockOn.performed -= HandleLockOnInput;
+
+        DestroyRuntimeTargetIcon();
     }
 
     void Update()
@@ -372,7 +361,6 @@ public class TargetLockSystem : MonoBehaviour
         isLockedOn = true;
         lockOnCamera.LookAt = currentLookTarget;
         lockOnCamera.Priority = 20;
-        CacheTargetIconCanvas();
         ShowTargetIcon();
         UpdateTargetUI();
     }
@@ -463,13 +451,13 @@ public class TargetLockSystem : MonoBehaviour
         Bounds bounds;
         if (TryGetTargetBounds(currentTarget, out bounds))
         {
-            float iconHeight = Mathf.Lerp(bounds.min.y, bounds.max.y, targetIconBoundsHeight) + targetIconHeadOffset;
+            float iconHeight = Mathf.Lerp(bounds.min.y, bounds.max.y, fallbackLockPointBoundsHeight) + fallbackLockPointOffset;
             return new Vector3(bounds.center.x, iconHeight, bounds.center.z);
         }
 
         Transform headPoint = ResolveTargetChild(currentTarget, HeadPointName);
         if (headPoint != null)
-            return headPoint.position + Vector3.up * targetIconHeadOffset;
+            return headPoint.position + Vector3.up * fallbackLockPointOffset;
 
         return currentTarget != null ? currentTarget.position + Vector3.up * 1.1f : Vector3.zero;
     }
@@ -539,8 +527,8 @@ public class TargetLockSystem : MonoBehaviour
         results.Clear();
         scannedEnemies.Clear();
 
-        TargetLockPoint[] sceneLockPoints = FindObjectsOfType<TargetLockPoint>(true);
-        for (int i = 0; i < sceneLockPoints.Length; i++)
+        IReadOnlyList<TargetLockPoint> sceneLockPoints = TargetLockPoint.ActiveLockPoints;
+        for (int i = 0; i < sceneLockPoints.Count; i++)
         {
             TargetLockPoint point = sceneLockPoints[i];
             if (point == null || !point.IsLockable)
@@ -664,7 +652,7 @@ public class TargetLockSystem : MonoBehaviour
         Bounds bounds;
         if (TryGetTargetBounds(root, out bounds))
         {
-            float iconHeight = Mathf.Lerp(bounds.min.y, bounds.max.y, targetIconBoundsHeight) + targetIconHeadOffset;
+            float iconHeight = Mathf.Lerp(bounds.min.y, bounds.max.y, fallbackLockPointBoundsHeight) + fallbackLockPointOffset;
             return new Vector3(bounds.center.x, iconHeight, bounds.center.z);
         }
 
@@ -741,17 +729,6 @@ public class TargetLockSystem : MonoBehaviour
         return bounds.size.sqrMagnitude > 0.0001f;
     }
 
-    private void PositionTargetIcon(Vector3 screenPos)
-    {
-        RectTransform iconTransform = EnsureRuntimeTargetIcon();
-        if (iconTransform == null)
-            return;
-
-        iconTransform.anchorMin = Vector2.zero;
-        iconTransform.anchorMax = Vector2.zero;
-        iconTransform.anchoredPosition = new Vector2(screenPos.x, screenPos.y);
-    }
-
     private void PositionWorldTargetIcon(Vector3 worldPos)
     {
         SpriteRenderer renderer = EnsureWorldTargetIcon();
@@ -804,85 +781,6 @@ public class TargetLockSystem : MonoBehaviour
         return runtimeDotSprite;
     }
 
-    private void CacheTargetIconCanvas()
-    {
-        if (targetIcon == null)
-        {
-            targetIconCanvas = null;
-            targetIconGraphics = null;
-            targetIconRenderers = null;
-            return;
-        }
-
-        if (targetIconCanvas == null || !targetIcon.IsChildOf(targetIconCanvas.transform))
-            targetIconCanvas = targetIcon.GetComponentInParent<Canvas>();
-
-        if (targetIconGraphics == null || targetIconGraphics.Length == 0)
-            targetIconGraphics = targetIcon.GetComponentsInChildren<Graphic>(true);
-
-        if (targetIconRenderers == null || targetIconRenderers.Length == 0)
-            targetIconRenderers = targetIcon.GetComponentsInChildren<CanvasRenderer>(true);
-    }
-
-    private RectTransform EnsureRuntimeTargetIcon()
-    {
-        RectTransform parent = GetTargetIconRootRect();
-        if (runtimeTargetIcon != null)
-        {
-            if (parent != null && runtimeTargetIcon.parent != parent)
-                runtimeTargetIcon.SetParent(parent, false);
-
-            return runtimeTargetIcon;
-        }
-
-        if (parent == null)
-            return null;
-
-        GameObject iconObject = new GameObject("RuntimeTargetLockDot");
-        iconObject.transform.SetParent(parent, false);
-        runtimeTargetIcon = iconObject.AddComponent<RectTransform>();
-        runtimeTargetIcon.anchorMin = Vector2.zero;
-        runtimeTargetIcon.anchorMax = Vector2.zero;
-        runtimeTargetIcon.pivot = new Vector2(0.5f, 0.5f);
-        runtimeTargetIcon.sizeDelta = new Vector2(18f, 18f);
-
-        runtimeTargetIconImage = iconObject.AddComponent<RawImage>();
-        runtimeTargetIconImage.texture = GetRuntimeDotTexture();
-        runtimeTargetIconImage.color = Color.white;
-        runtimeTargetIconImage.raycastTarget = false;
-        iconObject.SetActive(false);
-        return runtimeTargetIcon;
-    }
-
-    private RectTransform GetTargetIconRootRect()
-    {
-        Canvas canvas = GetOrCreateRuntimeOverlayCanvas();
-        return canvas != null ? canvas.GetComponent<RectTransform>() : null;
-    }
-
-    private Canvas GetOrCreateRuntimeOverlayCanvas()
-    {
-        if (runtimeOverlayCanvas != null && runtimeOverlayCanvas.GetComponent<RectTransform>() != null)
-            return runtimeOverlayCanvas;
-
-        if (runtimeOverlayCanvas != null)
-        {
-            Destroy(runtimeOverlayCanvas.gameObject);
-            runtimeOverlayCanvas = null;
-        }
-
-        GameObject canvasObject = new GameObject("TargetLockOverlayCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
-        DontDestroyOnLoad(canvasObject);
-        runtimeOverlayCanvas = canvasObject.GetComponent<Canvas>();
-        runtimeOverlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        runtimeOverlayCanvas.sortingOrder = 1000;
-
-        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
-
-        return runtimeOverlayCanvas;
-    }
-
     private Texture2D GetRuntimeDotTexture()
     {
         if (runtimeDotTexture != null)
@@ -911,39 +809,10 @@ public class TargetLockSystem : MonoBehaviour
         return runtimeDotTexture;
     }
 
-    private void HideTargetIcon(bool createRuntimeIcon = false)
+    private void HideTargetIcon(bool unused = false)
     {
         if (worldTargetIcon != null && worldTargetIcon.activeSelf)
             worldTargetIcon.SetActive(false);
-
-        RectTransform runtimeIcon = createRuntimeIcon ? EnsureRuntimeTargetIcon() : runtimeTargetIcon;
-        if (runtimeIcon != null && runtimeIcon.gameObject.activeSelf)
-            runtimeIcon.gameObject.SetActive(false);
-
-        if (targetIcon == null)
-            return;
-
-        CacheTargetIconCanvas();
-        if (!targetIcon.gameObject.activeSelf)
-            targetIcon.gameObject.SetActive(true);
-
-        if (targetIconGraphics != null)
-        {
-            for (int i = 0; i < targetIconGraphics.Length; i++)
-            {
-                if (targetIconGraphics[i] != null)
-                    targetIconGraphics[i].enabled = false;
-            }
-        }
-
-        if (targetIconRenderers != null)
-        {
-            for (int i = 0; i < targetIconRenderers.Length; i++)
-            {
-                if (targetIconRenderers[i] != null)
-                    targetIconRenderers[i].SetAlpha(0f);
-            }
-        }
     }
 
     private void ShowTargetIcon()
@@ -951,34 +820,24 @@ public class TargetLockSystem : MonoBehaviour
         SpriteRenderer renderer = EnsureWorldTargetIcon();
         if (renderer != null && !renderer.gameObject.activeSelf)
             renderer.gameObject.SetActive(true);
+    }
 
-        if (runtimeTargetIcon != null && runtimeTargetIcon.gameObject.activeSelf)
-            runtimeTargetIcon.gameObject.SetActive(false);
+    private void DestroyRuntimeTargetIcon()
+    {
+        if (worldTargetIcon != null)
+            Destroy(worldTargetIcon);
+        if (worldTargetIconMaterial != null)
+            Destroy(worldTargetIconMaterial);
+        if (runtimeDotSprite != null)
+            Destroy(runtimeDotSprite);
+        if (runtimeDotTexture != null)
+            Destroy(runtimeDotTexture);
 
-        if (targetIcon == null)
-            return;
-
-        CacheTargetIconCanvas();
-        if (!targetIcon.gameObject.activeSelf)
-            targetIcon.gameObject.SetActive(true);
-
-        if (targetIconGraphics != null)
-        {
-            for (int i = 0; i < targetIconGraphics.Length; i++)
-            {
-                if (targetIconGraphics[i] != null)
-                    targetIconGraphics[i].enabled = false;
-            }
-        }
-
-        if (targetIconRenderers != null)
-        {
-            for (int i = 0; i < targetIconRenderers.Length; i++)
-            {
-                if (targetIconRenderers[i] != null)
-                    targetIconRenderers[i].SetAlpha(0f);
-            }
-        }
+        worldTargetIcon = null;
+        worldTargetIconRenderer = null;
+        worldTargetIconMaterial = null;
+        runtimeDotSprite = null;
+        runtimeDotTexture = null;
     }
 
     private void RecenterCamera()
