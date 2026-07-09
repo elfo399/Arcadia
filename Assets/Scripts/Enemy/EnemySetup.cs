@@ -17,7 +17,7 @@ public class EnemySetup : MonoBehaviour
         Transform headPoint = GetOrCreateHeadPoint();
 
         // 2. Usiamo quel punto per piazzare tutto il resto
-        SetupLockOnPoint(headPoint);
+        SetupDefaultLockPoint(headPoint);
         SetupHealthBar(headPoint);
     }
 
@@ -56,16 +56,34 @@ public class EnemySetup : MonoBehaviour
         return headObj.transform;
     }
 
-    void SetupLockOnPoint(Transform headPoint)
+    void SetupDefaultLockPoint(Transform headPoint)
     {
-        if (transform.Find("LockOnPoint") != null) return;
+        TargetLockPoint[] existingPoints = GetComponentsInChildren<TargetLockPoint>(true);
+        if (existingPoints != null && existingPoints.Length > 0)
+        {
+            return;
+        }
 
-        GameObject lockPoint = new GameObject("LockOnPoint");
+        Transform legacyPoint = transform.Find("LockOnPoint");
+        if (legacyPoint != null)
+        {
+            EnsureTargetLockPoint(legacyPoint);
+            return;
+        }
+
+        GameObject lockPoint = new GameObject("LockPoint_Center");
         lockPoint.transform.SetParent(transform);
         
         // Il lock-on va al PETTO, quindi 0.5 metri sotto la testa
         float lockY = headPoint.localPosition.y - 0.5f;
         lockPoint.transform.localPosition = new Vector3(0, lockY, 0);
+        EnsureTargetLockPoint(lockPoint.transform);
+    }
+
+    private static void EnsureTargetLockPoint(Transform lockPoint)
+    {
+        if (lockPoint != null && lockPoint.GetComponent<TargetLockPoint>() == null)
+            lockPoint.gameObject.AddComponent<TargetLockPoint>();
     }
 
     void SetupHealthBar(Transform headPoint)
@@ -137,6 +155,7 @@ public class EnemySetup : MonoBehaviour
 
             sliderComponent.targetGraphic = bgImg;
             sliderComponent.fillRect = fillRect;
+            sliderComponent.handleRect = null;
             sliderComponent.direction = Slider.Direction.LeftToRight;
             
             ExpandToFill(sliderObj.GetComponent<RectTransform>());

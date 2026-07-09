@@ -908,7 +908,7 @@ public class PlayerCombat : MonoBehaviour
         if (targetLockSystem != null && targetLockSystem.isLockedOn && targetLockSystem.currentTarget != null)
         {
             Vector3 origin = magicCastPoint != null ? magicCastPoint.position : transform.position + Vector3.up * 1.2f;
-            Vector3 targetPoint = GetLockTargetAimPoint(targetLockSystem.currentTarget);
+            Vector3 targetPoint = targetLockSystem.CurrentLockAimPoint;
             Vector3 toTarget = targetPoint - origin;
             if (toTarget.sqrMagnitude > 0.0001f)
                 return toTarget.normalized;
@@ -926,7 +926,7 @@ public class PlayerCombat : MonoBehaviour
 
         if (targetLockSystem != null && targetLockSystem.isLockedOn && targetLockSystem.currentTarget != null)
         {
-            Vector3 toTarget = targetLockSystem.currentTarget.position - transform.position;
+            Vector3 toTarget = targetLockSystem.CurrentLockAimPoint - transform.position;
             toTarget.y = 0f; // throw più stabile, evita impennate verticali
             if (toTarget.sqrMagnitude > 0.0001f)
                 baseDir = toTarget.normalized;
@@ -935,20 +935,6 @@ public class PlayerCombat : MonoBehaviour
         baseDir.y += throwArcUpBias;
         if (baseDir.sqrMagnitude <= 0.0001f) return transform.forward;
         return baseDir.normalized;
-    }
-
-    private static Vector3 GetLockTargetAimPoint(Transform target)
-    {
-        if (target == null) return Vector3.zero;
-        Transform lockPoint = target.Find("LockOnPoint");
-        if (lockPoint != null) return lockPoint.position;
-
-        // Preferisci il centro collider (petto/corpo) invece del pivot ai piedi.
-        Collider col = target.GetComponentInChildren<Collider>();
-        if (col != null)
-            return col.bounds.center;
-
-        return target.position + Vector3.up * 1.1f;
     }
 
     void PerformAttack(WeaponItem weapon, Hand hand, AttackType type)

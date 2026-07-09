@@ -244,6 +244,22 @@ public class MenuManager : MonoBehaviour
             attributesUIManager?.RefreshUI();
     }
 
+    public void BindPlayerInventory(PlayerInventory playerInventory)
+    {
+        if (playerInventory == null)
+            return;
+
+        currentPlayerInventory = playerInventory;
+        scenePlayerInventory = playerInventory;
+
+        inventoryUIManager?.SetPlayerInventory(currentPlayerInventory);
+        magicInventoryManager?.SetPlayerInventory(currentPlayerInventory);
+        equipmentManager?.SetPlayerInventory(currentPlayerInventory);
+        InitializeLinkedManagers();
+        inventoryUIManager?.RefreshSourceItemsFromPlayer();
+        RefreshEquipmentUI();
+    }
+
     private bool IsAttributesTabActive()
     {
         string tabKey = CurrentTabKey;

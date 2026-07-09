@@ -69,6 +69,7 @@ public class PlayerController : MonoBehaviour
     private InputAction cycleLeftEquipAction;
     private InputAction cycleUsableAction;
     private InputAction cycleMagicAction;
+    private Coroutine sceneEquipmentRefreshRoutine;
 
     private Vector3 velocity;
     private float lastDodgeTime = -999f;
@@ -109,8 +110,7 @@ public class PlayerController : MonoBehaviour
         playerInventory = GetComponent<PlayerInventory>();
         combat = GetComponent<PlayerCombat>();
 
-        if (menuManager == null)
-            Debug.LogWarning("[PlayerController] MenuManager non assegnato. Collegalo in Inspector.");
+        ResolveMenuManager();
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -122,13 +122,20 @@ public class PlayerController : MonoBehaviour
         EnsureControlsInitialized();
         if (Controls != null) Controls.Player.Enable();
         inventoryInputReadyTime = Time.unscaledTime + InventoryInputEnableDelay;
+        ResolveMenuManager();
         canMove = menuManager == null || !menuManager.IsMenuOpen;
+        RequestSceneEquipmentUIRefresh();
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
     void OnDisable()
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
+        if (sceneEquipmentRefreshRoutine != null)
+        {
+            StopCoroutine(sceneEquipmentRefreshRoutine);
+            sceneEquipmentRefreshRoutine = null;
+        }
         if (Controls != null) Controls.Player.Disable();
         if (playerStats != null) playerStats.SetInvulnerable(false);
     }
@@ -217,12 +224,47 @@ public class PlayerController : MonoBehaviour
         playerInventory = GetComponent<PlayerInventory>();
         playerStats = GetComponent<PlayerStats>();
         combat = GetComponent<PlayerCombat>();
-
-        if (menuManager != null)
-            menuManager.RefreshEquipmentUI();
+        ResolveMenuManager();
+        RequestSceneEquipmentUIRefresh();
 
         inventoryInputReadyTime = Time.unscaledTime + InventoryInputEnableDelay;
         canMove = menuManager == null || !menuManager.IsMenuOpen;
+    }
+
+    private void RequestSceneEquipmentUIRefresh()
+    {
+        if (!isActiveAndEnabled)
+        {
+            BindAndRefreshEquipmentUI();
+            return;
+        }
+
+        if (sceneEquipmentRefreshRoutine != null)
+            StopCoroutine(sceneEquipmentRefreshRoutine);
+
+        sceneEquipmentRefreshRoutine = StartCoroutine(RefreshSceneEquipmentUIRoutine());
+    }
+
+    private IEnumerator RefreshSceneEquipmentUIRoutine()
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            BindAndRefreshEquipmentUI();
+            yield return null;
+        }
+
+        sceneEquipmentRefreshRoutine = null;
+    }
+
+    private void BindAndRefreshEquipmentUI()
+    {
+        if (playerInventory == null)
+            playerInventory = GetComponent<PlayerInventory>();
+
+        ResolveMenuManager();
+
+        if (menuManager != null)
+            menuManager.BindPlayerInventory(playerInventory);
     }
 
     private void EnsureControlsInitialized()
@@ -510,6 +552,7 @@ public class PlayerController : MonoBehaviour
 
     private void ToggleInventory()
     {
+        ResolveMenuManager();
         if (menuManager == null)
         {
             Debug.LogWarning("[PlayerController] MenuManager non assegnato.");
@@ -529,6 +572,18 @@ public class PlayerController : MonoBehaviour
     {
         Room currentRoom = Room.CurrentPlayerRoom;
         return currentRoom == null || currentRoom.CanOpenMenuHere();
+    }
+
+    private void ResolveMenuManager()
+    {
+        if (menuManager != null)
+            return;
+
+#if UNITY_2023_1_OR_NEWER
+        menuManager = FindFirstObjectByType<MenuManager>();
+#else
+        menuManager = FindObjectOfType<MenuManager>();
+#endif
     }
 
 }
