@@ -11,7 +11,8 @@ public class EnemyHealthBar : MonoBehaviour
 
     void Start()
     {
-        cam = Camera.main;
+        SceneRuntimeReferences sceneReferences = SceneRuntimeReferences.Current;
+        cam = sceneReferences != null ? sceneReferences.GameplayCamera : null;
     }
 
     public void SetMaxHealth(int maxHealth)

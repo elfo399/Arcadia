@@ -1407,11 +1407,9 @@ public class PlayerInventory : MonoBehaviour
 
     private void EnsureItemDatabaseAssigned()
     {
-        if (itemDatabase != null) return;
-        itemDatabase = Resources.Load<ItemDatabase>("ItemDatabase");
         if (itemDatabase == null)
         {
-            Debug.LogWarning("[PlayerInventory] ItemDatabase non assegnato. Assegna un ItemDatabase in Inspector (o mettilo in Resources/ItemDatabase.asset) per un restore save affidabile.");
+            Debug.LogWarning("[PlayerInventory] ItemDatabase non assegnato in Inspector: il restore del save non e' affidabile.");
         }
     }
 

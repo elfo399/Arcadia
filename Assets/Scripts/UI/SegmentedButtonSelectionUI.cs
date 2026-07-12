@@ -53,10 +53,6 @@ public sealed class SegmentedButtonSelectionUI : MonoBehaviour
     {
         if (centerFrame == null)
             centerFrame = GetComponent<Image>();
-        if (leftFrame == null)
-            leftFrame = transform.Find("LeftFrame")?.GetComponent<Image>();
-        if (rightFrame == null)
-            rightFrame = transform.Find("RightFrame")?.GetComponent<Image>();
     }
 
     private void EnsureEffects()

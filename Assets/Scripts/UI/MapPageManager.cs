@@ -74,9 +74,6 @@ public class MapPageManager : MonoBehaviour
     private int lastDisplayedLevelExperience = int.MinValue;
     private int lastDisplayedExperienceToNextLevel = int.MinValue;
     private const int RunTimerStartSeconds = 0;
-    private const string MapContentName = "MapContent";
-    private const string MapFrameOverlayName = "MapFrameOverlay";
-
     private bool mapLayersConfigured;
 
     private void Awake()
@@ -208,15 +205,9 @@ public class MapPageManager : MonoBehaviour
 
         if (mapContentContainer == null)
         {
-            Transform existingContent = mapContainer.Find(MapContentName);
-            mapContentContainer = existingContent as RectTransform;
-
-            if (mapContentContainer == null)
-            {
-                GameObject contentObject = new GameObject(MapContentName, typeof(RectTransform));
-                mapContentContainer = contentObject.GetComponent<RectTransform>();
-                mapContentContainer.SetParent(mapContainer, false);
-            }
+            GameObject contentObject = new GameObject("MapContent", typeof(RectTransform));
+            mapContentContainer = contentObject.GetComponent<RectTransform>();
+            mapContentContainer.SetParent(mapContainer, false);
         }
 
         float inset = Mathf.Max(0f, mapPadding);
@@ -242,12 +233,6 @@ public class MapPageManager : MonoBehaviour
 
     private void EnsureMapFrameOverlay()
     {
-        if (mapFrameOverlayImage == null)
-        {
-            Transform existingOverlay = mapContainer.Find(MapFrameOverlayName);
-            mapFrameOverlayImage = existingOverlay != null ? existingOverlay.GetComponent<Image>() : null;
-        }
-
         if (mapFrameOverlayImage == null)
             return;
 
@@ -330,7 +315,6 @@ public class MapPageManager : MonoBehaviour
 
     private void ApplyCoinText(bool forceRefresh = false)
     {
-        ResolveCoinValueText();
         if (coinValueText == null)
             return;
 
@@ -441,10 +425,6 @@ public class MapPageManager : MonoBehaviour
         if (weatherManager == null)
             weatherManager = WeatherManager.Instance;
 
-        if (playerCharacterDatabase == null)
-            playerCharacterDatabase = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
-
-        ResolveCoinValueText();
         ResolvePlayerStats();
     }
 
@@ -454,57 +434,8 @@ public class MapPageManager : MonoBehaviour
             playerStats = PlayerStats.instance;
     }
 
-    private void ResolveCoinValueText()
-    {
-        if (coinValueText != null)
-            return;
-
-        coinValueText = FindMapPageCoinCountText();
-    }
-
-    private static TextMeshProUGUI FindMapPageCoinCountText()
-    {
-        TextMeshProUGUI fallback = null;
-        TextMeshProUGUI[] texts = FindObjectsOfType<TextMeshProUGUI>(true);
-        for (int i = 0; i < texts.Length; i++)
-        {
-            TextMeshProUGUI text = texts[i];
-            if (text == null || text.name != "Count")
-                continue;
-
-            Transform parent = text.transform.parent;
-            if (parent == null || parent.name != "Coin")
-                continue;
-
-            if (HasAncestor(parent, "MapPage"))
-                return text;
-
-            if (fallback == null)
-                fallback = text;
-        }
-
-        return fallback;
-    }
-
-    private static bool HasAncestor(Transform transform, string ancestorName)
-    {
-        Transform current = transform;
-        while (current != null)
-        {
-            if (current.name == ancestorName)
-                return true;
-
-            current = current.parent;
-        }
-
-        return false;
-    }
-
     private PlayerCharacterData ResolveSelectedCharacter()
     {
-        if (playerCharacterDatabase == null)
-            playerCharacterDatabase = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
-
         if (playerCharacterDatabase == null)
             return null;
 
@@ -660,6 +591,9 @@ public class MapPageManager : MonoBehaviour
 
     private string ResolvePlayerName()
     {
+        if (PlayerStats.instance != null && !string.IsNullOrWhiteSpace(PlayerStats.instance.CharacterName))
+            return PlayerStats.instance.CharacterName.Trim();
+
         PlayerCharacterData character = ResolveSelectedCharacter();
         if (character != null)
         {
@@ -668,9 +602,6 @@ public class MapPageManager : MonoBehaviour
 
             return character.GetCharacterId();
         }
-
-        if (PlayerStats.instance != null && !string.IsNullOrWhiteSpace(PlayerStats.instance.CharacterName))
-            return PlayerStats.instance.CharacterName.Trim();
 
         string inputName = playerNameInput != null ? playerNameInput.text : null;
         string resolvedName = string.IsNullOrWhiteSpace(inputName) ? defaultPlayerName : inputName;

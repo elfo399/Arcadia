@@ -76,6 +76,8 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
     private EquipmentManager equipmentManager;
     private Transform inventorySlotParent;
     private int inventoryInitialSlotCount;
+    [SerializeField] private Canvas dragCanvas;
+    [SerializeField] private RectTransform dragPreviewRoot;
     private Image activeDragPreview;
     private int dragOriginIndex = -1;
     private bool slotInputEnabled = true;
@@ -1143,46 +1145,18 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private Canvas ResolveDragCanvas()
     {
-        Canvas parentCanvas = GetComponentInParent<Canvas>();
-        if (parentCanvas != null && parentCanvas.isActiveAndEnabled)
-            return parentCanvas;
-
-        Canvas[] canvases = FindObjectsOfType<Canvas>();
-        Canvas bestCanvas = null;
-        int bestScore = int.MinValue;
-        for (int i = 0; i < canvases.Length; i++)
-        {
-            Canvas canvas = canvases[i];
-            if (canvas == null || !canvas.isActiveAndEnabled || !canvas.gameObject.activeInHierarchy)
-                continue;
-
-            int score = canvas.sortingOrder;
-            if (canvas.renderMode != RenderMode.WorldSpace)
-                score += 10000;
-            if (canvas.isRootCanvas)
-                score += 1000;
-
-            if (bestCanvas == null || score >= bestScore)
-            {
-                bestCanvas = canvas;
-                bestScore = score;
-            }
-        }
-
-        return bestCanvas;
+        return dragCanvas != null && dragCanvas.isActiveAndEnabled ? dragCanvas : null;
     }
 
     private RectTransform ResolveDragPreviewRoot(Canvas targetCanvas)
     {
-        const string previewRootName = "DragPreviewLayer";
-        Transform existing = targetCanvas.transform.Find(previewRootName);
-        if (existing != null && existing is RectTransform existingRect)
+        if (dragPreviewRoot != null)
         {
-            existing.SetAsLastSibling();
-            return existingRect;
+            dragPreviewRoot.SetAsLastSibling();
+            return dragPreviewRoot;
         }
 
-        GameObject root = new GameObject(previewRootName, typeof(RectTransform), typeof(Canvas), typeof(CanvasGroup));
+        GameObject root = new GameObject("DragPreviewLayer", typeof(RectTransform), typeof(Canvas), typeof(CanvasGroup));
         root.transform.SetParent(targetCanvas.transform, false);
         root.transform.SetAsLastSibling();
 
@@ -1201,7 +1175,8 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         canvasGroup.blocksRaycasts = false;
         canvasGroup.interactable = false;
 
-        return rectTransform;
+        dragPreviewRoot = rectTransform;
+        return dragPreviewRoot;
     }
 
     private void ClearDragPreview()

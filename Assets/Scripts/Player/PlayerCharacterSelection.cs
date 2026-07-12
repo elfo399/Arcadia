@@ -2,62 +2,38 @@ using UnityEngine;
 
 public static class PlayerCharacterSelection
 {
-    public const string DefaultCharacterId = "warrior";
-    private static string pendingNewCharacterId;
+    public const string DefaultCharacterId = SaveSystem.SingleCharacterId;
+    private static bool pendingNewCharacter;
 
-    public static string PendingNewCharacterId => pendingNewCharacterId;
+    public static string PendingNewCharacterId => pendingNewCharacter ? SaveSystem.SingleCharacterId : string.Empty;
 
     public static string GetSelectedCharacterId()
     {
-        string storedId = SaveSystem.GetSelectedCharacterId();
-        if (!string.IsNullOrWhiteSpace(storedId))
-            return storedId;
-
-        GameData data = SaveSystem.LoadData();
-        if (data != null && !string.IsNullOrWhiteSpace(data.selectedCharacterId))
-            return data.selectedCharacterId;
-
-        return DefaultCharacterId;
+        return SaveSystem.SingleCharacterId;
     }
 
     public static void StartNewCharacter(PlayerCharacterData character)
     {
-        if (character == null)
-        {
-            Debug.LogWarning("[PlayerCharacterSelection] Character missing.");
-            return;
-        }
-
-        StartNewCharacter(character.GetCharacterId(), character.displayName);
+        StartNewCharacter();
     }
 
     public static void StartNewCharacter(string characterId)
     {
-        StartNewCharacter(characterId, null);
+        StartNewCharacter();
     }
 
-    private static void StartNewCharacter(string characterId, string characterName)
+    public static void StartNewCharacter()
     {
-        string resolvedId = string.IsNullOrWhiteSpace(characterId) ? DefaultCharacterId : characterId.Trim();
-        string resolvedName = string.IsNullOrWhiteSpace(characterName) ? resolvedId : characterName.Trim();
-
         if (PlayerStats.instance != null && !string.IsNullOrWhiteSpace(PlayerStats.instance.SelectedCharacterId))
             PlayerStats.instance.SaveStatsImmediate();
 
-        pendingNewCharacterId = resolvedId;
-        SaveSystem.SelectCharacter(resolvedId);
-        SaveSystem.EnsureCharacterData(resolvedId, resolvedName);
+        pendingNewCharacter = true;
+        SaveSystem.SelectCharacter(SaveSystem.SingleCharacterId);
+        SaveSystem.EnsureCharacterData(SaveSystem.SingleCharacterId, SaveSystem.DefaultCharacterName);
     }
 
     internal static void ClearPendingNewCharacter(string characterId)
     {
-        if (string.IsNullOrWhiteSpace(pendingNewCharacterId))
-            return;
-
-        if (string.IsNullOrWhiteSpace(characterId)
-            || string.Equals(pendingNewCharacterId, characterId.Trim(), System.StringComparison.OrdinalIgnoreCase))
-        {
-            pendingNewCharacterId = string.Empty;
-        }
+        pendingNewCharacter = false;
     }
 }

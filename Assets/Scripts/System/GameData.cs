@@ -80,8 +80,8 @@ public class GameData
     // Incrementato quando cambia la struttura persistente del salvataggio.
     public int saveVersion;
 
-    // Selected character archetype. The start package is applied once, then the
-    // normal runtime stats/inventory become authoritative.
+    // Single player character identity. The temporary start package is applied
+    // once, then runtime stats/inventory become authoritative.
     public string selectedCharacterId;
     public string characterName;
     public bool selectedCharacterStartApplied;

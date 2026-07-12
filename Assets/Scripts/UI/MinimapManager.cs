@@ -56,6 +56,8 @@ public class MinimapManager : MonoBehaviour
     private Dictionary<Vector2Int, RoomData> _roomData = new Dictionary<Vector2Int, RoomData>();
     private HashSet<Vector2Int> _visitedRoomAnchors = new HashSet<Vector2Int>();
     private HashSet<Vector2Int> _revealedRoomAnchors = new HashSet<Vector2Int>(); // Stanze da mostrare permanentemente
+    private readonly Dictionary<string, RectTransform> runtimeRectChildren = new Dictionary<string, RectTransform>();
+    private readonly Dictionary<int, List<GameObject>> renderedMenuObjects = new Dictionary<int, List<GameObject>>();
     private Vector2Int _lastPlayerRoomAnchor = new Vector2Int(-999, -999);
     private const string RenderedMenuMapIconPrefix = "MenuMapRoomIcon_";
     private const string HubMapBackgroundName = "HubMap_Background";
@@ -68,8 +70,8 @@ public class MinimapManager : MonoBehaviour
     private RectTransform hubPlayerMarker;
     private RectTransform hubPortalMarker;
     private Image hubMapBackgroundImage;
-    private Transform hubPlayerTarget;
-    private Transform hubPortalTarget;
+    [SerializeField] private Transform hubPlayerTarget;
+    [SerializeField] private Transform hubPortalTarget;
     
     private float FullStep => iconBaseSize + iconSpacing;
 
@@ -233,11 +235,6 @@ public class MinimapManager : MonoBehaviour
         if (hubMapZone != null)
             return true;
 
-#if UNITY_2023_1_OR_NEWER
-        hubMapZone = FindFirstObjectByType<HubMapZone>();
-#else
-        hubMapZone = FindObjectOfType<HubMapZone>();
-#endif
         if (hubMapZone == null && createDefaultHubZoneIfMissing && IsHubScene(SceneManager.GetActiveScene().name))
         {
             GameObject zoneObject = new GameObject("HubMapZone_Runtime");
@@ -250,15 +247,13 @@ public class MinimapManager : MonoBehaviour
 
     private Transform ResolveHubPlayerTarget()
     {
+        if (PlayerStats.instance != null)
+            return PlayerStats.instance.transform;
+
         if (PlayerController.CurrentPlayerTransform != null)
             return PlayerController.CurrentPlayerTransform;
 
-        GameObject player = GameObject.FindGameObjectWithTag("Player");
-        if (player != null)
-            return player.transform;
-
-        GameObject namedPlayer = GameObject.Find("Player");
-        return namedPlayer != null ? namedPlayer.transform : null;
+        return hubPlayerTarget;
     }
 
     private Transform ResolveHubPortalTarget()
@@ -266,8 +261,7 @@ public class MinimapManager : MonoBehaviour
         if (hubMapZone != null && hubMapZone.PortalMarkerTarget != null)
             return hubMapZone.PortalMarkerTarget;
 
-        GameObject portal = GameObject.Find("DungeonPortal");
-        return portal != null ? portal.transform : null;
+        return hubPortalTarget;
     }
 
     private void ConfigureHubRuntimeContentSize()
@@ -350,15 +344,16 @@ public class MinimapManager : MonoBehaviour
             : Quaternion.identity;
     }
 
-    private static RectTransform EnsureRectChild(Transform parent, string objectName)
+    private RectTransform EnsureRectChild(Transform parent, string objectName)
     {
-        Transform existing = parent.Find(objectName);
-        if (existing != null)
-            return existing as RectTransform ?? existing.gameObject.AddComponent<RectTransform>();
+        string key = parent.GetInstanceID() + ":" + objectName;
+        if (runtimeRectChildren.TryGetValue(key, out RectTransform existing) && existing != null)
+            return existing;
 
         GameObject child = new GameObject(objectName, typeof(RectTransform));
         RectTransform rect = child.GetComponent<RectTransform>();
         rect.SetParent(parent, false);
+        runtimeRectChildren[key] = rect;
         return rect;
     }
 
@@ -444,11 +439,12 @@ public class MinimapManager : MonoBehaviour
             (data.size.y * iconBaseSize) + ((data.size.y - 1) * iconSpacing)
         );
 
-        Image fillImage = iconObj.transform.Find("RoomFill")?.GetComponent<Image>() ?? iconObj.GetComponent<Image>();
+        MinimapRoomIconView iconView = iconObj.GetComponent<MinimapRoomIconView>();
+        Image fillImage = iconView != null ? iconView.FillImage : iconObj.GetComponent<Image>();
         if (fillImage != null)
             fillImage.color = visitedRoomColor;
 
-        Image overlayImg = iconObj.transform.Find("IconOverlay")?.GetComponent<Image>();
+        Image overlayImg = iconView != null ? iconView.OverlayImage : null;
         if (overlayImg != null)
         {
             overlayImg.gameObject.SetActive(false);
@@ -518,7 +514,8 @@ public class MinimapManager : MonoBehaviour
             if (_revealedRoomAnchors.Contains(roomAnchor))
             {
                 iconObj.SetActive(true);
-                Image fillImage = iconObj.transform.Find("RoomFill")?.GetComponent<Image>() ?? iconObj.GetComponent<Image>();
+                MinimapRoomIconView iconView = iconObj.GetComponent<MinimapRoomIconView>();
+                Image fillImage = iconView != null ? iconView.FillImage : iconObj.GetComponent<Image>();
 
                 if (roomAnchor == currentRoomAnchor)
                 {
@@ -590,6 +587,7 @@ public class MinimapManager : MonoBehaviour
             RoomData data = _roomData[roomAnchor];
             GameObject iconObj = Instantiate(roomIconPrefab, targetContainer);
             iconObj.name = $"{RenderedMenuMapIconPrefix}{roomAnchor.x}_{roomAnchor.y}";
+            RegisterRenderedMenuObject(targetContainer, iconObj);
             SetupIconVisuals(iconObj, roomAnchor, data);
 
             if (overrideRoomFillColor)
@@ -632,6 +630,7 @@ public class MinimapManager : MonoBehaviour
         float padding)
     {
         RectTransform root = EnsureRectChild(targetContainer, RenderedHubMapPrefix + "Root");
+        RegisterRenderedMenuObject(targetContainer, root.gameObject);
         StretchToParent(root);
         root.SetAsLastSibling();
 
@@ -690,14 +689,42 @@ public class MinimapManager : MonoBehaviour
 
     private void ClearRenderedMenuMap(RectTransform targetContainer)
     {
-        for (int i = targetContainer.childCount - 1; i >= 0; i--)
+        int key = targetContainer.GetInstanceID();
+        if (!renderedMenuObjects.TryGetValue(key, out List<GameObject> objects))
+            return;
+
+        List<string> cachedKeysToRemove = runtimeRectChildren
+            .Where(entry => entry.Value == null || objects.Any(root =>
+                root != null && (entry.Value.gameObject == root || entry.Value.IsChildOf(root.transform))))
+            .Select(entry => entry.Key)
+            .ToList();
+
+        for (int i = 0; i < cachedKeysToRemove.Count; i++)
+            runtimeRectChildren.Remove(cachedKeysToRemove[i]);
+
+        for (int i = objects.Count - 1; i >= 0; i--)
         {
-            Transform child = targetContainer.GetChild(i);
-            if (child != null
-                && (child.name.StartsWith(RenderedMenuMapIconPrefix, System.StringComparison.Ordinal)
-                    || child.name.StartsWith(RenderedHubMapPrefix, System.StringComparison.Ordinal)))
-                Destroy(child.gameObject);
+            if (objects[i] != null)
+                Destroy(objects[i]);
         }
+
+        objects.Clear();
+    }
+
+    private void RegisterRenderedMenuObject(RectTransform targetContainer, GameObject renderedObject)
+    {
+        if (targetContainer == null || renderedObject == null)
+            return;
+
+        int key = targetContainer.GetInstanceID();
+        if (!renderedMenuObjects.TryGetValue(key, out List<GameObject> objects))
+        {
+            objects = new List<GameObject>();
+            renderedMenuObjects.Add(key, objects);
+        }
+
+        if (!objects.Contains(renderedObject))
+            objects.Add(renderedObject);
     }
 
     private RectInt BuildRoomBounds(List<Vector2Int> visibleAnchors)
@@ -724,7 +751,8 @@ public class MinimapManager : MonoBehaviour
 
     private void ApplyIconVisibilityState(GameObject iconObj, Vector2Int roomAnchor, Vector2Int currentRoomAnchor)
     {
-        Image fillImage = iconObj.transform.Find("RoomFill")?.GetComponent<Image>() ?? iconObj.GetComponent<Image>();
+        MinimapRoomIconView iconView = iconObj.GetComponent<MinimapRoomIconView>();
+        Image fillImage = iconView != null ? iconView.FillImage : iconObj.GetComponent<Image>();
         if (fillImage == null)
             return;
 
@@ -738,10 +766,8 @@ public class MinimapManager : MonoBehaviour
 
     private void ApplyRoomFillColor(GameObject iconObj, Color color)
     {
-        Transform roomFill = iconObj.transform.Find("RoomFill");
-        Image fillImage = roomFill != null ? roomFill.GetComponent<Image>() : null;
-        if (fillImage == null)
-            fillImage = iconObj.GetComponent<Image>();
+        MinimapRoomIconView iconView = iconObj.GetComponent<MinimapRoomIconView>();
+        Image fillImage = iconView != null ? iconView.FillImage : iconObj.GetComponent<Image>();
 
         if (fillImage != null)
             fillImage.color = color;

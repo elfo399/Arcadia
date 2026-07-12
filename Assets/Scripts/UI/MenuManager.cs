@@ -12,6 +12,7 @@ public class MenuManager : MonoBehaviour
     [Header("Scene References")]
     [SerializeField] private GameObject inventoryPanel;
     [SerializeField] private GameObject playerHudPanel;
+    [SerializeField] private bool hidePlayerHudPanelWhenMenuOpen;
     [SerializeField] private InventoryUIManager inventoryUIManager;
     [SerializeField] private MagicInventoryManager magicInventoryManager;
     [SerializeField] private EquipmentManager equipmentManager;
@@ -851,7 +852,7 @@ public class MenuManager : MonoBehaviour
 
     private bool ShouldHidePlayerHudPanelWhenMenuOpen()
     {
-        return playerHudPanel != null && playerHudPanel.name != "HUD_Canvas";
+        return playerHudPanel != null && hidePlayerHudPanelWhenMenuOpen;
     }
 
     private static bool IsQuestTabKey(string tabKey)

@@ -4,41 +4,36 @@ using System.IO;
 public static class SaveSystem
 {
     public const int CurrentSaveVersion = 1;
+    public const string SingleCharacterId = "player";
+    public const string DefaultCharacterName = "Player";
 
-    private const string LegacySaveFileName = "gamedata.json";
-    private const string CharacterSavePrefix = "gamedata_";
-    private const string CharacterSaveExtension = ".json";
+    private const string SaveFileName = "gamedata.json";
+    private const string LegacyCharacterSavePrefix = "gamedata_";
+    private const string LegacyCharacterSaveExtension = ".json";
     private const string PlayerPrefsSelectedCharacterKey = "SelectedCharacterId";
 
     public static string GetSelectedCharacterId()
     {
-        return PlayerPrefs.GetString(PlayerPrefsSelectedCharacterKey, string.Empty);
+        StoreSingleCharacterId();
+        return SingleCharacterId;
     }
 
     public static void SelectCharacter(string characterId)
     {
-        StoreSelectedCharacterId(characterId);
+        StoreSingleCharacterId();
     }
 
     public static GameData EnsureCharacterData(string characterId, string characterName)
     {
-        string normalizedId = NormalizeCharacterId(characterId);
-        if (string.IsNullOrWhiteSpace(normalizedId))
-            return null;
-
-        string resolvedName = string.IsNullOrWhiteSpace(characterName) ? normalizedId : characterName.Trim();
-        GameData existingData = LoadData(normalizedId, allowLegacyFallback: false, storeSelectedCharacter: false);
+        GameData existingData = LoadData(characterId, allowLegacyFallback: true);
         if (existingData != null)
-        {
-            StoreSelectedCharacterId(normalizedId);
             return existingData;
-        }
 
         GameData newData = new GameData
         {
             saveVersion = CurrentSaveVersion,
-            selectedCharacterId = normalizedId,
-            characterName = resolvedName,
+            selectedCharacterId = SingleCharacterId,
+            characterName = ResolveCharacterName(characterName),
             selectedCharacterStartApplied = false,
             usesUnifiedCoins = true
         };
@@ -50,19 +45,15 @@ public static class SaveSystem
     public static void SaveData(GameData data)
     {
         if (data != null)
-        {
-            data.saveVersion = CurrentSaveVersion;
-            data.usesUnifiedCoins = true;
-        }
+            PrepareSingleCharacterData(data);
 
-        string path = GetSaveFilePath(data != null ? data.selectedCharacterId : string.Empty);
-        string json = JsonUtility.ToJson(data, true); // 'true' per formattare il JSON in modo leggibile
+        string path = GetSaveFilePath();
+        string json = JsonUtility.ToJson(data, true);
 
         try
         {
             File.WriteAllText(path, json);
-            if (data != null && !string.IsNullOrWhiteSpace(data.selectedCharacterId))
-                StoreSelectedCharacterId(data.selectedCharacterId);
+            StoreSingleCharacterId();
             Debug.Log($"Dati salvati con successo in: {path}");
         }
         catch (System.Exception e)
@@ -73,93 +64,90 @@ public static class SaveSystem
 
     public static GameData LoadData()
     {
-        string selectedCharacterId = GetSelectedCharacterId();
-        if (!string.IsNullOrWhiteSpace(selectedCharacterId))
-        {
-            GameData selectedData = LoadData(selectedCharacterId);
-            if (selectedData != null)
-                return selectedData;
-        }
-
-        GameData legacyData = LoadLegacyData();
-        if (legacyData != null && !string.IsNullOrWhiteSpace(legacyData.selectedCharacterId))
-        {
-            GameData selectedData = LoadData(legacyData.selectedCharacterId, allowLegacyFallback: false);
-            if (selectedData != null)
-            {
-                StoreSelectedCharacterId(selectedData.selectedCharacterId);
-                return selectedData;
-            }
-
-            StoreSelectedCharacterId(legacyData.selectedCharacterId);
-        }
-
-        return legacyData;
+        return LoadData(null, allowLegacyFallback: true);
     }
 
     public static GameData LoadData(string characterId, bool allowLegacyFallback = true)
     {
-        return LoadData(characterId, allowLegacyFallback, storeSelectedCharacter: true);
-    }
-
-    private static GameData LoadData(string characterId, bool allowLegacyFallback, bool storeSelectedCharacter)
-    {
-        string normalizedId = NormalizeCharacterId(characterId);
-        if (!string.IsNullOrWhiteSpace(normalizedId))
+        GameData data = LoadDataFromPath(GetSaveFilePath(), logMissing: false);
+        if (data != null)
         {
-            GameData characterData = LoadDataFromPath(GetCharacterSaveFilePath(normalizedId), logMissing: false);
-            if (characterData != null)
-            {
-                if (string.IsNullOrWhiteSpace(characterData.selectedCharacterId)
-                    || !string.Equals(characterData.selectedCharacterId.Trim(), normalizedId, System.StringComparison.OrdinalIgnoreCase))
-                {
-                    characterData.selectedCharacterId = normalizedId;
-                }
-
-                if (storeSelectedCharacter)
-                    StoreSelectedCharacterId(characterData.selectedCharacterId);
-                return characterData;
-            }
+            PrepareSingleCharacterData(data);
+            StoreSingleCharacterId();
+            return data;
         }
 
         if (!allowLegacyFallback)
             return null;
 
-        GameData legacyData = LoadLegacyData();
-        if (legacyData == null)
-            return null;
-
-        if (string.IsNullOrWhiteSpace(normalizedId)
-            || string.IsNullOrWhiteSpace(legacyData.selectedCharacterId)
-            || string.Equals(legacyData.selectedCharacterId.Trim(), normalizedId, System.StringComparison.OrdinalIgnoreCase))
+        data = LoadLegacyCharacterData(characterId);
+        if (data != null)
         {
-            if (string.IsNullOrWhiteSpace(legacyData.selectedCharacterId))
-                legacyData.selectedCharacterId = normalizedId;
-            if (storeSelectedCharacter && !string.IsNullOrWhiteSpace(legacyData.selectedCharacterId))
-                StoreSelectedCharacterId(legacyData.selectedCharacterId);
-            return legacyData;
+            PrepareSingleCharacterData(data);
+            SaveData(data);
+            Debug.Log("[SaveSystem] Vecchio salvataggio per personaggio migrato nel salvataggio unico.");
+            return data;
         }
 
+        Debug.Log("Nessun file di salvataggio trovato. Verranno usati i valori di default.");
         return null;
     }
 
     public static string GetSaveFilePath()
     {
-        string selectedCharacterId = GetSelectedCharacterId();
-        return GetSaveFilePath(selectedCharacterId);
+        return Path.Combine(Application.persistentDataPath, SaveFileName);
     }
 
     public static string GetSaveFilePath(string characterId)
     {
-        string normalizedId = NormalizeCharacterId(characterId);
-        return string.IsNullOrWhiteSpace(normalizedId)
-            ? GetLegacySaveFilePath()
-            : GetCharacterSaveFilePath(normalizedId);
+        return GetSaveFilePath();
     }
 
-    private static GameData LoadLegacyData(bool logMissing = true)
+    private static GameData LoadLegacyCharacterData(string requestedCharacterId)
     {
-        return LoadDataFromPath(GetLegacySaveFilePath(), logMissing);
+        string requestedId = NormalizeCharacterId(requestedCharacterId);
+        if (!string.IsNullOrWhiteSpace(requestedId))
+        {
+            GameData requestedData = LoadDataFromPath(GetLegacyCharacterSaveFilePath(requestedId), logMissing: false);
+            if (requestedData != null)
+                return requestedData;
+        }
+
+        string storedId = PlayerPrefs.GetString(PlayerPrefsSelectedCharacterKey, string.Empty);
+        storedId = NormalizeCharacterId(storedId);
+        if (!string.IsNullOrWhiteSpace(storedId)
+            && !string.Equals(storedId, requestedId, System.StringComparison.OrdinalIgnoreCase))
+        {
+            GameData storedData = LoadDataFromPath(GetLegacyCharacterSaveFilePath(storedId), logMissing: false);
+            if (storedData != null)
+                return storedData;
+        }
+
+        try
+        {
+            var directory = new DirectoryInfo(Application.persistentDataPath);
+            if (!directory.Exists)
+                return null;
+
+            FileInfo newest = null;
+            FileInfo[] files = directory.GetFiles(LegacyCharacterSavePrefix + "*" + LegacyCharacterSaveExtension);
+            for (int i = 0; i < files.Length; i++)
+            {
+                FileInfo file = files[i];
+                if (file == null || string.Equals(file.Name, SaveFileName, System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (newest == null || file.LastWriteTimeUtc > newest.LastWriteTimeUtc)
+                    newest = file;
+            }
+
+            return newest != null ? LoadDataFromPath(newest.FullName, logMissing: false) : null;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[SaveSystem] Impossibile cercare vecchi salvataggi per personaggio: {e.Message}");
+            return null;
+        }
     }
 
     private static GameData LoadDataFromPath(string path, bool logMissing = true)
@@ -171,7 +159,7 @@ public static class SaveSystem
         {
             if (logMissing)
                 Debug.Log("Nessun file di salvataggio trovato. Verranno usati i valori di default.");
-            return null; // Ritorna null se non c'e' un file
+            return null;
         }
 
         try
@@ -186,18 +174,15 @@ public static class SaveSystem
         catch (System.Exception e)
         {
             Debug.LogError($"Errore durante il caricamento dei dati: {e.Message}");
-            return null; // In caso di errore, ritorna null per evitare crash
+            return null;
         }
     }
 
-    private static string GetLegacySaveFilePath()
+    private static string GetLegacyCharacterSaveFilePath(string characterId)
     {
-        return Path.Combine(Application.persistentDataPath, LegacySaveFileName);
-    }
-
-    private static string GetCharacterSaveFilePath(string characterId)
-    {
-        return Path.Combine(Application.persistentDataPath, CharacterSavePrefix + SanitizeFileName(characterId) + CharacterSaveExtension);
+        return Path.Combine(
+            Application.persistentDataPath,
+            LegacyCharacterSavePrefix + SanitizeFileName(characterId) + LegacyCharacterSaveExtension);
     }
 
     private static string NormalizeCharacterId(string characterId)
@@ -205,13 +190,45 @@ public static class SaveSystem
         return string.IsNullOrWhiteSpace(characterId) ? string.Empty : characterId.Trim();
     }
 
-    private static void StoreSelectedCharacterId(string characterId)
+    private static void PrepareSingleCharacterData(GameData data)
     {
-        string normalizedId = NormalizeCharacterId(characterId);
-        if (string.IsNullOrWhiteSpace(normalizedId))
+        if (data == null)
             return;
 
-        PlayerPrefs.SetString(PlayerPrefsSelectedCharacterKey, normalizedId);
+        data.saveVersion = CurrentSaveVersion;
+        data.selectedCharacterId = SingleCharacterId;
+        data.characterName = ResolveCharacterName(data.characterName);
+        data.usesUnifiedCoins = true;
+    }
+
+    private static string ResolveCharacterName(string characterName)
+    {
+        if (string.IsNullOrWhiteSpace(characterName))
+            return DefaultCharacterName;
+
+        string normalized = characterName.Trim();
+        return IsLegacyArchetypeName(normalized) ? DefaultCharacterName : normalized;
+    }
+
+    private static bool IsLegacyArchetypeName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        string normalized = value.Trim();
+        return string.Equals(normalized, "warrior", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "guerriero", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "mage", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "maga", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "assassin", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "robert", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "archer", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "arciere", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void StoreSingleCharacterId()
+    {
+        PlayerPrefs.SetString(PlayerPrefsSelectedCharacterKey, SingleCharacterId);
         PlayerPrefs.Save();
     }
 
@@ -273,7 +290,6 @@ public static class SaveSystem
             switch (data.saveVersion)
             {
                 case 0:
-                    // I salvataggi precedenti non contenevano checkpoint di run.
                     data.dungeonCheckpointActive = false;
                     data.dungeonFloor = 1;
                     data.dungeonSeed = string.Empty;

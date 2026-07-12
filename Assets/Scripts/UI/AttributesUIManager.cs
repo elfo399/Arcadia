@@ -320,6 +320,9 @@ public class AttributesUIManager : MonoBehaviour
     private string ResolveSelectedCharacterName(PlayerCharacterData character)
     {
         CachePlayerStats();
+        if (playerStats != null && !string.IsNullOrWhiteSpace(playerStats.CharacterName))
+            return playerStats.CharacterName.Trim();
+
         string selectedCharacterId = playerStats != null ? playerStats.SelectedCharacterId : string.Empty;
         if (string.IsNullOrWhiteSpace(selectedCharacterId))
             selectedCharacterId = PlayerCharacterSelection.GetSelectedCharacterId();
@@ -336,17 +339,11 @@ public class AttributesUIManager : MonoBehaviour
             return character.GetCharacterId();
         }
 
-        if (playerStats != null && !string.IsNullOrWhiteSpace(playerStats.CharacterName))
-            return playerStats.CharacterName.Trim();
-
         return string.IsNullOrWhiteSpace(selectedCharacterId) ? "Player" : selectedCharacterId.Trim();
     }
 
     private PlayerCharacterData ResolveCharacterById(string characterId)
     {
-        if (playerCharacterDatabase == null)
-            playerCharacterDatabase = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
-
         if (playerCharacterDatabase == null || string.IsNullOrWhiteSpace(characterId))
             return null;
 
@@ -385,9 +382,6 @@ public class AttributesUIManager : MonoBehaviour
 
     private PlayerCharacterData ResolveSelectedCharacter()
     {
-        if (playerCharacterDatabase == null)
-            playerCharacterDatabase = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
-
         if (playerCharacterDatabase == null)
             return null;
 

@@ -47,6 +47,7 @@ public class PlayerController : MonoBehaviour
 
     [Header("UI")]
     public MenuManager menuManager;
+    [SerializeField] private Camera gameplayCamera;
 
     // Flags
     [HideInInspector] public bool canMove = true;
@@ -98,7 +99,7 @@ public class PlayerController : MonoBehaviour
     {
         CurrentPlayerTransform = transform;
         controller = GetComponent<CharacterController>();
-        cam = Camera.main != null ? Camera.main.transform : null;
+        ResolveGameplayCamera();
         EnsureControlsInitialized();
         canMove = true;
         isSprinting = false;
@@ -152,7 +153,7 @@ public class PlayerController : MonoBehaviour
     void Update()
     {
         if (Controls == null || controller == null) return;
-        if (cam == null && Camera.main != null) cam = Camera.main.transform;
+        if (cam == null) ResolveGameplayCamera();
 
         if (IsInventoryOpen)
         {
@@ -220,7 +221,8 @@ public class PlayerController : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        cam = Camera.main != null ? Camera.main.transform : null;
+        CurrentPlayerTransform = transform;
+        ResolveGameplayCamera();
         playerInventory = GetComponent<PlayerInventory>();
         playerStats = GetComponent<PlayerStats>();
         combat = GetComponent<PlayerCombat>();
@@ -579,11 +581,17 @@ public class PlayerController : MonoBehaviour
         if (menuManager != null)
             return;
 
-#if UNITY_2023_1_OR_NEWER
-        menuManager = FindFirstObjectByType<MenuManager>();
-#else
-        menuManager = FindObjectOfType<MenuManager>();
-#endif
+        SceneRuntimeReferences sceneReferences = SceneRuntimeReferences.Current;
+        menuManager = sceneReferences != null ? sceneReferences.MenuManager : null;
+    }
+
+    private void ResolveGameplayCamera()
+    {
+        SceneRuntimeReferences sceneReferences = SceneRuntimeReferences.Current;
+        if (sceneReferences != null && sceneReferences.GameplayCamera != null)
+            gameplayCamera = sceneReferences.GameplayCamera;
+
+        cam = gameplayCamera != null ? gameplayCamera.transform : null;
     }
 
 }

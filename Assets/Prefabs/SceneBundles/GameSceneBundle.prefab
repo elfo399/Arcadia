@@ -9000,6 +9000,7 @@ MonoBehaviour:
   sprintStaminaCostPerSecond: 12
   fallingSpeedThreshold: -3
   menuManager: {fileID: 1961855508484937179}
+  gameplayCamera: {fileID: 5859882124658424796}
   canMove: 1
   moveAmount: 0
   isSprinting: 0
@@ -9211,6 +9212,7 @@ MonoBehaviour:
   totalArmorWeight: 0
   unequippedInventoryWeightMultiplier: 0.2
   forceStartDataIgnoreSave: 1
+  playerCharacterDatabase: {fileID: 11400000, guid: a15fb32dca48451fa0e6ce06388747f2, type: 2}
   inspectorStartingCharacter: {fileID: 11400000, guid: 558a6ba40e7b493194ff5d7b2b99b68d, type: 2}
   useInspectorStartingCharacter: 1
   resetSaveFromInspectorCharacterOnPlay: 0
@@ -9278,6 +9280,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   freeLookCamera: {fileID: 2120024902459904781}
   lockOnCamera: {fileID: 3448073863218548092}
+  gameplayCamera: {fileID: 5859882124658424796}
+  playerCameraTarget: {fileID: 5496749885546390362}
   playerModel: {fileID: 6469205501266830037}
   scanRadius: 20
   enemyLayer:
@@ -9287,7 +9291,9 @@ MonoBehaviour:
   switchCooldown: 0.3
   switchThreshold: 0.5
   rotationSpeed: 20
-  targetIcon: {fileID: 7199453571408968386}
+  fallbackLockPointOffset: 0
+  fallbackLockPointBoundsHeight: 0.55
+  targetIconShader: {fileID: 4800000, guid: d8e4a9c1b5f6471a83c0e2d6f9b74a52, type: 3}
   isLockedOn: 0
   currentTarget: {fileID: 0}
 --- !u!114 &5204515650180598861
@@ -13080,6 +13086,54 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!1 &876540219876540221
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 876540219876540222}
+  - component: {fileID: 876540219876540220}
+  m_Layer: 0
+  m_Name: RuntimeReferences
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &876540219876540222
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 876540219876540221}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7601458093605130212}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &876540219876540220
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 876540219876540221}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7b3f4e19a2d46e58f71a0b6c94d2e83, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  gameplayCamera: {fileID: 5859882124658424796}
+  freeLookCamera: {fileID: 2120024902459904781}
+  lockOnCamera: {fileID: 3448073863218548092}
+  menuManager: {fileID: 1961855508484937179}
 --- !u!4 &7601458093605130212
 Transform:
   m_ObjectHideFlags: 0
@@ -13105,6 +13159,7 @@ Transform:
   - {fileID: 973117496044099363}
   - {fileID: 7672310567037001922}
   - {fileID: 2525763885744764084}
+  - {fileID: 876540219876540222}
   m_Father: {fileID: 908021476646515214}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2882410719811797892
@@ -13511,6 +13566,8 @@ MonoBehaviour:
   slotPrefab: {fileID: 3146139372920839725, guid: 8694c9e84f74c054fb9adb7618c38d3e, type: 3}
   magicSlotParent: {fileID: 1936803770165610882}
   magicInitialSlotCount: 6
+  dragCanvas: {fileID: 2623185933720860935}
+  dragPreviewRoot: {fileID: 0}
   noMagicBanner: {fileID: 7477788545451197559}
   magicGridRoot: {fileID: 3498201488369606274}
   magicDetailRoot: {fileID: 7441941955407863880}
@@ -16843,6 +16900,8 @@ MonoBehaviour:
   slotPrefab: {fileID: 3146139372920839725, guid: 8694c9e84f74c054fb9adb7618c38d3e, type: 3}
   slotParent: {fileID: 1182048874581647898}
   initialSlotCount: 30
+  dragCanvas: {fileID: 2623185933720860935}
+  dragPreviewRoot: {fileID: 0}
   noItemsBanner: {fileID: 1812727816334082680}
   detailRoot: {fileID: 8990826988521730502}
   detailIcon: {fileID: 3092019940251878182}
@@ -33765,6 +33824,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   inventoryPanel: {fileID: 5175280791241473993}
   playerHudPanel: {fileID: 202994784695131193}
+  hidePlayerHudPanelWhenMenuOpen: 0
   inventoryUIManager: {fileID: 8245631111312744317}
   magicInventoryManager: {fileID: 336187298598509159}
   equipmentManager: {fileID: 1479106832397090911}

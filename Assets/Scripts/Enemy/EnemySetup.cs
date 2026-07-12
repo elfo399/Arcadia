@@ -11,21 +11,24 @@ public class EnemySetup : MonoBehaviour
     [Header("Prefab Barra (Opzionale)")]
     public GameObject customHealthBarPrefab;
 
+    [Header("Punti Enemy")]
+    [SerializeField] private Transform headPoint;
+    [SerializeField] private Transform lockPoint;
+
     void Awake()
     {
         // 1. Creiamo (o troviamo) il punto della testa automaticamente
-        Transform headPoint = GetOrCreateHeadPoint();
+        Transform resolvedHeadPoint = GetOrCreateHeadPoint();
 
         // 2. Usiamo quel punto per piazzare tutto il resto
-        SetupDefaultLockPoint(headPoint);
-        SetupHealthBar(headPoint);
+        SetupDefaultLockPoint(resolvedHeadPoint);
+        SetupHealthBar(resolvedHeadPoint);
     }
 
     Transform GetOrCreateHeadPoint()
     {
-        // Se l'hai messo a mano, usiamo quello
-        Transform existing = transform.Find("HeadPoint");
-        if (existing != null) return existing;
+        if (headPoint != null)
+            return headPoint;
 
         // Altrimenti lo creiamo noi matematicamente
         GameObject headObj = new GameObject("HeadPoint");
@@ -53,31 +56,33 @@ public class EnemySetup : MonoBehaviour
         // Posizioniamo il punto
         headObj.transform.localPosition = new Vector3(0, yPos, 0);
         
-        return headObj.transform;
+        headPoint = headObj.transform;
+        return headPoint;
     }
 
     void SetupDefaultLockPoint(Transform headPoint)
     {
+        if (lockPoint != null)
+        {
+            EnsureTargetLockPoint(lockPoint);
+            return;
+        }
+
         TargetLockPoint[] existingPoints = GetComponentsInChildren<TargetLockPoint>(true);
         if (existingPoints != null && existingPoints.Length > 0)
         {
+            lockPoint = existingPoints[0].transform;
             return;
         }
 
-        Transform legacyPoint = transform.Find("LockOnPoint");
-        if (legacyPoint != null)
-        {
-            EnsureTargetLockPoint(legacyPoint);
-            return;
-        }
-
-        GameObject lockPoint = new GameObject("LockPoint_Center");
-        lockPoint.transform.SetParent(transform);
+        GameObject lockPointObject = new GameObject("LockPoint_Center");
+        lockPointObject.transform.SetParent(transform);
         
         // Il lock-on va al PETTO, quindi 0.5 metri sotto la testa
         float lockY = headPoint.localPosition.y - 0.5f;
-        lockPoint.transform.localPosition = new Vector3(0, lockY, 0);
-        EnsureTargetLockPoint(lockPoint.transform);
+        lockPointObject.transform.localPosition = new Vector3(0, lockY, 0);
+        lockPoint = lockPointObject.transform;
+        EnsureTargetLockPoint(lockPoint);
     }
 
     private static void EnsureTargetLockPoint(Transform lockPoint)

@@ -1,13 +1,14 @@
   # Arcadia - Handoff Dettagliato
 
   Data ultimo audit completo: 2026-06-23
+  Ultimo aggiornamento operativo: 2026-07-13
   Workspace: `d:\Unity\Arcadia`
   Documento pensato per riprendere il lavoro su un altro PC senza dover riaprire questa chat.
 
   Versione Unity verificata: `2022.3.62f3`
   Baseline Git verificata: `main` / `origin/main` a `18b3da5`
 
-  > Nota di validita': le sezioni 38-45 contengono l'audit del 2026-06-23 e prevalgono sulle note storiche precedenti quando descrivono sistemi cambiati dopo marzo 2026.
+  > Nota di validita': la sezione 46 contiene lo stato operativo piu' recente del 2026-07-13 e prevale sulle note storiche precedenti quando parla di save, scene references, target lock, minimap, quest UI, meteo/eclissi e working tree. Le sezioni 38-45 restano utili come audit del 2026-06-23.
 
   ## 1. Obiettivo del refactor fatto finora
 
@@ -2068,10 +2069,10 @@
 
   Responsabilita':
 
-  - salva/carica un JSON separato per personaggio in:
-    - `Application.persistentDataPath/gamedata_<characterId>.json`
-  - conserva il personaggio selezionato in `PlayerPrefs`, chiave `SelectedCharacterId`
-  - mantiene il fallback legacy `Application.persistentDataPath/gamedata.json`
+  - salva/carica un unico JSON del personaggio giocatore in:
+    - `Application.persistentDataPath/gamedata.json`
+  - conserva per compatibilita' `SelectedCharacterId` in `PlayerPrefs`, ma lo forza a `player`
+  - migra i vecchi save per classe/personaggio `gamedata_<characterId>.json` nel save unico
   - migra il vecchio wallet oro/argento/rame verso `bankCoins`
 
   Metodi:
@@ -3140,7 +3141,7 @@
   - versione Unity, pacchetti e scene di build
   - manager UI
   - player systems
-  - personaggi selezionabili e salvataggi separati
+  - personaggio runtime e save unico `player`
   - combat
   - inventory/loadout/save
   - dungeon generator
@@ -3236,7 +3237,7 @@
   - modificare solo la copia di `GameScene` di un manager persistente puo' non avere effetto quando il gioco parte da `HubScene`
   - per test attendibili verificare sia avvio diretto di `GameScene` sia transizione `HubScene -> GameScene`
 
-  ## 40. Personaggi selezionabili e salvataggi
+  ## 40. Personaggio runtime e salvataggi
 
   ### 40.1 Asset personaggio
 
@@ -3248,20 +3249,21 @@
   - `PlayerCharacterBootstrapper`
   - `PlayerCharacterSelectionButton`
 
-  Database runtime:
+  Stato corrente:
 
-  - `Assets/Resources/PlayerCharacterDatabase.asset`
-  - caricato tramite `Resources.Load("PlayerCharacterDatabase")`
-  - personaggio default: `Warrior`
+  - il runtime usa un solo slot identita': `player`
+  - `PlayerStats` espone `playerCharacterDatabase` da Inspector
+  - `PlayerCharacterBootstrapper` legge il database da `PlayerStats.CharacterDatabase`
+  - non affidarsi piu' a `Resources.Load("PlayerCharacterDatabase")` come meccanismo principale
 
-  Personaggi configurati:
+  Gli asset personaggio restano utili come preset iniziali:
 
   - `warrior` / Guerriero
   - `mage` / Maga
   - `assassin` / Robert
   - `archer` / Arciere
 
-  Ogni asset definisce attributi, risorse base, flask, alignment, loadout e backpack iniziale. `previewPrefab` e `playerPrefab` risultano attualmente non assegnati nei quattro asset.
+  Ogni asset definisce attributi, risorse base, flask, alignment, loadout e backpack iniziale. Il save pero' non crea piu' file separati per questi archetipi: il personaggio autorevole del giocatore resta `player`.
 
   ### 40.2 Regola di bootstrap
 
@@ -3269,13 +3271,13 @@
 
   `PlayerStats` puo' usare anche `inspectorStartingCharacter` come override. Questo rende importante non lasciare flag di test attivi in produzione.
 
-  ### 40.3 Save per personaggio
+  ### 40.3 Save unico del personaggio
 
   Il file corrente e':
 
-  - `gamedata_<characterId>.json`
+  - `gamedata.json`
 
-  `gamedata.json` e' solo fallback legacy. Il sistema conserva e ripristina:
+  I vecchi `gamedata_<characterId>.json` vengono usati solo come sorgente di migrazione. Il sistema conserva e ripristina:
 
   - identita' personaggio
   - livello, esperienza e attributi
@@ -3503,3 +3505,343 @@
   - 14 warning non bloccanti sui GUID dei `.anim.meta` del page flip
 
   Non sono stati eseguiti Play Mode test automatici perche' il progetto non contiene test assembly. Lo smoke test manuale resta obbligatorio.
+
+  ## 46. Aggiornamento operativo - 2026-07-13
+
+  Questa sezione descrive lo stato piu' recente dopo il rollback mirato del meteo/eclissi e prevale sulle note storiche precedenti quando c'e' conflitto.
+
+  ### 46.1 Regola importante su Unity
+
+  Non chiudere Unity automaticamente durante interventi futuri.
+
+  Se Unity risulta gia' aperto o bloccato:
+
+  - non killare il processo senza conferma esplicita
+  - non cancellare `Temp/UnityLockfile` senza conferma esplicita
+  - non avviare Unity in batch mode mentre l'editor e' aperto
+
+  ### 46.2 Meteo / eclissi
+
+  Tutte le prove su eclissi, sole/luna realistici, transiti e debug eclipse sono state rimosse dal working tree.
+
+  Stato corrente:
+
+  - `Assets/Scripts/System/WeatherManager.cs` e' tornato pulito rispetto a Git
+  - i blocchi serializzati `WeatherManager` in `GameScene`, `HubScene` e `GameSceneBundle.prefab` sono stati ripristinati
+  - in `HubScene` sono stati ripristinati anche i valori RainFX modificati durante le prove:
+    - posizione
+    - `maxNumParticles`
+    - emission rate
+
+  Quindi non considerare piu' attuali:
+
+  - durata giorno/notte 20/19 minuti
+  - luna indipendente shiftata per causare eclissi
+  - eclissi immediate al play
+  - test alba/tramonto/mezzogiorno
+  - sole/luna runtime creati o pilotati per l'eclissi
+
+  La prossima iterazione meteo va fatta da zero e separata in una branch/commit dedicata.
+
+  ### 46.3 SceneRuntimeReferences
+
+  Aggiunto nuovo script:
+
+  - `Assets/Scripts/System/SceneRuntimeReferences.cs`
+
+  Ruolo:
+
+  - espone riferimenti runtime di scena senza usare `Camera.main`, `FindObjectOfType` o nomi hardcoded
+  - contiene:
+    - `GameplayCamera`
+    - `FreeLookCamera`
+    - `LockOnCamera`
+    - `MenuManager`
+  - imposta `SceneRuntimeReferences.Current` in `Awake`
+
+  Gerarchia corrente corretta:
+
+  ```text
+  __SYSTEM
+  `-- RuntimeReferences
+      `-- SceneRuntimeReferences
+  ```
+
+  Questa struttura e' presente in:
+
+  - `Assets/Scenes/GameScene.unity`
+  - `Assets/Scenes/HubScene.unity`
+  - `Assets/Prefabs/SceneBundles/GameSceneBundle.prefab`
+
+  Non rimettere il componente direttamente su `__SYSTEM`: `__SYSTEM` deve restare un contenitore ordinato.
+
+  ### 46.4 Save unico `player`
+
+  Il save corrente non e' piu' per archetipi/personaggi separati.
+
+  Stato corrente:
+
+  - `SaveSystem.SingleCharacterId = "player"`
+  - `SaveSystem.DefaultCharacterName = "Player"`
+  - il file autorevole e' `Application.persistentDataPath/gamedata.json`
+  - `SelectedCharacterId` in `PlayerPrefs` viene mantenuto per compatibilita', ma forzato a `player`
+  - vecchi file `gamedata_<characterId>.json` vengono letti solo per migrazione
+
+  Deprecato:
+
+  - assumere che `warrior`, `mage`, `assassin`, `archer` siano slot save separati
+  - usare `Resources.Load("PlayerCharacterDatabase")` come fonte primaria
+  - salvare file per-character come comportamento normale
+
+  Da testare:
+
+  - nuovo gioco senza save
+  - load con `gamedata.json` gia' presente
+  - migrazione da un vecchio `gamedata_<characterId>.json`
+  - nome personaggio dopo load/migrazione
+  - inventory/loadout dopo load/migrazione
+
+  ### 46.5 Scene e prefab sono parte della feature
+
+  Le modifiche non sono solo script.
+
+  File scena/prefab coinvolti e da includere nel push:
+
+  - `Assets/Scenes/GameScene.unity`
+  - `Assets/Scenes/HubScene.unity`
+  - `Assets/Prefabs/SceneBundles/GameSceneBundle.prefab`
+  - `Assets/Prefabs/UI/UI_RoomIcon.prefab`
+  - `Assets/Prefabs/Charapter/Skeleton/Prefab/Skeleton.prefab`
+
+  Questi file contengono riferimenti assegnati in Inspector per:
+
+  - `SceneRuntimeReferences`
+  - gameplay camera
+  - Cinemachine FreeLook
+  - Cinemachine lock-on camera
+  - `MenuManager`
+  - `PlayerCharacterDatabase`
+  - drag canvas inventory/magic
+  - shader target lock
+  - minimap room icon view
+  - lock point skeleton
+
+  Non pushare solo gli script: il runtime dipende dalle assegnazioni serializzate.
+
+  ### 46.6 Minimap e map page
+
+  Aggiunto nuovo script:
+
+  - `Assets/Scripts/UI/MinimapRoomIconView.cs`
+
+  Ruolo:
+
+  - espone `FillImage`
+  - espone `OverlayImage`
+  - permette a `MinimapManager` di non cercare piu' child per nome come `RoomFill` / `IconOverlay`
+
+  Stato corrente:
+
+  - `UI_RoomIcon.prefab` contiene il nuovo componente e i riferimenti fill/overlay
+  - `MinimapManager` usa dizionari runtime per oggetti renderizzati nel menu
+  - hub minimap usa target player/portal espliciti quando disponibili
+
+  Da testare:
+
+  - minimap in Hub
+  - minimap in GameScene
+  - apertura pagina Maps
+  - passaggio Hub -> GameScene -> Hub
+  - marker player e portal in Hub
+
+  ### 46.7 Target lock
+
+  Aggiunto nuovo shader:
+
+  - `Assets/Shaders/TargetLockDotUnlit.shader`
+
+  Ruolo:
+
+  - shader trasparente unlit per marker target lock
+  - `Queue = Overlay`
+  - `ZTest Always`
+  - `ZWrite Off`
+  - mantiene il marker visibile sopra il target
+
+  `TargetLockSystem` ora usa:
+
+  - `SceneRuntimeReferences.GameplayCamera`
+  - `SceneRuntimeReferences.FreeLookCamera`
+  - `SceneRuntimeReferences.LockOnCamera`
+  - `playerCameraTarget` assegnato
+  - `targetIconShader` assegnato
+
+  Nota:
+
+  - con `ZTest Always` il marker puo' vedersi anche attraverso ostacoli
+  - se in futuro questo non va bene, valutare `ZTest LEqual`, ma cambierebbe il comportamento visivo
+
+  Da testare:
+
+  - lock/unlock su nemici
+  - cambio target
+  - target senza `TargetLockPoint`
+  - target con `TargetLockPoint`
+  - icona visibile e non deformata
+  - transizione camera normale/lock-on
+
+  ### 46.8 Enemy setup e health bar
+
+  `EnemySetup` ora supporta riferimenti espliciti:
+
+  - `headPoint`
+  - `lockPoint`
+
+  Se non assegnati, prova ancora a crearli/risolverli.
+
+  `EnemyHealthBar` ora usa `SceneRuntimeReferences.GameplayCamera` invece di `Camera.main`.
+
+  Da testare:
+
+  - skeleton prefab
+  - health bar orientata verso camera
+  - lock point sullo skeleton
+  - nemici spawnati runtime
+
+  ### 46.9 Inventory / Magic / Equipment
+
+  Stato corrente:
+
+  - `InventoryUIManager` usa `dragCanvas` e `dragPreviewRoot`
+  - `MagicInventoryManager` usa `dragCanvas` e `dragPreviewRoot`
+  - `EquipmentManager` non cerca piu' automaticamente gli armor container per nome
+  - `InventorySlot` non prova piu' a trovare automaticamente `Icon` o la prima image figlia
+
+  Implicazione:
+
+  - la UI e' piu' esplicita e meno fragile
+  - pero' i riferimenti prefab/scena devono essere assegnati correttamente
+
+  Da testare:
+
+  - drag/drop inventory
+  - drag/drop magic
+  - equip weapon
+  - equip shield
+  - equip usable
+  - equip magic
+  - equip armor helmet/chest/leggings/boots
+  - navigazione pad
+  - chiusura menu durante drag
+
+  ### 46.10 Quest UI rows
+
+  Stato corrente:
+
+  - `QuestItemUI`
+  - `QuestObjectiveItemUI`
+  - `QuestRewardItemUI`
+
+  hanno meno fallback automatici e si aspettano riferimenti corretti nel prefab.
+
+  Deprecato:
+
+  - affidarsi a child cercati per nome (`Title`, `Name`, `Location`, `Completed`, `Category`, `Value`, ecc.)
+  - aggiungere runtime `Button` / `Outline` come fallback
+
+  Da testare:
+
+  - lista quest
+  - selezione mouse
+  - selezione pad
+  - dettaglio quest
+  - obiettivi completati/non completati
+  - reward
+  - claim reward
+
+  ### 46.11 Debug / cleanup consigliato prima del push finale
+
+  Cose candidate da togliere o mettere dietro flag senza cambiare gameplay:
+
+  - `Assets/Scripts/UI/FpsDisplay.cs`
+    - crea overlay FPS automaticamente a runtime
+    - tenerlo solo in `UNITY_EDITOR` / `DEVELOPMENT_BUILD` oppure rimuoverlo dal push release
+  - log danno/combat:
+    - `WeaponDamage`
+    - `WeaponThrowProjectile`
+    - `MagicProjectile`
+    - `PlayerStats.TakeDamage`
+  - `CoreGenerator.showRngLogs`
+    - portare default a `false`
+  - log stanze/porte/loot:
+    - `Room`
+    - `InteractableDoor`
+    - `TreasureChest`
+  - log save/load path in `SaveSystem`
+
+  Warning/error per riferimenti mancanti vanno tenuti: servono a trovare setup rotti in Unity.
+
+  ### 46.12 Working tree funzionale da pushare
+
+  Da includere nel push funzionale:
+
+  - `Assets/Scripts/System/SceneRuntimeReferences.cs`
+  - `Assets/Scripts/System/GameData.cs`
+  - `Assets/Scripts/System/SaveSystem.cs`
+  - `Assets/Scripts/Player/PlayerCharacterBootstrapper.cs`
+  - `Assets/Scripts/Player/PlayerCharacterSelection.cs`
+  - `Assets/Scripts/Player/PlayerController.cs`
+  - `Assets/Scripts/Player/PlayerInteraction.cs`
+  - `Assets/Scripts/Player/PlayerInventory.cs`
+  - `Assets/Scripts/Player/PlayerStats.cs`
+  - `Assets/Scripts/UI/AttributesUIManager.cs`
+  - `Assets/Scripts/UI/CompassSystem.cs`
+  - `Assets/Scripts/UI/EquipmentManager.cs`
+  - `Assets/Scripts/UI/InventorySlot.cs`
+  - `Assets/Scripts/UI/InventoryUIManager.cs`
+  - `Assets/Scripts/UI/MagicInventoryManager.cs`
+  - `Assets/Scripts/UI/MapPageManager.cs`
+  - `Assets/Scripts/UI/MenuManager.cs`
+  - `Assets/Scripts/UI/MinimapManager.cs`
+  - `Assets/Scripts/UI/MinimapRoomIconView.cs`
+  - `Assets/Scripts/UI/QuestItemUI.cs`
+  - `Assets/Scripts/UI/QuestObjectiveItemUI.cs`
+  - `Assets/Scripts/UI/QuestRewardItemUI.cs`
+  - `Assets/Scripts/UI/SegmentedButtonSelectionUI.cs`
+  - `Assets/Scripts/camera/TargetLockSystem.cs`
+  - `Assets/Scripts/Enemy/EnemyHealthBar.cs`
+  - `Assets/Scripts/Enemy/EnemySetup.cs`
+  - `Assets/Shaders/TargetLockDotUnlit.shader`
+  - scene/prefab elencati in 46.5
+
+  Da decidere separatamente:
+
+  - `Assets/Blink/Persone/`
+    - nuovi asset FBX/personaggi/NPC
+    - sono untracked
+    - includerli solo se sono intenzionali per questa feature
+  - `handoff.md`
+    - documento interno, utile da committare solo se si vuole tracciare lo stato operativo
+
+  Da NON includere come modifica funzionale:
+
+  - prove meteo/eclissi
+  - modifiche a `WeatherManager.cs`
+
+  ### 46.13 Smoke test minimo prima del commit/push
+
+  1. aprire `HubScene`
+  2. verificare `__SYSTEM/RuntimeReferences`
+  3. premere Play da Hub
+  4. aprire/chiudere menu
+  5. testare Equipment, Inventory, Magic, Attributes, Journal
+  6. testare drag/drop inventory e magic
+  7. equipaggiare weapon, shield, usable, magic, armor
+  8. verificare minimap Hub e portal marker
+  9. entrare in GameScene
+  10. verificare camera gameplay e compass
+  11. verificare minimap dungeon e pagina Maps
+  12. lockare un nemico e controllare marker target
+  13. farsi colpire e verificare health bar / danno / armor
+  14. salvare, uscire da Play, rientrare e verificare load
+  15. controllare console: nessun missing reference nuovo

@@ -35,61 +35,7 @@ public class QuestObjectiveItemUI : MonoBehaviour
 
     private void ResolveReferences()
     {
-        if (titleText == null)
-            titleText = FindTextContains("title");
-
-        if (descriptionText == null)
-            descriptionText = FindTextContains("objective")
-                              ?? FindTextContains("desc")
-                              ?? FindTextContains("description");
-
-        if (completedToggle == null)
-            completedToggle = GetComponentInChildren<Toggle>(true);
-
-        if (completedToggle != null && completedToggle.graphic is Image toggleGraphic)
-        {
-            string currentName = checkImage != null ? checkImage.gameObject.name.ToLowerInvariant() : string.Empty;
-            if (checkImage == null || !currentName.Contains("check"))
-                checkImage = toggleGraphic;
-        }
-
-        if (checkImage == null)
-        {
-            var images = GetComponentsInChildren<Image>(true);
-            for (int i = 0; i < images.Length; i++)
-            {
-                if (images[i] == null) continue;
-                string n = images[i].gameObject.name.ToLowerInvariant();
-                if (n.Contains("check"))
-                {
-                    checkImage = images[i];
-                    break;
-                }
-            }
-        }
-
-        if (titleText == null || descriptionText == null)
-        {
-            var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
-            for (int i = 0; i < texts.Length; i++)
-            {
-                if (texts[i] == null) continue;
-                if (titleText == null) titleText = texts[i];
-                else if (descriptionText == null && texts[i] != titleText) descriptionText = texts[i];
-            }
-        }
-    }
-
-    private TextMeshProUGUI FindTextContains(string token)
-    {
-        if (string.IsNullOrWhiteSpace(token)) return null;
-        var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
-        for (int i = 0; i < texts.Length; i++)
-        {
-            if (texts[i] == null) continue;
-            if (texts[i].gameObject.name.ToLowerInvariant().Contains(token))
-                return texts[i];
-        }
-        return null;
+        if (checkImage == null && completedToggle != null)
+            checkImage = completedToggle.graphic as Image;
     }
 }

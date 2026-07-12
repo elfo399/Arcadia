@@ -57,7 +57,12 @@ public class CompassSystem : MonoBehaviour
     private void ResolveReferences()
     {
         if (cameraTransform == null || !cameraTransform)
-            cameraTransform = Camera.main != null ? Camera.main.transform : null;
+        {
+            SceneRuntimeReferences sceneReferences = SceneRuntimeReferences.Current;
+            cameraTransform = sceneReferences != null && sceneReferences.GameplayCamera != null
+                ? sceneReferences.GameplayCamera.transform
+                : null;
+        }
         
         if (compassBarRect != null) compassWidth = compassBarRect.rect.width;
     }

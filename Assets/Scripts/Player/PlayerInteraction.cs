@@ -7,14 +7,12 @@ public class PlayerInteraction : MonoBehaviour
     public float interactRange = 2f;
     public LayerMask interactLayer; // Importante: metti i lock/casse su un layer specifico o Default
 
-    private Transform cam;
     private PlayerController playerController;
     private bool isSubscribed;
     private System.Action<InputAction.CallbackContext> interactCallback;
 
     void Awake()
     {
-        cam = Camera.main != null ? Camera.main.transform : null;
         playerController = GetComponent<PlayerController>();
         interactCallback = _ => TryInteract();
     }

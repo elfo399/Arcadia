@@ -9,6 +9,8 @@ public class TargetLockSystem : MonoBehaviour
     [Header("Riferimenti")]
     public CinemachineFreeLook freeLookCamera;
     public CinemachineVirtualCamera lockOnCamera;
+    [SerializeField] private Camera gameplayCamera;
+    [SerializeField] private Transform playerCameraTarget;
     public Transform playerModel;
 
     [Header("Ricerca")]
@@ -26,6 +28,7 @@ public class TargetLockSystem : MonoBehaviour
     [Header("Fallback Lock Point")]
     [SerializeField] private float fallbackLockPointOffset = 0f;
     [SerializeField, Range(0.35f, 1f)] private float fallbackLockPointBoundsHeight = 0.55f;
+    [SerializeField] private Shader targetIconShader;
 
     [Header("Debug")]
     public bool isLockedOn = false;
@@ -46,11 +49,6 @@ public class TargetLockSystem : MonoBehaviour
     private readonly List<Transform> lockPointCandidates = new List<Transform>();
     private readonly List<EnemyHealth> candidateEnemies = new List<EnemyHealth>();
     private readonly HashSet<EnemyHealth> scannedEnemies = new HashSet<EnemyHealth>();
-
-    private const string LockOnCameraName = "CM_LockOn";
-    private const string CameraTargetName = "CamTarget";
-    private const string LegacyLockOnPointName = "LockOnPoint";
-    private const string HeadPointName = "HeadPoint";
 
     void Awake()
     {
@@ -138,14 +136,21 @@ public class TargetLockSystem : MonoBehaviour
         if (playerController == null)
             playerController = GetComponentInParent<PlayerController>();
 
+        SceneRuntimeReferences sceneReferences = SceneRuntimeReferences.Current;
+        if (sceneReferences != null)
+        {
+            if (sceneReferences.GameplayCamera != null)
+                gameplayCamera = sceneReferences.GameplayCamera;
+            if (sceneReferences.FreeLookCamera != null)
+                freeLookCamera = sceneReferences.FreeLookCamera;
+            if (sceneReferences.LockOnCamera != null)
+                lockOnCamera = sceneReferences.LockOnCamera;
+        }
+
+        mainCam = gameplayCamera;
+
         Transform followTarget = playerController != null ? playerController.transform : transform;
-        Transform lookAtTarget = ResolveLookAtTarget(followTarget);
-
-        if (freeLookCamera == null)
-            freeLookCamera = FindObjectOfType<CinemachineFreeLook>();
-
-        if (lockOnCamera == null)
-            lockOnCamera = FindVirtualCamera(LockOnCameraName);
+        Transform lookAtTarget = playerCameraTarget != null ? playerCameraTarget : followTarget;
 
         if (freeLookCamera != null)
         {
@@ -160,52 +165,13 @@ public class TargetLockSystem : MonoBehaviour
         }
     }
 
-    private Transform ResolveLookAtTarget(Transform followTarget)
-    {
-        if (followTarget == null)
-            return null;
-
-        Transform[] children = followTarget.GetComponentsInChildren<Transform>(true);
-        for (int i = 0; i < children.Length; i++)
-        {
-            if (children[i].name == CameraTargetName)
-                return children[i];
-        }
-
-        return followTarget;
-    }
-
-    private CinemachineVirtualCamera FindVirtualCamera(string preferredName)
-    {
-        CinemachineVirtualCamera[] cameras = FindObjectsOfType<CinemachineVirtualCamera>();
-        CinemachineVirtualCamera fallback = null;
-
-        for (int i = 0; i < cameras.Length; i++)
-        {
-            CinemachineVirtualCamera camera = cameras[i];
-            if (camera == null)
-                continue;
-
-            if (fallback == null)
-                fallback = camera;
-            if (camera.name == preferredName)
-                return camera;
-        }
-
-        return fallback;
-    }
-
     private Camera ResolveGameplayCamera()
     {
-        Camera[] cameras = FindObjectsOfType<Camera>();
-        for (int i = 0; i < cameras.Length; i++)
-        {
-            Camera camera = cameras[i];
-            if (camera != null && camera.isActiveAndEnabled && camera.GetComponent<CinemachineBrain>() != null)
-                return camera;
-        }
+        SceneRuntimeReferences sceneReferences = SceneRuntimeReferences.Current;
+        if (sceneReferences != null && sceneReferences.GameplayCamera != null)
+            gameplayCamera = sceneReferences.GameplayCamera;
 
-        return Camera.main;
+        return gameplayCamera;
     }
 
     private void HandleTargetSwitching()
@@ -455,10 +421,6 @@ public class TargetLockSystem : MonoBehaviour
             return new Vector3(bounds.center.x, iconHeight, bounds.center.z);
         }
 
-        Transform headPoint = ResolveTargetChild(currentTarget, HeadPointName);
-        if (headPoint != null)
-            return headPoint.position + Vector3.up * fallbackLockPointOffset;
-
         return currentTarget != null ? currentTarget.position + Vector3.up * 1.1f : Vector3.zero;
     }
 
@@ -561,25 +523,6 @@ public class TargetLockSystem : MonoBehaviour
         }
     }
 
-    private static Transform ResolveTargetChild(Transform root, string childName)
-    {
-        if (root == null)
-            return null;
-
-        Transform direct = root.Find(childName);
-        if (direct != null)
-            return direct;
-
-        Transform[] children = root.GetComponentsInChildren<Transform>(true);
-        for (int i = 0; i < children.Length; i++)
-        {
-            if (children[i].name == childName)
-                return children[i];
-        }
-
-        return null;
-    }
-
     private static void CollectLockPointCandidates(Transform root, List<Transform> results)
     {
         results.Clear();
@@ -594,30 +537,8 @@ public class TargetLockSystem : MonoBehaviour
                 AddUniqueLockPoint(results, point.transform);
         }
 
-        Transform[] children = root.GetComponentsInChildren<Transform>(true);
-        for (int i = 0; i < children.Length; i++)
-        {
-            Transform child = children[i];
-            if (child == null || !child.gameObject.activeInHierarchy)
-                continue;
-
-            TargetLockPoint lockPoint = child.GetComponent<TargetLockPoint>();
-            if (lockPoint != null && !lockPoint.IsLockable)
-                continue;
-
-            if (IsLockPointName(child.name))
-                AddUniqueLockPoint(results, child);
-        }
-
         if (results.Count == 0)
             results.Add(root);
-    }
-
-    private static bool IsLockPointName(string objectName)
-    {
-        return objectName == LegacyLockOnPointName
-               || objectName.StartsWith("LockPoint", System.StringComparison.OrdinalIgnoreCase)
-               || objectName.StartsWith("LockOnPoint", System.StringComparison.OrdinalIgnoreCase);
     }
 
     private static void AddUniqueLockPoint(List<Transform> results, Transform point)
@@ -759,10 +680,9 @@ public class TargetLockSystem : MonoBehaviour
         worldTargetIconRenderer.color = Color.white;
         worldTargetIconRenderer.sortingOrder = 32767;
 
-        Shader shader = Shader.Find("GUI/Text Shader");
-        if (shader != null)
+        if (targetIconShader != null)
         {
-            worldTargetIconMaterial = new Material(shader);
+            worldTargetIconMaterial = new Material(targetIconShader);
             worldTargetIconRenderer.material = worldTargetIconMaterial;
         }
 

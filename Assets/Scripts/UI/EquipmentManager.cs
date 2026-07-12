@@ -365,11 +365,6 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
 
     private void ResolveArmorContainersFromHierarchy()
     {
-        armorHelmetContainer = ResolveArmorContainer(armorHelmetContainer, "helmet");
-        armorChestplateContainer = ResolveArmorContainer(armorChestplateContainer, "chestplate");
-        armorLeggingsContainer = ResolveArmorContainer(armorLeggingsContainer, "leggings");
-        armorBootsContainer = ResolveArmorContainer(armorBootsContainer, "boots");
-
         LogMissingArmorContainer(armorHelmetContainer, "helmet");
         LogMissingArmorContainer(armorChestplateContainer, "chestplate");
         LogMissingArmorContainer(armorLeggingsContainer, "leggings");
@@ -624,52 +619,12 @@ public class EquipmentManager : MonoBehaviour, IInventorySlotHandler
             if (armorEquipSlots[i] != null) armorEquipSlots[i].SetFocused(showPadFocus && equipCrossFocus == EquipCrossFocus.Armor && i == armorIndex);
     }
 
-    private static Transform FindNamedChild(Transform root, string childName)
-    {
-        if (root == null || string.IsNullOrWhiteSpace(childName))
-            return null;
-
-        foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
-        {
-            if (child != null && child.name == childName)
-                return child;
-        }
-
-        return null;
-    }
-
-    private Transform ResolveArmorContainer(Transform current, string childName)
-    {
-        if (current != null)
-            return current;
-
-        Transform found = FindNamedChild(transform, childName);
-        if (found != null)
-            return found;
-
-        if (equipmentBackground != null)
-        {
-            found = FindNamedChild(equipmentBackground.transform, childName);
-            if (found != null)
-                return found;
-        }
-
-        if (inventoryBackground != null)
-        {
-            found = FindNamedChild(inventoryBackground.transform, childName);
-            if (found != null)
-                return found;
-        }
-
-        return null;
-    }
-
     private void LogMissingArmorContainer(Transform container, string slotName)
     {
         if (container != null)
             return;
 
-        Debug.LogWarning($"[EquipmentManager] Armor container '{slotName}' non trovato. Assegna il riferimento in Inspector oppure usa esattamente il nome '{slotName}' nella UI.");
+        Debug.LogWarning($"[EquipmentManager] Armor container '{slotName}' non assegnato in Inspector.");
     }
 
     public void HandleSlotPointerDown(int index)

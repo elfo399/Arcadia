@@ -220,23 +220,8 @@ public class InventorySlot : MonoBehaviour,
 
         if (iconImage == null)
         {
-            // 1) Cerca child chiamato "Icon"
-            var iconTransform = transform.Find("Icon");
-            if (iconTransform != null)
-                iconImage = iconTransform.GetComponent<Image>();
-
-            // 2) Prima Image figlia diversa dal background
-            if (iconImage == null)
-            {
-                var images = GetComponentsInChildren<Image>(true);
-                foreach (var img in images)
-                {
-                    if (img == null) continue;
-                    if (img == GetComponent<Image>()) continue; // salta eventuale bg sullo stesso GO
-                    iconImage = img;
-                    break;
-                }
-            }
+            if (logMissingReferences)
+                Debug.LogWarning($"InventorySlot '{name}' non ha iconImage assegnato in Inspector.");
         }
 
     }

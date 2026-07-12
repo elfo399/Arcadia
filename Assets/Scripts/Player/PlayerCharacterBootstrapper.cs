@@ -3,8 +3,6 @@ using UnityEngine.SceneManagement;
 
 public static class PlayerCharacterBootstrapper
 {
-    private const string ResourcesDatabasePath = "PlayerCharacterDatabase";
-
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Initialize()
     {
@@ -20,22 +18,20 @@ public static class PlayerCharacterBootstrapper
 
     public static bool ApplyToCurrentPlayer(PlayerCharacterDatabase databaseOverride = null)
     {
-        PlayerStats stats = PlayerStats.instance != null
-            ? PlayerStats.instance
-            : Object.FindObjectOfType<PlayerStats>();
+        PlayerStats stats = PlayerStats.instance;
 
         if (stats == null)
             return false;
 
         PlayerCharacterDatabase database = databaseOverride != null
             ? databaseOverride
-            : Resources.Load<PlayerCharacterDatabase>(ResourcesDatabasePath);
+            : stats.CharacterDatabase;
 
         if (database == null)
         {
             if (!stats.HasInspectorStartingCharacter)
             {
-                Debug.LogWarning($"[PlayerCharacterBootstrapper] Missing Resources/{ResourcesDatabasePath}.asset.");
+                Debug.LogWarning("[PlayerCharacterBootstrapper] PlayerCharacterDatabase non assegnato a PlayerStats.");
                 return false;
             }
         }

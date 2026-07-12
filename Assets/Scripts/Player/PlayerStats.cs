@@ -107,6 +107,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     [Header("Debug / Bootstrap")]
     [SerializeField] private bool forceStartDataIgnoreSave = false;
     [Header("Character Start")]
+    [SerializeField] private PlayerCharacterDatabase playerCharacterDatabase;
     [SerializeField] private PlayerCharacterData inspectorStartingCharacter;
     [SerializeField] private bool useInspectorStartingCharacter = true;
     [SerializeField] private bool resetSaveFromInspectorCharacterOnPlay = false;
@@ -123,6 +124,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public string SelectedCharacterId => selectedCharacterId;
     public string CharacterName => ResolveCharacterName();
     public bool HasInspectorStartingCharacter => useInspectorStartingCharacter && inspectorStartingCharacter != null;
+    public PlayerCharacterDatabase CharacterDatabase => playerCharacterDatabase;
     public bool HasActiveDungeonCheckpoint => dungeonCheckpointActive;
 
     void Awake()
@@ -470,7 +472,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         GameData data = new GameData
         {
             saveVersion = SaveSystem.CurrentSaveVersion,
-            selectedCharacterId = this.selectedCharacterId,
+            selectedCharacterId = SaveSystem.SingleCharacterId,
             characterName = ResolveCharacterName(),
             selectedCharacterStartApplied = this.selectedCharacterStartApplied,
             playerLevel = this.playerLevel,
@@ -527,15 +529,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public void LoadStats()
     {
-        bool inspectorCharacterSelectsSlot;
-        string requestedCharacterId = ResolveRequestedCharacterIdForLoad(out inspectorCharacterSelectsSlot);
-        GameData data = SaveSystem.LoadData(requestedCharacterId, allowLegacyFallback: !inspectorCharacterSelectsSlot);
+        string requestedCharacterId = ResolveRequestedCharacterIdForLoad(out _);
+        GameData data = SaveSystem.LoadData(requestedCharacterId, allowLegacyFallback: true);
 
         if (forceStartDataIgnoreSave && data == null)
         {
             loadedDataCache = null;
-            selectedCharacterId = string.Empty;
-            characterName = string.Empty;
+            selectedCharacterId = SaveSystem.SingleCharacterId;
+            characterName = SaveSystem.DefaultCharacterName;
             selectedCharacterStartApplied = false;
             loadedQuestStateApplied = true;
             loadedInventoryStateApplied = true;
@@ -551,7 +552,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         loadedInventoryStateApplied = false;
         if (data != null)
         {
-            selectedCharacterId = !string.IsNullOrWhiteSpace(data.selectedCharacterId) ? data.selectedCharacterId : requestedCharacterId;
+            selectedCharacterId = SaveSystem.SingleCharacterId;
             characterName = ResolveLoadedCharacterName(data.characterName, selectedCharacterId);
             selectedCharacterStartApplied = data.selectedCharacterStartApplied;
             this.playerLevel = Mathf.Max(1, data.playerLevel > 0 ? data.playerLevel : this.playerLevel);
@@ -571,7 +572,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             this.runCoins = Mathf.Max(0, data.runCoins);
             this.bankCoins = ResolveSavedBankCoins(data);
             ApplyLoadedDungeonCheckpoint(data);
-            ApplyCharacterBaseResources(selectedCharacterId);
+            ApplyCharacterBaseResources();
             SyncLegacyWalletFields();
             // Non applicare qui quest/inventory: se avviene prima degli Awake degli altri componenti
             // (es. PlayerInventory), il loro Awake può sovrascrivere i dati caricati.
@@ -582,8 +583,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
         }
         else
         {
-            selectedCharacterId = string.Empty;
-            characterName = string.Empty;
+            selectedCharacterId = SaveSystem.SingleCharacterId;
+            characterName = SaveSystem.DefaultCharacterName;
             selectedCharacterStartApplied = false;
             ClearDungeonCheckpoint();
             Debug.Log("Nessun file di salvataggio trovato. Verranno usati i valori correnti (da Inspector alla prima esecuzione).");
@@ -593,19 +594,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private string ResolveRequestedCharacterIdForLoad(out bool inspectorCharacterSelectsSlot)
     {
         inspectorCharacterSelectsSlot = false;
-
-        if (HasInspectorStartingCharacter)
-        {
-            string inspectorCharacterId = inspectorStartingCharacter.GetCharacterId();
-            if (!string.IsNullOrWhiteSpace(inspectorCharacterId))
-            {
-                inspectorCharacterSelectsSlot = true;
-                SaveSystem.SelectCharacter(inspectorCharacterId);
-                return inspectorCharacterId;
-            }
-        }
-
-        return PlayerCharacterSelection.GetSelectedCharacterId();
+        return SaveSystem.SingleCharacterId;
     }
 
     private void ApplyLoadedCharacterData(GameData data, string fallbackCharacterId)
@@ -617,7 +606,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         loadedQuestStateApplied = false;
         loadedInventoryStateApplied = false;
 
-        selectedCharacterId = !string.IsNullOrWhiteSpace(data.selectedCharacterId) ? data.selectedCharacterId : fallbackCharacterId;
+        selectedCharacterId = SaveSystem.SingleCharacterId;
         characterName = ResolveLoadedCharacterName(data.characterName, selectedCharacterId);
         selectedCharacterStartApplied = data.selectedCharacterStartApplied;
         this.playerLevel = Mathf.Max(1, data.playerLevel > 0 ? data.playerLevel : this.playerLevel);
@@ -637,7 +626,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         this.runCoins = Mathf.Max(0, data.runCoins);
         this.bankCoins = ResolveSavedBankCoins(data);
         ApplyLoadedDungeonCheckpoint(data);
-        ApplyCharacterBaseResources(selectedCharacterId);
+        ApplyCharacterBaseResources();
         SyncLegacyWalletFields();
     }
 
@@ -664,10 +653,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
         bool hasPendingNewCharacter = !string.IsNullOrWhiteSpace(pendingCharacterId);
         if (hasPendingNewCharacter)
         {
-            GameData pendingData = SaveSystem.LoadData(pendingCharacterId, allowLegacyFallback: false);
+            GameData pendingData = SaveSystem.LoadData(SaveSystem.SingleCharacterId, allowLegacyFallback: false);
             if (pendingData != null && pendingData.selectedCharacterStartApplied)
             {
-                ApplyLoadedCharacterData(pendingData, pendingCharacterId);
+                ApplyLoadedCharacterData(pendingData, SaveSystem.SingleCharacterId);
                 PlayerCharacterSelection.ClearPendingNewCharacter(selectedCharacterId);
                 RecalculateDerivedStats(keepCurrentRatio: true);
                 RefreshArmorTotals();
@@ -690,31 +679,22 @@ public class PlayerStats : MonoBehaviour, IDamageable
                 || string.IsNullOrWhiteSpace(loadedDataCache.selectedCharacterId));
 
         PlayerCharacterData character = shouldUseInspectorCharacter ? inspectorStartingCharacter : null;
-        string requestedCharacterId;
-        if (hasPendingNewCharacter)
-            requestedCharacterId = pendingCharacterId;
-        else if (shouldUseInspectorCharacter)
-            requestedCharacterId = character.GetCharacterId();
-        else if (hasLoadedSave)
-            requestedCharacterId = loadedDataCache.selectedCharacterId;
-        else
-            requestedCharacterId = PlayerCharacterSelection.GetSelectedCharacterId();
 
         bool shouldApply = hasPendingNewCharacter
             || shouldUseInspectorCharacter
             || !hasLoadedSave
-            || (!loadedDataCache.selectedCharacterStartApplied && !string.IsNullOrWhiteSpace(requestedCharacterId));
+            || !loadedDataCache.selectedCharacterStartApplied;
 
         if (!shouldApply)
             return false;
 
         if (character == null)
-            character = database != null ? database.GetById(requestedCharacterId) : null;
+            character = ResolveDefaultStartingCharacter(database);
         if (character == null)
             return false;
 
         ApplyStartingCharacter(character);
-        selectedCharacterId = character.GetCharacterId();
+        selectedCharacterId = SaveSystem.SingleCharacterId;
         selectedCharacterStartApplied = true;
         if (shouldUseInspectorCharacter)
             inspectorStartingCharacterAppliedThisSession = true;
@@ -728,8 +708,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (character == null)
             return;
 
-        selectedCharacterId = character.GetCharacterId();
-        characterName = ResolveCharacterDisplayName(character);
+        selectedCharacterId = SaveSystem.SingleCharacterId;
+        characterName = SaveSystem.DefaultCharacterName;
 
         playerLevel = Mathf.Max(1, character.startingLevel);
         levelExperience = 0;
@@ -800,12 +780,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (!string.IsNullOrWhiteSpace(savedName))
             return savedName.Trim();
 
-        PlayerCharacterData character = ResolveCharacterDataById(fallbackCharacterId);
-        string displayName = ResolveCharacterDisplayName(character);
-        if (!string.IsNullOrWhiteSpace(displayName))
-            return displayName;
-
-        return string.IsNullOrWhiteSpace(fallbackCharacterId) ? "Player" : fallbackCharacterId.Trim();
+        return SaveSystem.DefaultCharacterName;
     }
 
     private static string ResolveCharacterDisplayName(PlayerCharacterData character)
@@ -819,18 +794,25 @@ public class PlayerStats : MonoBehaviour, IDamageable
         return character.GetCharacterId();
     }
 
-    private static PlayerCharacterData ResolveCharacterDataById(string characterId)
+    private PlayerCharacterData ResolveCharacterDataById(string characterId)
     {
-        PlayerCharacterDatabase database = Resources.Load<PlayerCharacterDatabase>("PlayerCharacterDatabase");
-        return database != null ? database.GetById(characterId) : null;
+        return playerCharacterDatabase != null ? playerCharacterDatabase.GetById(characterId) : null;
     }
 
-    private void ApplyCharacterBaseResources(string characterId)
+    private PlayerCharacterData ResolveDefaultStartingCharacter(PlayerCharacterDatabase database = null)
     {
-        if (string.IsNullOrWhiteSpace(characterId))
-            return;
+        if (database != null && database.DefaultCharacter != null)
+            return database.DefaultCharacter;
 
-        PlayerCharacterData character = ResolveCharacterDataById(characterId);
+        if (playerCharacterDatabase != null && playerCharacterDatabase.DefaultCharacter != null)
+            return playerCharacterDatabase.DefaultCharacter;
+
+        return inspectorStartingCharacter;
+    }
+
+    private void ApplyCharacterBaseResources()
+    {
+        PlayerCharacterData character = ResolveDefaultStartingCharacter();
         if (character == null)
             return;
 
