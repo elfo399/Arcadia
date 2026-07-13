@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -57,7 +58,7 @@ public class WeatherManager : MonoBehaviour
         {
             phase = DayPhase.Dawn,
             displayName = "Alba",
-            durationSeconds = 45f,
+            durationSeconds = 360f,
             ambientLightColor = new Color(0.55f, 0.45f, 0.42f, 1f),
             directionalLightColor = new Color(1f, 0.73f, 0.55f, 1f),
             directionalLightIntensity = 0.55f,
@@ -68,7 +69,7 @@ public class WeatherManager : MonoBehaviour
         {
             phase = DayPhase.Day,
             displayName = "Giorno",
-            durationSeconds = 90f,
+            durationSeconds = 720f,
             ambientLightColor = new Color(0.78f, 0.78f, 0.74f, 1f),
             directionalLightColor = new Color(1f, 0.96f, 0.84f, 1f),
             directionalLightIntensity = 1f,
@@ -79,7 +80,7 @@ public class WeatherManager : MonoBehaviour
         {
             phase = DayPhase.Sunset,
             displayName = "Tramonto",
-            durationSeconds = 60f,
+            durationSeconds = 360f,
             ambientLightColor = new Color(0.5f, 0.34f, 0.36f, 1f),
             directionalLightColor = new Color(1f, 0.48f, 0.32f, 1f),
             directionalLightIntensity = 0.45f,
@@ -90,7 +91,7 @@ public class WeatherManager : MonoBehaviour
         {
             phase = DayPhase.Night,
             displayName = "Notte",
-            durationSeconds = 75f,
+            durationSeconds = 1440f,
             ambientLightColor = new Color(0.2f, 0.24f, 0.36f, 1f),
             directionalLightColor = new Color(0.46f, 0.56f, 0.9f, 1f),
             directionalLightIntensity = 0.2f,
@@ -147,9 +148,23 @@ public class WeatherManager : MonoBehaviour
     [SerializeField] private Light moonLight;
     [SerializeField, Range(0f, 1f)] private float moonLightIntensity = 0.22f;
     [SerializeField] private Color moonLightColor = new Color(0.55f, 0.65f, 1f, 1f);
+    [SerializeField] private float moonOrbitAzimuthDegrees = -30f;
+    [SerializeField] private float moonOrbitStartingOffsetDegrees = 180f;
+    [SerializeField, Min(0.01f)] private float moonOrbitSpeedMultiplier = 0.8f;
     [SerializeField, Min(5f)] private float moonOrbitDistance = 250f;
     [SerializeField, Min(0.1f)] private float moonVisualSize = 18f;
     [SerializeField] private Color moonVisualColor = new Color(0.82f, 0.88f, 1f, 1f);
+    [SerializeField] private bool darkenMoonDuringEclipse = true;
+    [SerializeField, Min(0.1f)] private float eclipseOuterAngleDegrees = 3f;
+    [SerializeField, Min(0f)] private float eclipseFullAngleDegrees = 0.45f;
+    [SerializeField] private Color eclipsedMoonVisualColor = new Color(0.025f, 0.022f, 0.02f, 1f);
+    [SerializeField, Range(0f, 1f)] private float eclipsedMoonLightMultiplier = 0f;
+
+    [Header("UI")]
+    [SerializeField] private TextMeshProUGUI timeText;
+    [SerializeField] private TextMeshProUGUI phaseWeatherText;
+    [SerializeField, Range(0, 23)] private int cycleStartHour = 6;
+    [SerializeField, Range(0, 59)] private int cycleStartMinute = 0;
 
     [Header("Weather Transitions")]
     [SerializeField, Min(0.05f)] private float weatherEffectFadeInSeconds = 2.5f;
@@ -224,15 +239,27 @@ public class WeatherManager : MonoBehaviour
     private Material moonVisualMaterial;
     private bool createdRuntimeMoonLight;
     private bool createdRuntimeMoonVisual;
+    private float moonOrbitAngleDegrees;
+    private float currentEclipseAmount;
+    private float currentVisualEclipseAmount;
+    private float lastEclipseAngleDegrees = float.PositiveInfinity;
+    private bool isValidEclipse;
+    private string lastWeatherUiText = string.Empty;
+    private string lastTimeUiText = string.Empty;
 
     public event Action<DayPhase, string> DayPhaseChanged;
     public event Action<WeatherCondition, string> WeatherChanged;
     public event Action<string> DisplayNameChanged;
+    public event Action<bool, float> EclipseChanged;
 
     public DayPhase CurrentPhase => currentPhaseSettings != null ? currentPhaseSettings.phase : startingPhase;
     public WeatherCondition CurrentCondition => currentCondition;
     public string CurrentDisplayName => currentDisplayName;
+    public string CurrentWeatherUiLabel => GetWeatherUiLabel();
     public bool IsRunning => isRunning;
+    public float CurrentEclipseAmount => currentEclipseAmount;
+    public bool IsValidEclipse => isValidEclipse;
+    public bool IsEclipseInProgress => currentVisualEclipseAmount > 0.001f && CurrentPhase != DayPhase.Night;
     public float CycleTimeSeconds => cycleTimeSeconds;
     public float CycleNormalized
     {
@@ -252,6 +279,7 @@ public class WeatherManager : MonoBehaviour
         ResolveReferences();
         NormalizePhaseSettings();
         SetCycleToPhase(startingPhase);
+        InitializeMoonOrbit();
         isRunning = playOnStart;
         weatherTimerSeconds = 0f;
         ApplyCurrentState(force: true);
@@ -281,9 +309,11 @@ public class WeatherManager : MonoBehaviour
         float deltaTime = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
         float scaledDeltaTime = deltaTime * timeMultiplier;
         AdvanceCycle(scaledDeltaTime);
+        AdvanceMoonOrbit(scaledDeltaTime);
         AdvanceWeather(scaledDeltaTime);
         ApplyPhaseLighting();
         ApplyWorldEffects();
+        UpdateWeatherUi();
     }
 
     public void Play()
@@ -339,6 +369,9 @@ public class WeatherManager : MonoBehaviour
         if (!autoChangeWeather || deltaSeconds <= 0f)
             return;
 
+        if (IsEclipseInProgress)
+            return;
+
         weatherTimerSeconds += deltaSeconds;
         float interval = Mathf.Max(1f, weatherChangeIntervalSeconds);
         if (weatherTimerSeconds < interval)
@@ -373,6 +406,7 @@ public class WeatherManager : MonoBehaviour
             DayPhaseChanged?.Invoke(CurrentPhase, currentDisplayName);
 
         lastAppliedCondition = currentCondition;
+        UpdateWeatherUi();
     }
 
     private void ApplyPhaseLighting()
@@ -382,7 +416,8 @@ public class WeatherManager : MonoBehaviour
 
         DayPhaseSettings nextPhaseSettings = smoothPhaseLighting ? GetNextPhaseSettings() : currentPhaseSettings;
         float phaseProgress = smoothPhaseLighting ? GetCurrentPhaseProgress() : 0f;
-        Quaternion sunRotation = Quaternion.Euler(InterpolateSunEuler(currentPhaseSettings.directionalLightEulerAngles, nextPhaseSettings.directionalLightEulerAngles, phaseProgress));
+        Vector3 sunEuler = GetCurrentSunEuler(nextPhaseSettings, phaseProgress);
+        Quaternion sunRotation = Quaternion.Euler(sunEuler);
 
         if (driveAmbientLight)
             RenderSettings.ambientLight = Color.Lerp(currentPhaseSettings.ambientLightColor, nextPhaseSettings.ambientLightColor, phaseProgress);
@@ -400,6 +435,17 @@ public class WeatherManager : MonoBehaviour
         ApplyMoonState(GetLightSourceDirection(sunRotation));
     }
 
+    private Vector3 GetCurrentSunEuler(DayPhaseSettings nextPhaseSettings, float phaseProgress)
+    {
+        if (currentPhaseSettings == null)
+            currentPhaseSettings = GetPhaseSettings(startingPhase) ?? dayPhases[0];
+
+        if (nextPhaseSettings == null)
+            nextPhaseSettings = currentPhaseSettings;
+
+        return InterpolateSunEuler(currentPhaseSettings.directionalLightEulerAngles, nextPhaseSettings.directionalLightEulerAngles, phaseProgress);
+    }
+
     private void ApplyMoonState(Vector3 sunSourceDirection)
     {
         if (!driveMoonLight && !driveMoonVisual)
@@ -407,24 +453,72 @@ public class WeatherManager : MonoBehaviour
 
         ResolveMoonReferences();
 
-        Vector3 moonSourceDirection = -sunSourceDirection.normalized;
+        Vector3 moonSourceDirection = GetMoonSourceDirection();
         float visibility = GetMoonVisibility(moonSourceDirection);
+        float eclipseAngle = GetSourceAngleDegrees(sunSourceDirection, moonSourceDirection);
+        float eclipseAmount = GetMoonEclipseAmount(sunSourceDirection, moonSourceDirection, eclipseAngle);
+        bool validEclipse = ShouldUseEclipseState(eclipseAngle, eclipseAmount);
+        float validEclipseAmount = validEclipse ? eclipseAmount : 0f;
+        currentVisualEclipseAmount = eclipseAmount;
+        UpdateEclipseState(validEclipseAmount);
 
         if (driveMoonLight && moonLight != null)
         {
             moonLight.type = LightType.Directional;
             moonLight.shadows = LightShadows.None;
             moonLight.color = moonLightColor;
-            moonLight.intensity = moonLightIntensity * visibility;
+            moonLight.intensity = moonLightIntensity * visibility * Mathf.Lerp(1f, eclipsedMoonLightMultiplier, eclipseAmount);
             moonLight.enabled = visibility > 0.001f;
             moonLight.transform.rotation = GetStableLookRotation(-moonSourceDirection);
         }
 
         if (driveMoonVisual)
-            ApplyMoonVisual(moonSourceDirection, visibility);
+            ApplyMoonVisual(moonSourceDirection, visibility, eclipseAmount);
+
+        lastEclipseAngleDegrees = eclipseAngle;
     }
 
-    private void ApplyMoonVisual(Vector3 moonSourceDirection, float visibility)
+    private void UpdateEclipseState(float validEclipseAmount)
+    {
+        bool nextIsValidEclipse = validEclipseAmount > 0.001f;
+        bool changed = nextIsValidEclipse != isValidEclipse;
+
+        currentEclipseAmount = validEclipseAmount;
+        isValidEclipse = nextIsValidEclipse;
+
+        if (changed)
+            EclipseChanged?.Invoke(isValidEclipse, currentEclipseAmount);
+    }
+
+    private void InitializeMoonOrbit()
+    {
+        Vector3 sunEuler = currentPhaseSettings != null
+            ? currentPhaseSettings.directionalLightEulerAngles
+            : new Vector3(75f, moonOrbitAzimuthDegrees, 0f);
+
+        moonOrbitAngleDegrees = Mathf.Repeat(sunEuler.x + moonOrbitStartingOffsetDegrees, 360f);
+    }
+
+    private void AdvanceMoonOrbit(float deltaSeconds)
+    {
+        if (deltaSeconds <= 0f)
+            return;
+
+        float totalDuration = GetTotalCycleDuration();
+        if (totalDuration <= 0f)
+            return;
+
+        float degreesPerSecond = 360f / totalDuration * Mathf.Max(0.01f, moonOrbitSpeedMultiplier);
+        moonOrbitAngleDegrees = Mathf.Repeat(moonOrbitAngleDegrees + degreesPerSecond * deltaSeconds, 360f);
+    }
+
+    private Vector3 GetMoonSourceDirection()
+    {
+        Quaternion moonRotation = Quaternion.Euler(moonOrbitAngleDegrees, moonOrbitAzimuthDegrees, 0f);
+        return GetLightSourceDirection(moonRotation);
+    }
+
+    private void ApplyMoonVisual(Vector3 moonSourceDirection, float visibility, float eclipseAmount)
     {
         if (moonVisualTransform == null)
             return;
@@ -452,10 +546,53 @@ public class WeatherManager : MonoBehaviour
 
         if (moonVisualMaterial != null)
         {
-            Color visualColor = moonVisualColor;
+            Color visualColor = Color.Lerp(moonVisualColor, eclipsedMoonVisualColor, eclipseAmount);
             visualColor.a *= visibility;
             SetMaterialColor(moonVisualMaterial, visualColor);
         }
+    }
+
+    private float GetMoonEclipseAmount(Vector3 sunSourceDirection, Vector3 moonSourceDirection, float angle)
+    {
+        if (!darkenMoonDuringEclipse)
+            return 0f;
+
+        if (sunSourceDirection.sqrMagnitude < 0.0001f || moonSourceDirection.sqrMagnitude < 0.0001f)
+            return 0f;
+
+        float sunVisibility = GetMoonVisibility(sunSourceDirection);
+        float moonVisibility = GetMoonVisibility(moonSourceDirection);
+        if (sunVisibility <= 0.001f || moonVisibility <= 0.001f)
+            return 0f;
+
+        float outerAngle = Mathf.Max(0.1f, eclipseOuterAngleDegrees);
+        float fullAngle = Mathf.Clamp(eclipseFullAngleDegrees, 0f, outerAngle);
+
+        if (angle >= outerAngle)
+            return 0f;
+
+        if (angle <= fullAngle)
+            return 1f;
+
+        float partial = 1f - Mathf.InverseLerp(fullAngle, outerAngle, angle);
+        return Mathf.SmoothStep(0f, 1f, partial) * Mathf.Min(sunVisibility, moonVisibility);
+    }
+
+    private bool ShouldUseEclipseState(float angle, float eclipseAmount)
+    {
+        if (CurrentPhase == DayPhase.Night || eclipseAmount <= 0.001f)
+            return false;
+
+        return true;
+    }
+
+    private static float GetSourceAngleDegrees(Vector3 firstSourceDirection, Vector3 secondSourceDirection)
+    {
+        if (firstSourceDirection.sqrMagnitude < 0.0001f || secondSourceDirection.sqrMagnitude < 0.0001f)
+            return 180f;
+
+        float dot = Mathf.Clamp(Vector3.Dot(firstSourceDirection.normalized, secondSourceDirection.normalized), -1f, 1f);
+        return Mathf.Acos(dot) * Mathf.Rad2Deg;
     }
 
     private float GetMoonVisibility(Vector3 moonSourceDirection)
@@ -477,6 +614,60 @@ public class WeatherManager : MonoBehaviour
         forward.Normalize();
         Vector3 up = Mathf.Abs(Vector3.Dot(forward, Vector3.up)) > 0.95f ? Vector3.forward : Vector3.up;
         return Quaternion.LookRotation(forward, up);
+    }
+
+    private void UpdateWeatherUi()
+    {
+        if (timeText != null)
+        {
+            string nextTimeText = GetClockText();
+            if (nextTimeText != lastTimeUiText)
+            {
+                timeText.text = nextTimeText;
+                lastTimeUiText = nextTimeText;
+            }
+        }
+
+        if (phaseWeatherText != null)
+        {
+            string nextWeatherText = $"{GetDayNightUiLabel()} - {GetWeatherUiLabel()}";
+            if (nextWeatherText != lastWeatherUiText)
+            {
+                phaseWeatherText.text = nextWeatherText;
+                lastWeatherUiText = nextWeatherText;
+            }
+        }
+    }
+
+    private string GetClockText()
+    {
+        float normalized = CycleNormalized;
+        int startMinutes = cycleStartHour * 60 + cycleStartMinute;
+        int totalMinutes = Mathf.FloorToInt(startMinutes + normalized * 24f * 60f) % (24 * 60);
+        int hours = totalMinutes / 60;
+        int minutes = totalMinutes % 60;
+        return $"{hours:00}:{minutes:00}";
+    }
+
+    private string GetDayNightUiLabel()
+    {
+        return CurrentPhase == DayPhase.Night ? "NIGHT" : "DAY";
+    }
+
+    private string GetWeatherUiLabel()
+    {
+        if (IsValidEclipse)
+            return "ECLIPSE";
+
+        switch (currentCondition)
+        {
+            case WeatherCondition.Raining:
+                return "RAIN";
+            case WeatherCondition.Lightning2:
+                return "THUNDER";
+            default:
+                return "SUN";
+        }
     }
 
     private string BuildDisplayName()
@@ -1408,10 +1599,10 @@ public class WeatherManager : MonoBehaviour
     {
         return new[]
         {
-            new DayPhaseSettings { phase = DayPhase.Dawn, displayName = "Alba", directionalLightEulerAngles = new Vector3(5f, -30f, 0f), animatorStateName = "Dawn" },
-            new DayPhaseSettings { phase = DayPhase.Day, displayName = "Giorno", directionalLightEulerAngles = new Vector3(75f, -30f, 0f), animatorStateName = "Day" },
-            new DayPhaseSettings { phase = DayPhase.Sunset, displayName = "Tramonto", directionalLightEulerAngles = new Vector3(170f, -30f, 0f), animatorStateName = "Noon" },
-            new DayPhaseSettings { phase = DayPhase.Night, displayName = "Notte", directionalLightEulerAngles = new Vector3(260f, -30f, 0f), animatorStateName = "Night" }
+            new DayPhaseSettings { phase = DayPhase.Dawn, displayName = "Alba", durationSeconds = 360f, directionalLightEulerAngles = new Vector3(5f, -30f, 0f), animatorStateName = "Dawn" },
+            new DayPhaseSettings { phase = DayPhase.Day, displayName = "Giorno", durationSeconds = 720f, directionalLightEulerAngles = new Vector3(75f, -30f, 0f), animatorStateName = "Day" },
+            new DayPhaseSettings { phase = DayPhase.Sunset, displayName = "Tramonto", durationSeconds = 360f, directionalLightEulerAngles = new Vector3(170f, -30f, 0f), animatorStateName = "Noon" },
+            new DayPhaseSettings { phase = DayPhase.Night, displayName = "Notte", durationSeconds = 1440f, directionalLightEulerAngles = new Vector3(260f, -30f, 0f), animatorStateName = "Night" }
         };
     }
 

@@ -613,6 +613,9 @@ public class MapPageManager : MonoBehaviour
         if (weatherManager == null)
             weatherManager = WeatherManager.Instance;
 
+        if (weatherManager != null && !string.IsNullOrWhiteSpace(weatherManager.CurrentWeatherUiLabel))
+            return weatherManager.CurrentWeatherUiLabel.Trim();
+
         if (weatherManager != null && !string.IsNullOrWhiteSpace(weatherManager.CurrentDisplayName))
             return weatherManager.CurrentDisplayName.Trim();
 

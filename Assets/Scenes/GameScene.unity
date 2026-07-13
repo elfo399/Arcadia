@@ -10738,7 +10738,7 @@ MonoBehaviour:
   dayPhases:
   - phase: 0
     displayName: Alba
-    durationSeconds: 45
+    durationSeconds: 360
     ambientLightColor: {r: 0.55, g: 0.45, b: 0.42, a: 1}
     directionalLightColor: {r: 1, g: 0.73, b: 0.55, a: 1}
     directionalLightIntensity: 0.55
@@ -10746,7 +10746,7 @@ MonoBehaviour:
     animatorStateName: Dawn
   - phase: 1
     displayName: Giorno
-    durationSeconds: 90
+    durationSeconds: 720
     ambientLightColor: {r: 0.78, g: 0.78, b: 0.74, a: 1}
     directionalLightColor: {r: 1, g: 0.96, b: 0.84, a: 1}
     directionalLightIntensity: 1
@@ -10754,7 +10754,7 @@ MonoBehaviour:
     animatorStateName: Day
   - phase: 2
     displayName: Tramonto
-    durationSeconds: 60
+    durationSeconds: 360
     ambientLightColor: {r: 0.5, g: 0.34, b: 0.36, a: 1}
     directionalLightColor: {r: 1, g: 0.48, b: 0.32, a: 1}
     directionalLightIntensity: 0.45
@@ -10762,7 +10762,7 @@ MonoBehaviour:
     animatorStateName: Noon
   - phase: 3
     displayName: Notte
-    durationSeconds: 75
+    durationSeconds: 1440
     ambientLightColor: {r: 0.2, g: 0.24, b: 0.36, a: 1}
     directionalLightColor: {r: 0.46, g: 0.56, b: 0.9, a: 1}
     directionalLightIntensity: 0.2
