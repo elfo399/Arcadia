@@ -19,6 +19,7 @@ public class WeatherManager : MonoBehaviour
     {
         Clear = 0,
         Raining = 1,
+        Cloudy = 2,
         Lightning2 = 3
     }
 
@@ -106,14 +107,22 @@ public class WeatherManager : MonoBehaviour
     [SerializeField] private bool rerollWeatherOnPhaseChange = true;
     [SerializeField] private bool avoidRepeatingWeather = true;
     [SerializeField] private bool suppressWorldWeatherEffectsInIndoorScenes = true;
+    [SerializeField] private bool suppressWorldCloudsInIndoorScenes;
     [SerializeField] private string[] indoorSceneNames = { "GameScene" };
     [SerializeField] private WeatherConditionSettings[] weatherConditions =
     {
         new WeatherConditionSettings
         {
             condition = WeatherCondition.Clear,
-            weight = 60f,
+            weight = 45f,
             displayName = "",
+            animatorStateName = ""
+        },
+        new WeatherConditionSettings
+        {
+            condition = WeatherCondition.Cloudy,
+            weight = 20f,
+            displayName = "Nuvoloso",
             animatorStateName = ""
         },
         new WeatherConditionSettings
@@ -126,7 +135,7 @@ public class WeatherManager : MonoBehaviour
         new WeatherConditionSettings
         {
             condition = WeatherCondition.Lightning2,
-            weight = 15f,
+            weight = 10f,
             displayName = "Tempesta",
             animatorStateName = "Lightning2"
         }
@@ -182,6 +191,29 @@ public class WeatherManager : MonoBehaviour
     [SerializeField] private Vector2 rainWindVelocity = new Vector2(1.4f, 0.35f);
     [SerializeField] private Vector2 stormWindVelocity = new Vector2(4.5f, 1.2f);
 
+    [Header("World Clouds")]
+    [SerializeField] private string cloudLayerObjectName = "CloudLayer";
+    [SerializeField] private Transform cloudLayerRoot;
+    [SerializeField] private MeshRenderer[] cloudRenderers;
+    [SerializeField, Range(0f, 1f)] private float clearCloudOpacity = 0f;
+    [SerializeField, Range(0f, 1f)] private float cloudyCloudOpacity = 0.55f;
+    [SerializeField, Range(0f, 1f)] private float rainCloudOpacity = 0.72f;
+    [SerializeField, Range(0f, 1f)] private float stormCloudOpacity = 0.9f;
+    [SerializeField, Min(0.05f)] private float cloudFadeInSeconds = 5f;
+    [SerializeField, Min(0.05f)] private float cloudFadeOutSeconds = 8f;
+    [SerializeField] private Color cloudColor = new Color(0.88f, 0.9f, 0.92f, 1f);
+    [SerializeField] private Color stormCloudColor = new Color(0.35f, 0.38f, 0.45f, 1f);
+    [SerializeField] private float cloudLayerHeight = 58f;
+    [SerializeField] private Vector2 cloudDriftVelocity = new Vector2(0.08f, 0.03f);
+    [SerializeField] private Vector2 stormCloudDriftVelocity = new Vector2(0.28f, 0.12f);
+    [SerializeField, Min(1f)] private float cloudDriftWrapDistance = 60f;
+    [SerializeField] private bool randomizeCloudLayoutOnWeatherChange = true;
+    [SerializeField] private Vector2 cloudLayoutAreaSize = new Vector2(180f, 120f);
+    [SerializeField] private Vector2 cloudScaleRange = new Vector2(0.9f, 1.45f);
+    [SerializeField] private Vector2 cloudHeightOffsetRange = new Vector2(-4f, 8f);
+    [SerializeField] private Vector2 cloudYawRange = new Vector2(-50f, 50f);
+    [SerializeField, Min(0f)] private float cloudMinimumSpacing = 18f;
+
     [Header("World Lightning")]
     [SerializeField] private bool enableLightningEffects = true;
     [SerializeField] private string lightningEffectObjectName = "LightningFX";
@@ -221,6 +253,10 @@ public class WeatherManager : MonoBehaviour
     private float weatherTimerSeconds;
     private Coroutine lightningRoutine;
     private float rainEffectIntensity;
+    private float cloudEffectIntensity;
+    private Vector2 cloudDriftOffset;
+    private bool warnedMissingCloudLayer;
+    private bool cloudLayoutNeedsRandomize = true;
     private float wetSurfaceIntensity;
     private float wetSurfaceDryTimerSeconds;
     private Vector2 rainWindCurrentVelocity;
@@ -228,17 +264,22 @@ public class WeatherManager : MonoBehaviour
     private MeshFilter wetSurfaceMeshFilter;
     private MeshRenderer wetSurfaceMeshRenderer;
     private Material wetSurfaceMaterial;
+    private MaterialPropertyBlock cloudPropertyBlock;
     private bool wetSurfaceBaseScaleInitialized;
     private Vector3 wetSurfaceBaseLocalScale = Vector3.one;
     private int lastRainResolveSceneHandle = -1;
     private int lastLightningResolveSceneHandle = -1;
+    private int lastCloudResolveSceneHandle = -1;
     private Transform moonVisualTransform;
     private MeshFilter moonVisualMeshFilter;
     private MeshRenderer moonVisualRenderer;
     private Mesh moonVisualMesh;
     private Material moonVisualMaterial;
+    private MaterialPropertyBlock moonVisualPropertyBlock;
     private bool createdRuntimeMoonLight;
     private bool createdRuntimeMoonVisual;
+    private bool createdRuntimeMoonMesh;
+    private bool createdRuntimeMoonMaterial;
     private float moonOrbitAngleDegrees;
     private float currentEclipseAmount;
     private float currentVisualEclipseAmount;
@@ -278,6 +319,7 @@ public class WeatherManager : MonoBehaviour
         Instance = this;
         ResolveReferences();
         NormalizePhaseSettings();
+        NormalizeWeatherConditionSettings();
         SetCycleToPhase(startingPhase);
         InitializeMoonOrbit();
         isRunning = playOnStart;
@@ -288,9 +330,11 @@ public class WeatherManager : MonoBehaviour
     private void OnDestroy()
     {
         rainEffectIntensity = 0f;
+        cloudEffectIntensity = 0f;
         wetSurfaceIntensity = 0f;
         wetSurfaceDryTimerSeconds = 0f;
         StopRainEffect();
+        StopCloudEffect();
         ApplyWetSurfaceEffect(suppressWorldEffects: false);
         RestoreWetSurfaceScale();
         DestroyRuntimeWetSurface();
@@ -330,6 +374,9 @@ public class WeatherManager : MonoBehaviour
     {
         if (currentCondition == condition)
             return;
+
+        if (randomizeCloudLayoutOnWeatherChange && (IsCloudWeather(condition) || IsCloudWeather(currentCondition)))
+            cloudLayoutNeedsRandomize = true;
 
         currentCondition = condition;
         ApplyCurrentState(force: false);
@@ -544,11 +591,11 @@ public class WeatherManager : MonoBehaviour
             : -moonSourceDirection;
         moonVisualTransform.rotation = GetStableLookRotation(forward);
 
-        if (moonVisualMaterial != null)
+        if (moonVisualRenderer != null)
         {
             Color visualColor = Color.Lerp(moonVisualColor, eclipsedMoonVisualColor, eclipseAmount);
             visualColor.a *= visibility;
-            SetMaterialColor(moonVisualMaterial, visualColor);
+            ApplyMoonVisualColor(visualColor);
         }
     }
 
@@ -663,6 +710,8 @@ public class WeatherManager : MonoBehaviour
         {
             case WeatherCondition.Raining:
                 return "RAIN";
+            case WeatherCondition.Cloudy:
+                return "CLOUD";
             case WeatherCondition.Lightning2:
                 return "THUNDER";
             default:
@@ -701,6 +750,9 @@ public class WeatherManager : MonoBehaviour
         WeatherConditionSettings settings = GetWeatherConditionSettings(currentCondition);
         if (settings != null && !string.IsNullOrWhiteSpace(settings.animatorStateName))
             return settings.animatorStateName;
+
+        if (currentCondition == WeatherCondition.Cloudy)
+            return string.IsNullOrWhiteSpace(currentPhaseSettings.animatorStateName) ? currentPhaseSettings.phase.ToString() : currentPhaseSettings.animatorStateName;
 
         return currentCondition.ToString();
     }
@@ -741,9 +793,53 @@ public class WeatherManager : MonoBehaviour
     private void ApplyWorldEffects()
     {
         bool suppressWorldEffects = ShouldSuppressWorldWeatherEffects();
+        bool suppressCloudEffects = suppressWorldCloudsInIndoorScenes && suppressWorldEffects;
+        ApplyCloudEffect(suppressCloudEffects);
         ApplyRainEffect(suppressWorldEffects);
         ApplyWetSurfaceEffect(suppressWorldEffects);
         ApplyLightningEffect(suppressWorldEffects);
+    }
+
+    private void ApplyCloudEffect(bool suppressWorldEffects)
+    {
+        ResolveCloudReferences();
+
+        float targetIntensity = suppressWorldEffects ? 0f : GetCloudTargetOpacity();
+        if (targetIntensity > 0.001f && !HasValidCloudRenderer())
+        {
+            if (!warnedMissingCloudLayer)
+            {
+                Debug.LogWarning($"[WeatherManager] Weather is {currentCondition}, but no cloud MeshRenderer was found. Add a '{cloudLayerObjectName}' child with cloud renderers under this WeatherManager.", this);
+                warnedMissingCloudLayer = true;
+            }
+
+            return;
+        }
+
+        if (targetIntensity <= 0.001f)
+            cloudLayoutNeedsRandomize = true;
+
+        float transitionSeconds = targetIntensity > cloudEffectIntensity ? cloudFadeInSeconds : cloudFadeOutSeconds;
+        float transitionStep = GetWeatherEffectDeltaTime() / Mathf.Max(0.05f, transitionSeconds);
+        cloudEffectIntensity = Mathf.MoveTowards(cloudEffectIntensity, targetIntensity, transitionStep);
+
+        if (cloudEffectIntensity <= 0.001f)
+        {
+            StopCloudEffect();
+            return;
+        }
+
+        if (cloudLayerRoot != null && !cloudLayerRoot.gameObject.activeSelf)
+            cloudLayerRoot.gameObject.SetActive(true);
+
+        if (randomizeCloudLayoutOnWeatherChange && cloudLayoutNeedsRandomize && IsCloudWeather(currentCondition))
+        {
+            RandomizeCloudLayout();
+            cloudLayoutNeedsRandomize = false;
+        }
+
+        UpdateCloudLayerPosition();
+        ApplyCloudRendererState();
     }
 
     private void ApplyRainEffect(bool suppressWorldEffects)
@@ -822,6 +918,221 @@ public class WeatherManager : MonoBehaviour
         velocity.space = ParticleSystemSimulationSpace.World;
         velocity.x = new ParticleSystem.MinMaxCurve(rainWindCurrentVelocity.x);
         velocity.z = new ParticleSystem.MinMaxCurve(rainWindCurrentVelocity.y);
+    }
+
+    private float GetCloudTargetOpacity()
+    {
+        switch (currentCondition)
+        {
+            case WeatherCondition.Cloudy:
+                return cloudyCloudOpacity;
+            case WeatherCondition.Raining:
+                return rainCloudOpacity;
+            case WeatherCondition.Lightning2:
+                return stormCloudOpacity;
+            default:
+                return clearCloudOpacity;
+        }
+    }
+
+    private bool IsCloudWeather(WeatherCondition condition)
+    {
+        return condition == WeatherCondition.Cloudy || condition == WeatherCondition.Raining || condition == WeatherCondition.Lightning2;
+    }
+
+    private Color GetCloudTargetColor()
+    {
+        float stormBlend = currentCondition == WeatherCondition.Lightning2 ? 1f : 0f;
+        Color color = Color.Lerp(cloudColor, stormCloudColor, stormBlend);
+        color.a *= Mathf.Clamp01(cloudEffectIntensity);
+        return color;
+    }
+
+    private Vector2 GetCloudTargetDriftVelocity()
+    {
+        if (currentCondition == WeatherCondition.Lightning2)
+            return stormCloudDriftVelocity;
+
+        if (currentCondition == WeatherCondition.Raining)
+            return Vector2.Lerp(cloudDriftVelocity, stormCloudDriftVelocity, 0.45f);
+
+        return cloudDriftVelocity;
+    }
+
+    private void UpdateCloudLayerPosition()
+    {
+        if (cloudLayerRoot == null)
+            return;
+
+        float deltaTime = GetWeatherEffectDeltaTime();
+        Vector2 velocity = GetCloudTargetDriftVelocity();
+        cloudDriftOffset += velocity * deltaTime;
+
+        float wrapDistance = Mathf.Max(1f, cloudDriftWrapDistance);
+        cloudDriftOffset.x = Mathf.Repeat(cloudDriftOffset.x + wrapDistance, wrapDistance * 2f) - wrapDistance;
+        cloudDriftOffset.y = Mathf.Repeat(cloudDriftOffset.y + wrapDistance, wrapDistance * 2f) - wrapDistance;
+
+        Vector3 origin = ResolveWorldEffectOrigin();
+        cloudLayerRoot.position = new Vector3(origin.x + cloudDriftOffset.x, origin.y + cloudLayerHeight, origin.z + cloudDriftOffset.y);
+    }
+
+    private void RandomizeCloudLayout()
+    {
+        if (cloudRenderers == null || cloudRenderers.Length == 0)
+            return;
+
+        float halfWidth = Mathf.Max(1f, Mathf.Abs(cloudLayoutAreaSize.x)) * 0.5f;
+        float halfDepth = Mathf.Max(1f, Mathf.Abs(cloudLayoutAreaSize.y)) * 0.5f;
+        float minSpacingSqr = cloudMinimumSpacing * cloudMinimumSpacing;
+
+        for (int i = 0; i < cloudRenderers.Length; i++)
+        {
+            MeshRenderer renderer = cloudRenderers[i];
+            if (renderer == null)
+                continue;
+
+            Vector3 localPosition = renderer.transform.localPosition;
+            for (int attempt = 0; attempt < 12; attempt++)
+            {
+                localPosition = new Vector3(
+                    UnityEngine.Random.Range(-halfWidth, halfWidth),
+                    RandomRange(cloudHeightOffsetRange),
+                    UnityEngine.Random.Range(-halfDepth, halfDepth));
+
+                if (cloudMinimumSpacing <= 0f || HasCloudSpacing(i, localPosition, minSpacingSqr))
+                    break;
+            }
+
+            float scale = Mathf.Max(0.01f, RandomRange(cloudScaleRange));
+            renderer.transform.localPosition = localPosition;
+            renderer.transform.localRotation = Quaternion.Euler(0f, RandomRange(cloudYawRange), 0f);
+            renderer.transform.localScale = new Vector3(scale, scale, scale);
+        }
+    }
+
+    private bool HasCloudSpacing(int rendererIndex, Vector3 candidatePosition, float minSpacingSqr)
+    {
+        for (int i = 0; i < rendererIndex; i++)
+        {
+            MeshRenderer other = cloudRenderers[i];
+            if (other == null)
+                continue;
+
+            Vector3 offset = candidatePosition - other.transform.localPosition;
+            offset.y = 0f;
+            if (offset.sqrMagnitude < minSpacingSqr)
+                return false;
+        }
+
+        return true;
+    }
+
+    private static float RandomRange(Vector2 range)
+    {
+        float min = Mathf.Min(range.x, range.y);
+        float max = Mathf.Max(range.x, range.y);
+        return Mathf.Approximately(min, max) ? min : UnityEngine.Random.Range(min, max);
+    }
+
+    private void ApplyCloudRendererState()
+    {
+        if (cloudRenderers == null)
+            return;
+
+        Color color = GetCloudTargetColor();
+        for (int i = 0; i < cloudRenderers.Length; i++)
+        {
+            MeshRenderer renderer = cloudRenderers[i];
+            if (renderer == null)
+                continue;
+
+            renderer.enabled = cloudEffectIntensity > 0.001f;
+            ApplyCloudRendererColor(renderer, color);
+        }
+    }
+
+    private void ApplyCloudRendererColor(MeshRenderer renderer, Color color)
+    {
+        if (cloudPropertyBlock == null)
+            cloudPropertyBlock = new MaterialPropertyBlock();
+
+        renderer.GetPropertyBlock(cloudPropertyBlock);
+        cloudPropertyBlock.SetColor("_Color", color);
+        cloudPropertyBlock.SetColor("_BaseColor", color);
+        renderer.SetPropertyBlock(cloudPropertyBlock);
+    }
+
+    private void ResolveCloudReferences()
+    {
+        if (cloudLayerRoot != null && HasValidCloudRenderer())
+            return;
+
+        if (cloudLayerRoot == null && string.IsNullOrWhiteSpace(cloudLayerObjectName))
+            return;
+
+        int activeSceneHandle = SceneManager.GetActiveScene().handle;
+        if (cloudLayerRoot == null && cloudRenderers != null && cloudRenderers.Length == 0 && lastCloudResolveSceneHandle == activeSceneHandle)
+            return;
+
+        lastCloudResolveSceneHandle = activeSceneHandle;
+
+        string targetName = string.IsNullOrWhiteSpace(cloudLayerObjectName) ? string.Empty : cloudLayerObjectName.Trim();
+        if (cloudLayerRoot == null && !string.IsNullOrWhiteSpace(targetName))
+        {
+            Transform directChild = transform.Find(targetName);
+            if (directChild != null)
+                cloudLayerRoot = directChild;
+        }
+
+        if (cloudLayerRoot == null && !string.IsNullOrWhiteSpace(targetName))
+        {
+            Transform[] transforms = FindObjectsOfType<Transform>(true);
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                Transform candidate = transforms[i];
+                if (candidate != null && string.Equals(candidate.name, targetName, StringComparison.OrdinalIgnoreCase))
+                {
+                    cloudLayerRoot = candidate;
+                    break;
+                }
+            }
+        }
+
+        cloudRenderers = cloudLayerRoot != null
+            ? cloudLayerRoot.GetComponentsInChildren<MeshRenderer>(true)
+            : Array.Empty<MeshRenderer>();
+        cloudLayoutNeedsRandomize = true;
+    }
+
+    private bool HasValidCloudRenderer()
+    {
+        if (cloudRenderers == null || cloudRenderers.Length == 0)
+            return false;
+
+        for (int i = 0; i < cloudRenderers.Length; i++)
+        {
+            if (cloudRenderers[i] != null)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void StopCloudEffect()
+    {
+        if (cloudRenderers != null)
+        {
+            for (int i = 0; i < cloudRenderers.Length; i++)
+            {
+                if (cloudRenderers[i] != null)
+                    cloudRenderers[i].enabled = false;
+            }
+        }
+
+        if (cloudLayerRoot != null && cloudLayerRoot.gameObject.activeSelf)
+            cloudLayerRoot.gameObject.SetActive(false);
+
+        cloudLayoutNeedsRandomize = true;
     }
 
     private void ApplyLightningEffect(bool suppressWorldEffects)
@@ -1595,6 +1906,21 @@ public class WeatherManager : MonoBehaviour
             dayPhases = CreateDefaultPhases();
     }
 
+    private void NormalizeWeatherConditionSettings()
+    {
+        if (weatherConditions == null || weatherConditions.Length == 0)
+        {
+            weatherConditions = CreateDefaultWeatherConditions();
+            return;
+        }
+
+        if (HasWeatherConditionSetting(WeatherCondition.Cloudy))
+            return;
+
+        Array.Resize(ref weatherConditions, weatherConditions.Length + 1);
+        weatherConditions[weatherConditions.Length - 1] = CreateCloudyWeatherCondition();
+    }
+
     private static DayPhaseSettings[] CreateDefaultPhases()
     {
         return new[]
@@ -1604,6 +1930,42 @@ public class WeatherManager : MonoBehaviour
             new DayPhaseSettings { phase = DayPhase.Sunset, displayName = "Tramonto", durationSeconds = 360f, directionalLightEulerAngles = new Vector3(170f, -30f, 0f), animatorStateName = "Noon" },
             new DayPhaseSettings { phase = DayPhase.Night, displayName = "Notte", durationSeconds = 1440f, directionalLightEulerAngles = new Vector3(260f, -30f, 0f), animatorStateName = "Night" }
         };
+    }
+
+    private static WeatherConditionSettings[] CreateDefaultWeatherConditions()
+    {
+        return new[]
+        {
+            new WeatherConditionSettings { condition = WeatherCondition.Clear, weight = 45f, displayName = "", animatorStateName = "" },
+            CreateCloudyWeatherCondition(),
+            new WeatherConditionSettings { condition = WeatherCondition.Raining, weight = 25f, displayName = "Pioggia", animatorStateName = "Raining" },
+            new WeatherConditionSettings { condition = WeatherCondition.Lightning2, weight = 10f, displayName = "Tempesta", animatorStateName = "Lightning2" }
+        };
+    }
+
+    private static WeatherConditionSettings CreateCloudyWeatherCondition()
+    {
+        return new WeatherConditionSettings
+        {
+            condition = WeatherCondition.Cloudy,
+            weight = 20f,
+            displayName = "Nuvoloso",
+            animatorStateName = ""
+        };
+    }
+
+    private bool HasWeatherConditionSetting(WeatherCondition condition)
+    {
+        if (weatherConditions == null)
+            return false;
+
+        for (int i = 0; i < weatherConditions.Length; i++)
+        {
+            if (weatherConditions[i] != null && weatherConditions[i].condition == condition)
+                return true;
+        }
+
+        return false;
     }
 
     private void ResolveReferences()
@@ -1635,7 +1997,7 @@ public class WeatherManager : MonoBehaviour
                 moonLight = moonRoot.GetComponentInChildren<Light>(true);
 
             if (moonVisualTransform == null)
-                moonVisualTransform = moonRoot;
+                moonVisualTransform = FindMoonVisualTransform(moonRoot);
         }
 
         if (moonLight == null && autoCreateMoon)
@@ -1674,12 +2036,22 @@ public class WeatherManager : MonoBehaviour
         {
             moonVisualMesh = CreateMoonDiscMesh();
             moonVisualMeshFilter.sharedMesh = moonVisualMesh;
+            createdRuntimeMoonMesh = true;
         }
 
-        if (moonVisualRenderer != null && moonVisualMaterial == null)
+        if (moonVisualRenderer != null)
         {
-            moonVisualMaterial = CreateMoonVisualMaterial();
-            moonVisualRenderer.sharedMaterial = moonVisualMaterial;
+            if (moonVisualRenderer.sharedMaterial == null)
+            {
+                moonVisualMaterial = CreateMoonVisualMaterial();
+                moonVisualRenderer.sharedMaterial = moonVisualMaterial;
+                createdRuntimeMoonMaterial = true;
+            }
+            else
+            {
+                moonVisualMaterial = moonVisualRenderer.sharedMaterial;
+            }
+
             moonVisualRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             moonVisualRenderer.receiveShadows = false;
             moonVisualRenderer.enabled = false;
@@ -1692,6 +2064,10 @@ public class WeatherManager : MonoBehaviour
             return null;
 
         string targetName = moonObjectName.Trim();
+        Transform directChild = transform.Find(targetName);
+        if (directChild != null)
+            return directChild;
+
         Transform[] transforms = FindObjectsOfType<Transform>(true);
         for (int i = 0; i < transforms.Length; i++)
         {
@@ -1701,6 +2077,22 @@ public class WeatherManager : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static Transform FindMoonVisualTransform(Transform moonRoot)
+    {
+        if (moonRoot == null)
+            return null;
+
+        MeshRenderer renderer = moonRoot.GetComponentInChildren<MeshRenderer>(true);
+        if (renderer != null)
+            return renderer.transform;
+
+        MeshFilter filter = moonRoot.GetComponentInChildren<MeshFilter>(true);
+        if (filter != null)
+            return filter.transform;
+
+        return moonRoot;
     }
 
     private void CreateRuntimeMoonVisual()
@@ -1718,7 +2110,7 @@ public class WeatherManager : MonoBehaviour
         createdRuntimeMoonVisual = true;
     }
 
-    private Mesh CreateMoonDiscMesh()
+    private static Mesh CreateMoonDiscMesh()
     {
         const int segments = 48;
         Vector3[] vertices = new Vector3[segments + 1];
@@ -1774,32 +2166,52 @@ public class WeatherManager : MonoBehaviour
         return material;
     }
 
+    private void ApplyMoonVisualColor(Color color)
+    {
+        if (moonVisualRenderer == null)
+            return;
+
+        if (moonVisualPropertyBlock == null)
+            moonVisualPropertyBlock = new MaterialPropertyBlock();
+
+        moonVisualRenderer.GetPropertyBlock(moonVisualPropertyBlock);
+        moonVisualPropertyBlock.SetColor("_Color", color);
+        moonVisualPropertyBlock.SetColor("_BaseColor", color);
+        moonVisualRenderer.SetPropertyBlock(moonVisualPropertyBlock);
+    }
+
     private void DestroyMoonRuntime()
     {
-        if (moonVisualMaterial != null)
+        if (createdRuntimeMoonMaterial && moonVisualMaterial != null)
         {
             Destroy(moonVisualMaterial);
-            moonVisualMaterial = null;
         }
 
-        if (moonVisualMesh != null)
+        if (createdRuntimeMoonMesh && moonVisualMesh != null)
         {
             Destroy(moonVisualMesh);
-            moonVisualMesh = null;
         }
 
         if (createdRuntimeMoonVisual && moonVisualTransform != null)
         {
             Destroy(moonVisualTransform.gameObject);
-            moonVisualTransform = null;
-            moonVisualMeshFilter = null;
-            moonVisualRenderer = null;
         }
 
         if (createdRuntimeMoonLight && moonLight != null)
         {
             Destroy(moonLight.gameObject);
-            moonLight = null;
         }
+
+        moonVisualMaterial = null;
+        moonVisualMesh = null;
+        moonVisualTransform = null;
+        moonVisualMeshFilter = null;
+        moonVisualRenderer = null;
+        moonLight = null;
+        createdRuntimeMoonMaterial = false;
+        createdRuntimeMoonMesh = false;
+        createdRuntimeMoonVisual = false;
+        createdRuntimeMoonLight = false;
     }
+
 }

@@ -10715,7 +10715,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 1110812459}
   m_Father: {fileID: 1534586610}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &541700703
@@ -10734,7 +10735,7 @@ MonoBehaviour:
   useUnscaledTime: 0
   timeMultiplier: 1
   startingPhase: 1
-  currentCondition: 0
+  currentCondition: 2
   dayPhases:
   - phase: 0
     displayName: Alba
@@ -10772,17 +10773,25 @@ MonoBehaviour:
   weatherChangeIntervalSeconds: 30
   rerollWeatherOnPhaseChange: 1
   avoidRepeatingWeather: 1
+  suppressWorldWeatherEffectsInIndoorScenes: 1
+  suppressWorldCloudsInIndoorScenes: 0
+  indoorSceneNames:
+  - GameScene
   weatherConditions:
   - condition: 0
-    weight: 60
+    weight: 45
     displayName: 
-    animatorStateName: 
+    animatorStateName:
+  - condition: 2
+    weight: 20
+    displayName: Nuvoloso
+    animatorStateName:
   - condition: 1
     weight: 25
     displayName: Pioggia
     animatorStateName: Raining
   - condition: 3
-    weight: 15
+    weight: 10
     displayName: Tempesta
     animatorStateName: Lightning2
   weatherAnimator: {fileID: 891278981}
@@ -10791,6 +10800,85 @@ MonoBehaviour:
   driveDirectionalLight: 1
   driveAmbientLight: 1
   smoothPhaseLighting: 1
+  autoCreateMoon: 1
+  driveMoonLight: 1
+  driveMoonVisual: 1
+  moonObjectName: Moon
+  moonLight: {fileID: 920250983}
+  moonLightIntensity: 0.22
+  moonLightColor: {r: 0.55, g: 0.65, b: 1, a: 1}
+  moonOrbitAzimuthDegrees: -30
+  moonOrbitStartingOffsetDegrees: 180
+  moonOrbitSpeedMultiplier: 0.8
+  moonOrbitDistance: 250
+  moonVisualSize: 18
+  moonVisualColor: {r: 0.82, g: 0.88, b: 1, a: 1}
+  darkenMoonDuringEclipse: 1
+  eclipseOuterAngleDegrees: 3
+  eclipseFullAngleDegrees: 0.45
+  eclipsedMoonVisualColor: {r: 0.025, g: 0.022, b: 0.02, a: 1}
+  eclipsedMoonLightMultiplier: 0
+  timeText: {fileID: 0}
+  phaseWeatherText: {fileID: 0}
+  cycleStartHour: 6
+  cycleStartMinute: 0
+  weatherEffectFadeInSeconds: 2.5
+  weatherEffectFadeOutSeconds: 4
+  rainEffectObjectName: RainFX
+  rainEffectRoot: {fileID: 0}
+  rainParticleSystems: []
+  rainBaseEmissionRate: 1400
+  rainingEmissionMultiplier: 1
+  stormEmissionMultiplier: 1.35
+  rainWindVelocity: {x: 1.4, y: 0.35}
+  stormWindVelocity: {x: 4.5, y: 1.2}
+  cloudLayerObjectName: CloudLayer
+  cloudLayerRoot: {fileID: 0}
+  cloudRenderers: []
+  clearCloudOpacity: 0
+  cloudyCloudOpacity: 0.55
+  rainCloudOpacity: 0.72
+  stormCloudOpacity: 0.9
+  cloudFadeInSeconds: 5
+  cloudFadeOutSeconds: 8
+  cloudColor: {r: 0.88, g: 0.9, b: 0.92, a: 1}
+  stormCloudColor: {r: 0.35, g: 0.38, b: 0.45, a: 1}
+  cloudLayerHeight: 58
+  cloudDriftVelocity: {x: 0.08, y: 0.03}
+  stormCloudDriftVelocity: {x: 0.28, y: 0.12}
+  cloudDriftWrapDistance: 60
+  randomizeCloudLayoutOnWeatherChange: 1
+  cloudLayoutAreaSize: {x: 180, y: 120}
+  cloudScaleRange: {x: 0.9, y: 1.45}
+  cloudHeightOffsetRange: {x: -4, y: 8}
+  cloudYawRange: {x: -50, y: 50}
+  cloudMinimumSpacing: 18
+  enableLightningEffects: 1
+  lightningEffectObjectName: LightningFX
+  lightningRoot: {fileID: 0}
+  lightningLine: {fileID: 0}
+  lightningFlashLight: {fileID: 0}
+  lightningMinIntervalSeconds: 2.5
+  lightningMaxIntervalSeconds: 7
+  lightningBoltDurationSeconds: 0.12
+  lightningSpawnRadius: 28
+  lightningSkyHeight: 28
+  lightningGroundHeight: 1.5
+  lightningSegmentCount: 9
+  lightningWidth: 0.08
+  lightningColor: {r: 0.62, g: 0.82, b: 1, a: 1}
+  lightningFlashIntensity: 4
+  lightningFlashRange: 65
+  wetSurfaceRoot: {fileID: 0}
+  wetSurfaceLineRenderers: []
+  wetSurfaceColor: {r: 0.23, g: 0.42, b: 0.55, a: 0.42}
+  wetSurfaceSize: {x: 3.2, y: 1.5}
+  wetSurfaceLineWidth: 0.22
+  wetSurfaceSegments: 28
+  wetSurfaceShapeIrregularity: 0.65
+  wetSurfaceDryDelaySeconds: 8
+  wetSurfaceDryFadeSeconds: 12
+  wetSurfaceMinimumDryScale: 0.2
 --- !u!1 &554167103
 GameObject:
   m_ObjectHideFlags: 0
@@ -10840,8 +10928,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
@@ -16970,6 +17058,100 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 911413823}
   m_CullTransparentMesh: 1
+--- !u!1 &920250981
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 920250982}
+  - component: {fileID: 920250983}
+  m_Layer: 0
+  m_Name: Moon Light
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &920250982
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 920250981}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1110812459}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!108 &920250983
+Light:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 920250981}
+  m_Enabled: 0
+  serializedVersion: 10
+  m_Type: 1
+  m_Shape: 0
+  m_Color: {r: 0.55, g: 0.65, b: 1, a: 1}
+  m_Intensity: 0
+  m_Range: 10
+  m_SpotAngle: 30
+  m_InnerSpotAngle: 21.80208
+  m_CookieSize: 10
+  m_Shadows:
+    m_Type: 0
+    m_Resolution: -1
+    m_CustomResolution: -1
+    m_Strength: 1
+    m_Bias: 0.05
+    m_NormalBias: 0.4
+    m_NearPlane: 0.2
+    m_CullingMatrixOverride:
+      e00: 1
+      e01: 0
+      e02: 0
+      e03: 0
+      e10: 0
+      e11: 1
+      e12: 0
+      e13: 0
+      e20: 0
+      e21: 0
+      e22: 1
+      e23: 0
+      e30: 0
+      e31: 0
+      e32: 0
+      e33: 1
+    m_UseCullingMatrixOverride: 0
+  m_Cookie: {fileID: 0}
+  m_DrawHalo: 0
+  m_Flare: {fileID: 0}
+  m_RenderMode: 0
+  m_CullingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_RenderingLayerMask: 1
+  m_Lightmapping: 4
+  m_LightShadowCasterMode: 0
+  m_AreaSize: {x: 1, y: 1}
+  m_BounceIntensity: 1
+  m_ColorTemperature: 6570
+  m_UseColorTemperature: 0
+  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_UseBoundingSphereOverride: 0
+  m_UseViewFrustumForShadowCasterCull: 1
+  m_ShadowRadius: 0
+  m_ShadowAngle: 0
 --- !u!1 &925370847
 GameObject:
   m_ObjectHideFlags: 0
@@ -20237,6 +20419,39 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1110631817}
   m_CullTransparentMesh: 1
+--- !u!1 &1110812458
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1110812459}
+  m_Layer: 0
+  m_Name: Moon
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1110812459
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1110812458}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1382175248}
+  - {fileID: 920250982}
+  m_Father: {fileID: 541700702}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1112394781
 GameObject:
   m_ObjectHideFlags: 0
@@ -26071,6 +26286,89 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1381451573}
   m_CullTransparentMesh: 1
+--- !u!1 &1382175247
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1382175248}
+  - component: {fileID: 1382175250}
+  - component: {fileID: 1382175249}
+  m_Layer: 0
+  m_Name: Moon Disc
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1382175248
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1382175247}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1110812459}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1382175249
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1382175247}
+  m_Enabled: 0
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 3bf276eff0a37c44596b1035cfb5561b, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1382175250
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1382175247}
+  m_Mesh: {fileID: 4300000, guid: 1c9be5acce4e8d446b222ecea6434018, type: 2}
 --- !u!1 &1387164581
 GameObject:
   m_ObjectHideFlags: 0
@@ -40397,6 +40695,22 @@ MonoBehaviour:
   indicatorCycles: 3
   savingIndicator: {fileID: 2147300004}
   savingAnimator: {fileID: 2147300008}
+--- !u!114 &2147400001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2147400101}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7b3f4e19a2d46e58f71a0b6c94d2e83, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  gameplayCamera: {fileID: 963194227}
+  freeLookCamera: {fileID: 419000995}
+  lockOnCamera: {fileID: 29471743}
+  menuManager: {fileID: 633410528}
 --- !u!1 &2147400101
 GameObject:
   m_ObjectHideFlags: 0
@@ -40429,22 +40743,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1534586610}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2147400001
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2147400101}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c7b3f4e19a2d46e58f71a0b6c94d2e83, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  gameplayCamera: {fileID: 963194227}
-  freeLookCamera: {fileID: 419000995}
-  lockOnCamera: {fileID: 29471743}
-  menuManager: {fileID: 633410528}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
