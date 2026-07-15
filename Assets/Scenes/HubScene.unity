@@ -1868,6 +1868,7 @@ GameObject:
   - component: {fileID: 65124488}
   - component: {fileID: 65124487}
   - component: {fileID: 65124486}
+  - component: {fileID: 65124491}
   m_Layer: 0
   m_Name: DungeonPortal
   m_TagString: Untagged
@@ -1977,6 +1978,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 852840421}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!64 &65124491
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 65124485}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &70618504
 GameObject:
   m_ObjectHideFlags: 0
@@ -6959,7 +6982,7 @@ ParticleSystem:
         m_RotationOrder: 4
     randomizeRotationDirection: 0
     gravitySource: 0
-    maxNumParticles: 4500
+    maxNumParticles: 5000
     customEmitterVelocity: {x: 0, y: 0, z: 0}
     size3D: 0
     rotation3D: 0
@@ -7025,9 +7048,9 @@ ParticleSystem:
     boxThickness: {x: 0, y: 0, z: 0}
     radiusThickness: 1
     donutRadius: 0.2
-    m_Position: {x: 152, y: 35, z: -70}
+    m_Position: {x: 150, y: 35, z: 0}
     m_Rotation: {x: 0, y: 0, z: 0}
-    m_Scale: {x: 755, y: 2, z: 790}
+    m_Scale: {x: 650, y: 2, z: 700}
     placementMode: 0
     m_MeshMaterialIndex: 0
     m_MeshNormalOffset: 0
@@ -7225,8 +7248,8 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 1400
-      minScalar: 1400
+      scalar: 3000
+      minScalar: 3000
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -9974,7 +9997,7 @@ ParticleSystem:
         m_NumAlphaKeys: 2
     range: {x: 0, y: 1}
   CollisionModule:
-    enabled: 0
+    enabled: 1
     serializedVersion: 4
     type: 0
     collisionMode: 0
@@ -9986,8 +10009,8 @@ ParticleSystem:
     m_Dampen:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0
-      minScalar: 0
+      scalar: 1
+      minScalar: 1
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -10039,8 +10062,8 @@ ParticleSystem:
     m_Bounce:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 1
-      minScalar: 1
+      scalar: 0
+      minScalar: 0
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -10142,17 +10165,17 @@ ParticleSystem:
         m_PreInfinity: 2
         m_PostInfinity: 2
         m_RotationOrder: 4
-    minKillSpeed: 0
+    minKillSpeed: 0.1
     maxKillSpeed: 10000
     radiusScale: 1
     collidesWith:
       serializedVersion: 2
-      m_Bits: 4294967295
+      m_Bits: 1
     maxCollisionShapes: 256
-    quality: 0
-    voxelSize: 0.5
+    quality: 1
+    voxelSize: 0.75
     collisionMessages: 0
-    collidesWithDynamic: 1
+    collidesWithDynamic: 0
     interiorCollisions: 0
   TriggerModule:
     enabled: 0
@@ -13519,6 +13542,7 @@ GameObject:
   - component: {fileID: 463494320}
   - component: {fileID: 463494319}
   - component: {fileID: 463494318}
+  - component: {fileID: 463494322}
   m_Layer: 0
   m_Name: ExternalSquare
   m_TagString: Untagged
@@ -13614,6 +13638,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 852840421}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!64 &463494322
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 463494316}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &465157722
 GameObject:
   m_ObjectHideFlags: 0
@@ -23468,13 +23514,13 @@ MonoBehaviour:
   m_MinimumDistanceFromTarget: 0.8
   m_AvoidObstacles: 1
   m_DistanceLimit: 0
-  m_MinimumOcclusionTime: 0
+  m_MinimumOcclusionTime: 0.05
   m_CameraRadius: 0.2
   m_Strategy: 0
   m_MaximumEffort: 4
-  m_SmoothingTime: 0.1
-  m_Damping: 0.1
-  m_DampingWhenOccluded: 0
+  m_SmoothingTime: 0.65
+  m_Damping: 0.25
+  m_DampingWhenOccluded: 0.15
   m_OptimalTargetDistance: 0
 --- !u!114 &911776037
 MonoBehaviour:
@@ -24552,13 +24598,13 @@ MonoBehaviour:
   m_MinimumDistanceFromTarget: 0.8
   m_AvoidObstacles: 1
   m_DistanceLimit: 0
-  m_MinimumOcclusionTime: 0
+  m_MinimumOcclusionTime: 0.05
   m_CameraRadius: 0.2
   m_Strategy: 0
   m_MaximumEffort: 4
-  m_SmoothingTime: 0.1
-  m_Damping: 0.1
-  m_DampingWhenOccluded: 0
+  m_SmoothingTime: 0.65
+  m_Damping: 0.25
+  m_DampingWhenOccluded: 0.15
   m_OptimalTargetDistance: 0
 --- !u!114 &950411490
 MonoBehaviour:
@@ -30360,6 +30406,7 @@ GameObject:
   - component: {fileID: 1217224185}
   - component: {fileID: 1217224184}
   - component: {fileID: 1217224183}
+  - component: {fileID: 1217224186}
   m_Layer: 0
   m_Name: InsideSquare
   m_TagString: Untagged
@@ -30454,6 +30501,28 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1217224181}
+  m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!64 &1217224186
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1217224181}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &1218286008
 GameObject:
@@ -32002,7 +32071,7 @@ MonoBehaviour:
   useUnscaledTime: 0
   timeMultiplier: 1
   startingPhase: 1
-  currentCondition: 1
+  currentCondition: 0
   dayPhases:
   - phase: 0
     displayName: Alba
@@ -32095,7 +32164,7 @@ MonoBehaviour:
   rainEffectRoot: {fileID: 346425451}
   rainParticleSystems:
   - {fileID: 346425453}
-  rainBaseEmissionRate: 1400
+  rainBaseEmissionRate: 3000
   rainingEmissionMultiplier: 1
   stormEmissionMultiplier: 1.35
   rainWindVelocity: {x: 1.4, y: 0.35}

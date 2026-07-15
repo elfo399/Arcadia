@@ -183,7 +183,7 @@ public class WeatherManager : MonoBehaviour
     [SerializeField] private string rainEffectObjectName = "RainFX";
     [SerializeField] private Transform rainEffectRoot;
     [SerializeField] private ParticleSystem[] rainParticleSystems;
-    [SerializeField, Min(1f)] private float rainBaseEmissionRate = 1400f;
+    [SerializeField, Min(1f)] private float rainBaseEmissionRate = 3000f;
     [SerializeField, Min(0f)] private float rainingEmissionMultiplier = 1f;
     [SerializeField, Min(0f)] private float stormEmissionMultiplier = 1.35f;
 

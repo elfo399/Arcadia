@@ -20884,13 +20884,13 @@ MonoBehaviour:
   m_MinimumDistanceFromTarget: 0.8
   m_AvoidObstacles: 1
   m_DistanceLimit: 0
-  m_MinimumOcclusionTime: 0
+  m_MinimumOcclusionTime: 0.05
   m_CameraRadius: 0.2
   m_Strategy: 0
   m_MaximumEffort: 4
-  m_SmoothingTime: 0.1
-  m_Damping: 0.1
-  m_DampingWhenOccluded: 0
+  m_SmoothingTime: 0.65
+  m_Damping: 0.25
+  m_DampingWhenOccluded: 0.15
   m_OptimalTargetDistance: 0
 --- !u!1 &4862638764610992693
 GameObject:
@@ -25523,13 +25523,13 @@ MonoBehaviour:
   m_MinimumDistanceFromTarget: 0.8
   m_AvoidObstacles: 1
   m_DistanceLimit: 0
-  m_MinimumOcclusionTime: 0
+  m_MinimumOcclusionTime: 0.05
   m_CameraRadius: 0.2
   m_Strategy: 0
   m_MaximumEffort: 4
-  m_SmoothingTime: 0.1
-  m_Damping: 0.1
-  m_DampingWhenOccluded: 0
+  m_SmoothingTime: 0.65
+  m_Damping: 0.25
+  m_DampingWhenOccluded: 0.15
   m_OptimalTargetDistance: 0
 --- !u!1 &5999768774925129342
 GameObject:
@@ -29638,7 +29638,7 @@ MonoBehaviour:
   rainEffectObjectName: RainFX
   rainEffectRoot: {fileID: 0}
   rainParticleSystems: []
-  rainBaseEmissionRate: 1400
+  rainBaseEmissionRate: 3000
   rainingEmissionMultiplier: 1
   stormEmissionMultiplier: 1.35
   rainWindVelocity: {x: 1.4, y: 0.35}
