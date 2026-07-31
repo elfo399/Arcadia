@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d5fd944f5a2a5145bf58fdff4f4b0f5, type: 3}
+  m_Name: BasicArrowRegistry
+  m_EditorClassIdentifier: 
+  entries:
+  - category: BasicArrow
+    key: arrow
+    itemName: Arrow
+    icon: {fileID: 21300000, guid: a43a1bb9e7c5f2749a31c490f1ebff28, type: 3}
+    weaponData: {fileID: 0}
+    usableData: {fileID: 0}
+    itemData: {fileID: 11400000, guid: 8dcc8513464141c40a0a38dc44690d46, type: 2}
+    armorData: {fileID: 0}
+    magicData: {fileID: 0}

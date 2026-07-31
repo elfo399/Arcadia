@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 75a4f08b5f4548758ac8a62178b2d8b4, type: 3}
+  m_Name: Warrior
+  m_EditorClassIdentifier: 
+  classId: warrior
+  displayName: Guerriero
+  description: Molto vigore, forza e difesa. Parte con spada, scudo e armatura completa.
+  portrait: {fileID: 21300000, guid: e4931f4cd56dfee4799e5d2302939f00, type: 3}
+  previewPrefab: {fileID: 0}
+  playerPrefab: {fileID: 0}
+  startingLevel: 1
+  experienceToNextLevel: 100
+  vigor: 16
+  mind: 7
+  endurance: 14
+  strength: 16
+  dexterity: 9
+  intelligence: 6
+  faith: 8
+  baseMaxHealth: 110
+  baseMaxStamina: 105
+  baseMaxMana: 35
+  maxFlasks: 4
+  flaskHealAmount: 45
+  karma: 0
+  benedetto: 0
+  malefico: 0
+  rightLoadout:
+  - {fileID: 11400000, guid: d4c94f42b047e794c939b2f303ff63eb, type: 2}
+  - {fileID: 0}
+  - {fileID: 0}
+  leftLoadout:
+  - {fileID: 11400000, guid: 42feb8f52f3ce9542b98698eb7978862, type: 2}
+  - {fileID: 0}
+  - {fileID: 0}
+  magicLoadout:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  magicLoadoutQuantities: 010000000100000001000000
+  usableLoadout:
+  - {fileID: 11400000, guid: d7838d3d159dcea4c9b82c4f749b4585, type: 2}
+  - {fileID: 0}
+  - {fileID: 0}
+  usableLoadoutQuantities: 040000000100000001000000
+  armorLoadout:
+  - {fileID: 11400000, guid: 97e193c3d2ca1e94ebbe6103681b90c0, type: 2}
+  - {fileID: 11400000, guid: fb3552b270368d342bf635324e861ffb, type: 2}
+  - {fileID: 11400000, guid: dca2868c496065d4baa8294dc19a6199, type: 2}
+  - {fileID: 11400000, guid: ea5b3f18e86e79a4eac0c07f702f7136, type: 2}
+  backpackItems: []

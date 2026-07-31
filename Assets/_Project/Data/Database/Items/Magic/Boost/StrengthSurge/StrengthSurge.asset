@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa321ae8b8623ec469233a3600ae956f, type: 3}
+  m_Name: StrengthSurge
+  m_EditorClassIdentifier: 
+  magicName: Strength Surge
+  description: Aumenta temporaneamente la forza.
+  icon: {fileID: 0}
+  category: 1
+  effectType: 3
+  magicDamage: 0
+  healAmount: 0
+  boostAttribute: 4
+  boostAmount: 5
+  boostDurationSeconds: 20
+  criticalHit: 1
+  scaling: STR C
+  requirements: INT 8+
+  manaCost: 10
+  castTime: 0.35
+  castCooldown: 0.45
+  projectilePrefab: {fileID: 0}
+  projectileSpeed: 18
+  projectileLifetime: 4
+  spawnOffset: {x: 0, y: 1.2, z: 0.7}
+  hitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295

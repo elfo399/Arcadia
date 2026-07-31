@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d5fd944f5a2a5145bf58fdff4f4b0f5, type: 3}
+  m_Name: UsableRegistry
+  m_EditorClassIdentifier: 
+  entries:
+  - category: Flasks_Health
+    key: flasks_health
+    itemName: Flasks Health
+    icon: {fileID: 21300000, guid: 3890113d47a7c3f4688481e648e92de3, type: 3}
+    weaponData: {fileID: 0}
+    usableData: {fileID: 11400000, guid: d7838d3d159dcea4c9b82c4f749b4585, type: 2}
+    itemData: {fileID: 0}
+    armorData: {fileID: 0}
+    magicData: {fileID: 0}
+  - category: Flasks_Mana
+    key: flasks_mana
+    itemName: Flasks Mana
+    icon: {fileID: 21300000, guid: 36c2418a6e9215745b078fbe46bfe422, type: 3}
+    weaponData: {fileID: 0}
+    usableData: {fileID: 11400000, guid: 6880c0233439fcd4f801ee879f1c1277, type: 2}
+    itemData: {fileID: 0}
+    armorData: {fileID: 0}
+    magicData: {fileID: 0}
