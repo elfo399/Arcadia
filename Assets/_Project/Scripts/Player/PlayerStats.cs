@@ -92,9 +92,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private float flaskTimer;
     private Animator animator;
     private GameData loadedDataCache;
-    private string selectedCharacterId;
-    private string characterName;
-    private bool selectedCharacterStartApplied;
+    private string playerId;
+    private string playerName;
+    private string selectedClassId;
+    private bool startingClassApplied;
     private bool dungeonCheckpointActive;
     private int dungeonCheckpointFloor = 1;
     private string dungeonCheckpointSeed = string.Empty;
@@ -130,8 +131,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public int TotalArmorPhysicalDefense => totalArmorPhysicalDefense;
     public int TotalArmorMagicDefense => totalArmorMagicDefense;
     public float TotalArmorWeight => totalArmorWeight;
-    public string SelectedCharacterId => selectedCharacterId;
-    public string CharacterName => ResolveCharacterName();
+    public string PlayerId => playerId;
+    public string PlayerName => ResolvePlayerName();
+    public string SelectedClassId => selectedClassId;
     public bool HasInspectorStartingClass => useInspectorStartingClass && inspectorStartingClass != null;
     public PlayerClassDatabase ClassDatabase => playerClassDatabase;
     public bool HasActiveDungeonCheckpoint => dungeonCheckpointActive;
@@ -564,9 +566,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
         GameData data = new GameData
         {
             saveVersion = SaveSystem.CurrentSaveVersion,
-            selectedCharacterId = SaveSystem.SingleCharacterId,
-            characterName = ResolveCharacterName(),
-            selectedCharacterStartApplied = this.selectedCharacterStartApplied,
+            playerId = SaveSystem.SinglePlayerId,
+            playerName = ResolvePlayerName(),
+            selectedClassId = selectedClassId,
+            startingClassApplied = this.startingClassApplied,
             playerLevel = this.playerLevel,
             levelExperience = this.levelExperience,
             experienceToNextLevel = this.experienceToNextLevel,
@@ -621,15 +624,16 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public void LoadStats()
     {
-        string requestedCharacterId = ResolveRequestedCharacterIdForLoad(out _);
-        GameData data = SaveSystem.LoadData(requestedCharacterId, allowLegacyFallback: true);
+        string requestedPlayerId = ResolveRequestedPlayerIdForLoad(out _);
+        GameData data = SaveSystem.LoadData(requestedPlayerId, allowLegacyFallback: true);
 
         if (forceStartDataIgnoreSave && data == null)
         {
             loadedDataCache = null;
-            selectedCharacterId = SaveSystem.SingleCharacterId;
-            characterName = SaveSystem.DefaultCharacterName;
-            selectedCharacterStartApplied = false;
+            playerId = SaveSystem.SinglePlayerId;
+            playerName = SaveSystem.DefaultPlayerName;
+            selectedClassId = string.Empty;
+            startingClassApplied = false;
             loadedQuestStateApplied = true;
             loadedInventoryStateApplied = true;
             Debug.Log("ForceStartData attivo e nessun salvataggio trovato: uso dati iniziali da Inspector/StartingLoadout.");
@@ -644,9 +648,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
         loadedInventoryStateApplied = false;
         if (data != null)
         {
-            selectedCharacterId = SaveSystem.SingleCharacterId;
-            characterName = ResolveLoadedCharacterName(data.characterName, selectedCharacterId);
-            selectedCharacterStartApplied = data.selectedCharacterStartApplied;
+            playerId = SaveSystem.SinglePlayerId;
+            playerName = ResolveLoadedPlayerName(data.playerName, playerId);
+            selectedClassId = data.selectedClassId ?? string.Empty;
+            startingClassApplied = data.startingClassApplied;
+            EnsureSelectedClassIdFallback();
             this.playerLevel = Mathf.Max(1, data.playerLevel > 0 ? data.playerLevel : this.playerLevel);
             this.levelExperience = Mathf.Max(0, data.levelExperience);
             this.experienceToNextLevel = Mathf.Max(1, data.experienceToNextLevel > 0 ? data.experienceToNextLevel : this.experienceToNextLevel);
@@ -664,7 +670,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             this.runCoins = Mathf.Max(0, data.runCoins);
             this.bankCoins = ResolveSavedBankCoins(data);
             ApplyLoadedDungeonCheckpoint(data);
-            ApplyCharacterBaseResources();
+            ApplyClassBaseResources();
             SyncLegacyWalletFields();
             // Non applicare qui quest/inventory: se avviene prima degli Awake degli altri componenti
             // (es. PlayerInventory), il loro Awake può sovrascrivere i dati caricati.
@@ -675,21 +681,22 @@ public class PlayerStats : MonoBehaviour, IDamageable
         }
         else
         {
-            selectedCharacterId = SaveSystem.SingleCharacterId;
-            characterName = SaveSystem.DefaultCharacterName;
-            selectedCharacterStartApplied = false;
+            playerId = SaveSystem.SinglePlayerId;
+            playerName = SaveSystem.DefaultPlayerName;
+            selectedClassId = string.Empty;
+            startingClassApplied = false;
             ClearDungeonCheckpoint();
             Debug.Log("Nessun file di salvataggio trovato. Verranno usati i valori correnti (da Inspector alla prima esecuzione).");
         }
     }
 
-    private string ResolveRequestedCharacterIdForLoad(out bool inspectorCharacterSelectsSlot)
+    private string ResolveRequestedPlayerIdForLoad(out bool inspectorClassSelectsSlot)
     {
-        inspectorCharacterSelectsSlot = false;
-        return SaveSystem.SingleCharacterId;
+        inspectorClassSelectsSlot = false;
+        return SaveSystem.SinglePlayerId;
     }
 
-    private void ApplyLoadedCharacterData(GameData data, string fallbackCharacterId)
+    private void ApplyLoadedPlayerData(GameData data, string fallbackPlayerId)
     {
         if (data == null)
             return;
@@ -698,9 +705,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
         loadedQuestStateApplied = false;
         loadedInventoryStateApplied = false;
 
-        selectedCharacterId = SaveSystem.SingleCharacterId;
-        characterName = ResolveLoadedCharacterName(data.characterName, selectedCharacterId);
-        selectedCharacterStartApplied = data.selectedCharacterStartApplied;
+        playerId = SaveSystem.SinglePlayerId;
+        playerName = ResolveLoadedPlayerName(data.playerName, playerId);
+        selectedClassId = data.selectedClassId ?? string.Empty;
+        startingClassApplied = data.startingClassApplied;
+        EnsureSelectedClassIdFallback();
         this.playerLevel = Mathf.Max(1, data.playerLevel > 0 ? data.playerLevel : this.playerLevel);
         this.levelExperience = Mathf.Max(0, data.levelExperience);
         this.experienceToNextLevel = Mathf.Max(1, data.experienceToNextLevel > 0 ? data.experienceToNextLevel : this.experienceToNextLevel);
@@ -718,7 +727,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         this.runCoins = Mathf.Max(0, data.runCoins);
         this.bankCoins = ResolveSavedBankCoins(data);
         ApplyLoadedDungeonCheckpoint(data);
-        ApplyCharacterBaseResources();
+        ApplyClassBaseResources();
         SyncLegacyWalletFields();
     }
 
@@ -752,8 +761,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             && (forceInspectorStart
                 || resetSaveFromInspectorClassOnPlay
                 || !hasLoadedSave
-                || !loadedDataCache.selectedCharacterStartApplied
-                || string.IsNullOrWhiteSpace(loadedDataCache.selectedCharacterId));
+                || !loadedDataCache.startingClassApplied);
 
         PlayerClassData playerClass = hasPendingNewPlayer
             ? ResolvePendingStartingClass(database)
@@ -762,7 +770,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         bool shouldApply = hasPendingNewPlayer
             || shouldUseInspectorClass
             || !hasLoadedSave
-            || !loadedDataCache.selectedCharacterStartApplied;
+            || !loadedDataCache.startingClassApplied;
 
         if (!shouldApply)
             return false;
@@ -773,8 +781,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
             return false;
 
         ApplyStartingClass(playerClass);
-        selectedCharacterId = SaveSystem.SingleCharacterId;
-        selectedCharacterStartApplied = true;
+        playerId = SaveSystem.SinglePlayerId;
+        selectedClassId = playerClass.GetClassId();
+        startingClassApplied = true;
         if (shouldUseInspectorClass)
             inspectorStartingClassAppliedThisSession = true;
         PlayerClassSelection.ClearPendingNewPlayer();
@@ -787,8 +796,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (playerClass == null)
             return;
 
-        selectedCharacterId = SaveSystem.SingleCharacterId;
-        characterName = SaveSystem.DefaultCharacterName;
+        playerId = SaveSystem.SinglePlayerId;
+        selectedClassId = playerClass.GetClassId();
+        if (string.IsNullOrWhiteSpace(playerName))
+            playerName = SaveSystem.DefaultPlayerName;
 
         playerLevel = Mathf.Max(1, playerClass.startingLevel);
         levelExperience = 0;
@@ -835,31 +846,31 @@ public class PlayerStats : MonoBehaviour, IDamageable
         UpdateAllUI();
     }
 
-    public void SetCharacterName(string value, bool save = true)
+    public void SetPlayerName(string value, bool save = true)
     {
-        string resolvedName = string.IsNullOrWhiteSpace(value) ? ResolveCharacterName() : value.Trim();
-        if (string.Equals(characterName, resolvedName, StringComparison.Ordinal))
+        string resolvedName = string.IsNullOrWhiteSpace(value) ? ResolvePlayerName() : value.Trim();
+        if (string.Equals(playerName, resolvedName, StringComparison.Ordinal))
             return;
 
-        characterName = resolvedName;
+        playerName = resolvedName;
         if (save)
             SaveStats();
     }
 
-    private string ResolveCharacterName()
+    private string ResolvePlayerName()
     {
-        if (!string.IsNullOrWhiteSpace(characterName))
-            return characterName.Trim();
+        if (!string.IsNullOrWhiteSpace(playerName))
+            return playerName.Trim();
 
-        return ResolveLoadedCharacterName(string.Empty, selectedCharacterId);
+        return ResolveLoadedPlayerName(string.Empty, playerId);
     }
 
-    private string ResolveLoadedCharacterName(string savedName, string fallbackCharacterId)
+    private string ResolveLoadedPlayerName(string savedName, string fallbackPlayerId)
     {
         if (!string.IsNullOrWhiteSpace(savedName))
             return savedName.Trim();
 
-        return SaveSystem.DefaultCharacterName;
+        return SaveSystem.DefaultPlayerName;
     }
 
     private static string ResolveClassDisplayName(PlayerClassData playerClass)
@@ -913,7 +924,17 @@ public class PlayerStats : MonoBehaviour, IDamageable
         return inspectorStartingClass;
     }
 
-    private void ApplyCharacterBaseResources()
+    private void EnsureSelectedClassIdFallback()
+    {
+        if (!string.IsNullOrWhiteSpace(selectedClassId))
+            return;
+
+        PlayerClassData fallbackClass = ResolveDefaultStartingClass();
+        if (fallbackClass != null)
+            selectedClassId = fallbackClass.GetClassId();
+    }
+
+    private void ApplyClassBaseResources()
     {
         PlayerClassData playerClass = ResolveDefaultStartingClass();
         if (playerClass == null)

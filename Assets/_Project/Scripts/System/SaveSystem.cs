@@ -3,38 +3,39 @@ using System.IO;
 
 public static class SaveSystem
 {
-    public const int CurrentSaveVersion = 1;
-    public const string SingleCharacterId = "player";
-    public const string DefaultCharacterName = "Player";
+    public const int CurrentSaveVersion = 2;
+    public const string SinglePlayerId = "player";
+    public const string DefaultPlayerName = "Player";
 
     private const string SaveFileName = "gamedata.json";
     private const string LegacyCharacterSavePrefix = "gamedata_";
     private const string LegacyCharacterSaveExtension = ".json";
-    private const string PlayerPrefsSelectedCharacterKey = "SelectedCharacterId";
+    private const string PlayerPrefsSelectedPlayerKey = "SelectedPlayerId";
 
-    public static string GetSelectedCharacterId()
+    public static string GetSelectedPlayerId()
     {
-        StoreSingleCharacterId();
-        return SingleCharacterId;
+        StoreSinglePlayerId();
+        return SinglePlayerId;
     }
 
-    public static void SelectCharacter(string characterId)
+    public static void SelectPlayer(string playerId)
     {
-        StoreSingleCharacterId();
+        StoreSinglePlayerId();
     }
 
-    public static GameData EnsureCharacterData(string characterId, string characterName)
+    public static GameData EnsurePlayerData(string playerId, string playerName, string selectedClassId = null)
     {
-        GameData existingData = LoadData(characterId, allowLegacyFallback: true);
+        GameData existingData = LoadData(playerId, allowLegacyFallback: true);
         if (existingData != null)
             return existingData;
 
         GameData newData = new GameData
         {
             saveVersion = CurrentSaveVersion,
-            selectedCharacterId = SingleCharacterId,
-            characterName = ResolveCharacterName(characterName),
-            selectedCharacterStartApplied = false,
+            playerId = SinglePlayerId,
+            playerName = ResolvePlayerName(playerName),
+            selectedClassId = ResolveClassId(selectedClassId),
+            startingClassApplied = false,
             usesUnifiedCoins = true
         };
 
@@ -45,7 +46,7 @@ public static class SaveSystem
     public static void SaveData(GameData data)
     {
         if (data != null)
-            PrepareSingleCharacterData(data);
+            PrepareSinglePlayerData(data);
 
         string path = GetSaveFilePath();
         string json = JsonUtility.ToJson(data, true);
@@ -53,7 +54,7 @@ public static class SaveSystem
         try
         {
             File.WriteAllText(path, json);
-            StoreSingleCharacterId();
+            StoreSinglePlayerId();
             Debug.Log($"Dati salvati con successo in: {path}");
         }
         catch (System.Exception e)
@@ -67,25 +68,25 @@ public static class SaveSystem
         return LoadData(null, allowLegacyFallback: true);
     }
 
-    public static GameData LoadData(string characterId, bool allowLegacyFallback = true)
+    public static GameData LoadData(string playerId, bool allowLegacyFallback = true)
     {
         GameData data = LoadDataFromPath(GetSaveFilePath(), logMissing: false);
         if (data != null)
         {
-            PrepareSingleCharacterData(data);
-            StoreSingleCharacterId();
+            PrepareSinglePlayerData(data);
+            StoreSinglePlayerId();
             return data;
         }
 
         if (!allowLegacyFallback)
             return null;
 
-        data = LoadLegacyCharacterData(characterId);
+        data = LoadLegacyPlayerData(playerId);
         if (data != null)
         {
-            PrepareSingleCharacterData(data);
+            PrepareSinglePlayerData(data);
             SaveData(data);
-            Debug.Log("[SaveSystem] Vecchio salvataggio per personaggio migrato nel salvataggio unico.");
+            Debug.Log("[SaveSystem] Vecchio salvataggio migrato nel salvataggio unico del player.");
             return data;
         }
 
@@ -98,27 +99,27 @@ public static class SaveSystem
         return Path.Combine(Application.persistentDataPath, SaveFileName);
     }
 
-    public static string GetSaveFilePath(string characterId)
+    public static string GetSaveFilePath(string playerId)
     {
         return GetSaveFilePath();
     }
 
-    private static GameData LoadLegacyCharacterData(string requestedCharacterId)
+    private static GameData LoadLegacyPlayerData(string requestedPlayerId)
     {
-        string requestedId = NormalizeCharacterId(requestedCharacterId);
+        string requestedId = NormalizePlayerId(requestedPlayerId);
         if (!string.IsNullOrWhiteSpace(requestedId))
         {
-            GameData requestedData = LoadDataFromPath(GetLegacyCharacterSaveFilePath(requestedId), logMissing: false);
+            GameData requestedData = LoadDataFromPath(GetLegacyPlayerSaveFilePath(requestedId), logMissing: false);
             if (requestedData != null)
                 return requestedData;
         }
 
-        string storedId = PlayerPrefs.GetString(PlayerPrefsSelectedCharacterKey, string.Empty);
-        storedId = NormalizeCharacterId(storedId);
+        string storedId = PlayerPrefs.GetString(PlayerPrefsSelectedPlayerKey, string.Empty);
+        storedId = NormalizePlayerId(storedId);
         if (!string.IsNullOrWhiteSpace(storedId)
             && !string.Equals(storedId, requestedId, System.StringComparison.OrdinalIgnoreCase))
         {
-            GameData storedData = LoadDataFromPath(GetLegacyCharacterSaveFilePath(storedId), logMissing: false);
+            GameData storedData = LoadDataFromPath(GetLegacyPlayerSaveFilePath(storedId), logMissing: false);
             if (storedData != null)
                 return storedData;
         }
@@ -166,6 +167,7 @@ public static class SaveSystem
         {
             string json = File.ReadAllText(path);
             GameData data = JsonUtility.FromJson<GameData>(json);
+            MigrateLegacyPlayerIdentityFields(data, json);
             MigrateLegacyCurrencyFields(data, json);
             MigrateSaveVersion(data);
             Debug.Log($"Dati caricati con successo da: {path}");
@@ -178,36 +180,42 @@ public static class SaveSystem
         }
     }
 
-    private static string GetLegacyCharacterSaveFilePath(string characterId)
+    private static string GetLegacyPlayerSaveFilePath(string playerId)
     {
         return Path.Combine(
             Application.persistentDataPath,
-            LegacyCharacterSavePrefix + SanitizeFileName(characterId) + LegacyCharacterSaveExtension);
+            LegacyCharacterSavePrefix + SanitizeFileName(playerId) + LegacyCharacterSaveExtension);
     }
 
-    private static string NormalizeCharacterId(string characterId)
+    private static string NormalizePlayerId(string playerId)
     {
-        return string.IsNullOrWhiteSpace(characterId) ? string.Empty : characterId.Trim();
+        return string.IsNullOrWhiteSpace(playerId) ? string.Empty : playerId.Trim();
     }
 
-    private static void PrepareSingleCharacterData(GameData data)
+    private static void PrepareSinglePlayerData(GameData data)
     {
         if (data == null)
             return;
 
         data.saveVersion = CurrentSaveVersion;
-        data.selectedCharacterId = SingleCharacterId;
-        data.characterName = ResolveCharacterName(data.characterName);
+        data.playerId = SinglePlayerId;
+        data.playerName = ResolvePlayerName(data.playerName);
+        data.selectedClassId = ResolveClassId(data.selectedClassId);
         data.usesUnifiedCoins = true;
     }
 
-    private static string ResolveCharacterName(string characterName)
+    private static string ResolvePlayerName(string playerName)
     {
-        if (string.IsNullOrWhiteSpace(characterName))
-            return DefaultCharacterName;
+        if (string.IsNullOrWhiteSpace(playerName))
+            return DefaultPlayerName;
 
-        string normalized = characterName.Trim();
-        return IsLegacyArchetypeName(normalized) ? DefaultCharacterName : normalized;
+        string normalized = playerName.Trim();
+        return IsLegacyArchetypeName(normalized) ? DefaultPlayerName : normalized;
+    }
+
+    private static string ResolveClassId(string classId)
+    {
+        return string.IsNullOrWhiteSpace(classId) ? string.Empty : classId.Trim();
     }
 
     private static bool IsLegacyArchetypeName(string value)
@@ -226,15 +234,15 @@ public static class SaveSystem
             || string.Equals(normalized, "arciere", System.StringComparison.OrdinalIgnoreCase);
     }
 
-    private static void StoreSingleCharacterId()
+    private static void StoreSinglePlayerId()
     {
-        PlayerPrefs.SetString(PlayerPrefsSelectedCharacterKey, SingleCharacterId);
+        PlayerPrefs.SetString(PlayerPrefsSelectedPlayerKey, SinglePlayerId);
         PlayerPrefs.Save();
     }
 
     private static string SanitizeFileName(string value)
     {
-        string normalized = NormalizeCharacterId(value);
+        string normalized = NormalizePlayerId(value);
         if (string.IsNullOrWhiteSpace(normalized))
             return "unknown";
 
@@ -272,6 +280,44 @@ public static class SaveSystem
         data.usesUnifiedCoins = true;
     }
 
+    private static void MigrateLegacyPlayerIdentityFields(GameData data, string json)
+    {
+        if (data == null || string.IsNullOrWhiteSpace(json))
+            return;
+
+        if (string.IsNullOrWhiteSpace(data.playerId))
+        {
+            data.playerId = SinglePlayerId;
+        }
+
+        if (string.IsNullOrWhiteSpace(data.playerName))
+        {
+            string legacyPlayerName = ReadJsonString(json, "characterName");
+            data.playerName = ResolvePlayerName(legacyPlayerName);
+        }
+
+        if (string.IsNullOrWhiteSpace(data.selectedClassId))
+        {
+            string legacyClassId = ReadJsonString(json, "selectedClassId");
+            if (string.IsNullOrWhiteSpace(legacyClassId))
+                legacyClassId = ReadJsonString(json, "startingClassId");
+            if (string.IsNullOrWhiteSpace(legacyClassId))
+                legacyClassId = ReadJsonString(json, "classId");
+            if (string.IsNullOrWhiteSpace(legacyClassId))
+            {
+                legacyClassId = ReadJsonString(json, "selectedCharacterId");
+                if (string.Equals(legacyClassId, SinglePlayerId, System.StringComparison.OrdinalIgnoreCase))
+                    legacyClassId = string.Empty;
+            }
+
+            data.selectedClassId = ResolveClassId(legacyClassId);
+        }
+
+        if (!data.startingClassApplied)
+            data.startingClassApplied = ReadJsonBool(json, "selectedCharacterStartApplied")
+                                        || ReadJsonBool(json, "startingClassApplied");
+    }
+
     private static void MigrateSaveVersion(GameData data)
     {
         if (data == null)
@@ -296,6 +342,13 @@ public static class SaveSystem
                     data.saveVersion = 1;
                     break;
 
+                case 1:
+                    data.playerId = SinglePlayerId;
+                    data.playerName = ResolvePlayerName(data.playerName);
+                    data.selectedClassId = ResolveClassId(data.selectedClassId);
+                    data.saveVersion = 2;
+                    break;
+
                 default:
                     Debug.LogWarning($"Migrazione non disponibile dalla versione {data.saveVersion}.");
                     return;
@@ -316,5 +369,33 @@ public static class SaveSystem
             return 0;
 
         return int.TryParse(match.Groups[1].Value, out int value) ? value : 0;
+    }
+
+    private static bool ReadJsonBool(string json, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(json) || string.IsNullOrWhiteSpace(fieldName))
+            return false;
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            json,
+            "\"" + System.Text.RegularExpressions.Regex.Escape(fieldName) + "\"\\s*:\\s*(true|false)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        return match.Success && bool.TryParse(match.Groups[1].Value, out bool value) && value;
+    }
+
+    private static string ReadJsonString(string json, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(json) || string.IsNullOrWhiteSpace(fieldName))
+            return string.Empty;
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            json,
+            "\"" + System.Text.RegularExpressions.Regex.Escape(fieldName) + "\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"");
+
+        if (!match.Success)
+            return string.Empty;
+
+        return System.Text.RegularExpressions.Regex.Unescape(match.Groups[1].Value);
     }
 }

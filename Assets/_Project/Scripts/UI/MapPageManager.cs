@@ -441,11 +441,11 @@ public class MapPageManager : MonoBehaviour
             return null;
 
         string selectedClassId = PlayerStats.instance != null
-            ? PlayerStats.instance.SelectedCharacterId
+            ? PlayerStats.instance.SelectedClassId
             : string.Empty;
 
         if (string.IsNullOrWhiteSpace(selectedClassId))
-            selectedClassId = PlayerClassSelection.GetSelectedPlayerId();
+            selectedClassId = PlayerClassSelection.GetSelectedClassId();
 
         PlayerClassData explicitClassMatch = ResolveClassById(selectedClassId);
         return explicitClassMatch != null ? explicitClassMatch : playerClassDatabase.GetById(selectedClassId);
@@ -556,7 +556,7 @@ public class MapPageManager : MonoBehaviour
         {
             defaultPlayerName = value.Trim();
             if (PlayerStats.instance != null)
-                PlayerStats.instance.SetCharacterName(defaultPlayerName);
+                PlayerStats.instance.SetPlayerName(defaultPlayerName);
         }
 
         ApplyRunInfoTexts(forceRefresh: true);
@@ -592,8 +592,8 @@ public class MapPageManager : MonoBehaviour
 
     private string ResolvePlayerName()
     {
-        if (PlayerStats.instance != null && !string.IsNullOrWhiteSpace(PlayerStats.instance.CharacterName))
-            return PlayerStats.instance.CharacterName.Trim();
+        if (PlayerStats.instance != null && !string.IsNullOrWhiteSpace(PlayerStats.instance.PlayerName))
+            return PlayerStats.instance.PlayerName.Trim();
 
         PlayerClassData playerClass = ResolveSelectedClass();
         if (playerClass != null)

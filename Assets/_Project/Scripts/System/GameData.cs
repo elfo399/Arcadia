@@ -80,11 +80,12 @@ public class GameData
     // Incrementato quando cambia la struttura persistente del salvataggio.
     public int saveVersion;
 
-    // Single player character identity. The temporary start package is applied
-    // once, then runtime stats/inventory become authoritative.
-    public string selectedCharacterId;
-    public string characterName;
-    public bool selectedCharacterStartApplied;
+    // Single player identity. The starting class is applied once, then runtime
+    // stats/inventory become authoritative.
+    public string playerId;
+    public string playerName;
+    public string selectedClassId;
+    public bool startingClassApplied;
 
     // Leveling
     public int playerLevel;
@@ -92,7 +93,7 @@ public class GameData
     public int experienceToNextLevel;
     public int unspentAttributePoints;
 
-    // Character attributes
+    // Player attributes
     public int vigor;
     public int mind;
     public int endurance;

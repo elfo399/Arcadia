@@ -320,12 +320,12 @@ public class AttributesUIManager : MonoBehaviour
     private string ResolveSelectedClassName(PlayerClassData playerClass)
     {
         CachePlayerStats();
-        if (playerStats != null && !string.IsNullOrWhiteSpace(playerStats.CharacterName))
-            return playerStats.CharacterName.Trim();
+        if (playerStats != null && !string.IsNullOrWhiteSpace(playerStats.PlayerName))
+            return playerStats.PlayerName.Trim();
 
-        string selectedClassId = playerStats != null ? playerStats.SelectedCharacterId : string.Empty;
+        string selectedClassId = playerStats != null ? playerStats.SelectedClassId : string.Empty;
         if (string.IsNullOrWhiteSpace(selectedClassId))
-            selectedClassId = PlayerClassSelection.GetSelectedPlayerId();
+            selectedClassId = PlayerClassSelection.GetSelectedClassId();
 
         PlayerClassData selectedClass = ResolveClassById(selectedClassId);
         if (selectedClass != null)
@@ -386,9 +386,9 @@ public class AttributesUIManager : MonoBehaviour
             return null;
 
         CachePlayerStats();
-        string selectedClassId = playerStats != null ? playerStats.SelectedCharacterId : string.Empty;
+        string selectedClassId = playerStats != null ? playerStats.SelectedClassId : string.Empty;
         if (string.IsNullOrWhiteSpace(selectedClassId))
-            selectedClassId = PlayerClassSelection.GetSelectedPlayerId();
+            selectedClassId = PlayerClassSelection.GetSelectedClassId();
 
         return playerClassDatabase.GetById(selectedClassId);
     }

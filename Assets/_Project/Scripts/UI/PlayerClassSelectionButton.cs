@@ -8,7 +8,7 @@ public class PlayerClassSelectionButton : MonoBehaviour
     [SerializeField] private bool applyToCurrentPlayer;
     [SerializeField] private string sceneToLoadAfterSelect;
 
-    public void SelectCharacter()
+    public void SelectClass()
     {
         if (playerClass == null)
         {

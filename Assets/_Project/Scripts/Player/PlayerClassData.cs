@@ -22,10 +22,6 @@ public class PlayerClassData : ScriptableObject
     public string displayName = "Warrior";
     [TextArea] public string description;
     public Sprite portrait;
-    public GameObject previewPrefab;
-
-    [Header("Prefab Override")]
-    public GameObject playerPrefab;
 
     [Header("Level")]
     [Min(1)] public int startingLevel = 1;
