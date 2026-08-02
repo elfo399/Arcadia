@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   magicName: fireball
   description: Palla di fuoco distruttiva
-  icon: {fileID: 21300000, guid: ad7dda36761a41b449b9d3f09daf4d1f, type: 3}
+  icon: {fileID: 21300000, guid: ad7dda36761a41b449b9d3f09daf4d1f, type: 3}
   category: 0
   effectType: 0
   magicDamage: 10
@@ -26,9 +26,9 @@ MonoBehaviour:
   scaling: INT C
   requirements: INT 10+
   manaCost: 12
-  castTime: 1
+  castTime: 0.35
   castCooldown: 0.45
-  projectilePrefab: {fileID: 8932603339110045951, guid: 52f17b1b318f07842b38e3cafa30578c, type: 3}
+  projectilePrefab: {fileID: 0}
   projectileSpeed: 18
   projectileLifetime: 4
   spawnOffset: {x: 0, y: 1.2, z: 0.7}
