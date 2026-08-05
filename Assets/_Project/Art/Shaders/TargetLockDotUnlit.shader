@@ -10,6 +10,7 @@ Shader "Arcadia/TargetLockDotUnlit"
     {
         Tags
         {
+            "RenderPipeline" = "UniversalPipeline"
             "Queue" = "Overlay"
             "RenderType" = "Transparent"
             "IgnoreProjector" = "True"
@@ -24,42 +25,48 @@ Shader "Arcadia/TargetLockDotUnlit"
 
         Pass
         {
-            CGPROGRAM
+            Tags { "LightMode" = "SRPDefaultUnlit" }
+
+            HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #include "UnityCG.cginc"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            sampler2D _MainTex;
-            fixed4 _Color;
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
 
-            struct appdata
+            CBUFFER_START(UnityPerMaterial)
+                half4 _Color;
+            CBUFFER_END
+
+            struct Attributes
             {
-                float4 vertex : POSITION;
+                float4 positionOS : POSITION;
                 float2 uv : TEXCOORD0;
-                fixed4 color : COLOR;
+                half4 color : COLOR;
             };
 
-            struct v2f
+            struct Varyings
             {
-                float4 vertex : SV_POSITION;
+                float4 positionHCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
-                fixed4 color : COLOR;
+                half4 color : COLOR;
             };
 
-            v2f vert(appdata input)
+            Varyings vert(Attributes input)
             {
-                v2f output;
-                output.vertex = UnityObjectToClipPos(input.vertex);
+                Varyings output;
+                output.positionHCS = TransformObjectToHClip(input.positionOS.xyz);
                 output.uv = input.uv;
                 output.color = input.color * _Color;
                 return output;
             }
 
-            fixed4 frag(v2f input) : SV_Target
+            half4 frag(Varyings input) : SV_Target
             {
-                return tex2D(_MainTex, input.uv) * input.color;
+                return SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv) * input.color;
             }
-            ENDCG
+            ENDHLSL
         }
     }
 }
