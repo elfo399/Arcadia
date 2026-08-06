@@ -34,6 +34,11 @@ public class PrefabScatterToolWindow : EditorWindow
     [SerializeField] private bool allowRendererBoundsFallback = true;
     [SerializeField] private bool overridePlacedLayer = true;
     [SerializeField] private int placedLayer = 2;
+    [SerializeField] private bool brushEnabled = false;
+    [SerializeField] private bool eraseBrush = false;
+    [SerializeField] private float brushRadius = 2f;
+    [SerializeField] private int brushDensity = 4;
+    [SerializeField] private float brushStrokeSpacing = 0.75f;
 
     private int lastRaycastMissCount;
     private int lastSlopeRejectedCount;
@@ -43,6 +48,10 @@ public class PrefabScatterToolWindow : EditorWindow
     private SerializedObject serializedWindow;
     private SerializedProperty prefabsProp;
     private System.Random prng;
+    private bool brushStrokeActive;
+    private int brushUndoGroup = -1;
+    private Vector3 lastBrushStampPosition;
+    private bool hasLastBrushStampPosition;
 
     [MenuItem("Tools/Arcadia/Prefab Scatter Tool")]
     public static void OpenWindow()
@@ -57,11 +66,14 @@ public class PrefabScatterToolWindow : EditorWindow
         serializedWindow = new SerializedObject(this);
         prefabsProp = serializedWindow.FindProperty("prefabs");
         SceneView.duringSceneGui += OnSceneGUI;
+        wantsMouseMove = true;
     }
 
     private void OnDisable()
     {
         SceneView.duringSceneGui -= OnSceneGUI;
+        brushStrokeActive = false;
+        brushUndoGroup = -1;
     }
 
     private void OnGUI()
@@ -75,10 +87,27 @@ public class PrefabScatterToolWindow : EditorWindow
         EditorGUILayout.LabelField("Prefab Scatter Tool", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Sparge prefab su un'area rettangolare usando raycast verso il basso. "
-            + "Pensato per alberi, rocce, cespugli e altri elementi statici di scena.",
+            + "La modalita Pennello permette anche di dipingerli direttamente nella Scene View.",
             MessageType.Info);
 
         EditorGUILayout.PropertyField(prefabsProp, true);
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("Aggiungi Prefab Selezionati"))
+            {
+                serializedWindow.ApplyModifiedProperties();
+                AddSelectedPrefabs();
+                serializedWindow.Update();
+            }
+
+            if (GUILayout.Button("Svuota Lista"))
+            {
+                serializedWindow.ApplyModifiedProperties();
+                prefabs.Clear();
+                EditorUtility.SetDirty(this);
+                serializedWindow.Update();
+            }
+        }
 
         EditorGUILayout.Space(4f);
         parentContainer = (Transform)EditorGUILayout.ObjectField("Parent Container", parentContainer, typeof(Transform), true);
@@ -138,6 +167,28 @@ public class PrefabScatterToolWindow : EditorWindow
         drawScenePreview = EditorGUILayout.Toggle("Draw Scene Preview", drawScenePreview);
 
         EditorGUILayout.Space(8f);
+        EditorGUILayout.LabelField("Pennello Scene View", EditorStyles.boldLabel);
+        brushEnabled = EditorGUILayout.Toggle("Attiva Pennello", brushEnabled);
+        using (new EditorGUI.DisabledScope(!brushEnabled))
+        {
+            eraseBrush = EditorGUILayout.Toggle("Modalita Gomma", eraseBrush);
+            brushRadius = Mathf.Max(0.1f, EditorGUILayout.FloatField("Raggio", brushRadius));
+            brushDensity = Mathf.Clamp(EditorGUILayout.IntField("Piante per Passata", brushDensity), 1, 100);
+            brushStrokeSpacing = Mathf.Max(0.05f, EditorGUILayout.FloatField("Spaziatura Trascinamento", brushStrokeSpacing));
+        }
+
+        if (brushEnabled)
+        {
+            EditorGUILayout.HelpBox(
+                EditorApplication.isPlaying
+                    ? "Il pennello e disattivato durante il Play Mode."
+                    : eraseBrush
+                    ? "GOMMA ATTIVA: trascina con il tasto sinistro per rimuovere i prefab del pennello dentro il cerchio. Alt continua a controllare la camera."
+                    : "Trascina con il tasto sinistro sulla superficie per dipingere. Alt continua a controllare la camera. Usa Min Distance per evitare sovrapposizioni.",
+                eraseBrush && !EditorApplication.isPlaying ? MessageType.Warning : MessageType.Info);
+        }
+
+        EditorGUILayout.Space(8f);
         using (new EditorGUILayout.HorizontalScope())
         {
             if (GUILayout.Button("Use Selection As Center"))
@@ -176,16 +227,225 @@ public class PrefabScatterToolWindow : EditorWindow
 
     private void OnSceneGUI(SceneView sceneView)
     {
-        if (!drawScenePreview)
+        if (drawScenePreview)
+        {
+            Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
+            Color fill = new Color(0.15f, 0.65f, 0.25f, 0.08f);
+            Color outline = new Color(0.15f, 0.75f, 0.25f, 0.95f);
+
+            Vector3 size = new Vector3(Mathf.Max(0.1f, areaSize.x), 0.01f, Mathf.Max(0.1f, areaSize.y));
+            Handles.DrawSolidRectangleWithOutline(GetRectPoints(areaCenter, size), fill, outline);
+            Handles.Label(areaCenter + Vector3.up * 0.1f, $"Scatter Area\n{areaSize.x:0.##} x {areaSize.y:0.##}");
+        }
+
+        if (brushEnabled)
+            HandleBrushSceneGUI(sceneView);
+    }
+
+    private void HandleBrushSceneGUI(SceneView sceneView)
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
             return;
 
-        Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
-        Color fill = new Color(0.15f, 0.65f, 0.25f, 0.08f);
-        Color outline = new Color(0.15f, 0.75f, 0.25f, 0.95f);
+        Event currentEvent = Event.current;
+        if (currentEvent == null)
+            return;
 
-        Vector3 size = new Vector3(Mathf.Max(0.1f, areaSize.x), 0.01f, Mathf.Max(0.1f, areaSize.y));
-        Handles.DrawSolidRectangleWithOutline(GetRectPoints(areaCenter, size), fill, outline);
-        Handles.Label(areaCenter + Vector3.up * 0.1f, $"Scatter Area\n{areaSize.x:0.##} x {areaSize.y:0.##}");
+        int controlId = GUIUtility.GetControlID("ArcadiaPrefabBrush".GetHashCode(), FocusType.Passive);
+        if (currentEvent.type == EventType.Layout)
+            HandleUtility.AddDefaultControl(controlId);
+
+        Ray mouseRay = HandleUtility.GUIPointToWorldRay(currentEvent.mousePosition);
+        bool hasSurface = TryRaycastBrushSurface(mouseRay, out RaycastHit hoverHit);
+
+        if (hasSurface)
+        {
+            Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
+            Handles.color = eraseBrush
+                ? new Color(1f, 0.2f, 0.15f, 0.95f)
+                : new Color(0.2f, 1f, 0.35f, 0.95f);
+            Handles.DrawWireDisc(hoverHit.point, hoverHit.normal, brushRadius);
+            Handles.DrawLine(hoverHit.point, hoverHit.point + hoverHit.normal * 0.4f);
+        }
+
+        if (currentEvent.alt || currentEvent.button != 0)
+            return;
+
+        if (currentEvent.type == EventType.MouseDown && hasSurface)
+        {
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName(eraseBrush ? "Erase Prefab Brush" : "Paint Prefab Brush");
+            brushUndoGroup = Undo.GetCurrentGroup();
+            brushStrokeActive = true;
+            hasLastBrushStampPosition = false;
+            ApplyBrushAt(hoverHit);
+            currentEvent.Use();
+            return;
+        }
+
+        if (currentEvent.type == EventType.MouseDrag && brushStrokeActive && hasSurface)
+        {
+            if (!hasLastBrushStampPosition || Vector3.Distance(lastBrushStampPosition, hoverHit.point) >= brushStrokeSpacing)
+                ApplyBrushAt(hoverHit);
+
+            currentEvent.Use();
+            return;
+        }
+
+        if (currentEvent.type == EventType.MouseUp && brushStrokeActive)
+        {
+            if (brushUndoGroup >= 0)
+                Undo.CollapseUndoOperations(brushUndoGroup);
+
+            brushStrokeActive = false;
+            brushUndoGroup = -1;
+            hasLastBrushStampPosition = false;
+            currentEvent.Use();
+        }
+    }
+
+    private void ApplyBrushAt(RaycastHit centerHit)
+    {
+        lastBrushStampPosition = centerHit.point;
+        hasLastBrushStampPosition = true;
+
+        if (eraseBrush)
+        {
+            EraseBrushPrefabs(centerHit.point);
+            MarkCurrentEditingSceneDirty();
+            return;
+        }
+
+        List<GameObject> validPrefabs = GetValidPrefabs();
+        if (validPrefabs.Count == 0)
+        {
+            Debug.LogWarning("[PrefabScatterTool] Assegna almeno un prefab prima di usare il pennello.");
+            brushStrokeActive = false;
+            return;
+        }
+
+        EnsureParentContainer();
+        prng ??= new System.Random(System.Environment.TickCount);
+
+        List<Vector3> occupiedPositions = GetExistingBrushPositions();
+        for (int i = 0; i < brushDensity; i++)
+        {
+            if (!TryFindBrushPlacement(centerHit.point, occupiedPositions, out RaycastHit placementHit))
+                continue;
+
+            GameObject prefab = validPrefabs[prng.Next(validPrefabs.Count)];
+            PlacePrefab(prefab, placementHit, occupiedPositions);
+        }
+
+        MarkCurrentEditingSceneDirty();
+    }
+
+    private bool TryFindBrushPlacement(Vector3 center, List<Vector3> occupiedPositions, out RaycastHit placementHit)
+    {
+        placementHit = default;
+
+        for (int attempt = 0; attempt < maxPlacementAttempts; attempt++)
+        {
+            float angle = (float)prng.NextDouble() * Mathf.PI * 2f;
+            float distance = Mathf.Sqrt((float)prng.NextDouble()) * brushRadius;
+            Vector3 sample = center + new Vector3(Mathf.Cos(angle) * distance, 0f, Mathf.Sin(angle) * distance);
+            Ray ray = new Ray(sample + Vector3.up * raycastHeight, Vector3.down);
+
+            if (!TryRaycastBrushSurface(ray, out RaycastHit hit, raycastHeight * 2f))
+                continue;
+
+            if (Vector3.Angle(hit.normal, Vector3.up) > maxSlopeAngle)
+                continue;
+
+            if (minDistance > 0f && !IsFarEnough(hit.point, occupiedPositions))
+                continue;
+
+            placementHit = hit;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryRaycastBrushSurface(Ray ray, out RaycastHit bestHit, float distance = Mathf.Infinity)
+    {
+        bestHit = default;
+        RaycastHit[] hits = Physics.RaycastAll(ray, distance, groundMask, QueryTriggerInteraction.Ignore);
+        if (hits == null || hits.Length == 0)
+            return false;
+
+        System.Array.Sort(hits, (left, right) => left.distance.CompareTo(right.distance));
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Transform hitTransform = hits[i].transform;
+            if (hitTransform == null)
+                continue;
+
+            if (parentContainer != null && (hitTransform == parentContainer || hitTransform.IsChildOf(parentContainer)))
+                continue;
+
+            if (surfaceRoot != null && hitTransform != surfaceRoot && !hitTransform.IsChildOf(surfaceRoot))
+                continue;
+
+            bestHit = hits[i];
+            return true;
+        }
+
+        return false;
+    }
+
+    private List<Vector3> GetExistingBrushPositions()
+    {
+        List<Vector3> positions = new();
+        if (parentContainer == null)
+            return positions;
+
+        for (int i = 0; i < parentContainer.childCount; i++)
+        {
+            Transform child = parentContainer.GetChild(i);
+            if (child != null)
+                positions.Add(child.position);
+        }
+
+        return positions;
+    }
+
+    private void EraseBrushPrefabs(Vector3 center)
+    {
+        if (parentContainer == null)
+            return;
+
+        List<GameObject> validPrefabs = GetValidPrefabs();
+        float sqrRadius = brushRadius * brushRadius;
+        for (int i = parentContainer.childCount - 1; i >= 0; i--)
+        {
+            Transform child = parentContainer.GetChild(i);
+            if (child == null)
+                continue;
+
+            Vector3 delta = child.position - center;
+            delta.y = 0f;
+            if (delta.sqrMagnitude > sqrRadius || !IsBrushPrefabInstance(child.gameObject, validPrefabs))
+                continue;
+
+            Undo.DestroyObjectImmediate(child.gameObject);
+        }
+    }
+
+    private static bool IsBrushPrefabInstance(GameObject instance, List<GameObject> validPrefabs)
+    {
+        GameObject source = PrefabUtility.GetCorrespondingObjectFromSource(instance);
+        if (source != null && validPrefabs.Contains(source))
+            return true;
+
+        for (int i = 0; i < validPrefabs.Count; i++)
+        {
+            GameObject prefab = validPrefabs[i];
+            if (prefab != null && instance.name.StartsWith(prefab.name, System.StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
     }
 
     private static Vector3[] GetRectPoints(Vector3 center, Vector3 size)
@@ -236,13 +496,7 @@ public class PrefabScatterToolWindow : EditorWindow
             return;
         }
 
-        if (parentContainer == null)
-        {
-            GameObject container = new GameObject("ScatteredPrefabs");
-            MoveToCurrentEditingScene(container);
-            Undo.RegisterCreatedObjectUndo(container, "Create Scatter Container");
-            parentContainer = container.transform;
-        }
+        EnsureParentContainer();
 
         int effectiveSeed = randomizeSeed ? System.Environment.TickCount ^ System.DateTime.Now.Millisecond : seed;
         prng = new System.Random(effectiveSeed);
@@ -270,6 +524,39 @@ public class PrefabScatterToolWindow : EditorWindow
         Undo.CollapseUndoOperations(undoGroup);
         MarkCurrentEditingSceneDirty();
         Debug.Log($"[PrefabScatterTool] Posizionati {placedCount}/{count} prefab. Seed: {effectiveSeed} | Miss:{lastRaycastMissCount} | Slope:{lastSlopeRejectedCount} | Distance:{lastDistanceRejectedCount} | Fallback:{lastRendererFallbackCount}");
+    }
+
+    private void AddSelectedPrefabs()
+    {
+        int added = 0;
+        GameObject[] selectedObjects = Selection.gameObjects;
+        for (int i = 0; i < selectedObjects.Length; i++)
+        {
+            GameObject candidate = selectedObjects[i];
+            if (candidate == null || !EditorUtility.IsPersistent(candidate))
+                continue;
+
+            if (PrefabUtility.GetPrefabAssetType(candidate) == PrefabAssetType.NotAPrefab || prefabs.Contains(candidate))
+                continue;
+
+            prefabs.Add(candidate);
+            added++;
+        }
+
+        EditorUtility.SetDirty(this);
+        if (added == 0)
+            Debug.LogWarning("[PrefabScatterTool] Seleziona uno o piu prefab nel Project prima di premere il pulsante.");
+    }
+
+    private void EnsureParentContainer()
+    {
+        if (parentContainer != null)
+            return;
+
+        GameObject container = new GameObject("ScatteredPrefabs");
+        MoveToCurrentEditingScene(container);
+        Undo.RegisterCreatedObjectUndo(container, "Create Scatter Container");
+        parentContainer = container.transform;
     }
 
     private bool TryFindPlacement(List<Vector3> placedPositions, out RaycastHit bestHit)
