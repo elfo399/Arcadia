@@ -96,7 +96,7 @@ public class TargetLockSystem : MonoBehaviour
 
     void Update()
     {
-        if (playerController != null && playerController.IsInventoryOpen)
+        if (playerController != null && playerController.IsGameplayInputBlocked)
             return;
 
         if (!isLockedOn)
@@ -200,6 +200,9 @@ public class TargetLockSystem : MonoBehaviour
 
     private void HandleLockOnInput(InputAction.CallbackContext context)
     {
+        if (playerController != null && playerController.IsGameplayInputBlocked)
+            return;
+
         if (isLockedOn) StopLockOn();
         else FindAndLockTarget();
     }
@@ -373,7 +376,7 @@ public class TargetLockSystem : MonoBehaviour
 
     private void UpdateTargetUI()
     {
-        if (!isLockedOn || currentTarget == null || (playerController != null && playerController.IsInventoryOpen))
+        if (!isLockedOn || currentTarget == null || (playerController != null && playerController.IsGameplayInputBlocked))
         {
             HideTargetIcon();
             return;

@@ -58,9 +58,13 @@ public partial class QuestManager : MonoBehaviour
     [Header("Settings")]
     [SerializeField] private bool persistAcrossScenes = true;
     [SerializeField] private bool autoNotifyOnStart = true;
+    [Tooltip("Quest attive immediatamente in una nuova partita.")]
     [SerializeField] private List<QuestDefinition> initialQuestDefinitions = new();
+    [Tooltip("Definizioni note ma non attive. Inserire qui le quest avviabili da dialoghi/servizi per ripristinare correttamente asset e reward dopo il load.")]
+    [SerializeField] private List<QuestDefinition> questDefinitionCatalog = new();
 
     private readonly List<QuestData> quests = new();
+    private readonly HashSet<string> warnedMissingCatalogQuestIds = new(StringComparer.OrdinalIgnoreCase);
 
     public event Action<List<QuestData>> OnQuestListChanged;
 
@@ -110,6 +114,91 @@ public partial class QuestManager : MonoBehaviour
     public List<QuestData> GetInitialQuestsSnapshot()
     {
         return CloneQuestList(BuildInitialQuests());
+    }
+
+    /// <summary>
+    /// Builds definition-backed runtime data for loading a save. Initial quests
+    /// are always included; catalog-only quests are materialized only when the
+    /// save says that they were started, so catalog registration never makes a
+    /// quest active by itself.
+    /// </summary>
+    public List<QuestData> GetQuestLoadDefinitionsSnapshot(IReadOnlyList<QuestData> savedQuests)
+    {
+        List<QuestData> result = BuildInitialQuests();
+        var includedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < result.Count; i++)
+        {
+            QuestData quest = result[i];
+            if (quest == null)
+                continue;
+
+            includedIds.Add(NormalizeQuestId(quest.questId, quest.title, quest.location));
+        }
+
+        if (savedQuests == null)
+            return result;
+
+        for (int i = 0; i < savedQuests.Count; i++)
+        {
+            QuestData savedQuest = savedQuests[i];
+            if (savedQuest == null)
+                continue;
+
+            string questId = NormalizeQuestId(savedQuest.questId, savedQuest.title, savedQuest.location);
+            if (includedIds.Contains(questId))
+                continue;
+
+            if (!TryGetQuestDefinition(questId, out QuestDefinition definition))
+            {
+                if (warnedMissingCatalogQuestIds.Add(questId))
+                {
+                    Debug.LogWarning(
+                        $"[QuestManager] La quest salvata '{questId}' non ha una QuestDefinition nel catalogo. "
+                        + "Lo stato testuale verra caricato, ma i riferimenti asset delle reward non possono essere ripristinati.",
+                        this);
+                }
+
+                continue;
+            }
+
+            QuestData definitionData = definition.CreateRuntimeData();
+            if (definitionData == null)
+                continue;
+
+            definitionData.questId = questId;
+            result.Add(definitionData);
+            includedIds.Add(questId);
+        }
+
+        return result;
+    }
+
+    public bool TryGetQuestDefinition(string questId, out QuestDefinition definition)
+    {
+        definition = null;
+        if (string.IsNullOrWhiteSpace(questId))
+            return false;
+
+        string normalizedId = questId.Trim();
+        return TryFindQuestDefinition(initialQuestDefinitions, normalizedId, out definition)
+               || TryFindQuestDefinition(questDefinitionCatalog, normalizedId, out definition);
+    }
+
+    public bool HasQuest(string questId)
+    {
+        return FindQuestIndex(questId) >= 0;
+    }
+
+    public bool TryGetQuestSnapshot(string questId, out QuestData quest)
+    {
+        quest = null;
+
+        int index = FindQuestIndex(questId);
+        if (index < 0)
+            return false;
+
+        quest = CloneQuestData(quests[index]);
+        return quest != null;
     }
 
     public List<QuestEntryData> GetQuestEntriesSnapshot()
@@ -188,8 +277,61 @@ public partial class QuestManager : MonoBehaviour
         return result;
     }
 
+    public bool TryStartQuest(QuestDefinition definition, bool notify = true)
+    {
+        if (definition == null)
+            return false;
+        if (string.IsNullOrWhiteSpace(definition.questId))
+        {
+            Debug.LogWarning("[QuestManager] StartQuest richiede una QuestDefinition con questId stabile.", definition);
+            return false;
+        }
+        if (!TryGetQuestDefinition(definition.questId, out QuestDefinition registeredDefinition))
+        {
+            Debug.LogWarning(
+                $"[QuestManager] QuestDefinition '{definition.questId.Trim()}' non registrata. "
+                + "Aggiungerla al Quest Definition Catalog prima di usarla in StartQuest.",
+                definition);
+            return false;
+        }
+        if (!EnsureLoadedQuestStateBeforeMutation())
+            return false;
+
+        QuestData runtimeQuest = registeredDefinition.CreateRuntimeData();
+        if (runtimeQuest == null)
+            return false;
+
+        string normalizedId = NormalizeQuestId(runtimeQuest.questId, runtimeQuest.title, runtimeQuest.location);
+        if (FindQuestIndex(normalizedId) >= 0)
+            return false;
+
+        QuestData quest = CloneQuestData(runtimeQuest);
+        quest.questId = normalizedId;
+        quests.Add(quest);
+
+        RebuildQuestObjectiveEventIndex();
+        if (notify)
+            NotifyChanged();
+
+        return true;
+    }
+
+    public bool TryStartQuest(string questId, bool notify = true)
+    {
+        if (!TryGetQuestDefinition(questId, out QuestDefinition definition))
+        {
+            Debug.LogWarning($"[QuestManager] QuestDefinition non trovata nel catalogo: '{questId}'.", this);
+            return false;
+        }
+
+        return TryStartQuest(definition, notify);
+    }
+
     public void AddOrUpdateQuest(string questId, string title, string location, bool completed = false, bool notify = true)
     {
+        if (!EnsureLoadedQuestStateBeforeMutation())
+            return;
+
         string normalizedId = NormalizeQuestId(questId, title, location);
         int index = FindQuestIndex(normalizedId);
 
@@ -219,6 +361,9 @@ public partial class QuestManager : MonoBehaviour
 
     public bool SetQuestCompleted(string questId, bool completed = true, bool notify = true)
     {
+        if (!EnsureLoadedQuestStateBeforeMutation())
+            return false;
+
         int index = FindQuestIndex(questId);
         if (index < 0) return false;
 
@@ -232,6 +377,9 @@ public partial class QuestManager : MonoBehaviour
 
     public bool SetQuestObjectiveCompleted(string questId, int objectiveIndex, bool completed = true, bool notify = true)
     {
+        if (!EnsureLoadedQuestStateBeforeMutation())
+            return false;
+
         int questIndex = FindQuestIndex(questId);
         if (questIndex < 0) return false;
 
@@ -261,6 +409,9 @@ public partial class QuestManager : MonoBehaviour
 
     public bool SetQuestObjectiveCompleted(string questId, string objectiveTitle, bool completed = true, bool notify = true)
     {
+        if (!EnsureLoadedQuestStateBeforeMutation())
+            return false;
+
         int questIndex = FindQuestIndex(questId);
         if (questIndex < 0 || string.IsNullOrWhiteSpace(objectiveTitle)) return false;
 
@@ -380,6 +531,99 @@ public partial class QuestManager : MonoBehaviour
         }
         return -1;
     }
+
+    private bool EnsureLoadedQuestStateBeforeMutation()
+    {
+        PlayerStats stats = PlayerStats.instance;
+        if (stats == null)
+            return true;
+
+        if (stats.EnsureLoadedQuestStateApplied())
+            return true;
+
+        Debug.LogWarning(
+            "[QuestManager] Mutazione quest rimandata: lo stato del save non e ancora applicabile.",
+            this);
+        return false;
+    }
+
+    private static bool TryFindQuestDefinition(
+        IReadOnlyList<QuestDefinition> definitions,
+        string questId,
+        out QuestDefinition definition)
+    {
+        definition = null;
+        if (definitions == null || string.IsNullOrWhiteSpace(questId))
+            return false;
+
+        for (int i = 0; i < definitions.Count; i++)
+        {
+            QuestDefinition candidate = definitions[i];
+            if (candidate == null)
+                continue;
+
+            // Catalog lookup intentionally requires a real persistent ID. The
+            // title/location fallback is retained only for legacy active quest
+            // data and must never make a new dialogue quest save-dependent on
+            // mutable display text.
+            if (string.IsNullOrWhiteSpace(candidate.questId))
+                continue;
+
+            string candidateId = candidate.questId.Trim();
+            if (!string.Equals(candidateId, questId, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            definition = candidate;
+            return true;
+        }
+
+        return false;
+    }
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        var knownIds = new Dictionary<string, QuestDefinition>(StringComparer.OrdinalIgnoreCase);
+        ValidateQuestDefinitionList(initialQuestDefinitions, "Initial Quest Definitions", knownIds);
+        ValidateQuestDefinitionList(questDefinitionCatalog, "Quest Definition Catalog", knownIds);
+    }
+
+    private void ValidateQuestDefinitionList(
+        IReadOnlyList<QuestDefinition> definitions,
+        string listName,
+        Dictionary<string, QuestDefinition> knownIds)
+    {
+        if (definitions == null)
+            return;
+
+        for (int i = 0; i < definitions.Count; i++)
+        {
+            QuestDefinition definition = definitions[i];
+            if (definition == null)
+                continue;
+
+            if (string.IsNullOrWhiteSpace(definition.questId))
+            {
+                Debug.LogWarning($"[QuestManager] {listName}[{i}] non ha un questId stabile.", this);
+                continue;
+            }
+
+            string questId = definition.questId.Trim();
+            if (!knownIds.TryGetValue(questId, out QuestDefinition existing))
+            {
+                knownIds.Add(questId, definition);
+                continue;
+            }
+
+            if (existing != definition)
+            {
+                Debug.LogWarning(
+                    $"[QuestManager] questId duplicato '{questId}' tra '{existing.name}' e '{definition.name}'.",
+                    this);
+            }
+        }
+    }
+#endif
 
     private void MergeDuplicateQuestState(int targetIndex, QuestData duplicate)
     {

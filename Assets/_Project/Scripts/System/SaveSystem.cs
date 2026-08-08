@@ -3,7 +3,7 @@ using System.IO;
 
 public static class SaveSystem
 {
-    public const int CurrentSaveVersion = 2;
+    public const int CurrentSaveVersion = 3;
     public const string SinglePlayerId = "player";
     public const string DefaultPlayerName = "Player";
 
@@ -170,6 +170,7 @@ public static class SaveSystem
             MigrateLegacyPlayerIdentityFields(data, json);
             MigrateLegacyCurrencyFields(data, json);
             MigrateSaveVersion(data);
+            EnsureNarrativeCollections(data);
             Debug.Log($"Dati caricati con successo da: {path}");
             return data;
         }
@@ -202,6 +203,7 @@ public static class SaveSystem
         data.playerName = ResolvePlayerName(data.playerName);
         data.selectedClassId = ResolveClassId(data.selectedClassId);
         data.usesUnifiedCoins = true;
+        EnsureNarrativeCollections(data);
     }
 
     private static string ResolvePlayerName(string playerName)
@@ -349,11 +351,27 @@ public static class SaveSystem
                     data.saveVersion = 2;
                     break;
 
+                case 2:
+                    EnsureNarrativeCollections(data);
+                    data.saveVersion = 3;
+                    break;
+
                 default:
                     Debug.LogWarning($"Migrazione non disponibile dalla versione {data.saveVersion}.");
                     return;
             }
         }
+    }
+
+    private static void EnsureNarrativeCollections(GameData data)
+    {
+        if (data == null)
+            return;
+
+        data.storyFlags ??= System.Array.Empty<string>();
+        data.dialogueHistory ??= new SavedDialogueHistoryData();
+        data.dialogueHistory.readNodeKeys ??= System.Array.Empty<string>();
+        data.dialogueHistory.selectedChoiceKeys ??= System.Array.Empty<string>();
     }
 
     private static int ReadJsonInt(string json, string fieldName)

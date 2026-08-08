@@ -26,7 +26,14 @@ public class PlayerAnimationEvents : MonoBehaviour
     // --- EVENTI PER MANO DESTRA ---
     public void EnableRightHand()
     {
-        if (rightHandDamage != null) rightHandDamage.EnableDamage();
+        if (rightHandDamage == null) return;
+        if (combat != null && combat.IsGameplayInputBlocked)
+        {
+            rightHandDamage.DisableDamage();
+            return;
+        }
+
+        rightHandDamage.EnableDamage();
     }
 
     public void DisableRightHand()
@@ -37,11 +44,24 @@ public class PlayerAnimationEvents : MonoBehaviour
     // --- EVENTI PER MANO SINISTRA ---
     public void EnableLeftHand()
     {
-        if (leftHandDamage != null) leftHandDamage.EnableDamage();
+        if (leftHandDamage == null) return;
+        if (combat != null && combat.IsGameplayInputBlocked)
+        {
+            leftHandDamage.DisableDamage();
+            return;
+        }
+
+        leftHandDamage.EnableDamage();
     }
 
     public void DisableLeftHand()
     {
+        if (leftHandDamage != null) leftHandDamage.DisableDamage();
+    }
+
+    public void DisableAllWeaponDamage()
+    {
+        if (rightHandDamage != null) rightHandDamage.DisableDamage();
         if (leftHandDamage != null) leftHandDamage.DisableDamage();
     }
 

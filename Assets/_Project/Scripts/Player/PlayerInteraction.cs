@@ -55,6 +55,11 @@ public class PlayerInteraction : MonoBehaviour
 
     void TryInteract()
     {
+        if (playerController == null)
+            playerController = GetComponent<PlayerController>();
+        if (playerController != null && playerController.IsGameplayInputBlocked)
+            return;
+
         // Cerca oggetti interagibili davanti al player
         Collider[] colliders = Physics.OverlapSphere(transform.position + transform.forward * 0.5f, interactRange, interactLayer);
 

@@ -8,6 +8,12 @@ using UnityEngine.Serialization;
 /// </summary>
 public class PlayerInventory : MonoBehaviour
 {
+    // Weapons and armor are represented by one InventoryItem per copy. This
+    // generous per-operation ceiling prevents malformed dialogue data from
+    // allocating millions of managed objects in a single frame. Stackable
+    // quantities are saturated separately at int.MaxValue.
+    public const int MaxNonStackedItemsPerAddOperation = 4096;
+
     [SerializeField, HideInInspector, FormerlySerializedAs("rightHandWeapon")]
     private WeaponItem legacyRightHandWeapon;
     [SerializeField, HideInInspector, FormerlySerializedAs("leftHandWeapon")]
@@ -65,6 +71,7 @@ public class PlayerInventory : MonoBehaviour
     private readonly List<InventoryItem> items = new();
     private readonly List<InventoryItem> magicInventorySlots = new();
     public IReadOnlyList<InventoryItem> Items => items;
+    public bool IsInitialized { get; private set; }
     private ItemDatabase cachedLookupDatabase;
     private (Dictionary<string, WeaponItem> weapons, Dictionary<string, MagicItemData> magics, Dictionary<string, ArmorItemData> armors, Dictionary<string, UsableItemData> usables, Dictionary<string, ItemData> items) cachedAssetLookups;
 
@@ -110,6 +117,7 @@ public class PlayerInventory : MonoBehaviour
         currentMagicIndex = SelectInitialIndex(magicLoadout);
         currentUsableIndex = SelectInitialIndex(usableLoadout);
         SyncEquippedReferences();
+        IsInitialized = true;
     }
 
     private void EnsureLoadoutSize()
@@ -312,45 +320,169 @@ public class PlayerInventory : MonoBehaviour
 
     public int GetTotalItemAmount(ItemData itemData)
     {
-        if (itemData == null) return 0;
-        int total = 0;
-        for (int i = 0; i < items.Count; i++)
-        {
-            var it = items[i];
-            if (it == null || it.itemData != itemData) continue;
-            total += Mathf.Max(0, it.amount);
-        }
-        return total;
+        return GetTotalItemAmount((ScriptableObject)itemData);
     }
 
-    public bool TryConsumeItem(ItemData itemData, int amount, out int remainingTotal)
+    public int GetTotalItemAmount(ScriptableObject itemAsset)
     {
-        remainingTotal = 0;
-        if (itemData == null) return false;
-        int toConsume = Mathf.Max(1, amount);
+        if (itemAsset == null) return 0;
 
-        for (int i = items.Count - 1; i >= 0 && toConsume > 0; i--)
+        long total = 0;
+        for (int i = 0; i < items.Count; i++)
         {
-            var it = items[i];
-            if (it == null || it.itemData != itemData) continue;
+            InventoryItem item = items[i];
+            if (!InventoryItemMatchesAsset(item, itemAsset)) continue;
 
-            int stack = Mathf.Max(0, it.amount);
-            if (stack <= 0)
+            total += Mathf.Max(0, item.amount);
+            if (total >= int.MaxValue)
+                return int.MaxValue;
+        }
+
+        return (int)total;
+    }
+
+    public bool HasItem(ScriptableObject itemAsset, int amount = 1)
+    {
+        return itemAsset != null && amount > 0 && GetTotalItemAmount(itemAsset) >= amount;
+    }
+
+    /// <summary>
+    /// Performs the allocation/overflow checks used by TryAddItem without
+    /// mutating the inventory. Dialogue batches can use this to reject invalid
+    /// quantities before running earlier actions.
+    /// </summary>
+    public bool CanAddItem(ScriptableObject itemAsset, int amount = 1)
+    {
+        if (itemAsset == null || amount <= 0)
+            return false;
+
+        if (itemAsset is WeaponItem || itemAsset is ArmorItemData)
+        {
+            return amount <= MaxNonStackedItemsPerAddOperation
+                   && items.Count <= int.MaxValue - amount;
+        }
+
+        InventoryItem existing = itemAsset switch
+        {
+            MagicItemData magic => FindStackableMagicItem(magic),
+            UsableItemData usable => FindStackableUsableItem(usable),
+            ItemData item => FindStackableGenericItem(item),
+            _ => null
+        };
+
+        // A missing stack can represent any positive int in one entry. An
+        // existing stack has room until it reaches int.MaxValue.
+        return itemAsset is MagicItemData or UsableItemData or ItemData
+               && (existing != null
+                   ? Mathf.Max(0, existing.amount) < int.MaxValue
+                   : items.Count < int.MaxValue);
+    }
+
+    public bool TryAddItem(ScriptableObject itemAsset, int amount = 1, bool save = true)
+    {
+        if (!CanAddItem(itemAsset, amount))
+        {
+            if ((itemAsset is WeaponItem || itemAsset is ArmorItemData)
+                && amount > MaxNonStackedItemsPerAddOperation)
             {
+                Debug.LogWarning(
+                    $"[PlayerInventory] Aggiunta rifiutata: {amount} copie non stackabili " +
+                    $"superano il limite per operazione ({MaxNonStackedItemsPerAddOperation}).",
+                    this);
+            }
+            return false;
+        }
+
+        bool changed;
+        switch (itemAsset)
+        {
+            case WeaponItem weapon:
+                changed = TryAddWeaponLoot(weapon, amount);
+                break;
+            case MagicItemData magic:
+                changed = TryAddMagicLoot(magic, amount);
+                break;
+            case ArmorItemData armor:
+                changed = TryAddArmorLoot(armor, amount);
+                break;
+            case UsableItemData usable:
+                changed = TryAddUsableLoot(usable, amount);
+                break;
+            case ItemData item:
+                changed = TryAddGenericItemLoot(item, amount);
+                break;
+            default:
+                return false;
+        }
+
+        if (changed && save)
+            RequestInventorySave();
+        return changed;
+    }
+
+    public bool TryRemoveItem(
+        ScriptableObject itemAsset,
+        int amount,
+        out int remainingTotal,
+        bool save = true)
+    {
+        remainingTotal = GetTotalItemAmount(itemAsset);
+        if (itemAsset == null || amount <= 0 || remainingTotal < amount)
+            return false;
+
+        int toRemove = amount;
+        for (int i = items.Count - 1; i >= 0 && toRemove > 0; i--)
+        {
+            InventoryItem item = items[i];
+            if (!InventoryItemMatchesAsset(item, itemAsset))
+                continue;
+
+            int stackAmount = Mathf.Max(0, item.amount);
+            if (stackAmount <= 0)
+            {
+                ClearRemovedItemFromLoadouts(item);
                 items.RemoveAt(i);
                 continue;
             }
 
-            int used = Mathf.Min(stack, toConsume);
-            it.amount = stack - used;
-            toConsume -= used;
+            int removed = Mathf.Min(stackAmount, toRemove);
+            item.amount = stackAmount - removed;
+            toRemove -= removed;
 
-            if (it.amount <= 0)
+            if (item.amount <= 0)
+            {
+                ClearRemovedItemFromLoadouts(item);
                 items.RemoveAt(i);
+            }
         }
 
-        remainingTotal = GetTotalItemAmount(itemData);
-        return toConsume == 0;
+        // The availability pre-check makes this operation atomic. Reaching a
+        // non-zero remainder would indicate externally corrupted inventory data.
+        if (toRemove > 0)
+        {
+            Debug.LogError("[PlayerInventory] Rimozione atomica fallita dopo un pre-check valido.", this);
+            remainingTotal = GetTotalItemAmount(itemAsset);
+            return false;
+        }
+
+        remainingTotal = GetTotalItemAmount(itemAsset);
+        if (itemAsset is not ItemData)
+        {
+            SyncMagicInventorySlots();
+            SyncEquippedReferences();
+        }
+        if (save)
+            RequestInventorySave();
+        return true;
+    }
+
+    public bool TryConsumeItem(ItemData itemData, int amount, out int remainingTotal)
+    {
+        return TryRemoveItem(
+            (ScriptableObject)itemData,
+            Mathf.Max(1, amount),
+            out remainingTotal,
+            save: false);
     }
 
     public int GetAmmoCountForWeapon(WeaponItem weapon)
@@ -474,75 +606,138 @@ public class PlayerInventory : MonoBehaviour
     public void AddItem(InventoryItem item) { if (item != null) items.Add(item); }
     public void AddWeaponLoot(WeaponItem weapon, int amount = 1)
     {
+        TryAddWeaponLoot(weapon, amount);
+    }
+
+    private bool TryAddWeaponLoot(WeaponItem weapon, int amount)
+    {
         if (weapon == null || amount <= 0)
-            return;
+            return false;
+        if (amount > MaxNonStackedItemsPerAddOperation || items.Count > int.MaxValue - amount)
+        {
+            Debug.LogWarning(
+                $"[PlayerInventory] Aggiunta arma rifiutata: quantita non stackabile non sicura ({amount}).",
+                this);
+            return false;
+        }
 
         for (int i = 0; i < amount; i++)
             items.Add(new InventoryItem(weapon, 1));
 
         RaiseCollectItemEvent(weapon.name, "weapon", amount);
+        return true;
     }
 
     public void AddArmorLoot(ArmorItemData armor, int amount = 1)
     {
+        TryAddArmorLoot(armor, amount);
+    }
+
+    private bool TryAddArmorLoot(ArmorItemData armor, int amount)
+    {
         if (armor == null || amount <= 0)
-            return;
+            return false;
+        if (amount > MaxNonStackedItemsPerAddOperation || items.Count > int.MaxValue - amount)
+        {
+            Debug.LogWarning(
+                $"[PlayerInventory] Aggiunta armatura rifiutata: quantita non stackabile non sicura ({amount}).",
+                this);
+            return false;
+        }
 
         for (int i = 0; i < amount; i++)
             items.Add(new InventoryItem(armor, 1));
 
         RaiseCollectItemEvent(armor.name, "armor", amount);
+        return true;
     }
 
     public void AddMagicLoot(MagicItemData magic, int amount = 1)
     {
+        TryAddMagicLoot(magic, amount);
+    }
+
+    private bool TryAddMagicLoot(MagicItemData magic, int amount)
+    {
         if (magic == null || amount <= 0)
-            return;
+            return false;
 
         InventoryItem existing = FindStackableMagicItem(magic);
         if (existing != null)
         {
-            existing.amount += amount;
-            RaiseCollectItemEvent(magic.name, "magic", amount);
-            return;
+            int added = SaturatingAddToStack(existing, amount);
+            if (added <= 0)
+                return false;
+            RaiseCollectItemEvent(magic.name, "magic", added);
+            return true;
         }
 
         items.Add(new InventoryItem(magic, amount));
         RaiseCollectItemEvent(magic.name, "magic", amount);
+        return true;
     }
 
     public void AddUsableLoot(UsableItemData usable, int amount = 1)
     {
+        TryAddUsableLoot(usable, amount);
+    }
+
+    private bool TryAddUsableLoot(UsableItemData usable, int amount)
+    {
         if (usable == null || amount <= 0)
-            return;
+            return false;
 
         InventoryItem existing = FindStackableUsableItem(usable);
         if (existing != null)
         {
-            existing.amount += amount;
-            RaiseCollectItemEvent(usable.name, "usable", amount);
-            return;
+            int added = SaturatingAddToStack(existing, amount);
+            if (added <= 0)
+                return false;
+            RaiseCollectItemEvent(usable.name, "usable", added);
+            return true;
         }
 
         items.Add(new InventoryItem(usable, amount));
         RaiseCollectItemEvent(usable.name, "usable", amount);
+        return true;
     }
 
     public void AddGenericItemLoot(ItemData item, int amount = 1)
     {
+        TryAddGenericItemLoot(item, amount);
+    }
+
+    private bool TryAddGenericItemLoot(ItemData item, int amount)
+    {
         if (item == null || amount <= 0)
-            return;
+            return false;
 
         InventoryItem existing = FindStackableGenericItem(item);
         if (existing != null)
         {
-            existing.amount += amount;
-            RaiseCollectItemEvent(item.name, "item", amount);
-            return;
+            int added = SaturatingAddToStack(existing, amount);
+            if (added <= 0)
+                return false;
+            RaiseCollectItemEvent(item.name, "item", added);
+            return true;
         }
 
         items.Add(new InventoryItem(item, amount));
         RaiseCollectItemEvent(item.name, "item", amount);
+        return true;
+    }
+
+    private static int SaturatingAddToStack(InventoryItem stack, int amount)
+    {
+        if (stack == null || amount <= 0)
+            return 0;
+
+        int current = Mathf.Max(0, stack.amount);
+        int updated = amount >= int.MaxValue - current
+            ? int.MaxValue
+            : current + amount;
+        stack.amount = updated;
+        return updated - current;
     }
 
     private static void RaiseCollectItemEvent(string targetId, string targetTag, int amount)
@@ -578,6 +773,80 @@ public class PlayerInventory : MonoBehaviour
 
         SyncMagicInventorySlots(minSlotCount);
         ApplyMagicInventorySlotOrderToItems();
+    }
+
+    private static bool InventoryItemMatchesAsset(InventoryItem item, ScriptableObject itemAsset)
+    {
+        if (item == null || itemAsset == null)
+            return false;
+
+        return itemAsset switch
+        {
+            WeaponItem weapon => item.weaponData == weapon,
+            MagicItemData magic => item.magicData == magic,
+            ArmorItemData armor => item.armorData == armor,
+            UsableItemData usable => item.usableData == usable,
+            ItemData genericItem => item.itemData == genericItem,
+            _ => false
+        };
+    }
+
+    private void ClearRemovedItemFromLoadouts(InventoryItem item)
+    {
+        if (item == null)
+            return;
+
+        string instanceId = item.instanceId;
+        bool hasInstanceId = !string.IsNullOrWhiteSpace(instanceId);
+
+        if (item.weaponData != null)
+        {
+            ClearLoadoutEntry(rightLoadout, rightInstanceIds, item.weaponData, instanceId, hasInstanceId);
+            ClearLoadoutEntry(leftLoadout, leftInstanceIds, item.weaponData, instanceId, hasInstanceId);
+        }
+        else if (item.magicData != null)
+        {
+            ClearLoadoutEntry(magicLoadout, magicInstanceIds, item.magicData, instanceId, hasInstanceId);
+        }
+        else if (item.armorData != null)
+        {
+            ClearLoadoutEntry(armorLoadout, armorInstanceIds, item.armorData, instanceId, hasInstanceId);
+        }
+        else if (item.usableData != null)
+        {
+            ClearLoadoutEntry(usableLoadout, usableInstanceIds, item.usableData, instanceId, hasInstanceId);
+        }
+    }
+
+    private static void ClearLoadoutEntry<T>(
+        T[] loadout,
+        string[] instanceIds,
+        T asset,
+        string instanceId,
+        bool hasInstanceId)
+        where T : UnityEngine.Object
+    {
+        if (loadout == null || instanceIds == null)
+            return;
+
+        int count = Mathf.Min(loadout.Length, instanceIds.Length);
+        for (int i = 0; i < count; i++)
+        {
+            bool matches = hasInstanceId
+                ? string.Equals(instanceIds[i], instanceId, System.StringComparison.Ordinal)
+                : loadout[i] == asset && string.IsNullOrWhiteSpace(instanceIds[i]);
+            if (!matches) continue;
+
+            loadout[i] = null;
+            instanceIds[i] = null;
+        }
+    }
+
+    private void RequestInventorySave()
+    {
+        PlayerStats stats = PlayerStats.instance != null ? PlayerStats.instance : GetComponent<PlayerStats>();
+        if (stats != null)
+            stats.SaveStats();
     }
 
     private InventoryItem FindStackableGenericItem(ItemData item)

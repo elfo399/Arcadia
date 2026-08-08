@@ -36,6 +36,14 @@ public class QuestDefinition : ScriptableObject
         };
     }
 
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (string.IsNullOrWhiteSpace(questId))
+            Debug.LogWarning($"[QuestDefinition] Quest ID vuoto nell'asset '{name}'.", this);
+    }
+#endif
+
     private static List<QuestManager.QuestObjectiveData> CloneObjectives(List<QuestManager.QuestObjectiveData> source)
     {
         var result = new List<QuestManager.QuestObjectiveData>();

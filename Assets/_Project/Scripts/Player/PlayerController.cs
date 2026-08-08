@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -65,12 +66,14 @@ public class PlayerController : MonoBehaviour
     private PlayerCombat combat;
     private PlayerInventory playerInventory;
     private PlayerStats playerStats;
+    private TargetLockSystem targetLockSystem;
     private Transform cam;
     private InputAction cycleRightEquipAction;
     private InputAction cycleLeftEquipAction;
     private InputAction cycleUsableAction;
     private InputAction cycleMagicAction;
     private Coroutine sceneEquipmentRefreshRoutine;
+    private readonly HashSet<object> gameplayInputLockOwners = new HashSet<object>();
 
     private Vector3 velocity;
     private float lastDodgeTime = -999f;
@@ -83,6 +86,8 @@ public class PlayerController : MonoBehaviour
     private const float InventoryInputEnableDelay = 0.25f;
 
     public bool IsGrounded => controller != null && controller.isGrounded;
+    public bool HasGameplayInputLock => gameplayInputLockOwners.Count > 0;
+    public bool IsGameplayInputBlocked => IsInventoryOpen || HasGameplayInputLock;
 
     public bool IsRolling
     {
@@ -110,6 +115,7 @@ public class PlayerController : MonoBehaviour
         playerStats = GetComponent<PlayerStats>();
         playerInventory = GetComponent<PlayerInventory>();
         combat = GetComponent<PlayerCombat>();
+        targetLockSystem = GetComponentInChildren<TargetLockSystem>(true);
 
         ResolveMenuManager();
 
@@ -124,7 +130,7 @@ public class PlayerController : MonoBehaviour
         if (Controls != null) Controls.Player.Enable();
         inventoryInputReadyTime = Time.unscaledTime + InventoryInputEnableDelay;
         ResolveMenuManager();
-        canMove = menuManager == null || !menuManager.IsMenuOpen;
+        canMove = !IsGameplayInputBlocked;
         RequestSceneEquipmentUIRefresh();
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
@@ -155,7 +161,8 @@ public class PlayerController : MonoBehaviour
         if (Controls == null || controller == null) return;
         if (cam == null) ResolveGameplayCamera();
 
-        if (IsInventoryOpen)
+        bool gameplayInputBlocked = IsGameplayInputBlocked;
+        if (gameplayInputBlocked)
         {
             canMove = false;
         }
@@ -171,7 +178,7 @@ public class PlayerController : MonoBehaviour
             isFalling = false;
         }
 
-        if (!IsInventoryOpen)
+        if (!gameplayInputBlocked)
         {
             bool isAttacking = combat != null && combat.isAttacking;
             bool isRolling = IsRolling;
@@ -203,13 +210,9 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            // Se l'inventario è aperto, azzera l'input di movimento
-            moveAmount = 0;
-            isSprinting = false;
-            animator.SetFloat("Speed", 0f);
-            animator.SetBool("IsSprinting", false);
+            StopMovementImmediate();
 
-            if (menuManager != null)
+            if (IsInventoryOpen && !HasGameplayInputLock && menuManager != null)
                 menuManager.HandleMenuInput(Controls);
         }
 
@@ -226,11 +229,12 @@ public class PlayerController : MonoBehaviour
         playerInventory = GetComponent<PlayerInventory>();
         playerStats = GetComponent<PlayerStats>();
         combat = GetComponent<PlayerCombat>();
+        targetLockSystem = GetComponentInChildren<TargetLockSystem>(true);
         ResolveMenuManager();
         RequestSceneEquipmentUIRefresh();
 
         inventoryInputReadyTime = Time.unscaledTime + InventoryInputEnableDelay;
-        canMove = menuManager == null || !menuManager.IsMenuOpen;
+        canMove = !IsGameplayInputBlocked;
     }
 
     private void RequestSceneEquipmentUIRefresh()
@@ -284,6 +288,7 @@ public class PlayerController : MonoBehaviour
 
     private void HandleQuickSlotCycleInput()
     {
+        if (IsGameplayInputBlocked) return;
         if (playerInventory == null) return;
 
         bool changed = false;
@@ -392,6 +397,13 @@ public class PlayerController : MonoBehaviour
 
     void HandleSprintAndDodgeInput(Vector2 moveInput)
     {
+        if (IsGameplayInputBlocked)
+        {
+            isSprinting = false;
+            actionButtonHeld = false;
+            return;
+        }
+
         bool pressed = Controls.Player.SprintOrDodge.WasPerformedThisFrame();
         bool released = Controls.Player.SprintOrDodge.WasReleasedThisFrame();
         bool isAttacking = combat != null && combat.isAttacking;
@@ -430,6 +442,8 @@ public class PlayerController : MonoBehaviour
 
     void HandleJump()
     {
+        if (IsGameplayInputBlocked) return;
+
         if (Controls.Player.Jump.WasPerformedThisFrame() && !IsRolling && combat != null && !combat.isAttacking)
         {
             if ((Time.time - lastGroundedTime) <= coyoteTime)
@@ -461,6 +475,7 @@ public class PlayerController : MonoBehaviour
 
     private void TryDodge(Vector2 moveInput)
     {
+        if (IsGameplayInputBlocked) return;
         if (isDodging) return;
         if (Time.time < lastDodgeTime + dodgeCooldown) return;
         
@@ -510,6 +525,9 @@ public class PlayerController : MonoBehaviour
         float iframeEnd = Mathf.Clamp(rollIFrameEndNormalized, iframeStart, 1f);
         while (elapsed < dodgeDuration)
         {
+            if (IsGameplayInputBlocked)
+                break;
+
             float t = elapsed / dodgeDuration;
             float curveValue = dodgeSpeedCurve.Evaluate(t);
             float currentSpeed = (dodgeDistance / dodgeDuration) * curveValue;
@@ -529,7 +547,7 @@ public class PlayerController : MonoBehaviour
 
         if (playerStats != null) playerStats.SetInvulnerable(false);
         isDodging = false;
-        canMove = true;
+        canMove = !IsGameplayInputBlocked;
         if (combat != null) combat.canAttack = true;
     }
 
@@ -537,6 +555,7 @@ public class PlayerController : MonoBehaviour
     {
         moveAmount = 0f;
         isSprinting = false;
+        actionButtonHeld = false;
         if (animator != null)
         {
             animator.SetFloat("Speed", 0f);
@@ -548,12 +567,17 @@ public class PlayerController : MonoBehaviour
     {
         if (Time.unscaledTime < inventoryInputReadyTime)
             return;
+        if (HasGameplayInputLock)
+            return;
 
         ToggleInventory();
     }
 
     private void ToggleInventory()
     {
+        if (HasGameplayInputLock)
+            return;
+
         ResolveMenuManager();
         if (menuManager == null)
         {
@@ -574,6 +598,40 @@ public class PlayerController : MonoBehaviour
     {
         Room currentRoom = Room.CurrentPlayerRoom;
         return currentRoom == null || currentRoom.CanOpenMenuHere();
+    }
+
+    public bool AcquireGameplayInputLock(object owner)
+    {
+        if (ReferenceEquals(owner, null))
+        {
+            Debug.LogWarning("[PlayerController] Impossibile acquisire il gameplay input lock senza un owner.");
+            return false;
+        }
+
+        bool added = gameplayInputLockOwners.Add(owner);
+        canMove = false;
+        StopMovementImmediate();
+        if (combat != null)
+            combat.CancelGameplayActionsForModal();
+
+        if (targetLockSystem == null)
+            targetLockSystem = GetComponentInChildren<TargetLockSystem>(true);
+        if (targetLockSystem != null && targetLockSystem.isLockedOn)
+            targetLockSystem.StopLockOn();
+
+        return added;
+    }
+
+    public bool ReleaseGameplayInputLock(object owner)
+    {
+        if (ReferenceEquals(owner, null))
+            return false;
+
+        bool removed = gameplayInputLockOwners.Remove(owner);
+        if (removed && !HasGameplayInputLock && !IsInventoryOpen && !isDodging)
+            canMove = true;
+
+        return removed;
     }
 
     private void ResolveMenuManager()

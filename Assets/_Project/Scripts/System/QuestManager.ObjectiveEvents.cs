@@ -105,7 +105,8 @@ public partial class QuestManager
             objective.requiredAmount = Mathf.Max(1, objective.requiredAmount);
             int previousAmount = objective.currentAmount;
             bool wasCompleted = objective.completed;
-            objective.currentAmount = Mathf.Min(objective.requiredAmount, Mathf.Max(0, objective.currentAmount) + questEvent.Amount);
+            long increasedAmount = (long)Mathf.Max(0, objective.currentAmount) + questEvent.Amount;
+            objective.currentAmount = (int)Math.Min(objective.requiredAmount, increasedAmount);
             objective.completed = objective.currentAmount >= objective.requiredAmount;
 
             if (previousAmount == objective.currentAmount && wasCompleted == objective.completed)

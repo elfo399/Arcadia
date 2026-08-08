@@ -1,0 +1,137 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5884b0f7a7c1081468bf7cce940b2367, type: 3}
+  m_Name: Dialogue_Blacksmith_Lore
+  m_EditorClassIdentifier: 
+  conversationId: blacksmith_lore
+  startNodeId: service_menu
+  nodes:
+  - nodeId: service_menu
+    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
+    text: Di cosa vuoi parlare?
+    portraitOverride: {fileID: 0}
+    animationTrigger: 
+    voiceClip: {fileID: 0}
+    conditions:
+      logic: 0
+      negate: 0
+      conditions: []
+      groups: []
+    actionsOnEnter: []
+    actionsOnExit: []
+    nextNodeId: 
+    choices:
+    - choiceId: tower_lore
+      text: Parlami della torre.
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions: []
+      nextNodeId: lore_tower
+      returnNodeId: service_menu
+      playerSpeaksChoice: 1
+      unavailableDisplay: 0
+      showReadIndicator: 1
+    - choiceId: ancient_runes
+      text: '[Intelligence 20] Parlami delle rune antiche.'
+      conditions:
+        logic: 0
+        negate: 0
+        conditions:
+        - type: 0
+          negate: 0
+          comparison: 3
+          value: 20
+          playerAttribute: 5
+          id: 
+          questState: 1
+          expected: 1
+          item:
+            itemType: 0
+            item: {fileID: 0}
+            weapon: {fileID: 0}
+            armor: {fileID: 0}
+            magic: {fileID: 0}
+            usable: {fileID: 0}
+          conversationId: 
+          nodeId: 
+          choiceId: 
+        groups: []
+      actions: []
+      nextNodeId: ancient_runes
+      returnNodeId: service_menu
+      playerSpeaksChoice: 1
+      unavailableDisplay: 0
+      showReadIndicator: 1
+    - choiceId: exit
+      text: Esci.
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions: []
+      nextNodeId: 
+      returnNodeId: 
+      playerSpeaksChoice: 0
+      unavailableDisplay: 0
+      showReadIndicator: 1
+  - nodeId: lore_tower
+    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
+    text: La vecchia torre veglia sulla valle da prima che io nascessi.
+    portraitOverride: {fileID: 0}
+    animationTrigger: 
+    voiceClip: {fileID: 0}
+    conditions:
+      logic: 0
+      negate: 0
+      conditions: []
+      groups: []
+    actionsOnEnter: []
+    actionsOnExit: []
+    nextNodeId: lore_tower_end
+    choices: []
+  - nodeId: lore_tower_end
+    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
+    text: Le sue pietre ricordano cose che gli uomini farebbero bene a dimenticare.
+    portraitOverride: {fileID: 0}
+    animationTrigger: 
+    voiceClip: {fileID: 0}
+    conditions:
+      logic: 0
+      negate: 0
+      conditions: []
+      groups: []
+    actionsOnEnter: []
+    actionsOnExit: []
+    nextNodeId: 
+    choices: []
+  - nodeId: ancient_runes
+    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
+    text: 'Quelle rune non decorano il metallo: gli impongono di ricordare la magia.'
+    portraitOverride: {fileID: 0}
+    animationTrigger: 
+    voiceClip: {fileID: 0}
+    conditions:
+      logic: 0
+      negate: 0
+      conditions: []
+      groups: []
+    actionsOnEnter: []
+    actionsOnExit: []
+    nextNodeId: 
+    choices: []
+  references:
+    version: 2
+    RefIds: []

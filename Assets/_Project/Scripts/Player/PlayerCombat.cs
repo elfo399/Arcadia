@@ -90,6 +90,12 @@ public class PlayerCombat : MonoBehaviour
 
     void Update()
     {
+        if (controller != null && controller.IsGameplayInputBlocked)
+        {
+            ResetBlockedGameplayInputState();
+            return;
+        }
+
         HandleBlockInput();
         UpdateBlockingAnimator();
         HandleParryInput();
@@ -98,7 +104,39 @@ public class PlayerCombat : MonoBehaviour
         HandleFlaskInput();
     }
 
+    private void ResetBlockedGameplayInputState()
+    {
+        isBlockingRight = false;
+        isBlockingLeft = false;
+        ClearShieldPendingState(Hand.Right);
+        ClearShieldPendingState(Hand.Left);
+        UpdateBlockingAnimator();
+    }
+
     public bool IsBlocking => isBlockingLeft || isBlockingRight;
+    public bool IsGameplayInputBlocked => controller != null && controller.IsGameplayInputBlocked;
+
+    public void CancelGameplayActionsForModal()
+    {
+        ResetBlockedGameplayInputState();
+        CancelParryState();
+
+        if (rangedActionRoutine != null)
+        {
+            StopCoroutine(rangedActionRoutine);
+            rangedActionRoutine = null;
+        }
+        if (meleeUnlockRoutine != null)
+        {
+            StopCoroutine(meleeUnlockRoutine);
+            meleeUnlockRoutine = null;
+        }
+
+        rangedAttackLockActive = false;
+        isAttacking = false;
+        if (animationEvents != null)
+            animationEvents.DisableAllWeaponDamage();
+    }
 
     private void HandleBlockInput()
     {
@@ -315,7 +353,7 @@ public class PlayerCombat : MonoBehaviour
 
         yield return new WaitForSeconds(Mathf.Max(0.05f, guardBreakDuration));
 
-        if (controller != null && !controller.IsInventoryOpen)
+        if (controller != null && !controller.IsGameplayInputBlocked)
             controller.canMove = true;
         canAttack = true;
         isGuardBroken = false;

@@ -127,6 +127,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private int temporaryDexterityBonus;
     private int temporaryIntelligenceBonus;
     private int temporaryFaithBonus;
+    private readonly HashSet<string> storyFlags = new(StringComparer.OrdinalIgnoreCase);
+    private readonly DialogueHistory dialogueHistory = new();
 
     public int TotalArmorPhysicalDefense => totalArmorPhysicalDefense;
     public int TotalArmorMagicDefense => totalArmorMagicDefense;
@@ -137,6 +139,13 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public bool HasInspectorStartingClass => useInspectorStartingClass && inspectorStartingClass != null;
     public PlayerClassDatabase ClassDatabase => playerClassDatabase;
     public bool HasActiveDungeonCheckpoint => dungeonCheckpointActive;
+    public DialogueHistory DialogueHistory => dialogueHistory;
+    /// <summary>
+    /// True after deferred quest and inventory data can no longer overwrite
+    /// gameplay mutations. Missing legacy save sections use scene defaults and
+    /// are considered applied.
+    /// </summary>
+    public bool IsPersistentStateReady => loadedQuestStateApplied && loadedInventoryStateApplied;
     public int EffectiveVigor => Mathf.Max(1, vigor + temporaryVigorBonus);
     public int EffectiveMind => Mathf.Max(1, mind + temporaryMindBonus);
     public int EffectiveEndurance => Mathf.Max(1, endurance + temporaryEnduranceBonus);
@@ -233,11 +242,68 @@ public class PlayerStats : MonoBehaviour, IDamageable
     }
 
     // --- GESTIONE MONETE ---
-    public void AddCoins(int coinAmount)
+    public void AddCoins(int coinAmount, bool save = true)
     {
-        runCoins += Mathf.Max(0, coinAmount);
+        int amount = Mathf.Max(0, coinAmount);
+        if (amount <= 0)
+            return;
+
+        int updated = SaturatingAdd(runCoins, amount);
+        if (updated == runCoins)
+            return;
+
+        runCoins = updated;
         SyncLegacyWalletFields();
-        SaveStats();
+        if (save)
+            SaveStats();
+    }
+
+    public bool HasCoins(int amount)
+    {
+        return amount <= 0 || runCoins >= amount;
+    }
+
+    public bool TryRemoveCoins(int amount, bool save = true)
+    {
+        if (amount <= 0 || runCoins < amount)
+            return false;
+
+        runCoins -= amount;
+        SyncLegacyWalletFields();
+        if (save)
+            SaveStats();
+        return true;
+    }
+
+    public bool ModifyKarma(int amount, bool save = true)
+    {
+        return TryModifyPersistentValue(ref karma, amount, save);
+    }
+
+    public bool ModifyBenedetto(int amount, bool save = true)
+    {
+        return TryModifyPersistentValue(ref benedetto, amount, save);
+    }
+
+    public bool ModifyMalefico(int amount, bool save = true)
+    {
+        return TryModifyPersistentValue(ref malefico, amount, save);
+    }
+
+    public bool AddAttributePoints(int amount, bool save = true)
+    {
+        if (amount <= 0)
+            return false;
+
+        int current = Mathf.Max(0, unspentAttributePoints);
+        int updated = SaturatingAdd(current, amount);
+        if (updated == unspentAttributePoints)
+            return false;
+
+        unspentAttributePoints = updated;
+        if (save)
+            SaveStats();
+        return true;
     }
 
     // --- GESTIONE CHIAVI ---
@@ -352,6 +418,17 @@ public class PlayerStats : MonoBehaviour, IDamageable
         UpdateFlaskUI();
     }
 
+    public void RestoreFlasks(int amount)
+    {
+        if (amount <= 0)
+            return;
+
+        int maximum = Mathf.Max(0, maxFlasks);
+        int current = Mathf.Clamp(currentFlasks, 0, maximum);
+        currentFlasks = Mathf.Min(maximum, SaturatingAdd(current, amount));
+        UpdateFlaskUI();
+    }
+
     public void SpendStamina(float amount)
     {
         // Se siamo nell'Hub, non consumare stamina (Opzionale)
@@ -398,6 +475,13 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (amount <= 0f) return;
         currentMana += amount;
         currentMana = Mathf.Min(currentMana, maxMana);
+    }
+
+    public void RestoreStamina(float amount)
+    {
+        if (amount <= 0f) return;
+        currentStamina += amount;
+        currentStamina = Mathf.Min(currentStamina, maxStamina);
     }
 
     public bool TryApplyMagicEffect(MagicItemData magic)
@@ -520,6 +604,93 @@ public class PlayerStats : MonoBehaviour, IDamageable
         dungeonCheckpointSeed = string.Empty;
     }
 
+    public bool HasStoryFlag(string flagId)
+    {
+        string normalized = NormalizeStoryFlagId(flagId);
+        return normalized.Length > 0 && storyFlags.Contains(normalized);
+    }
+
+    public bool SetStoryFlag(string flagId, bool save = true)
+    {
+        string normalized = NormalizeStoryFlagId(flagId);
+        if (normalized.Length == 0 || !storyFlags.Add(normalized))
+            return false;
+
+        if (save)
+            SaveStats();
+        return true;
+    }
+
+    public bool ClearStoryFlag(string flagId, bool save = true)
+    {
+        string normalized = NormalizeStoryFlagId(flagId);
+        if (normalized.Length == 0 || !storyFlags.Remove(normalized))
+            return false;
+
+        if (save)
+            SaveStats();
+        return true;
+    }
+
+    public string[] GetStoryFlagsSnapshot()
+    {
+        if (storyFlags.Count == 0)
+            return Array.Empty<string>();
+
+        var result = new string[storyFlags.Count];
+        storyFlags.CopyTo(result);
+        Array.Sort(result, StringComparer.OrdinalIgnoreCase);
+        return result;
+    }
+
+    public bool HasReadDialogueNode(string conversationId, string nodeId)
+    {
+        return dialogueHistory.HasReadNode(conversationId, nodeId);
+    }
+
+    public bool MarkDialogueNodeRead(string conversationId, string nodeId, bool save = true)
+    {
+        if (!dialogueHistory.MarkNodeRead(conversationId, nodeId))
+            return false;
+
+        if (save)
+            SaveStats();
+        return true;
+    }
+
+    public bool HasSelectedDialogueChoice(string conversationId, string nodeId, string choiceId)
+    {
+        return dialogueHistory.HasSelectedChoice(conversationId, nodeId, choiceId);
+    }
+
+    public bool MarkDialogueChoiceSelected(
+        string conversationId,
+        string nodeId,
+        string choiceId,
+        bool save = true)
+    {
+        if (!dialogueHistory.MarkChoiceSelected(conversationId, nodeId, choiceId))
+            return false;
+
+        if (save)
+            SaveStats();
+        return true;
+    }
+
+    public bool ResetNarrativeProgress(bool save = true)
+    {
+        bool changed = storyFlags.Count > 0
+                       || dialogueHistory.ReadNodeCount > 0
+                       || dialogueHistory.SelectedChoiceCount > 0;
+
+        storyFlags.Clear();
+        dialogueHistory.Clear();
+
+        if (changed && save)
+            SaveStats();
+        return changed;
+    }
+
     private void RequestSave(bool immediate)
     {
         if (immediate)
@@ -592,7 +763,13 @@ public class PlayerStats : MonoBehaviour, IDamageable
             dungeonSeed = this.dungeonCheckpointSeed,
             bankGold = this.bankGold,
             bankSilver = this.bankSilver,
-            bankCopper = this.bankCopper
+            bankCopper = this.bankCopper,
+            storyFlags = GetStoryFlagsSnapshot(),
+            dialogueHistory = new SavedDialogueHistoryData
+            {
+                readNodeKeys = dialogueHistory.ExportReadNodeKeys(),
+                selectedChoiceKeys = dialogueHistory.ExportSelectedChoiceKeys()
+            }
         };
 
         var questManager = GetCachedQuestManager();
@@ -630,6 +807,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (forceStartDataIgnoreSave && data == null)
         {
             loadedDataCache = null;
+            ApplySavedNarrativeState(null);
             playerId = SaveSystem.SinglePlayerId;
             playerName = SaveSystem.DefaultPlayerName;
             selectedClassId = string.Empty;
@@ -644,8 +822,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
             Debug.LogWarning("ForceStartData attivo, ma esiste un salvataggio: carico il salvataggio per evitare reset involontari.");
 
         loadedDataCache = data;
-        loadedQuestStateApplied = false;
-        loadedInventoryStateApplied = false;
+        ApplySavedNarrativeState(data);
+        loadedQuestStateApplied = data == null || data.quests == null;
+        loadedInventoryStateApplied = data == null || data.playerInventory == null;
         if (data != null)
         {
             playerId = SaveSystem.SinglePlayerId;
@@ -702,8 +881,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
             return;
 
         loadedDataCache = data;
-        loadedQuestStateApplied = false;
-        loadedInventoryStateApplied = false;
+        ApplySavedNarrativeState(data);
+        loadedQuestStateApplied = data.quests == null;
+        loadedInventoryStateApplied = data.playerInventory == null;
 
         playerId = SaveSystem.SinglePlayerId;
         playerName = ResolveLoadedPlayerName(data.playerName, playerId);
@@ -795,6 +975,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         if (playerClass == null)
             return;
+
+        ResetNarrativeProgress(save: false);
 
         playerId = SaveSystem.SinglePlayerId;
         selectedClassId = playerClass.GetClassId();
@@ -1323,7 +1505,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private void ApplyLoadedQuestStateIfPossible()
     {
         if (loadedQuestStateApplied) return;
-        if (loadedDataCache == null || loadedDataCache.quests == null) return;
+        if (loadedDataCache == null || loadedDataCache.quests == null)
+        {
+            loadedQuestStateApplied = true;
+            return;
+        }
 
         var questManager = GetCachedQuestManager();
         if (questManager == null) return;
@@ -1334,20 +1520,50 @@ public class PlayerStats : MonoBehaviour, IDamageable
             return;
         }
 
+        var savedQuests = DeserializeQuests(loadedDataCache.quests);
         var mapped = MergeSavedQuestStateIntoDefinitions(
-            questManager.GetInitialQuestsSnapshot(),
-            DeserializeQuests(loadedDataCache.quests));
+            questManager.GetQuestLoadDefinitionsSnapshot(savedQuests),
+            savedQuests);
         questManager.ReplaceAllQuests(mapped);
         loadedQuestStateApplied = true;
+    }
+
+    /// <summary>
+    /// Applies deferred quest save data before an external system mutates the
+    /// QuestManager. This prevents an early Start/OnEnable mutation from being
+    /// overwritten when PlayerStats performs its normal deferred load.
+    /// </summary>
+    public bool EnsureLoadedQuestStateApplied()
+    {
+        if (loadedQuestStateApplied)
+            return true;
+
+        ApplyLoadedQuestStateIfPossible();
+        return loadedQuestStateApplied;
+    }
+
+    /// <summary>
+    /// Retries both deferred save sections and reports whether gameplay systems
+    /// may safely mutate quest and inventory state.
+    /// </summary>
+    public bool TryEnsurePersistentStateReady()
+    {
+        EnsureLoadedQuestStateApplied();
+        ApplyLoadedInventoryStateIfPossible();
+        return IsPersistentStateReady;
     }
 
     private void ApplyLoadedInventoryStateIfPossible()
     {
         if (loadedInventoryStateApplied) return;
-        if (loadedDataCache == null || loadedDataCache.playerInventory == null) return;
+        if (loadedDataCache == null || loadedDataCache.playerInventory == null)
+        {
+            loadedInventoryStateApplied = true;
+            return;
+        }
 
         var playerInventory = GetCachedPlayerInventory();
-        if (playerInventory == null) return;
+        if (playerInventory == null || !playerInventory.IsInitialized) return;
 
         playerInventory.ApplySaveData(loadedDataCache.playerInventory);
         loadedInventoryStateApplied = true;
@@ -1615,6 +1831,57 @@ public class PlayerStats : MonoBehaviour, IDamageable
             default: return string.Empty;
         }
     }
+
+    private void ApplySavedNarrativeState(GameData data)
+    {
+        storyFlags.Clear();
+        string[] savedFlags = data != null ? data.storyFlags : null;
+        if (savedFlags != null)
+        {
+            for (int i = 0; i < savedFlags.Length; i++)
+            {
+                string normalized = NormalizeStoryFlagId(savedFlags[i]);
+                if (normalized.Length > 0)
+                    storyFlags.Add(normalized);
+            }
+        }
+
+        SavedDialogueHistoryData savedHistory = data != null ? data.dialogueHistory : null;
+        dialogueHistory.Import(
+            savedHistory != null ? savedHistory.readNodeKeys : null,
+            savedHistory != null ? savedHistory.selectedChoiceKeys : null);
+    }
+
+    private bool TryModifyPersistentValue(ref int currentValue, int amount, bool save)
+    {
+        if (amount == 0)
+            return false;
+
+        int updated = SaturatingAdd(currentValue, amount);
+        if (updated == currentValue)
+            return false;
+
+        currentValue = updated;
+        if (save)
+            SaveStats();
+        return true;
+    }
+
+    private static int SaturatingAdd(int currentValue, int amount)
+    {
+        long result = (long)currentValue + amount;
+        if (result > int.MaxValue)
+            return int.MaxValue;
+        if (result < int.MinValue)
+            return int.MinValue;
+        return (int)result;
+    }
+
+    private static string NormalizeStoryFlagId(string flagId)
+    {
+        return string.IsNullOrWhiteSpace(flagId) ? string.Empty : flagId.Trim();
+    }
+
     private QuestManager GetCachedQuestManager()
     {
         if (cachedQuestManager != null) return cachedQuestManager;
