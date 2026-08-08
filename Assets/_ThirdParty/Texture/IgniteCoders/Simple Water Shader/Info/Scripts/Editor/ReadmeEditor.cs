@@ -3,44 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using System;
-using System.IO;
-using System.Reflection;
 
 [CustomEditor(typeof(Readme))]
-[InitializeOnLoad]
 public class ReadmeEditor : Editor {
 	
-	static string kShowedReadmeSessionStateName = "ReadmeEditor.showedReadme";
-	
 	static float kSpace = 16f;
-	
-	static ReadmeEditor()
-	{
-		EditorApplication.delayCall += SelectReadmeAutomatically;
-	}
-	
-	static void SelectReadmeAutomatically()
-	{
-		if (!SessionState.GetBool(kShowedReadmeSessionStateName, false ))
-		{
-			var readme = SelectReadme();
-			SessionState.SetBool(kShowedReadmeSessionStateName, true);
-			
-			if (readme && !readme.loadedLayout)
-			{
-				LoadLayout();
-				readme.loadedLayout = true;
-			}
-		} 
-	}
-	
-	static void LoadLayout()
-	{
-		var assembly = typeof(EditorApplication).Assembly; 
-		var windowLayoutType = assembly.GetType("UnityEditor.WindowLayout", true);
-		var method = windowLayoutType.GetMethod("LoadWindowLayout", BindingFlags.Public | BindingFlags.Static);
-		method.Invoke(null, new object[]{Path.Combine(Application.dataPath, "IgniteCoders/Simple Water Shader/Info/Layout.wlt"), false});
-	}
 	
 	[MenuItem("Documentation/Simple Water Shader")]
 	static Readme SelectReadme() 
@@ -155,4 +122,3 @@ public class ReadmeEditor : Editor {
 		return GUI.Button (position, label, LinkStyle);
 	}
 }
-
