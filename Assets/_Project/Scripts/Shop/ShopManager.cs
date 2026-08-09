@@ -11,7 +11,7 @@ public enum ShopMode
     Sell
 }
 
-public sealed class ShopManager : MonoBehaviour
+public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 {
     [Header("Scene References")]
     [SerializeField] private GameObject shopHud;
@@ -41,6 +41,13 @@ public sealed class ShopManager : MonoBehaviour
     private Coroutine closeRoutine;
     private bool isClosing;
     private readonly List<InventorySlot> shopSlots = new List<InventorySlot>();
+    private readonly List<InventoryItem> shopItems = new List<InventoryItem>();
+    [SerializeField] private GameObject weaponSection;
+    [SerializeField] private GameObject shieldSection;
+    [SerializeField] private GameObject armorSection;
+    [SerializeField] private GameObject itemSection;
+    [SerializeField] private GameObject commonTitle;
+    [SerializeField] private GameObject commonImage;
     private int shopFocusIndex;
     private float lastNavigationTime = -999f;
     private const float NavigationRepeatCooldown = 0.20f;
@@ -73,15 +80,63 @@ public sealed class ShopManager : MonoBehaviour
         {
             InventorySlot slot = Instantiate(slotPrefab, slotParent);
             slot.name = $"InvSlot_{i:00}";
-            slot.SetDisplayOnly(true);
-            slot.Init(i, null);
+            slot.SetDisplayOnly(false);
+            slot.Init(i, this);
             slot.Clear();
         }
 
         shopSlots.Clear();
         shopSlots.AddRange(slotParent.GetComponentsInChildren<InventorySlot>(true));
         for (int i = 0; i < shopSlots.Count; i++)
+        {
+            shopSlots[i].SetDisplayOnly(false);
+            shopSlots[i].Init(i, this);
             shopSlots[i].SetFocused(false);
+        }
+    }
+
+    public void SetShopItems(IReadOnlyList<InventoryItem> items)
+    {
+        shopItems.Clear();
+        if (items != null) shopItems.AddRange(items);
+        for (int i = 0; i < shopSlots.Count; i++)
+        {
+            InventoryItem item = i < shopItems.Count ? shopItems[i] : null;
+            if (item != null) shopSlots[i].Setup(GetItemIcon(item), item.amount);
+            else shopSlots[i].Clear();
+        }
+        SetShopFocus(0);
+    }
+
+    private void ShowSelectedItem(int index)
+    {
+        HideDetailSections();
+        if (index < 0 || index >= shopItems.Count || shopItems[index] == null) return;
+        InventoryItem item = shopItems[index];
+        if (commonTitle != null) commonTitle.SetActive(true);
+        if (commonImage != null) commonImage.SetActive(true);
+        if (item.weaponData != null)
+            (item.weaponData.category == WeaponCategory.Shield ? shieldSection : weaponSection)?.SetActive(true);
+        else if (item.armorData != null)
+            armorSection?.SetActive(true);
+        else
+            itemSection?.SetActive(true);
+    }
+
+    private void HideDetailSections()
+    {
+        commonTitle?.SetActive(false);
+        commonImage?.SetActive(false);
+        weaponSection?.SetActive(false);
+        shieldSection?.SetActive(false);
+        armorSection?.SetActive(false);
+        itemSection?.SetActive(false);
+    }
+
+    private Sprite GetItemIcon(InventoryItem item)
+    {
+        if (item == null) return null;
+        return item.icon ?? item.weaponData?.icon ?? item.armorData?.icon ?? item.usableData?.icon ?? item.itemData?.icon;
     }
 
     private void OnDisable()
@@ -183,7 +238,16 @@ public sealed class ShopManager : MonoBehaviour
         shopFocusIndex = Mathf.Clamp(index, 0, shopSlots.Count - 1);
         for (int i = 0; i < shopSlots.Count; i++)
             shopSlots[i].SetFocused(i == shopFocusIndex);
+        ShowSelectedItem(shopFocusIndex);
     }
+
+    public void HandleSlotSelected(int index) => ShowSelectedItem(index);
+    public void HandleSlotSubmit(int index) => ConfirmRequested?.Invoke(CurrentMode);
+    public void HandleSlotPointerDown(int index) => SetShopFocus(index);
+    public void HandleSlotBeginDrag(int index, PointerEventData eventData) { }
+    public void HandleSlotDrag(PointerEventData eventData) { }
+    public void HandleSlotEndDrag() { }
+    public void HandleSlotDrop(int targetIndex) { }
 
     public void SetMode(ShopMode mode)
     {
