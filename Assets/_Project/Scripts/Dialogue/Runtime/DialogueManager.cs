@@ -75,8 +75,6 @@ public sealed class DialogueManager : MonoBehaviour
             DontDestroyOnLoad(gameObject);
         }
 
-        if (dialogueUI == null)
-            dialogueUI = GetComponentInChildren<DialogueUI>(true);
         if (voiceAudioSource == null)
             voiceAudioSource = GetComponent<AudioSource>();
         if (voiceAudioSource == null)
@@ -86,17 +84,12 @@ public sealed class DialogueManager : MonoBehaviour
 
         confirmCallback = OnConfirmPerformed;
         cancelCallback = OnCancelPerformed;
-        if (dialogueUI != null)
-        {
-            dialogueUI.LineCompleted -= OnLineCompleted;
-            dialogueUI.LineCompleted += OnLineCompleted;
-            dialogueUI.Hide();
-        }
     }
 
     private void OnEnable()
     {
         SceneManager.sceneLoaded += OnSceneLoaded;
+        RebindDialogueUI(SceneManager.GetActiveScene());
     }
 
     private void OnDisable()
@@ -109,13 +102,13 @@ public sealed class DialogueManager : MonoBehaviour
         StopVoice();
         if (dialogueUI != null)
             dialogueUI.Hide();
+        BindDialogueUI(null);
         ReleaseAllGameplayLocksImmediately();
     }
 
     private void OnDestroy()
     {
-        if (dialogueUI != null)
-            dialogueUI.LineCompleted -= OnLineCompleted;
+        BindDialogueUI(null);
         if (Instance == this)
             Instance = null;
     }
@@ -908,10 +901,66 @@ public sealed class DialogueManager : MonoBehaviour
         voiceAudioSource.clip = null;
     }
 
-    private void OnSceneLoaded(Scene _, LoadSceneMode __)
+    private void OnSceneLoaded(Scene scene, LoadSceneMode _)
     {
         if (IsDialogueActive)
             CloseDialogue(runCurrentExitActions: false);
+
+        RebindDialogueUI(scene);
+    }
+
+    private void RebindDialogueUI(Scene scene)
+    {
+        DialogueUI sceneUi = null;
+        DialogueUI[] candidates = FindObjectsOfType<DialogueUI>(true);
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            DialogueUI candidate = candidates[i];
+            if (candidate == null || candidate.gameObject.scene != scene)
+                continue;
+
+            if (sceneUi == null)
+            {
+                sceneUi = candidate;
+                continue;
+            }
+
+            Debug.LogWarning(
+                $"[DialogueManager] Piu DialogueUI nella scena '{scene.name}'; uso '{sceneUi.name}'.",
+                sceneUi);
+            break;
+        }
+
+        BindDialogueUI(sceneUi);
+        if (sceneUi == null)
+            Debug.LogWarning($"[DialogueManager] Nessuna DialogueUI trovata nella scena '{scene.name}'.", this);
+    }
+
+    private void BindDialogueUI(DialogueUI nextUi)
+    {
+        if (dialogueUI == nextUi)
+        {
+            if (dialogueUI != null)
+            {
+                dialogueUI.LineCompleted -= OnLineCompleted;
+                dialogueUI.LineCompleted += OnLineCompleted;
+                if (!IsDialogueActive)
+                    dialogueUI.Hide();
+            }
+            return;
+        }
+
+        if (dialogueUI != null)
+            dialogueUI.LineCompleted -= OnLineCompleted;
+
+        dialogueUI = nextUi;
+        if (dialogueUI == null)
+            return;
+
+        dialogueUI.LineCompleted -= OnLineCompleted;
+        dialogueUI.LineCompleted += OnLineCompleted;
+        if (!IsDialogueActive)
+            dialogueUI.Hide();
     }
 
     private IEnumerator LoadSceneAndTeleport(Transform originalPlayer, string sceneName, string targetId, bool useTargetRotation)

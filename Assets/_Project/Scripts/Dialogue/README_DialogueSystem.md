@@ -77,11 +77,11 @@ Campi principali:
 - `returnNodeId`: ritorno automatico a un menu dopo la fine del ramo;
 - `playerSpeaksChoice`: default true;
 - `unavailableDisplay`: `Disabled` (default) oppure `Hidden`;
-- `showReadIndicator`.
+- `showReadIndicator`: opt-in, attivarlo solo per veri argomenti lore.
 
 Con `playerSpeaksChoice`, il manager mostra automaticamente prima `PlayerStats.PlayerName: "testo choice"`, poi esegue le actions e passa al node successivo. Non serve duplicare la battuta in un secondo node.
 
-Le choice non disponibili rimangono visibili con prefisso lucchetto e `Button.interactable = false`. Una choice gia selezionata mostra il prefisso di lettura ma resta selezionabile.
+Le choice non disponibili rimangono visibili con prefisso lucchetto e `Button.interactable = false`. Una choice gia selezionata mostra il prefisso di lettura solo se `showReadIndicator` e attivo, ma resta selezionabile. Comandi ripetibili, servizi ed `Esci` devono lasciarlo disattivato; la history registra comunque ogni selezione.
 
 ## 6. Condizioni AND, OR e NOT
 
@@ -161,11 +161,14 @@ Sul GameObject/collider interagibile:
 
 ## 10. Configurare la Dialogue UI
 
-Il menu Editor `Arcadia > Dialogue > Create UI Prefab` genera un prefab non distruttivo. In alternativa creare:
+Il menu Editor `Arcadia > Dialogue > Create Dialogue Scene Objects` crea/configura normali GameObject nella scena attiva, come gli altri manager e le altre UI di Arcadia:
 
 ```text
-DialogueSystem                    (DialogueManager, AudioSource)
-`- Canvas                         (Canvas, CanvasScaler, GraphicRaycaster, DialogueUI)
+__SYSTEM
+`- DialogueManager                (DialogueManager, AudioSource)
+
+__UI
+`- DialogueUI                     (Canvas, CanvasScaler, GraphicRaycaster, DialogueUI)
    `- DialogueRoot                (Image/panel)
       |- ContentRow               (HorizontalLayoutGroup)
       |  |- PortraitContainer
@@ -180,9 +183,9 @@ DialogueSystem                    (DialogueManager, AudioSource)
       `- ContinueIndicator
 ```
 
-Collegare nel `DialogueUI` root, portrait, testi, choices root, button template e indicatore. `Choices Scroll Rect` e opzionale per UI manuali; se assegnato, la lista riparte dall'alto e segue automaticamente la scelta selezionata da tastiera/gamepad. Il prefab generato usa una viewport mascherata e un content ad altezza dinamica, quindi menu lunghi scorrono senza sovrapporsi a `ContentRow`. Collegare la UI nel `DialogueManager`, più lo speaker player. Il portrait container deve stare in un layout che ridistribuisce lo spazio quando viene disattivato.
+Collegare nel `DialogueUI` root, portrait, testi, choices root, button template e indicatore. `Choices Scroll Rect` e opzionale per UI manuali; se assegnato, la lista riparte dall'alto e segue automaticamente la scelta selezionata da tastiera/gamepad. La UI generata usa una viewport mascherata e un content ad altezza dinamica, quindi menu lunghi scorrono senza sovrapporsi a `ContentRow`. Il portrait container deve stare in un layout che ridistribuisce lo spazio quando viene disattivato.
 
-Il prefab/oggetto `DialogueSystem` va aggiunto una sola volta alla scena di avvio. Con `persistAcrossScenes` resta vivo tra Hub e Dungeon e distrugge eventuali duplicati.
+L'oggetto di scena `DialogueManager` va aggiunto una sola volta sotto `__SYSTEM`. Con `persistAcrossScenes` resta vivo tra Hub e Dungeon e distrugge eventuali duplicati. `DialogueUI` e invece scene-local sotto `__UI`: il manager la risolve una sola volta all'avvio e a ogni `sceneLoaded`, senza ricerche per frame. La UI non deve essere figlia del manager e nessuno dei due oggetti richiede un prefab.
 
 ## 11. Esempio Fabbro
 
@@ -193,7 +196,7 @@ Il menu `Arcadia > Dialogue > Create Blacksmith Example Assets` genera senza sov
 - conversazione/default menu e ramo lore;
 - profile prioritario basato su `met_blacksmith`.
 
-Con `HubSceneV1` aperta, il menu `Arcadia > Dialogue > Setup Active Hub Blacksmith` esegue l'intero setup in modo idempotente: genera prima gli asset e il prefab UI, configura `__NPC/city_dwellers_1` sul layer `Interactable` con collider/actor/profile e aggiunge `DialogueSystem` sotto `__SYSTEM` se manca.
+Con `HubSceneV1` aperta, il menu `Arcadia > Dialogue > Setup Active Hub Blacksmith` esegue l'intero setup in modo idempotente: genera prima gli asset, configura `__NPC/city_dwellers_1` sul layer `Interactable` con collider/actor/profile e crea i normali oggetti di scena `DialogueManager` sotto `__SYSTEM` e `DialogueUI` sotto `__UI` se mancano.
 
 Per usarlo:
 
@@ -291,7 +294,7 @@ Aggiungere `DialogueTeleportTarget` alla destinazione e assegnare un `targetId`.
 - `GameData`, `SaveSystem`: schema persistente v3 e migrazione.
 - `QuestManager`, `QuestManager.ObjectiveEvents`, `QuestDefinition`: catalogo non attivo, start/query quest, restore asset reward, guardia load e progressi saturati.
 
-Nessuna scena o prefab esistente viene riscritto automaticamente.
+Le scene vengono modificate soltanto dai menu Editor espliciti; il Dialogue System non richiede prefab runtime.
 
 ## 19. Limiti intenzionali
 
@@ -300,4 +303,4 @@ Nessuna scena o prefab esistente viene riscritto automaticamente.
 - Audio e un singolo `AudioSource`: niente lip sync, mixer o localization audio.
 - Nessuna Dialogue Camera obbligatoria; la camera gameplay resta attiva.
 - Nessun graph editor: dati inline, custom Inspector e validation coprono la prima versione.
-- Il comportamento visuale finale dipende dal prefab/UI configurato e deve essere verificato in Play Mode con il layout reale del progetto.
+- Il comportamento visuale finale dipende dalla `DialogueUI` configurata nella scena e deve essere verificato in Play Mode con il layout reale del progetto.

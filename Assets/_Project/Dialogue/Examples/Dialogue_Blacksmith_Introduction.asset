@@ -104,7 +104,7 @@ MonoBehaviour:
       returnNodeId: 
       playerSpeaksChoice: 0
       unavailableDisplay: 0
-      showReadIndicator: 1
+      showReadIndicator: 0
     - choiceId: buy
       text: Compra
       conditions:
@@ -133,7 +133,7 @@ MonoBehaviour:
       returnNodeId: 
       playerSpeaksChoice: 0
       unavailableDisplay: 0
-      showReadIndicator: 1
+      showReadIndicator: 0
     - choiceId: talk
       text: Parla.
       conditions:
@@ -146,7 +146,7 @@ MonoBehaviour:
       returnNodeId: service_menu
       playerSpeaksChoice: 1
       unavailableDisplay: 0
-      showReadIndicator: 1
+      showReadIndicator: 0
     - choiceId: ancient_runes
       text: '[Intelligence 20] Parlami delle rune antiche.'
       conditions:
@@ -238,7 +238,7 @@ MonoBehaviour:
       returnNodeId: service_menu
       playerSpeaksChoice: 1
       unavailableDisplay: 0
-      showReadIndicator: 1
+      showReadIndicator: 0
     - choiceId: exit
       text: Esci.
       conditions:
@@ -251,7 +251,7 @@ MonoBehaviour:
       returnNodeId: 
       playerSpeaksChoice: 0
       unavailableDisplay: 0
-      showReadIndicator: 1
+      showReadIndicator: 0
   - nodeId: lore_start
     speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
     text: La torre a nord era una fucina, molto prima che diventasse una rovina.

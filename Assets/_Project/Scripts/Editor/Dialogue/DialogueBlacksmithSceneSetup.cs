@@ -7,7 +7,6 @@ using UnityEngine.SceneManagement;
 public static class DialogueBlacksmithSceneSetup
 {
     private const string HubScenePath = "Assets/_Project/Scenes/HubSceneV1.unity";
-    private const string DialoguePrefabPath = "Assets/_Project/Dialogue/Prefabs/DialogueSystem.prefab";
     private const string PlayerSpeakerPath = "Assets/_Project/Dialogue/Examples/Speaker_Player.asset";
     private const string BlacksmithSpeakerPath = "Assets/_Project/Dialogue/Examples/Speaker_Blacksmith.asset";
     private const string BlacksmithProfilePath = "Assets/_Project/Dialogue/Examples/DialogueProfile_Blacksmith.asset";
@@ -16,6 +15,13 @@ public static class DialogueBlacksmithSceneSetup
     public static void SetupActiveHubBlacksmith()
     {
         SetupActiveHubBlacksmithInternal(showCompletionLog: true);
+    }
+
+    public static void SetupHubBlacksmithBatch()
+    {
+        EditorSceneManager.OpenScene(HubScenePath, OpenSceneMode.Single);
+        if (!SetupActiveHubBlacksmithInternal(showCompletionLog: true))
+            throw new InvalidOperationException("Setup batch del Fabbro non completato.");
     }
 
     private static bool SetupActiveHubBlacksmithInternal(bool showCompletionLog)
@@ -47,39 +53,27 @@ public static class DialogueBlacksmithSceneSetup
         int undoGroup = Undo.GetCurrentGroup();
         Undo.SetCurrentGroupName("Setup Fabbro Dialogue");
 
-        // The example assets must exist before the prefab is generated: the
-        // prefab builder can then serialize Speaker_Player immediately.
         DialogueAssetBuilder.CreateBlacksmithExampleAssets();
-        DialogueAssetBuilder.CreateDialogueUiPrefab();
 
         DialogueSpeakerData playerSpeaker = AssetDatabase.LoadAssetAtPath<DialogueSpeakerData>(PlayerSpeakerPath);
         DialogueSpeakerData blacksmithSpeaker = AssetDatabase.LoadAssetAtPath<DialogueSpeakerData>(BlacksmithSpeakerPath);
         DialogueProfile blacksmithProfile = AssetDatabase.LoadAssetAtPath<DialogueProfile>(BlacksmithProfilePath);
-        GameObject dialoguePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(DialoguePrefabPath);
-        if (playerSpeaker == null || blacksmithSpeaker == null || blacksmithProfile == null || dialoguePrefab == null)
+        if (playerSpeaker == null || blacksmithSpeaker == null || blacksmithProfile == null)
             throw new InvalidOperationException("Gli asset Dialogue del Fabbro non sono stati generati correttamente.");
 
-        DialogueManager manager = FindComponentInScene<DialogueManager>(scene);
-        if (manager == null)
-        {
-            GameObject instance = PrefabUtility.InstantiatePrefab(dialoguePrefab, scene) as GameObject;
-            if (instance == null)
-                throw new InvalidOperationException("Impossibile istanziare DialogueSystem.prefab.");
+        GameObject systemRoot = FindSceneObject(scene, "__SYSTEM");
+        GameObject uiSceneRoot = FindSceneObject(scene, "__UI") ?? FindSceneObject(scene, "_UI");
+        if (systemRoot == null || uiSceneRoot == null)
+            throw new InvalidOperationException("I root __SYSTEM e __UI non sono presenti nella HubSceneV1.");
 
-            Undo.RegisterCreatedObjectUndo(instance, "Create Dialogue System");
-            GameObject systemRoot = FindSceneObject(scene, "__SYSTEM");
-            if (systemRoot != null)
-            {
-                Undo.SetTransformParent(instance.transform, systemRoot.transform, "Parent Dialogue System");
-                instance.transform.localPosition = Vector3.zero;
-                instance.transform.localRotation = Quaternion.identity;
-                instance.transform.localScale = Vector3.one;
-            }
+        DialogueAssetBuilder.EnsureDialogueSceneObjects(
+            scene,
+            systemRoot.transform,
+            uiSceneRoot.transform,
+            out DialogueManager manager,
+            out DialogueUI dialogueUi);
 
-            manager = instance.GetComponent<DialogueManager>();
-        }
-
-        ConfigureManager(manager, playerSpeaker);
+        ConfigureManager(manager, playerSpeaker, dialogueUi);
         ConfigureBlacksmith(blacksmith, blacksmithSpeaker, blacksmithProfile);
         EnsurePlayerInteractionLayer(scene);
 
@@ -96,17 +90,20 @@ public static class DialogueBlacksmithSceneSetup
         {
             Debug.Log(
                 "[Dialogue Setup] Fabbro configurato: layer Interactable, trigger collider, " +
-                "DialogueActor, NPCInteractable, profilo Eldar e DialogueSystem nella HubSceneV1.",
+                "DialogueActor, NPCInteractable, profilo Eldar, DialogueManager sotto __SYSTEM e DialogueUI sotto __UI.",
                 blacksmith);
         }
 
         return true;
     }
 
-    private static void ConfigureManager(DialogueManager manager, DialogueSpeakerData playerSpeaker)
+    private static void ConfigureManager(
+        DialogueManager manager,
+        DialogueSpeakerData playerSpeaker,
+        DialogueUI dialogueUi)
     {
         if (manager == null)
-            throw new InvalidOperationException("DialogueSystem prefab senza DialogueManager.");
+            throw new InvalidOperationException("DialogueManager non disponibile nella scena.");
 
         Undo.RecordObject(manager, "Configure Dialogue Manager");
         var serializedManager = new SerializedObject(manager);
@@ -115,9 +112,9 @@ public static class DialogueBlacksmithSceneSetup
             throw new MissingFieldException(nameof(DialogueManager), "playerSpeaker");
 
         playerSpeakerProperty.objectReferenceValue = playerSpeaker;
+        SetObjectReference(serializedManager, "dialogueUI", dialogueUi);
         serializedManager.ApplyModifiedProperties();
         EditorUtility.SetDirty(manager);
-        PrefabUtility.RecordPrefabInstancePropertyModifications(manager);
     }
 
     private static void ConfigureBlacksmith(

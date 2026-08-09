@@ -11,9 +11,7 @@ using UnityEngine.UI;
 public static class DialogueAssetBuilder
 {
     private const string DialogueAssetRoot = "Assets/_Project/Dialogue";
-    private const string DialoguePrefabFolder = DialogueAssetRoot + "/Prefabs";
     private const string DialogueExampleFolder = DialogueAssetRoot + "/Examples";
-    private const string DialoguePrefabPath = DialoguePrefabFolder + "/DialogueSystem.prefab";
 
     private const string PlayerSpeakerPath = DialogueExampleFolder + "/Speaker_Player.asset";
     private const string BlacksmithSpeakerPath = DialogueExampleFolder + "/Speaker_Blacksmith.asset";
@@ -22,58 +20,117 @@ public static class DialogueAssetBuilder
     private const string LoreConversationPath = DialogueExampleFolder + "/Dialogue_Blacksmith_Lore.asset";
     private const string BlacksmithProfilePath = DialogueExampleFolder + "/DialogueProfile_Blacksmith.asset";
 
-    [MenuItem("Arcadia/Dialogue/Create UI Prefab", priority = 100)]
-    public static void CreateDialogueUiPrefab()
+    [MenuItem("Arcadia/Dialogue/Create Dialogue Scene Objects", priority = 100)]
+    public static void CreateDialogueSceneObjects()
     {
-        EnsureAssetFolder(DialoguePrefabFolder);
-
-        GameObject existingPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(DialoguePrefabPath);
-        if (existingPrefab != null)
+        Scene scene = SceneManager.GetActiveScene();
+        GameObject systemRoot = FindSceneObject(scene, "__SYSTEM");
+        GameObject uiRoot = FindSceneObject(scene, "__UI") ?? FindSceneObject(scene, "_UI");
+        if (!scene.IsValid() || !scene.isLoaded || systemRoot == null || uiRoot == null)
         {
-            Selection.activeObject = existingPrefab;
-            EditorGUIUtility.PingObject(existingPrefab);
-            Debug.Log($"[Dialogue Builder] Prefab gia presente e lasciato invariato: {DialoguePrefabPath}", existingPrefab);
+            Debug.LogWarning("[Dialogue Builder] La scena attiva deve contenere i root __SYSTEM e __UI.");
             return;
         }
 
-        if (AssetDatabase.LoadMainAssetAtPath(DialoguePrefabPath) != null)
+        EnsureDialogueSceneObjects(
+            scene,
+            systemRoot.transform,
+            uiRoot.transform,
+            out DialogueManager manager,
+            out DialogueUI dialogueUi);
+        EditorSceneManager.MarkSceneDirty(scene);
+        Selection.activeGameObject = dialogueUi.gameObject;
+        EditorGUIUtility.PingObject(dialogueUi.gameObject);
+        Debug.Log(
+            "[Dialogue Builder] DialogueManager e DialogueUI creati/configurati come normali oggetti della scena.",
+            manager);
+    }
+
+    public static void EnsureDialogueSceneObjects(
+        Scene scene,
+        Transform systemParent,
+        Transform uiParent,
+        out DialogueManager manager,
+        out DialogueUI dialogueUi)
+    {
+        RemoveMissingDialoguePrefabChild(systemParent, "DialogueManager");
+        RemoveMissingDialoguePrefabChild(uiParent, "DialogueUI");
+
+        manager = FindComponentInScene<DialogueManager>(scene);
+        dialogueUi = FindComponentInScene<DialogueUI>(scene);
+
+        if (dialogueUi != null && !IsDialogueUiConfigured(dialogueUi))
         {
-            Debug.LogError($"[Dialogue Builder] Il path '{DialoguePrefabPath}' e occupato da un asset non compatibile.");
+            Undo.DestroyObjectImmediate(dialogueUi.gameObject);
+            dialogueUi = null;
+        }
+
+        UnpackIfPrefabInstance(manager != null ? manager.gameObject : null);
+        UnpackIfPrefabInstance(dialogueUi != null ? dialogueUi.gameObject : null);
+
+        if (manager == null)
+        {
+            GameObject managerObject = BuildDialogueManagerHierarchy(scene);
+            Undo.RegisterCreatedObjectUndo(managerObject, "Create Dialogue Manager");
+            manager = managerObject.GetComponent<DialogueManager>();
+        }
+
+        if (dialogueUi == null)
+        {
+            GameObject uiObject = BuildDialogueUiHierarchy(scene);
+            Undo.RegisterCreatedObjectUndo(uiObject, "Create Dialogue UI");
+            dialogueUi = uiObject.GetComponent<DialogueUI>();
+        }
+
+        manager.gameObject.name = "DialogueManager";
+        dialogueUi.gameObject.name = "DialogueUI";
+        ParentAndReset(manager.transform, systemParent, "Parent Dialogue Manager");
+        ParentAndReset(dialogueUi.transform, uiParent, "Parent Dialogue UI");
+
+        SerializedObject managerObjectSerialized = new SerializedObject(manager);
+        SetObjectReference(managerObjectSerialized, "dialogueUI", dialogueUi);
+        managerObjectSerialized.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(manager);
+        EditorUtility.SetDirty(dialogueUi);
+    }
+
+    private static bool IsDialogueUiConfigured(DialogueUI dialogueUi)
+    {
+        if (dialogueUi == null || dialogueUi.transform.childCount == 0)
+            return false;
+
+        SerializedObject serializedUi = new SerializedObject(dialogueUi);
+        string[] requiredReferences =
+        {
+            "dialogueRoot",
+            "speakerNameText",
+            "dialogueBodyText",
+            "choicesRoot",
+            "choiceButtonPrefab"
+        };
+
+        for (int i = 0; i < requiredReferences.Length; i++)
+        {
+            SerializedProperty reference = serializedUi.FindProperty(requiredReferences[i]);
+            if (reference == null || reference.objectReferenceValue == null)
+                return false;
+        }
+
+        return true;
+    }
+
+    private static void RemoveMissingDialoguePrefabChild(Transform parent, string objectName)
+    {
+        if (parent == null)
             return;
-        }
 
-        Scene previewScene = EditorSceneManager.NewPreviewScene();
-        GameObject systemRoot = null;
-
-        try
+        for (int i = parent.childCount - 1; i >= 0; i--)
         {
-            // Unity 2022 does not allow a PreviewScene to become the active
-            // scene. BuildDialogueUiHierarchy moves its root into the preview
-            // scene immediately, before any prefab content is authored.
-            systemRoot = BuildDialogueUiHierarchy(previewScene);
-
-            GameObject savedPrefab = PrefabUtility.SaveAsPrefabAsset(systemRoot, DialoguePrefabPath, out bool success);
-            if (!success || savedPrefab == null)
-            {
-                Debug.LogError($"[Dialogue Builder] Creazione prefab fallita: {DialoguePrefabPath}");
-                return;
-            }
-
-            AssetDatabase.SaveAssets();
-            Selection.activeObject = savedPrefab;
-            EditorGUIUtility.PingObject(savedPrefab);
-            Debug.Log(
-                $"[Dialogue Builder] Creato {DialoguePrefabPath}. Le scene non sono state modificate; " +
-                "trascina il prefab nella scena bootstrap e assicurati che sia presente un EventSystem.",
-                savedPrefab);
-        }
-        finally
-        {
-            if (systemRoot != null)
-                UnityEngine.Object.DestroyImmediate(systemRoot);
-
-            if (previewScene.IsValid())
-                EditorSceneManager.ClosePreviewScene(previewScene);
+            GameObject child = parent.GetChild(i).gameObject;
+            bool isMissingPrefab = PrefabUtility.IsPrefabAssetMissing(child) ||
+                                   child.name.IndexOf("(Missing Prefab", StringComparison.Ordinal) >= 0;
+            if (child.name.StartsWith(objectName, StringComparison.Ordinal) && isMissingPrefab)
+                Undo.DestroyObjectImmediate(child);
         }
     }
 
@@ -115,7 +172,7 @@ public static class DialogueAssetBuilder
             asset => ConfigureDefaultConversation(asset, blacksmithSpeaker),
             createdAssets);
 
-        LoadOrCreateAsset<DialogueConversation>(
+        DialogueConversation loreConversation = LoadOrCreateAsset<DialogueConversation>(
             LoreConversationPath,
             asset => ConfigureLoreConversation(asset, blacksmithSpeaker),
             createdAssets);
@@ -124,6 +181,10 @@ public static class DialogueAssetBuilder
             BlacksmithProfilePath,
             asset => ConfigureBlacksmithProfile(asset, introConversation, defaultConversation),
             createdAssets);
+
+        ApplyBlacksmithReadIndicatorPolicy(introConversation);
+        ApplyBlacksmithReadIndicatorPolicy(defaultConversation);
+        ApplyBlacksmithReadIndicatorPolicy(loreConversation);
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -145,35 +206,51 @@ public static class DialogueAssetBuilder
             selection);
     }
 
-    private static GameObject BuildDialogueUiHierarchy(Scene previewScene)
+    private static GameObject BuildDialogueManagerHierarchy(Scene previewScene)
     {
-        var systemRoot = new GameObject("DialogueSystem");
-        if (systemRoot.scene != previewScene)
-            SceneManager.MoveGameObjectToScene(systemRoot, previewScene);
+        var managerRoot = new GameObject("DialogueManager");
+        if (managerRoot.scene != previewScene)
+            SceneManager.MoveGameObjectToScene(managerRoot, previewScene);
 
-        DialogueManager manager = systemRoot.AddComponent<DialogueManager>();
-        AudioSource voiceSource = systemRoot.AddComponent<AudioSource>();
+        DialogueManager manager = managerRoot.AddComponent<DialogueManager>();
+        AudioSource voiceSource = managerRoot.AddComponent<AudioSource>();
         voiceSource.playOnAwake = false;
         voiceSource.loop = false;
         voiceSource.spatialBlend = 0f;
 
-        GameObject canvasObject = CreateUiObject("Canvas", systemRoot.transform);
-        Canvas canvas = canvasObject.AddComponent<Canvas>();
+        SerializedObject managerObject = new SerializedObject(manager);
+        SetObjectReference(managerObject, "dialogueUI", null);
+        SetObjectReference(managerObject, "voiceAudioSource", voiceSource);
+        DialogueSpeakerData playerSpeaker = FindPlayerSpeakerAsset();
+        if (playerSpeaker != null)
+            SetObjectReference(managerObject, "playerSpeaker", playerSpeaker);
+        managerObject.ApplyModifiedPropertiesWithoutUndo();
+
+        return managerRoot;
+    }
+
+    private static GameObject BuildDialogueUiHierarchy(Scene previewScene)
+    {
+        var uiRoot = new GameObject("DialogueUI", typeof(RectTransform));
+        if (uiRoot.scene != previewScene)
+            SceneManager.MoveGameObjectToScene(uiRoot, previewScene);
+
+        Canvas canvas = uiRoot.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 100;
 
-        CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
+        CanvasScaler scaler = uiRoot.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
         scaler.matchWidthOrHeight = 0.5f;
-        canvasObject.AddComponent<GraphicRaycaster>();
-        DialogueUI dialogueUi = canvasObject.AddComponent<DialogueUI>();
+        uiRoot.AddComponent<GraphicRaycaster>();
+        DialogueUI dialogueUi = uiRoot.AddComponent<DialogueUI>();
 
-        RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
+        RectTransform canvasRect = uiRoot.GetComponent<RectTransform>();
         SetStretch(canvasRect);
 
-        GameObject dialogueRoot = CreateUiObject("DialogueRoot", canvasObject.transform);
+        GameObject dialogueRoot = CreateUiObject("DialogueRoot", uiRoot.transform);
         Image panelImage = dialogueRoot.AddComponent<Image>();
         panelImage.color = new Color(0.035f, 0.045f, 0.06f, 0.96f);
         RectTransform dialogueRect = dialogueRoot.GetComponent<RectTransform>();
@@ -352,18 +429,8 @@ public static class DialogueAssetBuilder
         SetObjectReference(uiObject, "continueIndicator", continueIndicator.gameObject);
         uiObject.ApplyModifiedPropertiesWithoutUndo();
 
-        SerializedObject managerObject = new SerializedObject(manager);
-        SetObjectReference(managerObject, "dialogueUI", dialogueUi);
-        SetObjectReference(managerObject, "voiceAudioSource", voiceSource);
-
-        DialogueSpeakerData playerSpeaker = FindPlayerSpeakerAsset();
-        if (playerSpeaker != null)
-            SetObjectReference(managerObject, "playerSpeaker", playerSpeaker);
-
-        managerObject.ApplyModifiedPropertiesWithoutUndo();
-
         dialogueRoot.SetActive(false);
-        return systemRoot;
+        return uiRoot;
     }
 
     private static void ConfigureIntroductionConversation(
@@ -504,7 +571,7 @@ public static class DialogueAssetBuilder
                         nextNodeId = "lore_start",
                         returnNodeId = "service_menu",
                         playerSpeaksChoice = true,
-                        showReadIndicator = true
+                        showReadIndicator = false
                     },
                     CreateAncientRunesChoice(),
                     new DialogueChoice
@@ -514,7 +581,7 @@ public static class DialogueAssetBuilder
                         nextNodeId = "dark_response",
                         returnNodeId = "service_menu",
                         playerSpeaksChoice = true,
-                        showReadIndicator = true,
+                        showReadIndicator = false,
                         actions = new List<DialogueAction>
                         {
                             AmountAction(DialogueActionType.ModifyMalefico, 5),
@@ -585,6 +652,7 @@ public static class DialogueAssetBuilder
             choiceId = choiceId,
             text = text,
             playerSpeaksChoice = false,
+            showReadIndicator = false,
             actions = new List<DialogueAction>
             {
                 new DialogueAction
@@ -595,6 +663,38 @@ public static class DialogueAssetBuilder
                 }
             }
         };
+    }
+
+    private static void ApplyBlacksmithReadIndicatorPolicy(DialogueConversation conversation)
+    {
+        if (conversation == null || conversation.nodes == null)
+            return;
+
+        bool changed = false;
+        for (int nodeIndex = 0; nodeIndex < conversation.nodes.Count; nodeIndex++)
+        {
+            DialogueNode node = conversation.nodes[nodeIndex];
+            if (node == null || node.choices == null)
+                continue;
+
+            for (int choiceIndex = 0; choiceIndex < node.choices.Count; choiceIndex++)
+            {
+                DialogueChoice choice = node.choices[choiceIndex];
+                if (choice == null)
+                    continue;
+
+                // Explicit example policy: only these authored lore topics opt in.
+                bool shouldShow = choice.choiceId == "tower_lore" || choice.choiceId == "ancient_runes";
+                if (choice.showReadIndicator == shouldShow)
+                    continue;
+
+                choice.showReadIndicator = shouldShow;
+                changed = true;
+            }
+        }
+
+        if (changed)
+            EditorUtility.SetDirty(conversation);
     }
 
     private static DialogueNode Node(
@@ -733,6 +833,73 @@ public static class DialogueAssetBuilder
         rectTransform.anchorMax = Vector2.one;
         rectTransform.offsetMin = new Vector2(left, bottom);
         rectTransform.offsetMax = new Vector2(-right, -top);
+    }
+
+    private static void UnpackIfPrefabInstance(GameObject instanceObject)
+    {
+        if (instanceObject == null || !PrefabUtility.IsPartOfPrefabInstance(instanceObject))
+            return;
+
+        GameObject root = PrefabUtility.GetOutermostPrefabInstanceRoot(instanceObject);
+        if (root != null)
+            PrefabUtility.UnpackPrefabInstance(
+                root,
+                PrefabUnpackMode.Completely,
+                InteractionMode.AutomatedAction);
+    }
+
+    private static void ParentAndReset(Transform child, Transform parent, string undoName)
+    {
+        if (child.parent != parent)
+            Undo.SetTransformParent(child, parent, undoName);
+
+        child.localPosition = Vector3.zero;
+        child.localRotation = Quaternion.identity;
+        child.localScale = Vector3.one;
+    }
+
+    private static GameObject FindSceneObject(Scene scene, string objectName)
+    {
+        if (!scene.IsValid() || !scene.isLoaded)
+            return null;
+
+        GameObject[] roots = scene.GetRootGameObjects();
+        for (int i = 0; i < roots.Length; i++)
+        {
+            Transform match = FindDescendant(roots[i].transform, objectName);
+            if (match != null)
+                return match.gameObject;
+        }
+
+        return null;
+    }
+
+    private static Transform FindDescendant(Transform root, string objectName)
+    {
+        if (root.name == objectName)
+            return root;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform match = FindDescendant(root.GetChild(i), objectName);
+            if (match != null)
+                return match;
+        }
+
+        return null;
+    }
+
+    private static T FindComponentInScene<T>(Scene scene) where T : Component
+    {
+        GameObject[] roots = scene.GetRootGameObjects();
+        for (int i = 0; i < roots.Length; i++)
+        {
+            T component = roots[i].GetComponentInChildren<T>(true);
+            if (component != null)
+                return component;
+        }
+
+        return null;
     }
 
     private static void EnsureAssetFolder(string folderPath)

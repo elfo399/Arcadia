@@ -20,5 +20,5 @@ public sealed class DialogueChoice
     public string returnNodeId;
     public bool playerSpeaksChoice = true;
     public DialogueUnavailableChoiceDisplay unavailableDisplay = DialogueUnavailableChoiceDisplay.Disabled;
-    public bool showReadIndicator = true;
+    public bool showReadIndicator = false;
 }

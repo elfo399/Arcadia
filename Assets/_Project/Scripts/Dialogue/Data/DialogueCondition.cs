@@ -99,21 +99,17 @@ public sealed class DialogueCondition
     [Tooltip("Inverte il risultato finale di questa condizione.")]
     public bool negate;
 
-    [Header("Confronto numerico")]
     public DialogueComparisonOperator comparison = DialogueComparisonOperator.GreaterOrEqual;
     public int value = 1;
     public DialoguePlayerAttribute playerAttribute;
 
-    [Header("ID / stato")]
     [Tooltip("Story flag o quest ID, secondo il tipo selezionato.")]
     public string id;
     public DialogueQuestState questState = DialogueQuestState.Active;
     public bool expected = true;
 
-    [Header("Inventory")]
     public DialogueItemReference item = new DialogueItemReference();
 
-    [Header("Dialogue History")]
     [Tooltip("Vuoto = conversazione corrente.")]
     public string conversationId;
     public string nodeId;

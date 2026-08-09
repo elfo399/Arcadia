@@ -9,7 +9,7 @@ public sealed class DialogueConditionGroupDrawer : PropertyDrawer
 
     public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
     {
-        float height = EditorGUIUtility.singleLineHeight;
+        float height = EditorGUIUtility.singleLineHeight * 2f + VerticalGap;
         if (!property.isExpanded)
             return height;
 
@@ -52,7 +52,12 @@ public sealed class DialogueConditionGroupDrawer : PropertyDrawer
 
         float y = position.y;
         Rect header = new Rect(position.x, y, position.width, EditorGUIUtility.singleLineHeight);
-        DrawHeader(header, property, label, logic, negate);
+        DrawHeader(header, property, label, negate);
+        y += EditorGUIUtility.singleLineHeight + VerticalGap;
+        DrawLabeledField(
+            new Rect(position.x, y, position.width, EditorGUIUtility.singleLineHeight),
+            "Mode",
+            logic);
         y += EditorGUIUtility.singleLineHeight + VerticalGap;
 
         if (!property.isExpanded)
@@ -142,20 +147,31 @@ public sealed class DialogueConditionGroupDrawer : PropertyDrawer
         Rect rect,
         SerializedProperty property,
         GUIContent label,
-        SerializedProperty logic,
         SerializedProperty negate)
     {
-        float labelWidth = Mathf.Min(EditorGUIUtility.labelWidth, Mathf.Max(80f, rect.width * 0.46f));
-        Rect foldoutRect = new Rect(rect.x, rect.y, labelWidth, rect.height);
+        const float negateWidth = 56f;
+        const float gap = 4f;
+        float foldoutWidth = Mathf.Max(0f, rect.width - negateWidth - gap);
+        Rect foldoutRect = new Rect(rect.x, rect.y, foldoutWidth, rect.height);
         property.isExpanded = EditorGUI.Foldout(foldoutRect, property.isExpanded, label, true);
 
-        Rect content = new Rect(foldoutRect.xMax, rect.y, Mathf.Max(0f, rect.xMax - foldoutRect.xMax), rect.height);
-        const float negateWidth = 54f;
-        Rect logicRect = new Rect(content.x, content.y, Mathf.Max(0f, content.width - negateWidth - 3f), content.height);
-        Rect negateRect = new Rect(logicRect.xMax + 3f, content.y, negateWidth, content.height);
-
-        EditorGUI.PropertyField(logicRect, logic, GUIContent.none);
+        Rect negateRect = new Rect(rect.xMax - negateWidth, rect.y, negateWidth, rect.height);
         EditorGUI.PropertyField(negateRect, negate, new GUIContent("NOT"));
+    }
+
+    private static void DrawLabeledField(Rect rect, string label, SerializedProperty value)
+    {
+        Rect indented = EditorGUI.IndentedRect(rect);
+        int oldIndent = EditorGUI.indentLevel;
+        EditorGUI.indentLevel = 0;
+        float labelWidth = Mathf.Clamp(indented.width * 0.34f, 52f, 100f);
+        labelWidth = Mathf.Min(labelWidth, Mathf.Max(0f, indented.width - 44f));
+        EditorGUI.LabelField(new Rect(indented.x, indented.y, labelWidth, indented.height), label);
+        EditorGUI.PropertyField(
+            new Rect(indented.x + labelWidth + 3f, indented.y, Mathf.Max(0f, indented.width - labelWidth - 3f), indented.height),
+            value,
+            GUIContent.none);
+        EditorGUI.indentLevel = oldIndent;
     }
 }
 
@@ -228,8 +244,9 @@ public sealed class DialogueConditionDrawer : PropertyDrawer
         EditorGUI.BeginProperty(position, label, property);
 
         float y = position.y;
-        DrawHeader(new Rect(position.x, y, position.width, EditorGUIUtility.singleLineHeight), property, label);
+        DrawHeaderLabel(new Rect(position.x, y, position.width, EditorGUIUtility.singleLineHeight), property, label);
         y += EditorGUIUtility.singleLineHeight + VerticalGap;
+        DrawPropertyLine(position, ref y, property, "type", "Type");
 
         int oldIndent = EditorGUI.indentLevel;
         EditorGUI.indentLevel = oldIndent + 1;
@@ -239,7 +256,8 @@ public sealed class DialogueConditionDrawer : PropertyDrawer
         {
             case DialogueConditionType.PlayerAttribute:
                 DrawPropertyLine(position, ref y, property, "playerAttribute", "Attribute");
-                DrawComparisonLine(position, ref y, property);
+                DrawPropertyLine(position, ref y, property, "comparison", "Operator");
+                DrawPropertyLine(position, ref y, property, "value", "Value");
                 break;
 
             case DialogueConditionType.PlayerLevel:
@@ -248,7 +266,8 @@ public sealed class DialogueConditionDrawer : PropertyDrawer
             case DialogueConditionType.Malefico:
             case DialogueConditionType.HasCoins:
             case DialogueConditionType.DungeonFloor:
-                DrawComparisonLine(position, ref y, property);
+                DrawPropertyLine(position, ref y, property, "comparison", "Operator");
+                DrawPropertyLine(position, ref y, property, "value", "Value");
                 break;
 
             case DialogueConditionType.QuestState:
@@ -268,7 +287,8 @@ public sealed class DialogueConditionDrawer : PropertyDrawer
 
             case DialogueConditionType.ItemAmount:
                 DrawPropertyLine(position, ref y, property, "item", "Item");
-                DrawComparisonLine(position, ref y, property);
+                DrawPropertyLine(position, ref y, property, "comparison", "Operator");
+                DrawPropertyLine(position, ref y, property, "value", "Value");
                 break;
 
             case DialogueConditionType.DialogueNodeRead:
@@ -300,44 +320,34 @@ public sealed class DialogueConditionDrawer : PropertyDrawer
         switch (type)
         {
             case DialogueConditionType.PlayerAttribute:
+            case DialogueConditionType.ItemAmount:
+                return 5;
+
             case DialogueConditionType.QuestState:
             case DialogueConditionType.StoryFlag:
             case DialogueConditionType.HasItem:
-            case DialogueConditionType.ItemAmount:
-                return 3;
-
-            case DialogueConditionType.DialogueNodeRead:
                 return 4;
 
-            case DialogueConditionType.DialogueChoiceSeen:
+            case DialogueConditionType.DialogueNodeRead:
                 return 5;
 
+            case DialogueConditionType.DialogueChoiceSeen:
+                return 6;
+
             default:
-                return 2;
+                return 4;
         }
     }
 
-    private static void DrawHeader(Rect rect, SerializedProperty property, GUIContent label)
+    private static void DrawHeaderLabel(Rect rect, SerializedProperty property, GUIContent label)
     {
-        Rect content = EditorGUI.PrefixLabel(rect, label);
+        Rect indented = EditorGUI.IndentedRect(rect);
         const float negateWidth = 58f;
-        Rect typeRect = new Rect(content.x, content.y, Mathf.Max(0f, content.width - negateWidth - 4f), content.height);
-        Rect negateRect = new Rect(typeRect.xMax + 4f, content.y, negateWidth, content.height);
-
-        EditorGUI.PropertyField(typeRect, property.FindPropertyRelative("type"), GUIContent.none);
+        const float gap = 4f;
+        Rect labelRect = new Rect(indented.x, indented.y, Mathf.Max(0f, indented.width - negateWidth - gap), indented.height);
+        Rect negateRect = new Rect(indented.xMax - negateWidth, indented.y, negateWidth, indented.height);
+        EditorGUI.LabelField(labelRect, label, EditorStyles.boldLabel);
         EditorGUI.PropertyField(negateRect, property.FindPropertyRelative("negate"), new GUIContent("NOT"));
-    }
-
-    private static void DrawComparisonLine(Rect bounds, ref float y, SerializedProperty property)
-    {
-        Rect line = NextLine(bounds, ref y);
-        Rect content = EditorGUI.PrefixLabel(line, new GUIContent("Comparison"));
-        float operatorWidth = Mathf.Max(80f, content.width * 0.58f);
-        Rect operatorRect = new Rect(content.x, content.y, operatorWidth, content.height);
-        Rect valueRect = new Rect(operatorRect.xMax + 3f, content.y, Mathf.Max(0f, content.xMax - operatorRect.xMax - 3f), content.height);
-
-        EditorGUI.PropertyField(operatorRect, property.FindPropertyRelative("comparison"), GUIContent.none);
-        EditorGUI.PropertyField(valueRect, property.FindPropertyRelative("value"), GUIContent.none);
     }
 
     private static void DrawPropertyLine(
@@ -347,11 +357,20 @@ public sealed class DialogueConditionDrawer : PropertyDrawer
         string propertyName,
         string label)
     {
-        EditorGUI.PropertyField(
-            NextLine(bounds, ref y),
-            property.FindPropertyRelative(propertyName),
-            new GUIContent(label),
-            true);
+        Rect line = EditorGUI.IndentedRect(NextLine(bounds, ref y));
+        int oldIndent = EditorGUI.indentLevel;
+        EditorGUI.indentLevel = 0;
+        float labelWidth = Mathf.Clamp(line.width * 0.36f, 60f, 120f);
+        labelWidth = Mathf.Min(labelWidth, Mathf.Max(0f, line.width - 44f));
+        Rect labelRect = new Rect(line.x, line.y, labelWidth, line.height);
+        Rect fieldRect = new Rect(
+            labelRect.xMax + 3f,
+            line.y,
+            Mathf.Max(0f, line.xMax - labelRect.xMax - 3f),
+            line.height);
+        EditorGUI.LabelField(labelRect, label);
+        EditorGUI.PropertyField(fieldRect, property.FindPropertyRelative(propertyName), GUIContent.none, true);
+        EditorGUI.indentLevel = oldIndent;
     }
 
     private static Rect NextLine(Rect bounds, ref float y)
