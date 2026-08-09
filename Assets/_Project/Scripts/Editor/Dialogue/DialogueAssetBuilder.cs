@@ -11,17 +11,18 @@ using UnityEngine.UI;
 public static class DialogueAssetBuilder
 {
     private const string DialogueAssetRoot = "Assets/_Project/Dialogue";
-    private const string DialogueExampleFolder = DialogueAssetRoot + "/Examples";
+    private const string DialogueSpeakersFolder = DialogueAssetRoot + "/Speakers";
+    private const string BlacksmithFolder = DialogueAssetRoot + "/NPC/Blacksmith_Eldar";
     private const string DialogueChoicePrefabPath = "Assets/_Project/Prefabs/UI/choise.prefab";
     private const string DefaultBlacksmithPortraitPath =
         "Assets/_Project/Art/Sprites/Test/Super Asset Bundle #2 - Adventure Time v1.5/Updated Paper Book/Sprites/Content/2 Icons/20.png";
 
-    private const string PlayerSpeakerPath = DialogueExampleFolder + "/Speaker_Player.asset";
-    private const string BlacksmithSpeakerPath = DialogueExampleFolder + "/Speaker_Blacksmith.asset";
-    private const string IntroConversationPath = DialogueExampleFolder + "/Dialogue_Blacksmith_Introduction.asset";
-    private const string DefaultConversationPath = DialogueExampleFolder + "/Dialogue_Blacksmith_Default.asset";
-    private const string LoreConversationPath = DialogueExampleFolder + "/Dialogue_Blacksmith_Lore.asset";
-    private const string BlacksmithProfilePath = DialogueExampleFolder + "/DialogueProfile_Blacksmith.asset";
+    private const string PlayerSpeakerPath = DialogueSpeakersFolder + "/Speaker_Player.asset";
+    private const string BlacksmithSpeakerPath = BlacksmithFolder + "/Speaker_Eldar.asset";
+    private const string IntroConversationPath = BlacksmithFolder + "/Dialogue_Eldar_Introduction.asset";
+    private const string DefaultConversationPath = BlacksmithFolder + "/Dialogue_Eldar_Default.asset";
+    private const string LoreConversationPath = BlacksmithFolder + "/Dialogue_Eldar_Lore.asset";
+    private const string BlacksmithProfilePath = BlacksmithFolder + "/Profile_Eldar.asset";
 
     [MenuItem("Arcadia/Dialogue/Create Dialogue Scene Objects", priority = 100)]
     public static void CreateDialogueSceneObjects()
@@ -345,10 +346,11 @@ public static class DialogueAssetBuilder
         }
     }
 
-    [MenuItem("Arcadia/Dialogue/Create Blacksmith Example Assets", priority = 110)]
+    [MenuItem("Arcadia/Dialogue/Create Blacksmith Assets", priority = 110)]
     public static void CreateBlacksmithExampleAssets()
     {
-        EnsureAssetFolder(DialogueExampleFolder);
+        EnsureAssetFolder(DialogueSpeakersFolder);
+        EnsureAssetFolder(BlacksmithFolder);
         var createdAssets = new List<UnityEngine.Object>();
 
         DialogueSpeakerData playerSpeaker = LoadOrCreateAsset<DialogueSpeakerData>(
@@ -411,9 +413,9 @@ public static class DialogueAssetBuilder
 
         Debug.Log(
             createdAssets.Count > 0
-                ? $"[Dialogue Builder] Creati {createdAssets.Count} asset Fabbro in {DialogueExampleFolder}. " +
+                ? $"[Dialogue Builder] Creati {createdAssets.Count} asset Fabbro in {BlacksmithFolder}. " +
                   "Gli asset gia esistenti sono rimasti invariati."
-                : $"[Dialogue Builder] Gli asset Fabbro esistono gia in {DialogueExampleFolder}; nessun file e stato sovrascritto.",
+                : $"[Dialogue Builder] Gli asset Fabbro esistono gia in {BlacksmithFolder}; nessun file e stato sovrascritto.",
             selection);
     }
 
