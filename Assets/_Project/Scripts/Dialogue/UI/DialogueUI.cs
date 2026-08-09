@@ -131,6 +131,9 @@ public sealed class DialogueUI : MonoBehaviour
 
         if (choicesRoot != null)
             choicesRoot.gameObject.SetActive(false);
+
+        SetChoiceScrollRectVisible(false);
+        SetChoiceScrollbarVisible(false);
     }
 
     private void OnDisable()
@@ -267,6 +270,7 @@ public sealed class DialogueUI : MonoBehaviour
         }
 
         HideSceneChoiceTemplate();
+        SetChoiceScrollRectVisible(true);
         choicesRoot.gameObject.SetActive(true);
         choiceSelectedCallback = onChoiceSelected;
 
@@ -318,6 +322,7 @@ public sealed class DialogueUI : MonoBehaviour
         }
 
         ResetChoiceScroll();
+        RefreshChoiceScrollbarVisibility();
         ConfigureVerticalNavigation();
         SelectFirstEnabledChoice();
     }
@@ -391,6 +396,9 @@ public sealed class DialogueUI : MonoBehaviour
 
         if (choicesRoot != null)
             choicesRoot.gameObject.SetActive(false);
+
+        SetChoiceScrollRectVisible(false);
+        SetChoiceScrollbarVisible(false);
     }
 
     public void SetContinueAvailable(bool visible)
@@ -584,6 +592,37 @@ public sealed class DialogueUI : MonoBehaviour
         RebuildChoiceLayout();
         choicesScrollRect.StopMovement();
         choicesScrollRect.verticalNormalizedPosition = 1f;
+    }
+
+    private void RefreshChoiceScrollbarVisibility()
+    {
+        if (choicesScrollRect == null || choicesScrollRect.verticalScrollbar == null)
+            return;
+
+        RebuildChoiceLayout();
+
+        RectTransform viewport = choicesScrollRect.viewport;
+        RectTransform content = choicesScrollRect.content;
+        bool hasOverflow = viewport != null
+                           && content != null
+                           && content.rect.height > viewport.rect.height + 0.5f;
+        SetChoiceScrollbarVisible(hasOverflow);
+    }
+
+    private void SetChoiceScrollbarVisible(bool visible)
+    {
+        if (choicesScrollRect == null || choicesScrollRect.verticalScrollbar == null)
+            return;
+
+        GameObject scrollbarObject = choicesScrollRect.verticalScrollbar.gameObject;
+        if (scrollbarObject.activeSelf != visible)
+            scrollbarObject.SetActive(visible);
+    }
+
+    private void SetChoiceScrollRectVisible(bool visible)
+    {
+        if (choicesScrollRect != null && choicesScrollRect.gameObject.activeSelf != visible)
+            choicesScrollRect.gameObject.SetActive(visible);
     }
 
     private void EnsureChoiceVisible(Button button)

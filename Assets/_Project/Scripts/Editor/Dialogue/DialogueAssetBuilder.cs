@@ -298,7 +298,7 @@ public static class DialogueAssetBuilder
         scrollbar.direction = Scrollbar.Direction.BottomToTop;
 
         scrollRect.verticalScrollbar = scrollbar;
-        scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+        scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
         scrollRect.verticalScrollbarSpacing = 4f;
 
         EditorUtility.SetDirty(viewport);
