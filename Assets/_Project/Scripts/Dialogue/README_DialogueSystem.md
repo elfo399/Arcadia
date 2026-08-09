@@ -71,7 +71,8 @@ La conversazione puo alternare liberamente Fabbro, Mago, Player e altri `Dialogu
 Campi principali:
 
 - `choiceId`: stabile e univoco nel node;
-- `text`;
+- `text`: etichetta breve mostrata sul pulsante;
+- `playerSpokenText`: frase pronunciata dal giocatore; se vuota usa automaticamente `text`;
 - conditions e actions;
 - `nextNodeId`;
 - `returnNodeId`: ritorno automatico a un menu dopo la fine del ramo;
@@ -255,7 +256,7 @@ Impostare un `ServiceId` univoco e usare lo stesso ID nell'action `OpenService`.
 
 Il manager riusa `PlayerController.Controls`:
 
-- `Interact`: completa la frase / avanza / conferma;
+- `Jump` (`X/Croce`, buttonSouth): completa la frase / avanza / conferma;
 - `Move.y`: navigazione verticale;
 - `SprintOrDodge`: cancel quando consentito.
 
@@ -265,7 +266,7 @@ Non viene creata una seconda action map e non esistono subscription permanenti d
 
 Alla chiusura il lock viene rilasciato solo dopo il rilascio fisico dell'input: questo evita che `R` (Interact e UseFlask nella mappa attuale) consumi una fiaschetta o che il Cancel provochi un roll.
 
-Il typewriter usa `Time.unscaledDeltaTime`. Una pressione completa la linea; la successiva avanza. Tenendo Interact, il fast-forward opera soltanto sui node gia letti e si arresta su node nuovi, player-choice sintetiche e qualsiasi node con choices.
+Il typewriter usa `Time.unscaledDeltaTime`. Una pressione di `X/Croce` completa la linea; dopo aver rilasciato il pulsante, una nuova pressione avanza. Non esiste avanzamento continuo tenendo premuto: ogni frase richiede un input distinto. `Interact` resta separato e serve ad avviare il dialogo con l'NPC.
 
 ## 16. Story Flags, History e Save
 

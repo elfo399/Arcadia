@@ -16,7 +16,7 @@ MonoBehaviour:
   startNodeId: service_menu
   nodes:
   - nodeId: service_menu
-    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
+    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
     text: Che posso fare per te?
     portraitOverride: {fileID: 0}
     animationTrigger: 
@@ -32,6 +32,7 @@ MonoBehaviour:
     choices:
     - choiceId: upgrade
       text: Potenzia equipaggiamento
+      playerSpokenText:
       conditions:
         logic: 0
         negate: 0
@@ -61,6 +62,7 @@ MonoBehaviour:
       showReadIndicator: 0
     - choiceId: buy
       text: Compra
+      playerSpokenText:
       conditions:
         logic: 0
         negate: 0
@@ -90,6 +92,7 @@ MonoBehaviour:
       showReadIndicator: 0
     - choiceId: talk
       text: Parla.
+      playerSpokenText: Parlami di piu della fucina.
       conditions:
         logic: 0
         negate: 0
@@ -103,6 +106,7 @@ MonoBehaviour:
       showReadIndicator: 0
     - choiceId: ancient_runes
       text: '[Intelligence 20] Parlami delle rune antiche.'
+      playerSpokenText:
       conditions:
         logic: 0
         negate: 0
@@ -134,6 +138,7 @@ MonoBehaviour:
       showReadIndicator: 1
     - choiceId: accept_dark_power
       text: Accetto il potere oscuro.
+      playerSpokenText:
       conditions:
         logic: 0
         negate: 0
@@ -195,6 +200,7 @@ MonoBehaviour:
       showReadIndicator: 0
     - choiceId: exit
       text: Esci.
+      playerSpokenText:
       conditions:
         logic: 0
         negate: 0
@@ -207,7 +213,7 @@ MonoBehaviour:
       unavailableDisplay: 0
       showReadIndicator: 0
   - nodeId: lore_start
-    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
+    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
     text: La torre a nord era una fucina, molto prima che diventasse una rovina.
     portraitOverride: {fileID: 0}
     animationTrigger: 
@@ -222,7 +228,7 @@ MonoBehaviour:
     nextNodeId: lore_end
     choices: []
   - nodeId: lore_end
-    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
+    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
     text: Se trovi un martello con il marchio del sole, riportamelo.
     portraitOverride: {fileID: 0}
     animationTrigger: 
@@ -237,7 +243,7 @@ MonoBehaviour:
     nextNodeId: 
     choices: []
   - nodeId: ancient_runes
-    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
+    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
     text: Hai occhio. Quelle rune legano il ricordo del fuoco alla lama.
     portraitOverride: {fileID: 0}
     animationTrigger: 
@@ -252,7 +258,7 @@ MonoBehaviour:
     nextNodeId: 
     choices: []
   - nodeId: dark_response
-    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
+    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
     text: Allora porta il peso della tua scelta. Il ferro non dimentica.
     portraitOverride: {fileID: 0}
     animationTrigger: 

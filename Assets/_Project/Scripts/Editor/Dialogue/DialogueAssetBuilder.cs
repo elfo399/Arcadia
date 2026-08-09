@@ -12,6 +12,9 @@ public static class DialogueAssetBuilder
 {
     private const string DialogueAssetRoot = "Assets/_Project/Dialogue";
     private const string DialogueExampleFolder = DialogueAssetRoot + "/Examples";
+    private const string DialogueChoicePrefabPath = "Assets/_Project/Prefabs/UI/choise.prefab";
+    private const string DefaultBlacksmithPortraitPath =
+        "Assets/_Project/Art/Sprites/Test/Super Asset Bundle #2 - Adventure Time v1.5/Updated Paper Book/Sprites/Content/2 Icons/20.png";
 
     private const string PlayerSpeakerPath = DialogueExampleFolder + "/Speaker_Player.asset";
     private const string BlacksmithSpeakerPath = DialogueExampleFolder + "/Speaker_Blacksmith.asset";
@@ -53,6 +56,7 @@ public static class DialogueAssetBuilder
         out DialogueManager manager,
         out DialogueUI dialogueUi)
     {
+        Button choicePrefabButton = ConfigureDialogueChoicePrefab();
         RemoveMissingDialoguePrefabChild(systemParent, "DialogueManager");
         RemoveMissingDialoguePrefabChild(uiParent, "DialogueUI");
 
@@ -86,12 +90,219 @@ public static class DialogueAssetBuilder
         dialogueUi.gameObject.name = "DialogueUI";
         ParentAndReset(manager.transform, systemParent, "Parent Dialogue Manager");
         ParentAndReset(dialogueUi.transform, uiParent, "Parent Dialogue UI");
+        ConfigureDialogueChoiceLayout(dialogueUi);
 
         SerializedObject managerObjectSerialized = new SerializedObject(manager);
         SetObjectReference(managerObjectSerialized, "dialogueUI", dialogueUi);
         managerObjectSerialized.ApplyModifiedPropertiesWithoutUndo();
+
+        if (choicePrefabButton != null)
+        {
+            SerializedObject serializedUi = new SerializedObject(dialogueUi);
+            SetObjectReference(serializedUi, "choiceButtonPrefab", choicePrefabButton);
+            serializedUi.ApplyModifiedPropertiesWithoutUndo();
+            RemoveLegacySceneChoiceTemplate(dialogueUi, choicePrefabButton);
+        }
+
         EditorUtility.SetDirty(manager);
         EditorUtility.SetDirty(dialogueUi);
+    }
+
+    public static Button ConfigureDialogueChoicePrefab()
+    {
+        GameObject prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(DialogueChoicePrefabPath);
+        if (prefabAsset == null)
+        {
+            Debug.LogWarning($"[Dialogue Builder] Prefab choice non trovato: {DialogueChoicePrefabPath}");
+            return null;
+        }
+
+        GameObject root = PrefabUtility.LoadPrefabContents(DialogueChoicePrefabPath);
+        try
+        {
+            QuestItemUI questItemUi = root.GetComponent<QuestItemUI>();
+            if (questItemUi != null)
+                UnityEngine.Object.DestroyImmediate(questItemUi);
+
+            Button button = root.GetComponent<Button>();
+            if (button == null)
+                button = root.AddComponent<Button>();
+
+            const float choiceHeight = 48f;
+            RectTransform rootRect = root.GetComponent<RectTransform>();
+            if (rootRect != null)
+                rootRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, choiceHeight);
+
+            LayoutElement choiceLayout = root.GetComponent<LayoutElement>();
+            if (choiceLayout == null)
+                choiceLayout = root.AddComponent<LayoutElement>();
+            choiceLayout.minHeight = choiceHeight;
+            choiceLayout.preferredHeight = choiceHeight;
+            choiceLayout.flexibleHeight = 0f;
+
+            DialogueChoiceUI choiceUi = root.GetComponent<DialogueChoiceUI>();
+            if (choiceUi == null)
+                choiceUi = root.AddComponent<DialogueChoiceUI>();
+
+            TMP_Text title = FindDescendant(root.transform, "Title")?.GetComponent<TMP_Text>();
+            GameObject heardIndicator = FindDescendant(root.transform, "Reward")?.gameObject;
+            Image selectionOverlay = FindDescendant(root.transform, "SelectionOverlay")?.GetComponent<Image>();
+            if (title != null)
+            {
+                title.fontSize = 20f;
+                title.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 40f);
+            }
+
+            string[] frameNames = { "Image", "Image (1)", "Image (2)" };
+            for (int i = 0; i < frameNames.Length; i++)
+            {
+                RectTransform frame = FindDescendant(root.transform, frameNames[i]) as RectTransform;
+                if (frame != null)
+                    frame.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, choiceHeight);
+            }
+
+            RectTransform heardIndicatorRect = heardIndicator != null
+                ? heardIndicator.transform as RectTransform
+                : null;
+            if (heardIndicatorRect != null)
+            {
+                heardIndicatorRect.sizeDelta = new Vector2(20f, 20f);
+                heardIndicatorRect.anchoredPosition = new Vector2(-12f, heardIndicatorRect.anchoredPosition.y);
+            }
+            SerializedObject serializedChoice = new SerializedObject(choiceUi);
+            SetObjectReference(serializedChoice, "choiceText", title);
+            SetObjectReference(serializedChoice, "heardIndicator", heardIndicator);
+            SetObjectReference(serializedChoice, "backgroundImage", selectionOverlay);
+            serializedChoice.ApplyModifiedPropertiesWithoutUndo();
+
+            PrefabUtility.SaveAsPrefabAsset(root, DialogueChoicePrefabPath);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(DialogueChoicePrefabPath);
+        return prefabAsset != null ? prefabAsset.GetComponent<Button>() : null;
+    }
+
+    private static void RemoveLegacySceneChoiceTemplate(DialogueUI dialogueUi, Button externalPrefabButton)
+    {
+        if (dialogueUi == null || externalPrefabButton == null)
+            return;
+
+        Transform template = FindDescendant(dialogueUi.transform, "ChoiceButtonTemplate");
+        if (template != null)
+            Undo.DestroyObjectImmediate(template.gameObject);
+    }
+
+    private static void ConfigureDialogueChoiceLayout(DialogueUI dialogueUi)
+    {
+        if (dialogueUi == null)
+            return;
+
+        Transform scrollViewTransform = FindDescendant(dialogueUi.transform, "ChoicesScrollView");
+        RectTransform scrollView = scrollViewTransform as RectTransform;
+        if (scrollView != null)
+        {
+            Undo.RecordObject(scrollView, "Resize Dialogue Choices");
+            scrollView.anchorMin = new Vector2(1f, 0f);
+            scrollView.anchorMax = new Vector2(1f, 0f);
+            scrollView.pivot = new Vector2(1f, 0f);
+            scrollView.anchoredPosition = new Vector2(-36f, 20f);
+            scrollView.sizeDelta = new Vector2(720f, 240f);
+            EditorUtility.SetDirty(scrollView);
+
+            ScrollRect scrollRect = scrollView.GetComponent<ScrollRect>();
+            Transform viewportTransform = FindDescendant(scrollView, "Viewport");
+            ConfigureChoicesScrollbar(
+                scrollRect,
+                viewportTransform as RectTransform,
+                registerUndo: true);
+        }
+
+        Transform choicesRootTransform = FindDescendant(dialogueUi.transform, "ChoicesRoot");
+        VerticalLayoutGroup choicesLayout = choicesRootTransform != null
+            ? choicesRootTransform.GetComponent<VerticalLayoutGroup>()
+            : null;
+        if (choicesLayout != null)
+        {
+            Undo.RecordObject(choicesLayout, "Add Dialogue Choice Margins");
+            choicesLayout.padding = new RectOffset(18, 18, 8, 8);
+            choicesLayout.spacing = 8f;
+            EditorUtility.SetDirty(choicesLayout);
+        }
+    }
+
+    private static void ConfigureChoicesScrollbar(
+        ScrollRect scrollRect,
+        RectTransform viewport,
+        bool registerUndo)
+    {
+        if (scrollRect == null || viewport == null)
+            return;
+
+        SetStretch(viewport, right: 22f);
+
+        Transform scrollbarTransform = FindDescendant(scrollRect.transform, "Scrollbar Vertical");
+        GameObject scrollbarObject;
+        if (scrollbarTransform == null)
+        {
+            scrollbarObject = CreateUiObject("Scrollbar Vertical", scrollRect.transform);
+            if (registerUndo)
+                Undo.RegisterCreatedObjectUndo(scrollbarObject, "Create Dialogue Scrollbar");
+        }
+        else
+        {
+            scrollbarObject = scrollbarTransform.gameObject;
+        }
+
+        RectTransform scrollbarRect = scrollbarObject.GetComponent<RectTransform>();
+        scrollbarRect.anchorMin = new Vector2(1f, 0f);
+        scrollbarRect.anchorMax = new Vector2(1f, 1f);
+        scrollbarRect.pivot = new Vector2(0.5f, 0.5f);
+        scrollbarRect.anchoredPosition = new Vector2(-9f, 0f);
+        scrollbarRect.sizeDelta = new Vector2(14f, -8f);
+
+        Image trackImage = scrollbarObject.GetComponent<Image>();
+        if (trackImage == null)
+            trackImage = scrollbarObject.AddComponent<Image>();
+        trackImage.color = new Color(0.08f, 0.055f, 0.04f, 0.82f);
+
+        Scrollbar scrollbar = scrollbarObject.GetComponent<Scrollbar>();
+        if (scrollbar == null)
+            scrollbar = scrollbarObject.AddComponent<Scrollbar>();
+
+        Transform slidingAreaTransform = FindDescendant(scrollbarObject.transform, "Sliding Area");
+        GameObject slidingArea = slidingAreaTransform != null
+            ? slidingAreaTransform.gameObject
+            : CreateUiObject("Sliding Area", scrollbarObject.transform);
+        RectTransform slidingAreaRect = slidingArea.GetComponent<RectTransform>();
+        SetStretch(slidingAreaRect, 2f, 2f, 2f, 2f);
+
+        Transform handleTransform = FindDescendant(slidingArea.transform, "Handle");
+        GameObject handle = handleTransform != null
+            ? handleTransform.gameObject
+            : CreateUiObject("Handle", slidingArea.transform);
+        RectTransform handleRect = handle.GetComponent<RectTransform>();
+        SetStretch(handleRect);
+
+        Image handleImage = handle.GetComponent<Image>();
+        if (handleImage == null)
+            handleImage = handle.AddComponent<Image>();
+        handleImage.color = new Color(1f, 0.85f, 0.2f, 1f);
+
+        scrollbar.handleRect = handleRect;
+        scrollbar.targetGraphic = handleImage;
+        scrollbar.direction = Scrollbar.Direction.BottomToTop;
+
+        scrollRect.verticalScrollbar = scrollbar;
+        scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+        scrollRect.verticalScrollbarSpacing = 4f;
+
+        EditorUtility.SetDirty(viewport);
+        EditorUtility.SetDirty(scrollbar);
+        EditorUtility.SetDirty(scrollRect);
     }
 
     private static bool IsDialogueUiConfigured(DialogueUI dialogueUi)
@@ -157,7 +368,7 @@ public static class DialogueAssetBuilder
             {
                 asset.speakerId = "blacksmith_eldar";
                 asset.displayName = "Eldar";
-                asset.portrait = null;
+                asset.portrait = AssetDatabase.LoadAssetAtPath<Sprite>(DefaultBlacksmithPortraitPath);
                 asset.isPlayer = false;
             },
             createdAssets);
@@ -330,11 +541,11 @@ public static class DialogueAssetBuilder
         // keyboard/gamepad selection is kept visible by DialogueUI.
         GameObject choicesScrollView = CreateUiObject("ChoicesScrollView", dialogueRoot.transform);
         RectTransform choicesScrollRectTransform = choicesScrollView.GetComponent<RectTransform>();
-        choicesScrollRectTransform.anchorMin = new Vector2(0.39f, 0f);
+        choicesScrollRectTransform.anchorMin = new Vector2(1f, 0f);
         choicesScrollRectTransform.anchorMax = new Vector2(1f, 0f);
-        choicesScrollRectTransform.pivot = new Vector2(0.5f, 0f);
-        choicesScrollRectTransform.anchoredPosition = new Vector2(-12f, 20f);
-        choicesScrollRectTransform.sizeDelta = new Vector2(-24f, 126f);
+        choicesScrollRectTransform.pivot = new Vector2(1f, 0f);
+        choicesScrollRectTransform.anchoredPosition = new Vector2(-36f, 20f);
+        choicesScrollRectTransform.sizeDelta = new Vector2(720f, 240f);
 
         ScrollRect choicesScrollRect = choicesScrollView.AddComponent<ScrollRect>();
         choicesScrollRect.horizontal = false;
@@ -354,7 +565,8 @@ public static class DialogueAssetBuilder
 
         GameObject choicesRoot = CreateUiObject("ChoicesRoot", choicesViewport.transform);
         var choicesLayout = choicesRoot.AddComponent<VerticalLayoutGroup>();
-        choicesLayout.spacing = 6f;
+        choicesLayout.padding = new RectOffset(18, 18, 8, 8);
+        choicesLayout.spacing = 8f;
         choicesLayout.childAlignment = TextAnchor.UpperRight;
         choicesLayout.childControlHeight = false;
         choicesLayout.childControlWidth = true;
@@ -372,6 +584,7 @@ public static class DialogueAssetBuilder
 
         choicesScrollRect.viewport = choicesViewportRect;
         choicesScrollRect.content = choicesRect;
+        ConfigureChoicesScrollbar(choicesScrollRect, choicesViewportRect, registerUndo: false);
 
         GameObject choiceTemplate = CreateUiObject("ChoiceButtonTemplate", choicesRoot.transform);
         Image choiceImage = choiceTemplate.AddComponent<Image>();
@@ -568,6 +781,7 @@ public static class DialogueAssetBuilder
                     {
                         choiceId = "talk",
                         text = "Parla.",
+                        playerSpokenText = "Parlami di piu della fucina.",
                         nextNodeId = "lore_start",
                         returnNodeId = "service_menu",
                         playerSpeaksChoice = true,

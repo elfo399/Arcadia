@@ -135,6 +135,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public float TotalArmorWeight => totalArmorWeight;
     public string PlayerId => playerId;
     public string PlayerName => ResolvePlayerName();
+    public Sprite PlayerPortrait
+    {
+        get
+        {
+            PlayerClassData playerClass = ResolveClassDataById(selectedClassId);
+            return playerClass != null ? playerClass.portrait : null;
+        }
+    }
     public string SelectedClassId => selectedClassId;
     public bool HasInspectorStartingClass => useInspectorStartingClass && inspectorStartingClass != null;
     public PlayerClassDatabase ClassDatabase => playerClassDatabase;

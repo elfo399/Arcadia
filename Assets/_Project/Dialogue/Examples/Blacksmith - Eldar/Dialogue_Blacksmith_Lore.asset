@@ -16,7 +16,7 @@ MonoBehaviour:
   startNodeId: service_menu
   nodes:
   - nodeId: service_menu
-    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
+    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
     text: Di cosa vuoi parlare?
     portraitOverride: {fileID: 0}
     animationTrigger: 
@@ -32,7 +32,6 @@ MonoBehaviour:
     choices:
     - choiceId: tower_lore
       text: Parlami della torre.
-      playerSpokenText:
       conditions:
         logic: 0
         negate: 0
@@ -46,7 +45,6 @@ MonoBehaviour:
       showReadIndicator: 1
     - choiceId: ancient_runes
       text: '[Intelligence 20] Parlami delle rune antiche.'
-      playerSpokenText:
       conditions:
         logic: 0
         negate: 0
@@ -78,7 +76,6 @@ MonoBehaviour:
       showReadIndicator: 1
     - choiceId: exit
       text: Esci.
-      playerSpokenText:
       conditions:
         logic: 0
         negate: 0
@@ -91,7 +88,7 @@ MonoBehaviour:
       unavailableDisplay: 0
       showReadIndicator: 0
   - nodeId: lore_tower
-    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
+    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
     text: La vecchia torre veglia sulla valle da prima che io nascessi.
     portraitOverride: {fileID: 0}
     animationTrigger: 
@@ -106,7 +103,7 @@ MonoBehaviour:
     nextNodeId: lore_tower_end
     choices: []
   - nodeId: lore_tower_end
-    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
+    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
     text: Le sue pietre ricordano cose che gli uomini farebbero bene a dimenticare.
     portraitOverride: {fileID: 0}
     animationTrigger: 
@@ -121,7 +118,7 @@ MonoBehaviour:
     nextNodeId: 
     choices: []
   - nodeId: ancient_runes
-    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
+    speaker: {fileID: 11400000, guid: 23d5b2647c2b2b748a6a58f9aa33a672, type: 2}
     text: 'Quelle rune non decorano il metallo: gli impongono di ricordare la magia.'
     portraitOverride: {fileID: 0}
     animationTrigger: 

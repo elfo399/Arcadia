@@ -18,6 +18,14 @@ public sealed class DialogueSpeakerData : ScriptableObject
         return string.IsNullOrWhiteSpace(displayName) ? name : displayName.Trim();
     }
 
+    public Sprite ResolvePortrait(PlayerStats playerStats)
+    {
+        if (isPlayer && playerStats != null && playerStats.PlayerPortrait != null)
+            return playerStats.PlayerPortrait;
+
+        return portrait;
+    }
+
 #if UNITY_EDITOR
     private void OnValidate()
     {

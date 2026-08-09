@@ -24,7 +24,6 @@ public sealed class DialogueManager : MonoBehaviour
     [SerializeField, Range(0.1f, 1f)] private float navigationThreshold = 0.55f;
     [SerializeField, Min(0.05f)] private float navigationInitialDelay = 0.35f;
     [SerializeField, Min(0.03f)] private float navigationRepeatDelay = 0.12f;
-    [SerializeField, Min(0.03f)] private float fastForwardStepDelay = 0.08f;
 
     private readonly DialogueConditionEvaluator conditionEvaluator = new DialogueConditionEvaluator();
     private readonly DialogueActionRunner actionRunner = new DialogueActionRunner();
@@ -35,11 +34,9 @@ public sealed class DialogueManager : MonoBehaviour
     private DialogueNode currentNode;
     private DialogueChoice pendingPlayerChoice;
     private string pendingReturnNodeId;
-    private bool currentNodeWasReadBefore;
     private bool choicesPresented;
     private bool hasSelectableChoices;
     private float inputGuardUntil;
-    private float nextFastForwardTime;
     private float nextNavigationTime;
     private int heldNavigationDirection;
     private int suppressConfirmFrame = -1;
@@ -119,7 +116,6 @@ public sealed class DialogueManager : MonoBehaviour
             return;
 
         HandleChoiceNavigation();
-        HandleReadDialogueFastForward();
     }
 
     public bool TryStartDialogue(NPCInteractable interactable, GameObject player)
@@ -177,7 +173,6 @@ public sealed class DialogueManager : MonoBehaviour
         heldNavigationDirection = 0;
         suppressConfirmFrame = -1;
         inputGuardUntil = Time.unscaledTime + openingInputGuard;
-        nextFastForwardTime = inputGuardUntil;
         IsDialogueActive = true;
 
         ReleasePendingGameplayLockImmediately();
@@ -302,13 +297,14 @@ public sealed class DialogueManager : MonoBehaviour
 
         string conversationId = context.ConversationId;
         PlayerStats stats = context.PlayerStats;
-        currentNodeWasReadBefore = stats != null && stats.HasReadDialogueNode(conversationId, node.nodeId);
         TriggerNodeAnimation(node);
         PlayVoice(node.voiceClip);
 
         DialogueSpeakerData speaker = node.speaker;
         string speakerName = speaker != null ? speaker.ResolveDisplayName(stats) : string.Empty;
-        Sprite portrait = node.portraitOverride != null ? node.portraitOverride : speaker != null ? speaker.portrait : null;
+        Sprite portrait = node.portraitOverride != null
+            ? node.portraitOverride
+            : speaker != null ? speaker.ResolvePortrait(stats) : null;
         dialogueUI.ShowLine(speakerName, portrait, node.text ?? string.Empty);
     }
 
@@ -409,9 +405,13 @@ public sealed class DialogueManager : MonoBehaviour
         {
             pendingPlayerChoice = choice;
             PlayerStats stats = context.PlayerStats;
-            string playerName = stats != null ? stats.PlayerName : SaveSystem.DefaultPlayerName;
-            Sprite portrait = playerSpeaker != null ? playerSpeaker.portrait : null;
-            dialogueUI.ShowLine(playerName, portrait, choice.text ?? string.Empty);
+            string playerName = playerSpeaker != null
+                ? playerSpeaker.ResolveDisplayName(stats)
+                : stats != null ? stats.PlayerName : SaveSystem.DefaultPlayerName;
+            Sprite portrait = playerSpeaker != null
+                ? playerSpeaker.ResolvePortrait(stats)
+                : stats != null ? stats.PlayerPortrait : null;
+            dialogueUI.ShowLine(playerName, portrait, choice.ResolvePlayerSpokenText());
             return;
         }
 
@@ -530,8 +530,6 @@ public sealed class DialogueManager : MonoBehaviour
         if (suppressConfirmFrame == Time.frameCount)
             return;
 
-        nextFastForwardTime = Time.unscaledTime + fastForwardStepDelay;
-
         if (dialogueUI.IsTyping)
         {
             dialogueUI.CompleteLine();
@@ -614,33 +612,6 @@ public sealed class DialogueManager : MonoBehaviour
         }
     }
 
-    private void HandleReadDialogueFastForward()
-    {
-        if (pendingPlayerChoice != null || !currentNodeWasReadBefore || currentNode == null
-            || context.PlayerController.Controls == null || Time.unscaledTime < inputGuardUntil)
-            return;
-        if (!context.PlayerController.Controls.Player.Interact.IsPressed())
-            return;
-
-        float now = Time.unscaledTime;
-        if (now < nextFastForwardTime)
-            return;
-
-        if (dialogueUI.IsTyping)
-        {
-            dialogueUI.CompleteLine();
-            nextFastForwardTime = now + fastForwardStepDelay;
-            return;
-        }
-
-        // Una decisione non viene mai selezionata o saltata automaticamente.
-        if (currentNode.choices != null && currentNode.choices.Count > 0)
-            return;
-
-        nextFastForwardTime = now + fastForwardStepDelay;
-        AdvanceFromCurrentNode();
-    }
-
     private void SubscribeInput()
     {
         PlayerControls controls = context != null && context.PlayerController != null
@@ -649,8 +620,10 @@ public sealed class DialogueManager : MonoBehaviour
         if (controls == null)
             return;
 
-        controls.Player.Interact.performed -= confirmCallback;
-        controls.Player.Interact.performed += confirmCallback;
+        // Dialogue confirm uses the south face button (X/Cross on PlayStation),
+        // already mapped to Jump. The gameplay lock prevents an actual jump.
+        controls.Player.Jump.performed -= confirmCallback;
+        controls.Player.Jump.performed += confirmCallback;
         controls.Player.SprintOrDodge.performed -= cancelCallback;
         controls.Player.SprintOrDodge.performed += cancelCallback;
     }
@@ -663,7 +636,7 @@ public sealed class DialogueManager : MonoBehaviour
         if (controls == null)
             return;
 
-        controls.Player.Interact.performed -= confirmCallback;
+        controls.Player.Jump.performed -= confirmCallback;
         controls.Player.SprintOrDodge.performed -= cancelCallback;
     }
 
@@ -1032,13 +1005,11 @@ public sealed class DialogueManager : MonoBehaviour
         StopVoice();
 
         PlayerStats stats = context.PlayerStats;
-        currentNodeWasReadBefore = stats != null
-                                   && stats.HasReadDialogueNode(context.ConversationId, currentNode.nodeId);
         DialogueSpeakerData speaker = currentNode.speaker;
         string speakerName = speaker != null ? speaker.ResolveDisplayName(stats) : string.Empty;
         Sprite portrait = currentNode.portraitOverride != null
             ? currentNode.portraitOverride
-            : speaker != null ? speaker.portrait : null;
+            : speaker != null ? speaker.ResolvePortrait(stats) : null;
         PlayVoice(currentNode.voiceClip);
         dialogueUI.ShowLine(speakerName, portrait, currentNode.text ?? string.Empty);
     }

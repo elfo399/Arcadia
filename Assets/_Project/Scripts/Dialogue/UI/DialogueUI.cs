@@ -281,7 +281,12 @@ public sealed class DialogueUI : MonoBehaviour
                 continue;
 
             button.gameObject.SetActive(true);
-            button.interactable = viewModel.Enabled;
+            bool showHeardIndicator = viewModel.AlreadySeen && viewModel.Choice.showReadIndicator;
+            DialogueChoiceUI choiceUi = button.GetComponent<DialogueChoiceUI>();
+            if (choiceUi != null)
+                choiceUi.Bind(viewModel.Choice.text, viewModel.Enabled, showHeardIndicator);
+            else
+                button.interactable = viewModel.Enabled;
 
             var runtimeButton = new RuntimeChoiceButton
             {
@@ -290,11 +295,14 @@ public sealed class DialogueUI : MonoBehaviour
             };
             runtimeChoiceButtons.Add(runtimeButton);
 
-            TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
-            if (label != null)
-                label.text = BuildChoiceLabel(viewModel);
-            else
-                WarnAboutMissingChoiceLabel();
+            if (choiceUi == null)
+            {
+                TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
+                if (label != null)
+                    label.text = BuildChoiceLabel(viewModel);
+                else
+                    WarnAboutMissingChoiceLabel();
+            }
 
             // Keep any persistent feedback configured on the prefab. This
             // runtime listener is discarded together with the cloned button.
