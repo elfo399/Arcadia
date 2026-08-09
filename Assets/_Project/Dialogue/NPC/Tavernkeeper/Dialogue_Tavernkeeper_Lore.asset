@@ -1,0 +1,122 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5884b0f7a7c1081468bf7cce940b2367, type: 3}
+  m_Name: Dialogue_Taverniere_Lore
+  m_EditorClassIdentifier: 
+  conversationId: tavernkeeper_lore
+  startNodeId: tavernkeeper_service_menu
+  nodes:
+  - nodeId: tavernkeeper_service_menu
+    speaker: {fileID: 11400000, guid: 1d4988c67b20f5641bbb8778bddf9ad8, type: 2}
+    text: Che posso fare per te?
+    portraitOverride: {fileID: 0}
+    animationTrigger: 
+    voiceClip: {fileID: 0}
+    conditions:
+      logic: 0
+      negate: 0
+      conditions: []
+      groups: []
+    actionsOnEnter: []
+    actionsOnExit: []
+    nextNodeId: 
+    choices:
+    - choiceId: tavern_board
+      text: Guarda la bacheca
+      playerSpokenText: 
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions:
+      - type: 17
+        amount: 1
+        stopOnFailure: 1
+        id: 
+        item:
+          itemType: 0
+          item: {fileID: 0}
+          weapon: {fileID: 0}
+          armor: {fileID: 0}
+          magic: {fileID: 0}
+          usable: {fileID: 0}
+        questDefinition: {fileID: 0}
+        serviceId: tavern
+        teleportTargetId: 
+        teleportSceneName: 
+        useTeleportTargetRotation: 1
+      nextNodeId: 
+      returnNodeId: 
+      playerSpeaksChoice: 0
+      unavailableDisplay: 0
+      showReadIndicator: 0
+    - choiceId: tavernkeeper_talk
+      text: Parla.
+      playerSpokenText: Vorrei saperne di piu.
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions: []
+      nextNodeId: tavernkeeper_lore
+      returnNodeId: tavernkeeper_service_menu
+      playerSpeaksChoice: 1
+      unavailableDisplay: 0
+      showReadIndicator: 0
+    - choiceId: tavern_lore
+      text: Raccontami della locanda.
+      playerSpokenText: 
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions: []
+      nextNodeId: tavernkeeper_lore
+      returnNodeId: tavernkeeper_service_menu
+      playerSpeaksChoice: 1
+      unavailableDisplay: 0
+      showReadIndicator: 1
+    - choiceId: tavernkeeper_exit
+      text: Esci.
+      playerSpokenText: 
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions: []
+      nextNodeId: 
+      returnNodeId: 
+      playerSpeaksChoice: 0
+      unavailableDisplay: 0
+      showReadIndicator: 0
+  - nodeId: tavernkeeper_lore
+    speaker: {fileID: 11400000, guid: 1d4988c67b20f5641bbb8778bddf9ad8, type: 2}
+    text: Questa locanda ha visto passare mercanti, eroi e qualche bugiardo memorabile.
+    portraitOverride: {fileID: 0}
+    animationTrigger: 
+    voiceClip: {fileID: 0}
+    conditions:
+      logic: 0
+      negate: 0
+      conditions: []
+      groups: []
+    actionsOnEnter: []
+    actionsOnExit: []
+    nextNodeId: 
+    choices: []
+  references:
+    version: 2
+    RefIds: []

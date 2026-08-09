@@ -1,0 +1,168 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5884b0f7a7c1081468bf7cce940b2367, type: 3}
+  m_Name: Dialogue_Mago_Introduction
+  m_EditorClassIdentifier: 
+  conversationId: mage_introduction
+  startNodeId: mage_intro_greeting
+  nodes:
+  - nodeId: mage_intro_greeting
+    speaker: {fileID: 11400000, guid: 1e44de32882ae0549a455a6bb38983e2, type: 2}
+    text: Le correnti arcane ti hanno condotto fino a me.
+    portraitOverride: {fileID: 0}
+    animationTrigger: 
+    voiceClip: {fileID: 0}
+    conditions:
+      logic: 0
+      negate: 0
+      conditions: []
+      groups: []
+    actionsOnEnter: []
+    actionsOnExit: []
+    nextNodeId: mage_intro_farewell
+    choices: []
+  - nodeId: mage_intro_farewell
+    speaker: {fileID: 11400000, guid: 1e44de32882ae0549a455a6bb38983e2, type: 2}
+    text: Quando sarai pronto, parleremo di magia.
+    portraitOverride: {fileID: 0}
+    animationTrigger: 
+    voiceClip: {fileID: 0}
+    conditions:
+      logic: 0
+      negate: 0
+      conditions: []
+      groups: []
+    actionsOnEnter: []
+    actionsOnExit:
+    - type: 11
+      amount: 1
+      stopOnFailure: 0
+      id: met_mage
+      item:
+        itemType: 0
+        item: {fileID: 0}
+        weapon: {fileID: 0}
+        armor: {fileID: 0}
+        magic: {fileID: 0}
+        usable: {fileID: 0}
+      questDefinition: {fileID: 0}
+      serviceId: 
+      teleportTargetId: 
+      teleportSceneName: 
+      useTeleportTargetRotation: 1
+    nextNodeId: mage_service_menu
+    choices: []
+  - nodeId: mage_service_menu
+    speaker: {fileID: 11400000, guid: 1e44de32882ae0549a455a6bb38983e2, type: 2}
+    text: Che posso fare per te?
+    portraitOverride: {fileID: 0}
+    animationTrigger: 
+    voiceClip: {fileID: 0}
+    conditions:
+      logic: 0
+      negate: 0
+      conditions: []
+      groups: []
+    actionsOnEnter: []
+    actionsOnExit: []
+    nextNodeId: 
+    choices:
+    - choiceId: mage_service
+      text: Impara magie
+      playerSpokenText: 
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions:
+      - type: 17
+        amount: 1
+        stopOnFailure: 1
+        id: 
+        item:
+          itemType: 0
+          item: {fileID: 0}
+          weapon: {fileID: 0}
+          armor: {fileID: 0}
+          magic: {fileID: 0}
+          usable: {fileID: 0}
+        questDefinition: {fileID: 0}
+        serviceId: magic
+        teleportTargetId: 
+        teleportSceneName: 
+        useTeleportTargetRotation: 1
+      nextNodeId: 
+      returnNodeId: 
+      playerSpeaksChoice: 0
+      unavailableDisplay: 0
+      showReadIndicator: 0
+    - choiceId: mage_talk
+      text: Parla.
+      playerSpokenText: Vorrei saperne di piu.
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions: []
+      nextNodeId: mage_lore
+      returnNodeId: mage_service_menu
+      playerSpeaksChoice: 1
+      unavailableDisplay: 0
+      showReadIndicator: 0
+    - choiceId: mage_lore
+      text: Parlami delle rune.
+      playerSpokenText: 
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions: []
+      nextNodeId: mage_lore
+      returnNodeId: mage_service_menu
+      playerSpeaksChoice: 1
+      unavailableDisplay: 0
+      showReadIndicator: 1
+    - choiceId: mage_exit
+      text: Esci.
+      playerSpokenText: 
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions: []
+      nextNodeId: 
+      returnNodeId: 
+      playerSpeaksChoice: 0
+      unavailableDisplay: 0
+      showReadIndicator: 0
+  - nodeId: mage_lore
+    speaker: {fileID: 11400000, guid: 1e44de32882ae0549a455a6bb38983e2, type: 2}
+    text: "Ogni runa \xE8 una promessa: pronunciarla significa accettarne il prezzo."
+    portraitOverride: {fileID: 0}
+    animationTrigger: 
+    voiceClip: {fileID: 0}
+    conditions:
+      logic: 0
+      negate: 0
+      conditions: []
+      groups: []
+    actionsOnEnter: []
+    actionsOnExit: []
+    nextNodeId: 
+    choices: []
+  references:
+    version: 2
+    RefIds: []
