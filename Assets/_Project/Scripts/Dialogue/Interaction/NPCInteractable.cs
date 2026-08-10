@@ -5,7 +5,7 @@ public sealed class NPCInteractable : MonoBehaviour, IInteractable
 {
     [Header("Dialogue")]
     [SerializeField] private string prompt = "Parla";
-    [SerializeField] private DialogueProfile dialogueProfile;
+    [SerializeField] private NpcProfile npcProfile;
     [Tooltip("Attore principale usato per speaker, animazioni e orientamento.")]
     [SerializeField] private DialogueActor mainSpeakerActor;
     [Tooltip("Punto verso cui ruota il player. Se non assegnato usa il focus del main speaker.")]
@@ -23,7 +23,8 @@ public sealed class NPCInteractable : MonoBehaviour, IInteractable
     private bool warnedMissingManager;
     private bool warnedMissingProfile;
 
-    public DialogueProfile Profile => dialogueProfile;
+    public DialogueProfile Profile => npcProfile != null ? npcProfile.dialogueProfile : null;
+    public NpcProfile NpcProfile => npcProfile;
     public DialogueActor MainSpeakerActor => mainSpeakerActor;
     public DialogueSpeakerData MainSpeaker => mainSpeakerActor != null ? mainSpeakerActor.Speaker : null;
     public Transform LookTarget => lookTarget != null
@@ -60,7 +61,7 @@ public sealed class NPCInteractable : MonoBehaviour, IInteractable
         if (manager.IsDialogueActive)
             return;
 
-        if (dialogueProfile == null)
+        if (Profile == null)
         {
             if (!warnedMissingProfile)
             {
@@ -84,7 +85,7 @@ public sealed class NPCInteractable : MonoBehaviour, IInteractable
     {
         rotationSpeed = Mathf.Max(0f, rotationSpeed);
 
-        if (dialogueProfile == null)
+        if (Profile == null)
             Debug.LogWarning($"[NPCInteractable] DialogueProfile mancante su '{name}'.", this);
         if (mainSpeakerActor == null)
             Debug.LogWarning($"[NPCInteractable] Main Speaker Actor mancante su '{name}'.", this);

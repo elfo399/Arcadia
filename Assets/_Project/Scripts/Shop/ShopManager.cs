@@ -30,8 +30,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Transform slotParent;
     [SerializeField] private GridLayoutGroup slotGrid;
     [SerializeField] [Min(0)] private int initialSlotCount = 30;
-    [Header("Merchant")]
-    [SerializeField] private MerchantData merchantData;
+    private MerchantData currentMerchant;
 
     [Header("Initial State")]
     [SerializeField] private ShopMode initialMode = ShopMode.Buy;
@@ -82,10 +81,14 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Image detailImage;
     [SerializeField] private TextMeshProUGUI detailTitle;
     [Header("Prices")]
-    [SerializeField] private TextMeshProUGUI weaponPriceText;
-    [SerializeField] private TextMeshProUGUI shieldPriceText;
-    [SerializeField] private TextMeshProUGUI armorPriceText;
-    [SerializeField] private TextMeshProUGUI itemPriceText;
+    [SerializeField] private TextMeshProUGUI weaponBuyPriceText;
+    [SerializeField] private TextMeshProUGUI weaponSellPriceText;
+    [SerializeField] private TextMeshProUGUI shieldBuyPriceText;
+    [SerializeField] private TextMeshProUGUI shieldSellPriceText;
+    [SerializeField] private TextMeshProUGUI armorBuyPriceText;
+    [SerializeField] private TextMeshProUGUI armorSellPriceText;
+    [SerializeField] private TextMeshProUGUI itemBuyPriceText;
+    [SerializeField] private TextMeshProUGUI itemSellPriceText;
     [SerializeField] private TextMeshProUGUI weaponDescription;
     [SerializeField] private TextMeshProUGUI weaponDamageText;
     [SerializeField] private TextMeshProUGUI weaponCriticalText;
@@ -251,24 +254,31 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
     private void RefreshSelectedPrice(ScriptableObject asset)
     {
-        if (weaponPriceText != null) weaponPriceText.text = string.Empty;
-        if (shieldPriceText != null) shieldPriceText.text = string.Empty;
-        if (armorPriceText != null) armorPriceText.text = string.Empty;
-        if (itemPriceText != null) itemPriceText.text = string.Empty;
+        if (weaponBuyPriceText != null) weaponBuyPriceText.text = string.Empty;
+        if (weaponSellPriceText != null) weaponSellPriceText.text = string.Empty;
+        if (shieldBuyPriceText != null) shieldBuyPriceText.text = string.Empty;
+        if (shieldSellPriceText != null) shieldSellPriceText.text = string.Empty;
+        if (armorBuyPriceText != null) armorBuyPriceText.text = string.Empty;
+        if (armorSellPriceText != null) armorSellPriceText.text = string.Empty;
+        if (itemBuyPriceText != null) itemBuyPriceText.text = string.Empty;
+        if (itemSellPriceText != null) itemSellPriceText.text = string.Empty;
         if (asset == null) return;
-        float buyMultiplier = merchantData != null ? merchantData.buyMultiplier : 1f;
-        float sellMultiplier = merchantData != null ? merchantData.sellMultiplier : 0.5f;
-        TextMeshProUGUI target = GetPriceText(asset);
-        if (target != null)
-            target.text = GetPrice(asset, CurrentMode == ShopMode.Buy ? buyMultiplier : sellMultiplier).ToString();
+        float buyMultiplier = currentMerchant != null ? currentMerchant.buyMultiplier : 1f;
+        float sellMultiplier = currentMerchant != null ? currentMerchant.sellMultiplier : 0.5f;
+        TextMeshProUGUI buyTarget = GetPriceText(asset, true);
+        TextMeshProUGUI sellTarget = GetPriceText(asset, false);
+        if (buyTarget != null) buyTarget.text = GetPrice(asset, buyMultiplier).ToString();
+        if (sellTarget != null) sellTarget.text = GetPrice(asset, sellMultiplier).ToString();
     }
 
-    private TextMeshProUGUI GetPriceText(ScriptableObject asset)
+    private TextMeshProUGUI GetPriceText(ScriptableObject asset, bool buy)
     {
         if (asset is WeaponItem weapon)
-            return weapon.category == WeaponCategory.Shield ? shieldPriceText : weaponPriceText;
-        if (asset is ArmorItemData) return armorPriceText;
-        return itemPriceText;
+            return weapon.category == WeaponCategory.Shield
+                ? (buy ? shieldBuyPriceText : shieldSellPriceText)
+                : (buy ? weaponBuyPriceText : weaponSellPriceText);
+        if (asset is ArmorItemData) return buy ? armorBuyPriceText : armorSellPriceText;
+        return buy ? itemBuyPriceText : itemSellPriceText;
     }
 
     private static void SetText(TextMeshProUGUI target, string value)
@@ -312,13 +322,24 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
     public bool OpenShop()
     {
-        return OpenShop(initialMode);
+        return OpenShop(initialMode, currentMerchant);
     }
 
     public bool OpenShop(ShopMode mode = ShopMode.Buy)
     {
+        return OpenShop(mode, currentMerchant);
+    }
+
+    public bool OpenShop(ShopMode mode, MerchantData merchantData)
+    {
         if (isClosing)
             return false;
+
+        if (merchantData == null)
+        {
+            Debug.LogWarning("[ShopManager] MerchantData mancante: apertura annullata.", this);
+            return false;
+        }
 
         if (shopHud == null)
         {
@@ -335,6 +356,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         if (IsOpen)
         {
             CurrentMode = mode;
+            currentMerchant = merchantData;
             ApplyModeVisuals();
             RefreshPlayerCoins();
             RefreshShopContents();
@@ -344,6 +366,9 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
         controls = playerController.Controls;
         CurrentMode = mode;
+        currentMerchant = merchantData;
+        remainingStock.Clear();
+        stockLoaded = false;
         IsOpen = true;
         isInteractive = false;
         openingFrame = Time.frameCount;
@@ -455,9 +480,9 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         }
         shopItems.Clear();
         buyEntries.Clear();
-        if (merchantData != null && merchantData.stock != null)
+        if (currentMerchant != null && currentMerchant.stock != null)
         {
-            foreach (MerchantData.StockEntry entry in merchantData.stock)
+            foreach (MerchantData.StockEntry entry in currentMerchant.stock)
             {
                 if (entry == null || entry.item == null) continue;
                 if (!remainingStock.ContainsKey(entry)) remainingStock.Add(entry, Mathf.Max(0, entry.quantity));
@@ -471,10 +496,10 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
     public bool TryBuy()
     {
-        if (!IsOpen || CurrentMode != ShopMode.Buy || merchantData == null || playerInventory == null || playerStats == null || shopFocusIndex >= buyEntries.Count) return false;
+        if (!IsOpen || CurrentMode != ShopMode.Buy || currentMerchant == null || playerInventory == null || playerStats == null || shopFocusIndex >= buyEntries.Count) return false;
         MerchantData.StockEntry entry = buyEntries[shopFocusIndex];
         if (entry == null || entry.item == null || (!entry.infiniteStock && remainingStock[entry] <= 0)) return false;
-        int price = GetPrice(entry.item, merchantData.buyMultiplier);
+        int price = GetPrice(entry.item, currentMerchant.buyMultiplier);
         if (!playerStats.HasCoins(price) || !playerInventory.CanAddItem(entry.item, 1)) return false;
         if (!playerStats.TryRemoveCoins(price, false)) return false;
         if (!playerInventory.TryAddItem(entry.item, 1, false)) { playerStats.AddCoins(price, false); return false; }
@@ -488,7 +513,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         InventoryItem selected = shopItems[shopFocusIndex];
         ScriptableObject asset = GetItemAsset(selected);
         if (asset == null || playerInventory.IsInstanceEquipped(selected.instanceId)) return false;
-        int price = GetPrice(asset, merchantData != null ? merchantData.sellMultiplier : 0.5f);
+        int price = GetPrice(asset, currentMerchant != null ? currentMerchant.sellMultiplier : 0.5f);
         if (playerStats.runCoins > int.MaxValue - price) return false;
         bool removed = (selected.weaponData != null || selected.armorData != null)
             ? playerInventory.TryRemoveInstance(selected.instanceId, 1, out _, false)
@@ -501,31 +526,31 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     {
         if (stockLoaded) return;
         stockLoaded = true;
-        if (merchantData == null || merchantData.stock == null) return;
+        if (currentMerchant == null || currentMerchant.stock == null) return;
         SavedMerchantStockData[] saved = playerStats != null && playerStats.LoadedDataSnapshot != null
             ? playerStats.LoadedDataSnapshot.merchantStocks : null;
-        for (int i = 0; i < merchantData.stock.Count; i++)
+        for (int i = 0; i < currentMerchant.stock.Count; i++)
         {
-            MerchantData.StockEntry entry = merchantData.stock[i];
+            MerchantData.StockEntry entry = currentMerchant.stock[i];
             if (entry == null || entry.infiniteStock) continue;
             int quantity = Mathf.Max(0, entry.quantity);
             if (saved != null)
                 for (int j = 0; j < saved.Length; j++)
-                    if (saved[j] != null && saved[j].merchantId == merchantData.merchantId && saved[j].entryId == GetEntryId(entry, i)) { quantity = Mathf.Max(0, saved[j].remainingQuantity); break; }
+                    if (saved[j] != null && saved[j].merchantId == currentMerchant.merchantId && saved[j].entryId == GetEntryId(entry, i)) { quantity = Mathf.Max(0, saved[j].remainingQuantity); break; }
             remainingStock[entry] = quantity;
         }
     }
 
     private SavedMerchantStockData[] CreateMerchantStockSave()
     {
-        if (merchantData == null || merchantData.stock == null) return System.Array.Empty<SavedMerchantStockData>();
+        if (currentMerchant == null || currentMerchant.stock == null) return System.Array.Empty<SavedMerchantStockData>();
         List<SavedMerchantStockData> result = new List<SavedMerchantStockData>();
-        for (int i = 0; i < merchantData.stock.Count; i++)
+        for (int i = 0; i < currentMerchant.stock.Count; i++)
         {
-            MerchantData.StockEntry entry = merchantData.stock[i];
+            MerchantData.StockEntry entry = currentMerchant.stock[i];
             if (entry == null || entry.infiniteStock) continue;
             int remaining = remainingStock.ContainsKey(entry) ? remainingStock[entry] : entry.quantity;
-            result.Add(new SavedMerchantStockData { merchantId = merchantData.merchantId, entryId = GetEntryId(entry, i), remainingQuantity = Mathf.Max(0, remaining) });
+            result.Add(new SavedMerchantStockData { merchantId = currentMerchant.merchantId, entryId = GetEntryId(entry, i), remainingQuantity = Mathf.Max(0, remaining) });
         }
         return result.ToArray();
     }
@@ -551,7 +576,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         ScriptableObject asset = GetItemAsset(shopItems[shopFocusIndex]);
         if (button == null || asset == null) return;
         button.interactable = CurrentMode == ShopMode.Buy
-            ? playerStats != null && playerStats.HasCoins(GetPrice(asset, merchantData != null ? merchantData.buyMultiplier : 1f)) && playerInventory != null && playerInventory.CanAddItem(asset, 1)
+            ? playerStats != null && currentMerchant != null && playerStats.HasCoins(GetPrice(asset, currentMerchant.buyMultiplier)) && playerInventory != null && playerInventory.CanAddItem(asset, 1)
             : playerInventory != null && !playerInventory.IsInstanceEquipped(shopItems[shopFocusIndex].instanceId);
     }
 

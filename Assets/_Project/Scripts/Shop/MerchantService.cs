@@ -12,11 +12,19 @@ public sealed class MerchantService : NpcServiceBehaviour
         if (shopManager == null || context == null || context.Player == null)
             return false;
 
+        NpcProfile npcProfile = context.Interactable != null ? context.Interactable.NpcProfile : null;
+        MerchantData merchantData = npcProfile != null ? npcProfile.merchantData : null;
+        if (merchantData == null)
+        {
+            Debug.LogWarning("[MerchantService] MerchantData mancante nel NpcProfile dell'NPC.", this);
+            return false;
+        }
+
         activeContext = context;
         shopManager.Closed -= OnShopClosed;
         shopManager.Closed += OnShopClosed;
 
-        if (shopManager.OpenShop(openMode))
+        if (shopManager.OpenShop(openMode, merchantData))
             return true;
 
         shopManager.Closed -= OnShopClosed;

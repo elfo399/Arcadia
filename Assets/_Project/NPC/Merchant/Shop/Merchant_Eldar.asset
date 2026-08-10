@@ -14,8 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   merchantId: merchant
   stock:
-  - item: {fileID: 11400000, guid: 8dcc8513464141c40a0a38dc44690d46, type: 2}
+  - entryId: 
+    item: {fileID: 11400000, guid: 8dcc8513464141c40a0a38dc44690d46, type: 2}
     quantity: 10
     infiniteStock: 0
-  buyMultiplier: 2
-  sellMultiplier: 1
+  buyMultiplier: 1
+  sellMultiplier: 0.5

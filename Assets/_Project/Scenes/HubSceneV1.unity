@@ -7065,7 +7065,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   prompt: Parla con Eldar
-  dialogueProfile: {fileID: 11400000, guid: d5445abf9b1436341b732e0ac3249d0b, type: 2}
+  npcProfile: {fileID: 11400000, guid: be6f3a7d9c1e4b2fa5d7e90123456789, type: 2}
   mainSpeakerActor: {fileID: 243472635}
   lookTarget: {fileID: 243472633}
   rotatePlayerTowardsNpc: 1
@@ -19481,7 +19481,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   prompt: Parla con Eldar
-  dialogueProfile: {fileID: 11400000, guid: 09ac62e1d0b052c48a0ca16eabc0b8d1, type: 2}
+  npcProfile: {fileID: 11400000, guid: ad5e2f6c8b9d4a1eb3c5d7f901234567, type: 2}
   mainSpeakerActor: {fileID: 520882764}
   lookTarget: {fileID: 520882762}
   rotatePlayerTowardsNpc: 1
@@ -23689,7 +23689,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   prompt: Parla con Eldar
-  dialogueProfile: {fileID: 11400000, guid: d9472b9b3c1ede24bb91473ba21589ae, type: 2}
+  npcProfile: {fileID: 11400000, guid: 8b3f0d8c6d8b4f0b9a1c2d3e4f5a6b70, type: 2}
   mainSpeakerActor: {fileID: 646629101}
   lookTarget: {fileID: 646629098}
   rotatePlayerTowardsNpc: 1
@@ -42330,7 +42330,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   prompt: Parla con Eldar
-  dialogueProfile: {fileID: 11400000, guid: 32cebf7e0df21db4ebd7658bd8b38d29, type: 2}
+  npcProfile: {fileID: 11400000, guid: 9c4f1e9d7a654c5fa2b3c4d5e6f70819, type: 2}
   mainSpeakerActor: {fileID: 1266076232}
   lookTarget: {fileID: 1266076230}
   rotatePlayerTowardsNpc: 1
@@ -61157,7 +61157,6 @@ MonoBehaviour:
   slotParent: {fileID: 1201882909}
   slotGrid: {fileID: 1201882910}
   initialSlotCount: 30
-  merchantData: {fileID: 11400000, guid: 4cfd00b6e1ee44cf9fcd07a9c9f94d2a, type: 2}
   initialMode: 0
   contentAppearStateName: Transition
   contentAppearDelay: 0.5833333
@@ -61188,6 +61187,14 @@ MonoBehaviour:
   itemSellSelection: {fileID: 1761044228}
   detailImage: {fileID: 533272700}
   detailTitle: {fileID: 1776323299}
+  weaponBuyPriceText: {fileID: 1847295308}
+  weaponSellPriceText: {fileID: 1091219890}
+  shieldBuyPriceText: {fileID: 1144271897}
+  shieldSellPriceText: {fileID: 589332331}
+  armorBuyPriceText: {fileID: 2008475525}
+  armorSellPriceText: {fileID: 21711823}
+  itemBuyPriceText: {fileID: 1562467136}
+  itemSellPriceText: {fileID: 1697029083}
   weaponDescription: {fileID: 1169481849}
   weaponDamageText: {fileID: 566857087}
   weaponCriticalText: {fileID: 75093738}

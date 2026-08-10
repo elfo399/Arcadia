@@ -157,7 +157,7 @@ public static class DialogueBlacksmithSceneSetup
         Undo.RecordObject(interactable, "Configure Blacksmith Interaction");
         var serializedInteractable = new SerializedObject(interactable);
         SetString(serializedInteractable, "prompt", "Parla con Eldar");
-        SetObjectReference(serializedInteractable, "dialogueProfile", profile);
+        SetObjectReference(serializedInteractable, "npcProfile", AssetDatabase.LoadAssetAtPath<NpcProfile>("Assets/_Project/NPC/Blacksmith_Eldar/NpcProfile_Eldar.asset"));
         SetObjectReference(serializedInteractable, "mainSpeakerActor", actor);
         SetObjectReference(serializedInteractable, "lookTarget", blacksmith.transform);
         SetBool(serializedInteractable, "rotatePlayerTowardsNpc", true);
