@@ -2290,6 +2290,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 49554510}
+  - component: {fileID: 49554511}
+  - component: {fileID: 49554512}
+  - component: {fileID: 49554513}
   m_Layer: 0
   m_Name: BlacksmithManager
   m_TagString: Untagged
@@ -2312,6 +2315,79 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1990750080}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &49554511
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 49554509}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f5a1f49b3f94f0b96ef73b1d0a2b1c4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  blacksmithHud: {fileID: 179674904}
+  initialFocus: {fileID: 1250113943}
+  playerController: {fileID: 1149146438}
+  playerInventory: {fileID: 1149146443}
+  playerStats: {fileID: 1149146436}
+  playerCoinsText: {fileID: 0}
+  bookAnimator: {fileID: 496206194}
+  contentAppearAnimator: {fileID: 484635566}
+  contentGroup: {fileID: 49554514}
+  slotPrefab: {fileID: 3146139372920839725, guid: 8694c9e84f74c054fb9adb7618c38d3e, type: 3}
+  slotParent: {fileID: 1250113944}
+  slotGrid: {fileID: 1250113945}
+  initialSlotCount: 30
+  contentAppearStateName: Transition
+  contentAppearDelay: 0.5833333
+  contentAppearDuration: 1.8
+  bookCloseStateName: CloseBook
+  bookCloseDuration: 0.6666666
+  recipes: []
+--- !u!114 &49554512
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 49554509}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f5a1f49b3f94f0b96ef73b1d0a2b1c5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  serviceId: blacksmith_upgrade
+  blacksmithManager: {fileID: 49554511}
+  openMode: 0
+--- !u!114 &49554513
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 49554509}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f5a1f49b3f94f0b96ef73b1d0a2b1c5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  serviceId: blacksmith_craft
+  blacksmithManager: {fileID: 49554511}
+  openMode: 1
+--- !u!225 &49554514
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 444734016}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &52277878
 GameObject:
   m_ObjectHideFlags: 0
@@ -5268,7 +5344,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &179674905
 RectTransform:
   m_ObjectHideFlags: 0
@@ -16315,6 +16391,7 @@ GameObject:
   m_Component:
   - component: {fileID: 444734017}
   - component: {fileID: 444734018}
+  - component: {fileID: 49554514}
   m_Layer: 0
   m_Name: Body
   m_TagString: Untagged
@@ -29884,7 +29961,7 @@ GameObject:
   - component: {fileID: 869383126}
   - component: {fileID: 869383125}
   m_Layer: 0
-  m_Name: Buy
+  m_Name: Wallet
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -41644,6 +41721,66 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1249543278}
   m_CullTransparentMesh: 1
+--- !u!1 &1250113943
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1250113944}
+  - component: {fileID: 1250113945}
+  m_Layer: 0
+  m_Name: GridInv
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1250113944
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1250113943}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: -16.186735}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1550128148}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 3.8211, y: -3.7035}
+  m_SizeDelta: {x: 270.6122, y: 305.77}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1250113945
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1250113943}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a8695521f0d02e499659fee002a26c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Padding:
+    m_Left: 0
+    m_Right: 0
+    m_Top: 0
+    m_Bottom: 0
+  m_ChildAlignment: 4
+  m_StartCorner: 0
+  m_StartAxis: 0
+  m_CellSize: {x: 42, y: 42}
+  m_Spacing: {x: 6, y: 6}
+  m_Constraint: 1
+  m_ConstraintCount: 5
 --- !u!1 &1251698897
 GameObject:
   m_ObjectHideFlags: 0
@@ -49576,6 +49713,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1931619538}
+  - {fileID: 1250113944}
   m_Father: {fileID: 444734017}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}

@@ -175,7 +175,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         HideDetailSections();
         if (index < 0 || index >= shopItems.Count || shopItems[index] == null) { RefreshSelectedPrice(null); return; }
         InventoryItem item = shopItems[index];
-        RefreshSelectedPrice(GetItemAsset(item));
+        RefreshSelectedPrice(GetItemAsset(item), item);
         Sprite icon = GetItemIcon(item);
         if (detailImage != null)
         {
@@ -183,34 +183,37 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
             detailImage.enabled = icon != null;
             detailImage.preserveAspect = true;
         }
-        if (detailTitle != null) detailTitle.text = item.title ?? string.Empty;
+        if (detailTitle != null) detailTitle.text = item.weaponData != null
+            ? WeaponUpgradeCalculator.GetDisplayName(item)
+            : item.title ?? string.Empty;
         if (commonTitle != null) commonTitle.SetActive(true);
         if (commonImage != null) commonImage.SetActive(true);
         if (item.weaponData != null)
         {
             WeaponItem weapon = item.weaponData;
+            EffectiveWeaponStats effective = WeaponUpgradeCalculator.GetStats(item);
             if (detailTitle != null && !string.IsNullOrEmpty(weapon.weaponName))
-                detailTitle.text = weapon.weaponName;
+                detailTitle.text = effective.DisplayName;
             if (weapon.category == WeaponCategory.Shield)
             {
                 shieldSection?.SetActive(true);
                 SetText(shieldDescription, weapon.description);
-                SetText(shieldDamageText, weapon.physicalDamage.ToString());
-                SetText(shieldCriticalText, weapon.criticalHit.ToString("0.##"));
+                SetText(shieldDamageText, effective.PhysicalDamage.ToString());
+                SetText(shieldCriticalText, effective.CriticalHit.ToString("0.##"));
                 SetText(shieldWeightText, weapon.weight.ToString("0.##"));
-                SetText(shieldScalingText, weapon.GetScalingLabel());
+                SetText(shieldScalingText, GetScalingLabel(effective));
                 SetText(shieldRequirementsText, weapon.GetRequirementsLabel());
-                SetText(shieldPhysicalDefenseText, Mathf.RoundToInt(Mathf.Clamp01(weapon.physicalBlockPercent) * 100f).ToString());
-                SetText(shieldMagicDefenseText, Mathf.RoundToInt(Mathf.Clamp01(weapon.magicBlockPercent) * 100f).ToString());
+                SetText(shieldPhysicalDefenseText, Mathf.RoundToInt(effective.PhysicalBlockPercent * 100f).ToString());
+                SetText(shieldMagicDefenseText, Mathf.RoundToInt(effective.MagicBlockPercent * 100f).ToString());
             }
             else
             {
                 weaponSection?.SetActive(true);
                 SetText(weaponDescription, weapon.description);
-                SetText(weaponDamageText, weapon.physicalDamage.ToString());
-                SetText(weaponCriticalText, weapon.criticalHit.ToString("0.##"));
+                SetText(weaponDamageText, effective.PhysicalDamage.ToString());
+                SetText(weaponCriticalText, effective.CriticalHit.ToString("0.##"));
                 SetText(weaponWeightText, weapon.weight.ToString("0.##"));
-                SetText(weaponScalingText, weapon.GetScalingLabel());
+                SetText(weaponScalingText, GetScalingLabel(effective));
                 SetText(weaponRequirementsText, weapon.GetRequirementsLabel());
             }
         }
@@ -249,7 +252,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         RefreshSelectedPrice(null);
     }
 
-    private void RefreshSelectedPrice(ScriptableObject asset)
+    private void RefreshSelectedPrice(ScriptableObject asset, InventoryItem instance = null)
     {
         if (weaponBuyPriceText != null) weaponBuyPriceText.text = string.Empty;
         if (weaponSellPriceText != null) weaponSellPriceText.text = string.Empty;
@@ -265,7 +268,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         TextMeshProUGUI buyTarget = GetPriceText(asset, true);
         TextMeshProUGUI sellTarget = GetPriceText(asset, false);
         if (buyTarget != null) buyTarget.text = GetPrice(asset, buyMultiplier).ToString();
-        if (sellTarget != null) sellTarget.text = GetPrice(asset, sellMultiplier).ToString();
+        if (sellTarget != null) sellTarget.text = GetPrice(instance, asset, sellMultiplier).ToString();
     }
 
     private TextMeshProUGUI GetPriceText(ScriptableObject asset, bool buy)
@@ -506,7 +509,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         InventoryItem selected = shopItems[shopFocusIndex];
         ScriptableObject asset = GetItemAsset(selected);
         if (asset == null || playerInventory.IsInstanceEquipped(selected.instanceId)) return false;
-        int price = GetPrice(asset, currentMerchant != null ? currentMerchant.sellMultiplier : 0.5f);
+        int price = GetPrice(selected, asset, currentMerchant != null ? currentMerchant.sellMultiplier : 0.5f);
         if (playerStats.runCoins > int.MaxValue - price) return false;
         bool removed = (selected.weaponData != null || selected.armorData != null)
             ? playerInventory.TryRemoveInstance(selected.instanceId, 1, out _, false)
@@ -560,6 +563,28 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     {
         int value = asset is WeaponItem weapon ? weapon.baseValue : asset is ArmorItemData armor ? armor.baseValue : asset is UsableItemData usable ? usable.baseValue : asset is MagicItemData magic ? magic.baseValue : asset is ItemData item ? item.baseValue : 0;
         return Mathf.Max(1, Mathf.RoundToInt(Mathf.Max(0f, value) * Mathf.Max(0f, multiplier)));
+    }
+
+    private static int GetPrice(InventoryItem instance, ScriptableObject asset, float multiplier)
+    {
+        int value = instance != null && instance.weaponData != null
+            ? WeaponUpgradeCalculator.GetEffectiveValue(instance)
+            : asset is WeaponItem weapon ? weapon.baseValue
+            : asset is ArmorItemData armor ? armor.baseValue
+            : asset is UsableItemData usable ? usable.baseValue
+            : asset is MagicItemData magic ? magic.baseValue
+            : asset is ItemData item ? item.baseValue : 0;
+        return Mathf.Max(1, Mathf.RoundToInt(Mathf.Max(0f, value) * Mathf.Max(0f, multiplier)));
+    }
+
+    private static string GetScalingLabel(EffectiveWeaponStats stats)
+    {
+        var parts = new System.Collections.Generic.List<string>();
+        if (stats.StrengthScalingRank != WeaponItem.ScalingRank.None) parts.Add("STR " + stats.StrengthScalingRank);
+        if (stats.DexterityScalingRank != WeaponItem.ScalingRank.None) parts.Add("DEX " + stats.DexterityScalingRank);
+        if (stats.IntelligenceScalingRank != WeaponItem.ScalingRank.None) parts.Add("INT " + stats.IntelligenceScalingRank);
+        if (stats.FaithScalingRank != WeaponItem.ScalingRank.None) parts.Add("FAI " + stats.FaithScalingRank);
+        return string.Join(" / ", parts);
     }
 
     private void ApplyModeVisuals()

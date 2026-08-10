@@ -91,10 +91,15 @@ public class WeaponDamage : MonoBehaviour
             return;
         }
 
+        InventoryItem currentInstance = playerInventory.GetInventoryItemForHand(hand);
         currentWeapon = playerInventory.GetWeaponForHand(hand);
-        if (currentWeapon != null)
+        if (currentInstance != null && currentInstance.weaponData != null)
         {
-            damage = Mathf.Max(0, currentWeapon.physicalDamage);
+            damage = Mathf.Max(0, WeaponUpgradeCalculator.GetStats(currentInstance).PhysicalDamage);
+        }
+        else if (currentWeapon != null)
+        {
+            damage = Mathf.Max(0, WeaponUpgradeCalculator.GetStats(currentWeapon).PhysicalDamage);
         }
         else
         {

@@ -19,6 +19,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private const float MagicDefensePerMind = 0.5f;
     public static PlayerStats instance;
     private readonly MerchantStockState merchantStockState = new MerchantStockState();
+    private readonly BlacksmithProgressionState blacksmithProgression = new BlacksmithProgressionState();
 
     [Header("Health")]
     public float maxHealth = 100f;
@@ -157,6 +158,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public bool IsPersistentStateReady => loadedQuestStateApplied && loadedInventoryStateApplied;
     public GameData LoadedDataSnapshot => loadedDataCache;
     public MerchantStockState MerchantStockState => merchantStockState;
+    public BlacksmithProgressionState BlacksmithProgression => blacksmithProgression;
     public int EffectiveVigor => Mathf.Max(1, vigor + temporaryVigorBonus);
     public int EffectiveMind => Mathf.Max(1, mind + temporaryMindBonus);
     public int EffectiveEndurance => Mathf.Max(1, endurance + temporaryEnduranceBonus);
@@ -622,6 +624,18 @@ public class PlayerStats : MonoBehaviour, IDamageable
         return normalized.Length > 0 && storyFlags.Contains(normalized);
     }
 
+    public bool LearnBlacksmithRecipe(string recipeId, bool save = true)
+    {
+        bool changed = blacksmithProgression.LearnRecipe(recipeId);
+        if (changed && save) SaveStats();
+        return changed;
+    }
+
+    public bool KnowsBlacksmithRecipe(string recipeId)
+    {
+        return blacksmithProgression.KnowsRecipe(recipeId);
+    }
+
     public bool SetStoryFlag(string flagId, bool save = true)
     {
         string normalized = NormalizeStoryFlagId(flagId);
@@ -784,6 +798,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
             }
         };
         data.merchantStocks = merchantStockState.Export();
+        data.blacksmith = new SavedBlacksmithData
+        {
+            knownRecipeIds = blacksmithProgression.Export()
+        };
 
         var questManager = GetCachedQuestManager();
         if (questManager != null)
@@ -1863,6 +1881,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
         dialogueHistory.Import(
             savedHistory != null ? savedHistory.readNodeKeys : null,
             savedHistory != null ? savedHistory.selectedChoiceKeys : null);
+
+        SavedBlacksmithData savedBlacksmith = data != null ? data.blacksmith : null;
+        blacksmithProgression.Import(savedBlacksmith != null ? savedBlacksmith.knownRecipeIds : null);
     }
 
     private bool TryModifyPersistentValue(ref int currentValue, int amount, bool save)

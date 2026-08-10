@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Text;
+using System.Collections.Generic;
 
 [CreateAssetMenu(menuName = "RogueLike/Weapon")]
 public class WeaponItem : ScriptableObject
@@ -30,6 +31,25 @@ public class WeaponItem : ScriptableObject
     // Display name of the weapon
     public string weaponName;
     [Min(0)] public int baseValue = 1;
+
+    [Header("Blacksmith")]
+    public WeaponRarity rarity = WeaponRarity.Common;
+    public bool canUpgrade = true;
+    public bool canCraft = false;
+    [Min(0)] public int upgradeCoinCost = 0;
+    public List<UpgradeMaterialRequirement> upgradeMaterialRequirements = new List<UpgradeMaterialRequirement>();
+    public List<UpgradeCostStage> upgradeCostStages = new List<UpgradeCostStage>();
+    [Min(0f)] public float physicalDamageGrowth = 0.05f;
+    [Min(0f)] public float magicDamageGrowth = 0.05f;
+    [Min(0f)] public float criticalHitGrowth = 0f;
+    [Min(0f)] public float criticalChanceGrowth = 0f;
+    [Min(0)] public int strengthScalingRankGrowth = 0;
+    [Min(0)] public int dexterityScalingRankGrowth = 0;
+    [Min(0)] public int intelligenceScalingRankGrowth = 0;
+    [Min(0)] public int faithScalingRankGrowth = 0;
+    [Min(0f)] public float physicalBlockGrowth = 0f;
+    [Min(0f)] public float magicBlockGrowth = 0f;
+    [Min(0f)] public float stabilityGrowth = 0f;
 
     [Header("Visual")]
     // Icon used in UI slots
@@ -179,6 +199,11 @@ public class WeaponItem : ScriptableObject
         return RankToFactor(intelligenceScalingRank);
     }
 
+    public float GetFaithScalingFactor()
+    {
+        return RankToFactor(faithScalingRank);
+    }
+
     public string GetScalingLabel()
     {
         StringBuilder sb = new StringBuilder(48);
@@ -245,6 +270,30 @@ public class WeaponItem : ScriptableObject
         if (hasStructured)
             requirements = GetRequirementsLabel();
         scaling = GetScalingLabel();
+        baseValue = Mathf.Max(0, baseValue);
+        upgradeCoinCost = Mathf.Max(0, upgradeCoinCost);
+        physicalDamageGrowth = Mathf.Max(0f, physicalDamageGrowth);
+        magicDamageGrowth = Mathf.Max(0f, magicDamageGrowth);
+        criticalHitGrowth = Mathf.Max(0f, criticalHitGrowth);
+        criticalChanceGrowth = Mathf.Max(0f, criticalChanceGrowth);
+        strengthScalingRankGrowth = Mathf.Max(0, strengthScalingRankGrowth);
+        dexterityScalingRankGrowth = Mathf.Max(0, dexterityScalingRankGrowth);
+        intelligenceScalingRankGrowth = Mathf.Max(0, intelligenceScalingRankGrowth);
+        faithScalingRankGrowth = Mathf.Max(0, faithScalingRankGrowth);
+        physicalBlockGrowth = Mathf.Max(0f, physicalBlockGrowth);
+        magicBlockGrowth = Mathf.Max(0f, magicBlockGrowth);
+        stabilityGrowth = Mathf.Max(0f, stabilityGrowth);
+        if (upgradeMaterialRequirements == null)
+            upgradeMaterialRequirements = new List<UpgradeMaterialRequirement>();
+        if (upgradeCostStages == null)
+            upgradeCostStages = new List<UpgradeCostStage>();
+        for (int i = 0; i < upgradeCostStages.Count; i++)
+        {
+            UpgradeCostStage stage = upgradeCostStages[i];
+            if (stage == null) continue;
+            stage.minimumTargetLevel = Mathf.Max(1, stage.minimumTargetLevel);
+            stage.coinCost = Mathf.Max(0, stage.coinCost);
+        }
     }
 #endif
 }
