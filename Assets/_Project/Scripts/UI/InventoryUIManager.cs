@@ -723,9 +723,12 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (itemDesc != null) itemDesc.text = description ?? string.Empty;
     }
 
-    private void ShowWeaponDetail(WeaponItem weapon, Sprite icon, string title, string description)
+    private void ShowWeaponDetail(InventoryItem inventoryItem, WeaponItem weapon, Sprite icon, string title, string description)
     {
         bool isShield = weapon.category == WeaponCategory.Shield;
+        EffectiveWeaponStats effective = inventoryItem != null
+            ? WeaponUpgradeCalculator.GetStats(inventoryItem)
+            : WeaponUpgradeCalculator.GetStats(weapon);
 
         if (weaponDetailRoot != null) weaponDetailRoot.SetActive(true);
         if (weaponDescriptionRoot != null) weaponDescriptionRoot.SetActive(!isShield);
@@ -739,23 +742,23 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
         if (isShield)
         {
-            if (shieldDamageText != null) shieldDamageText.text = weapon.physicalDamage.ToString();
-            if (shieldCriticalText != null) shieldCriticalText.text = weapon.criticalHit.ToString("0.##");
+            if (shieldDamageText != null) shieldDamageText.text = effective.PhysicalDamage.ToString();
+            if (shieldCriticalText != null) shieldCriticalText.text = effective.CriticalHit.ToString("0.##");
             if (shieldWeightText != null) shieldWeightText.text = weapon.weight.ToString("0.##");
-            if (shieldScalingText != null) shieldScalingText.text = weapon.GetScalingLabel();
+            if (shieldScalingText != null) shieldScalingText.text = GetScalingLabel(effective, weapon);
             if (shieldRequirementsText != null) shieldRequirementsText.text = weapon.GetRequirementsLabel();
             if (weaponPhysicalDefenseText != null)
-                weaponPhysicalDefenseText.text = Mathf.RoundToInt(Mathf.Clamp01(weapon.physicalBlockPercent) * 100f).ToString();
+                weaponPhysicalDefenseText.text = Mathf.RoundToInt(effective.PhysicalBlockPercent * 100f).ToString();
             if (weaponMagicDefenseText != null)
-                weaponMagicDefenseText.text = Mathf.RoundToInt(Mathf.Clamp01(weapon.magicBlockPercent) * 100f).ToString();
+                weaponMagicDefenseText.text = Mathf.RoundToInt(effective.MagicBlockPercent * 100f).ToString();
             SetWeaponStatsRootActive(false);
             return;
         }
 
-        if (weaponDamageText != null) weaponDamageText.text = weapon.physicalDamage.ToString();
-        if (weaponCriticalText != null) weaponCriticalText.text = weapon.criticalHit.ToString("0.##");
+        if (weaponDamageText != null) weaponDamageText.text = effective.PhysicalDamage.ToString();
+        if (weaponCriticalText != null) weaponCriticalText.text = effective.CriticalHit.ToString("0.##");
         if (weaponWeightText != null) weaponWeightText.text = weapon.weight.ToString("0.##");
-        if (weaponScalingText != null) weaponScalingText.text = weapon.GetScalingLabel();
+        if (weaponScalingText != null) weaponScalingText.text = GetScalingLabel(effective, weapon);
         if (weaponRequirementsText != null) weaponRequirementsText.text = weapon.GetRequirementsLabel();
         SetWeaponStatsRootActive(true);
     }
@@ -776,6 +779,16 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (armorMagicDefenseText != null) armorMagicDefenseText.text = armor.magicDefense.ToString();
 
         return true;
+    }
+
+    private static string GetScalingLabel(EffectiveWeaponStats stats, WeaponItem fallback)
+    {
+        var parts = new System.Collections.Generic.List<string>();
+        if (stats.StrengthScalingRank != WeaponItem.ScalingRank.None) parts.Add("STR " + stats.StrengthScalingRank);
+        if (stats.DexterityScalingRank != WeaponItem.ScalingRank.None) parts.Add("DEX " + stats.DexterityScalingRank);
+        if (stats.IntelligenceScalingRank != WeaponItem.ScalingRank.None) parts.Add("INT " + stats.IntelligenceScalingRank);
+        if (stats.FaithScalingRank != WeaponItem.ScalingRank.None) parts.Add("FAI " + stats.FaithScalingRank);
+        return parts.Count > 0 ? string.Join(" / ", parts) : (fallback != null ? fallback.GetScalingLabel() : string.Empty);
     }
 
     private void ShowGenericItemDetail(Sprite icon, string title, string description)
@@ -821,7 +834,7 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         HideDetailViews();
 
         Sprite icon = GetItemIcon(item);
-        string title = item.title;
+        string title = item.weaponData != null ? WeaponUpgradeCalculator.GetDisplayName(item) : item.title;
         string description = item.description;
 
         var weapon = item.weaponData;
@@ -832,10 +845,10 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
         if (weapon != null)
         {
             if (weapon.icon != null) icon = weapon.icon;
-            if (!string.IsNullOrEmpty(weapon.weaponName)) title = weapon.weaponName;
+            if (!string.IsNullOrEmpty(weapon.weaponName)) title = WeaponUpgradeCalculator.GetDisplayName(item);
             if (!string.IsNullOrEmpty(weapon.description)) description = weapon.description;
 
-            ShowWeaponDetail(weapon, icon, title, description);
+            ShowWeaponDetail(item, weapon, icon, title, description);
             equipmentManager?.RefreshEquipmentCross();
             UpdateEquipButtonState();
             return;

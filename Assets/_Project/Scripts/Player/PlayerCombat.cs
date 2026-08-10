@@ -251,13 +251,14 @@ public class PlayerCombat : MonoBehaviour
         if (amount <= 0f || stats == null)
             return false;
 
-        WeaponItem blockingShield = GetActiveBlockingShield();
-        if (blockingShield == null)
+        InventoryItem blockingShieldItem = GetActiveBlockingShield();
+        if (blockingShieldItem == null || blockingShieldItem.weaponData == null)
             return false;
+        EffectiveWeaponStats blockingShield = WeaponUpgradeCalculator.GetStats(blockingShieldItem);
         if (sourcePosition.HasValue && !IsWithinBlockAngle(sourcePosition.Value))
             return false;
 
-        float stabilityFactor = 1f - Mathf.Clamp01(blockingShield.stability * Mathf.Max(0f, blockStabilityScale));
+        float stabilityFactor = 1f - Mathf.Clamp01(blockingShield.Stability * Mathf.Max(0f, blockStabilityScale));
         float staminaCost = Mathf.Max(minimumBlockStaminaCost, amount * Mathf.Max(0.1f, stabilityFactor));
         if (!stats.HasStamina(staminaCost))
         {
@@ -267,8 +268,8 @@ public class PlayerCombat : MonoBehaviour
 
         stats.SpendStamina(staminaCost);
         float blockedPercent = damageType == WeaponItem.DamageType.Magic
-            ? Mathf.Clamp01(blockingShield.magicBlockPercent)
-            : Mathf.Clamp01(blockingShield.physicalBlockPercent);
+            ? blockingShield.MagicBlockPercent
+            : blockingShield.PhysicalBlockPercent;
         amount *= (1f - blockedPercent);
         if (stats.currentStamina <= 0.01f)
             TriggerGuardBreak();
@@ -300,23 +301,25 @@ public class PlayerCombat : MonoBehaviour
         return angle <= Mathf.Clamp(blockFrontAngle, 1f, 180f) * 0.5f;
     }
 
-    private WeaponItem GetActiveBlockingShield()
+    private InventoryItem GetActiveBlockingShield()
     {
-        WeaponItem best = null;
+        InventoryItem best = null;
 
         if (isBlockingLeft)
         {
-            var left = inventory != null ? inventory.GetWeaponForHand(Hand.Left) : null;
-            if (left != null && left.category == WeaponCategory.Shield && left.canBlock)
+            var left = inventory != null ? inventory.GetInventoryItemForHand(Hand.Left) : null;
+            if (left != null && left.weaponData != null && left.weaponData.category == WeaponCategory.Shield && left.weaponData.canBlock)
                 best = left;
         }
 
         if (isBlockingRight)
         {
-            var right = inventory != null ? inventory.GetWeaponForHand(Hand.Right) : null;
-            if (right != null && right.category == WeaponCategory.Shield && right.canBlock)
+            var right = inventory != null ? inventory.GetInventoryItemForHand(Hand.Right) : null;
+            if (right != null && right.weaponData != null && right.weaponData.category == WeaponCategory.Shield && right.weaponData.canBlock)
             {
-                if (best == null || right.physicalBlockPercent > best.physicalBlockPercent)
+                float rightBlock = WeaponUpgradeCalculator.GetStats(right).PhysicalBlockPercent;
+                float bestBlock = best != null ? WeaponUpgradeCalculator.GetStats(best).PhysicalBlockPercent : -1f;
+                if (best == null || rightBlock > bestBlock)
                     best = right;
             }
         }
@@ -547,6 +550,7 @@ public class PlayerCombat : MonoBehaviour
     void TryAttack(Hand hand, AttackType type)
     {
         // 1. Recupera l'arma (o i Pugni se slot vuoto)
+        InventoryItem weaponInstance = inventory.GetInventoryItemForHand(hand);
         WeaponItem weapon = inventory.GetWeaponForHand(hand);
 
         // DEBUG SICUREZZA 1: Arma mancante
@@ -559,12 +563,12 @@ public class PlayerCombat : MonoBehaviour
 
         if (weapon.category == WeaponCategory.Wand)
         {
-            TryCastWithWand(weapon, hand, type);
+            TryCastWithWand(weapon, hand, type, weaponInstance);
             return;
         }
         if (weapon.category == WeaponCategory.Bow)
         {
-            TryShootBow(weapon, hand, type);
+            TryShootBow(weapon, hand, type, weaponInstance);
             return;
         }
 
@@ -580,7 +584,7 @@ public class PlayerCombat : MonoBehaviour
 
         // 3. Esegui
         stats.SpendStamina(staminaCost);
-        PerformAttack(weapon, hand, type);
+        PerformAttack(weapon, weaponInstance, hand, type);
     }
 
     private bool TryHandleWeaponThrowInput()
@@ -604,6 +608,7 @@ public class PlayerCombat : MonoBehaviour
     {
         if (inventory == null || stats == null) return false;
 
+        InventoryItem equippedInstance = inventory.GetInventoryItemForHand(hand);
         WeaponItem equipped = hand == Hand.Right ? inventory.GetCurrentRightWeapon() : inventory.GetCurrentLeftWeapon();
         if (equipped == null) return false;
         if (hand == Hand.Right && equipped == inventory.unarmedRight) return false;
@@ -634,7 +639,10 @@ public class PlayerCombat : MonoBehaviour
 
         stats.SpendStamina(staminaCost);
 
-        var computed = ComputeAttackDamage(thrownWeapon, AttackType.Light);
+        InventoryItem thrownInstance = new InventoryItem(thrownWeapon, 1);
+        thrownInstance.instanceId = thrownInstanceId;
+        thrownInstance.upgradeLevel = equippedInstance != null ? equippedInstance.upgradeLevel : 0;
+        var computed = ComputeAttackDamage(thrownWeapon, AttackType.Light, thrownInstance);
         Vector3 fireDir = GetThrowDirection();
         Vector3 spawnPos = transform.position
                            + transform.forward * throwSpawnForwardOffset
@@ -649,7 +657,7 @@ public class PlayerCombat : MonoBehaviour
         return true;
     }
 
-    private void TryCastWithWand(WeaponItem wand, Hand hand, AttackType type)
+    private void TryCastWithWand(WeaponItem wand, Hand hand, AttackType type, InventoryItem weaponInstance = null)
     {
         if (wand == null || stats == null) return;
         if (rangedActionRoutine != null) return;
@@ -673,7 +681,7 @@ public class PlayerCombat : MonoBehaviour
             float cooldown = Mathf.Max(0f, wand.wandLightCooldown);
             if (Time.time < lastWandLightCastTime[handIndex] + cooldown) return;
 
-            var computed = ComputeAttackDamage(wand, AttackType.Light);
+            var computed = ComputeAttackDamage(wand, AttackType.Light, weaponInstance);
             int damage = computed.damage;
             Vector3 spawnPos = GetSpawnPosition(magicCastPoint, wand.wandLightSpawnOffset, fireDir);
             if (!TryPlayWeaponActionAnimation(wand, hand, AttackType.Light, out string lightAnim))
@@ -715,7 +723,7 @@ public class PlayerCombat : MonoBehaviour
         });
     }
 
-    private void TryShootBow(WeaponItem bow, Hand hand, AttackType type)
+    private void TryShootBow(WeaponItem bow, Hand hand, AttackType type, InventoryItem weaponInstance = null)
     {
         if (bow == null || stats == null || inventory == null) return;
         if (rangedActionRoutine != null) return;
@@ -734,7 +742,7 @@ public class PlayerCombat : MonoBehaviour
 
         Vector3 fireDir = GetMagicFireDirection();
         Vector3 spawnPos = GetSpawnPosition(magicCastPoint, bow.bowSpawnOffset, fireDir);
-        var computed = ComputeAttackDamage(bow, type);
+        var computed = ComputeAttackDamage(bow, type, weaponInstance);
         int damage = computed.damage;
         if (!TryPlayWeaponActionAnimation(bow, hand, type, out string bowAnim))
             return;
@@ -971,7 +979,7 @@ public class PlayerCombat : MonoBehaviour
         return baseDir.normalized;
     }
 
-    void PerformAttack(WeaponItem weapon, Hand hand, AttackType type)
+    void PerformAttack(WeaponItem weapon, InventoryItem weaponInstance, Hand hand, AttackType type)
     {
         // DEBUG SICUREZZA 3: Profilo Animazioni
         if (weapon.animationProfile == null)
@@ -989,7 +997,7 @@ public class PlayerCombat : MonoBehaviour
             return;
         }
 
-        var computed = ComputeAttackDamage(weapon, type);
+        var computed = ComputeAttackDamage(weapon, type, weaponInstance);
         if (animationEvents != null)
             animationEvents.PrepareAttackDamage(hand, computed.damage, computed.isCritical, type);
 
@@ -1068,21 +1076,24 @@ public class PlayerCombat : MonoBehaviour
         controller?.menuManager?.RefreshEquipmentUI();
     }
 
-    private (int damage, bool isCritical) ComputeAttackDamage(WeaponItem weapon, AttackType type)
+    private (int damage, bool isCritical) ComputeAttackDamage(WeaponItem weapon, AttackType type, InventoryItem weaponInstance = null)
     {
         if (weapon == null || stats == null)
             return (0, false);
 
         bool isRangedWeapon = weapon.rangeType == WeaponItem.WeaponRangeType.Ranged;
         bool isMagicWeapon = weapon.damageType == WeaponItem.DamageType.Magic;
+        EffectiveWeaponStats effective = weaponInstance != null && weaponInstance.weaponData == weapon
+            ? WeaponUpgradeCalculator.GetStats(weaponInstance)
+            : WeaponUpgradeCalculator.GetStats(weapon);
         float playerBaseDamage = isRangedWeapon
             ? Mathf.Max(0, stats.GetBaseRangedDamage())
             : (isMagicWeapon
                 ? Mathf.Max(0, stats.GetBaseMagicDamage())
                 : Mathf.Max(0, stats.GetBasePhysicalDamage()));
         float weaponBaseDamage = isMagicWeapon
-            ? Mathf.Max(0, weapon.magicDamage)
-            : Mathf.Max(0, weapon.physicalDamage);
+            ? Mathf.Max(0, effective.MagicDamage)
+            : Mathf.Max(0, effective.PhysicalDamage);
         float baseDamage = playerBaseDamage + weaponBaseDamage;
 
         // Lo scaling viene definito nel WeaponData:
@@ -1092,19 +1103,21 @@ public class PlayerCombat : MonoBehaviour
         if (isRangedWeapon)
         {
             // Ranged: scala con DEX (archi e affini)
-            scalingBonus = Mathf.Max(0f, weapon.GetDexterityScalingFactor())
+            scalingBonus = Mathf.Max(0f, effective.DexterityScalingFactor)
                            * PlayerStats.GetEffectiveAttributeValue(stats.EffectiveDexterity);
         }
         else if (isMagicWeapon)
         {
-            scalingBonus = Mathf.Max(0f, weapon.GetIntelligenceScalingFactor())
-                           * PlayerStats.GetEffectiveAttributeValue(stats.EffectiveIntelligence);
+            scalingBonus = Mathf.Max(0f, effective.IntelligenceScalingFactor)
+                           * PlayerStats.GetEffectiveAttributeValue(stats.EffectiveIntelligence)
+                           + Mathf.Max(0f, effective.FaithScalingFactor)
+                           * PlayerStats.GetEffectiveAttributeValue(stats.EffectiveFaith);
         }
         else
         {
-            scalingBonus = Mathf.Max(0f, weapon.GetStrengthScalingFactor())
+            scalingBonus = Mathf.Max(0f, effective.StrengthScalingFactor)
                            * PlayerStats.GetEffectiveAttributeValue(stats.EffectiveStrength)
-                           + Mathf.Max(0f, weapon.GetDexterityScalingFactor())
+                           + Mathf.Max(0f, effective.DexterityScalingFactor)
                            * PlayerStats.GetEffectiveAttributeValue(stats.EffectiveDexterity);
         }
 
@@ -1115,11 +1128,11 @@ public class PlayerCombat : MonoBehaviour
         float rawDamage = (baseDamage + scalingBonus) * attackMultiplier;
 
         bool isCritical = false;
-        float critChance = Mathf.Clamp01(weapon.criticalChance);
+        float critChance = effective.CriticalChance;
         if (critChance > 0f && Random.value <= critChance)
         {
             isCritical = true;
-            rawDamage *= Mathf.Max(1f, weapon.criticalHit);
+            rawDamage *= effective.CriticalHit;
         }
 
         // Se i requisiti non sono soddisfatti, il danno effettivo è al 50%.

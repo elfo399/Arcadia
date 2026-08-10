@@ -106,8 +106,8 @@ MonoBehaviour:
       playerSpeaksChoice: 0
       unavailableDisplay: 0
       showReadIndicator: 0
-    - choiceId: buy
-      text: Compra
+    - choiceId: craft
+      text: Forgia equipaggiamento
       playerSpokenText:
       conditions:
         logic: 0
@@ -127,7 +127,7 @@ MonoBehaviour:
           magic: {fileID: 0}
           usable: {fileID: 0}
         questDefinition: {fileID: 0}
-        serviceId: merchant_buy
+        serviceId: blacksmith_craft
         teleportTargetId:
         teleportSceneName:
         useTeleportTargetRotation: 1
@@ -150,6 +150,35 @@ MonoBehaviour:
       playerSpeaksChoice: 1
       unavailableDisplay: 0
       showReadIndicator: 0
+    - choiceId: exit
+      text: Esci.
+      playerSpokenText:
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions: []
+      nextNodeId:
+      returnNodeId:
+      playerSpeaksChoice: 0
+      unavailableDisplay: 0
+      showReadIndicator: 0
+  - nodeId: lore_start
+    speaker: {fileID: 11400000, guid: 8b3f0d8c6d8b4f0b9a1c2d3e4f5a6b70, type: 2}
+    text: La torre a nord era una fucina, molto prima che diventasse una rovina.
+    portraitOverride: {fileID: 0}
+    animationTrigger:
+    voiceClip: {fileID: 0}
+    conditions:
+      logic: 0
+      negate: 0
+      conditions: []
+      groups: []
+    actionsOnEnter: []
+    actionsOnExit: []
+    nextNodeId:
+    choices:
     - choiceId: ancient_runes
       text: '[Intelligence 20] Parlami delle rune antiche.'
       playerSpokenText:
@@ -178,7 +207,7 @@ MonoBehaviour:
         groups: []
       actions: []
       nextNodeId: ancient_runes
-      returnNodeId: service_menu
+      returnNodeId: lore_start
       playerSpeaksChoice: 1
       unavailableDisplay: 0
       showReadIndicator: 1
@@ -240,12 +269,12 @@ MonoBehaviour:
         teleportSceneName:
         useTeleportTargetRotation: 1
       nextNodeId: dark_response
-      returnNodeId: service_menu
+      returnNodeId: lore_start
       playerSpeaksChoice: 1
       unavailableDisplay: 0
       showReadIndicator: 0
-    - choiceId: exit
-      text: Esci.
+    - choiceId: exit_lore
+      text: Torna indietro.
       playerSpokenText:
       conditions:
         logic: 0
@@ -258,21 +287,6 @@ MonoBehaviour:
       playerSpeaksChoice: 0
       unavailableDisplay: 0
       showReadIndicator: 0
-  - nodeId: lore_start
-    speaker: {fileID: 11400000, guid: 8b3f0d8c6d8b4f0b9a1c2d3e4f5a6b70, type: 2}
-    text: La torre a nord era una fucina, molto prima che diventasse una rovina.
-    portraitOverride: {fileID: 0}
-    animationTrigger:
-    voiceClip: {fileID: 0}
-    conditions:
-      logic: 0
-      negate: 0
-      conditions: []
-      groups: []
-    actionsOnEnter: []
-    actionsOnExit: []
-    nextNodeId: lore_end
-    choices: []
   - nodeId: lore_end
     speaker: {fileID: 11400000, guid: 8b3f0d8c6d8b4f0b9a1c2d3e4f5a6b70, type: 2}
     text: Se trovi un martello con il marchio del sole, riportamelo.

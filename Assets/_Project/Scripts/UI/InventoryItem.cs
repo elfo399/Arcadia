@@ -11,6 +11,7 @@ public class InventoryItem
     public string instanceId;
     public Sprite icon;
     public int amount;
+    public int upgradeLevel;
     public string title;
     public string description;
 
@@ -29,6 +30,7 @@ public class InventoryItem
     {
         icon = itemIcon;
         amount = quantity;
+        upgradeLevel = 0;
         title = itemIcon != null ? itemIcon.name : string.Empty;
         description = string.Empty;
         weaponData = null;
@@ -44,6 +46,7 @@ public class InventoryItem
         icon = weapon != null ? weapon.icon : null;
         // le armi non sono stackabili visivamente: amount viene usato solo per duplicare in griglia
         amount = Mathf.Max(1, quantity);
+        upgradeLevel = 0;
         title = overrideTitle ?? (weapon != null ? weapon.weaponName : string.Empty);
         description = overrideDescription ?? (weapon != null ? weapon.description : string.Empty);
         itemData = null;
@@ -58,6 +61,7 @@ public class InventoryItem
         itemData = item;
         icon = item != null ? item.icon : null;
         amount = quantity;
+        upgradeLevel = 0;
         title = overrideTitle ?? (item != null ? item.itemName : string.Empty);
         description = overrideDescription ?? (item != null ? item.description : string.Empty);
         weaponData = null;
@@ -72,6 +76,7 @@ public class InventoryItem
         usableData = usable;
         icon = usable != null ? usable.icon : null;
         amount = quantity;
+        upgradeLevel = 0;
         title = overrideTitle ?? (usable != null ? usable.itemName : string.Empty);
         description = overrideDescription ?? (usable != null ? usable.description : string.Empty);
         weaponData = null;
@@ -86,6 +91,7 @@ public class InventoryItem
         armorData = armor;
         icon = armor != null ? armor.icon : null;
         amount = quantity;
+        upgradeLevel = 0;
         title = overrideTitle ?? (armor != null ? armor.itemName : string.Empty);
         description = overrideDescription ?? (armor != null ? armor.description : string.Empty);
         weaponData = null;
@@ -100,6 +106,7 @@ public class InventoryItem
         magicData = magic;
         icon = magic != null ? magic.icon : null;
         amount = quantity;
+        upgradeLevel = 0;
         title = overrideTitle ?? (magic != null ? magic.magicName : string.Empty);
         description = overrideDescription ?? (magic != null ? magic.description : string.Empty);
         weaponData = null;

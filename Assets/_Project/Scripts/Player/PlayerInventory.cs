@@ -140,6 +140,41 @@ public class PlayerInventory : MonoBehaviour
         return equipped != null ? equipped : (hand == Hand.Right ? unarmedRight : unarmedLeft);
     }
 
+    /// <summary>
+    /// Restituisce la copia esatta equipaggiata, quando il loadout contiene il
+    /// suo instanceId. Il fallback per i loadout legacy evita di rompere save
+    /// precedenti che non avevano ancora un id per slot.
+    /// </summary>
+    public InventoryItem GetInventoryItemForHand(Hand hand)
+    {
+        EnsureLoadoutSize();
+        WeaponItem weapon = hand == Hand.Right ? GetCurrentRightWeapon() : GetCurrentLeftWeapon();
+        if (weapon == null) return null;
+        string instanceId = GetCurrentWeaponInstanceId(hand);
+        InventoryItem fallback = null;
+        for (int i = 0; i < items.Count; i++)
+        {
+            InventoryItem item = items[i];
+            if (item == null || item.weaponData != weapon) continue;
+            if (!string.IsNullOrWhiteSpace(instanceId) && item.instanceId == instanceId)
+                return item;
+            fallback ??= item;
+        }
+        return fallback;
+    }
+
+    public InventoryItem FindWeaponInstance(string instanceId, WeaponItem weapon = null)
+    {
+        if (string.IsNullOrWhiteSpace(instanceId)) return null;
+        for (int i = 0; i < items.Count; i++)
+        {
+            InventoryItem item = items[i];
+            if (item == null || item.instanceId != instanceId) continue;
+            if (weapon == null || item.weaponData == weapon) return item;
+        }
+        return null;
+    }
+
     public string GetCurrentWeaponInstanceId(Hand hand)
     {
         EnsureLoadoutSize();
@@ -628,6 +663,36 @@ public class PlayerInventory : MonoBehaviour
 
     // Inventory management
     public void AddItem(InventoryItem item) { if (item != null) items.Add(item); }
+
+    public bool TryAddItemInstance(InventoryItem item, bool save = true)
+    {
+        if (item == null || item.amount <= 0) return false;
+        if (item.weaponData != null || item.armorData != null)
+        {
+            if (items.Count >= int.MaxValue || string.IsNullOrWhiteSpace(item.instanceId)) return false;
+            if (IsInstanceKnown(item.instanceId)) return false;
+        }
+        else if (item.itemData != null || item.magicData != null || item.usableData != null)
+        {
+            ScriptableObject asset = item.itemData as ScriptableObject;
+            if (asset == null) asset = item.magicData as ScriptableObject;
+            if (asset == null) asset = item.usableData as ScriptableObject;
+            if (!CanAddItem(asset, item.amount)) return false;
+        }
+        items.Add(item);
+        SyncMagicInventorySlots();
+        SyncEquippedReferences();
+        if (save) RequestInventorySave();
+        return true;
+    }
+
+    private bool IsInstanceKnown(string instanceId)
+    {
+        if (string.IsNullOrWhiteSpace(instanceId)) return false;
+        for (int i = 0; i < items.Count; i++)
+            if (items[i] != null && items[i].instanceId == instanceId) return true;
+        return false;
+    }
     public void AddWeaponLoot(WeaponItem weapon, int amount = 1)
     {
         TryAddWeaponLoot(weapon, amount);
@@ -1462,6 +1527,7 @@ public class PlayerInventory : MonoBehaviour
                 assetName = assetName,
                 itemName = string.IsNullOrWhiteSpace(itemName) ? it.title : itemName,
                 instanceId = it.instanceId,
+                upgradeLevel = it.weaponData != null ? WeaponUpgradeRules.ClampLevel(it.weaponData, it.upgradeLevel) : 0,
                 amount = Mathf.Max(1, it.amount),
                 title = it.title,
                 description = it.description
@@ -1658,6 +1724,8 @@ public class PlayerInventory : MonoBehaviour
         }
 
         restored.instanceId = string.IsNullOrWhiteSpace(saved.instanceId) ? restored.instanceId : saved.instanceId;
+        if (restored.weaponData != null)
+            restored.upgradeLevel = WeaponUpgradeRules.ClampLevel(restored.weaponData, saved.upgradeLevel);
         if (!string.IsNullOrWhiteSpace(saved.title)) restored.title = saved.title;
         if (!string.IsNullOrWhiteSpace(saved.description)) restored.description = saved.description;
         return restored;

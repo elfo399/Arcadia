@@ -21,6 +21,24 @@ public class WeaponItemEditor : Editor
     private SerializedProperty heavyDamageMultiplierProp;
     private SerializedProperty weightProp;
 
+    private SerializedProperty rarityProp;
+    private SerializedProperty canUpgradeProp;
+    private SerializedProperty canCraftProp;
+    private SerializedProperty upgradeCoinCostProp;
+    private SerializedProperty upgradeMaterialRequirementsProp;
+    private SerializedProperty upgradeCostStagesProp;
+    private SerializedProperty physicalDamageGrowthProp;
+    private SerializedProperty magicDamageGrowthProp;
+    private SerializedProperty criticalHitGrowthProp;
+    private SerializedProperty criticalChanceGrowthProp;
+    private SerializedProperty strengthScalingRankGrowthProp;
+    private SerializedProperty dexterityScalingRankGrowthProp;
+    private SerializedProperty intelligenceScalingRankGrowthProp;
+    private SerializedProperty faithScalingRankGrowthProp;
+    private SerializedProperty physicalBlockGrowthProp;
+    private SerializedProperty magicBlockGrowthProp;
+    private SerializedProperty stabilityGrowthProp;
+
     private SerializedProperty scalingProp;
     private SerializedProperty strengthScalingRankProp;
     private SerializedProperty dexterityScalingRankProp;
@@ -103,6 +121,24 @@ public class WeaponItemEditor : Editor
         lightDamageMultiplierProp = serializedObject.FindProperty("lightDamageMultiplier");
         heavyDamageMultiplierProp = serializedObject.FindProperty("heavyDamageMultiplier");
         weightProp = serializedObject.FindProperty("weight");
+
+        rarityProp = serializedObject.FindProperty("rarity");
+        canUpgradeProp = serializedObject.FindProperty("canUpgrade");
+        canCraftProp = serializedObject.FindProperty("canCraft");
+        upgradeCoinCostProp = serializedObject.FindProperty("upgradeCoinCost");
+        upgradeMaterialRequirementsProp = serializedObject.FindProperty("upgradeMaterialRequirements");
+        upgradeCostStagesProp = serializedObject.FindProperty("upgradeCostStages");
+        physicalDamageGrowthProp = serializedObject.FindProperty("physicalDamageGrowth");
+        magicDamageGrowthProp = serializedObject.FindProperty("magicDamageGrowth");
+        criticalHitGrowthProp = serializedObject.FindProperty("criticalHitGrowth");
+        criticalChanceGrowthProp = serializedObject.FindProperty("criticalChanceGrowth");
+        strengthScalingRankGrowthProp = serializedObject.FindProperty("strengthScalingRankGrowth");
+        dexterityScalingRankGrowthProp = serializedObject.FindProperty("dexterityScalingRankGrowth");
+        intelligenceScalingRankGrowthProp = serializedObject.FindProperty("intelligenceScalingRankGrowth");
+        faithScalingRankGrowthProp = serializedObject.FindProperty("faithScalingRankGrowth");
+        physicalBlockGrowthProp = serializedObject.FindProperty("physicalBlockGrowth");
+        magicBlockGrowthProp = serializedObject.FindProperty("magicBlockGrowth");
+        stabilityGrowthProp = serializedObject.FindProperty("stabilityGrowth");
 
         scalingProp = serializedObject.FindProperty("scaling");
         strengthScalingRankProp = serializedObject.FindProperty("strengthScalingRank");
@@ -199,6 +235,27 @@ public class WeaponItemEditor : Editor
         EditorGUILayout.PropertyField(lightDamageMultiplierProp);
         EditorGUILayout.PropertyField(heavyDamageMultiplierProp);
         EditorGUILayout.PropertyField(weightProp);
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Blacksmith", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(rarityProp);
+        EditorGUILayout.PropertyField(canUpgradeProp);
+        EditorGUILayout.PropertyField(canCraftProp);
+        EditorGUILayout.PropertyField(upgradeCoinCostProp);
+        EditorGUILayout.PropertyField(upgradeMaterialRequirementsProp, true);
+        EditorGUILayout.PropertyField(upgradeCostStagesProp, true);
+        EditorGUILayout.LabelField("Upgrade Growth", EditorStyles.miniBoldLabel);
+        EditorGUILayout.PropertyField(physicalDamageGrowthProp);
+        EditorGUILayout.PropertyField(magicDamageGrowthProp);
+        EditorGUILayout.PropertyField(criticalHitGrowthProp);
+        EditorGUILayout.PropertyField(criticalChanceGrowthProp);
+        EditorGUILayout.PropertyField(strengthScalingRankGrowthProp);
+        EditorGUILayout.PropertyField(dexterityScalingRankGrowthProp);
+        EditorGUILayout.PropertyField(intelligenceScalingRankGrowthProp);
+        EditorGUILayout.PropertyField(faithScalingRankGrowthProp);
+        EditorGUILayout.PropertyField(physicalBlockGrowthProp);
+        EditorGUILayout.PropertyField(magicBlockGrowthProp);
+        EditorGUILayout.PropertyField(stabilityGrowthProp);
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Scaling", EditorStyles.boldLabel);
