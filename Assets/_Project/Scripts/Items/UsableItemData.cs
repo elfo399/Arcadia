@@ -5,6 +5,7 @@ public class UsableItemData : ScriptableObject
 {
     [Header("Info")]
     public string itemName;
+    [Min(0)] public int baseValue = 1;
     [TextArea] public string description;
     public Sprite icon;
     [Min(0f)] public float weight = 0.1f;

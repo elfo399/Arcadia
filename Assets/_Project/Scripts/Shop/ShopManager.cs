@@ -30,6 +30,8 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Transform slotParent;
     [SerializeField] private GridLayoutGroup slotGrid;
     [SerializeField] [Min(0)] private int initialSlotCount = 30;
+    [Header("Merchant")]
+    [SerializeField] private MerchantData merchantData;
 
     [Header("Initial State")]
     [SerializeField] private ShopMode initialMode = ShopMode.Buy;
@@ -50,6 +52,8 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     private bool isInteractive;
     private readonly List<InventorySlot> shopSlots = new List<InventorySlot>();
     private readonly List<InventoryItem> shopItems = new List<InventoryItem>();
+    private readonly List<MerchantData.StockEntry> buyEntries = new List<MerchantData.StockEntry>();
+    private readonly Dictionary<MerchantData.StockEntry, int> remainingStock = new Dictionary<MerchantData.StockEntry, int>();
     [SerializeField] private GameObject weaponSection;
     [SerializeField] private GameObject shieldSection;
     [SerializeField] private GameObject armorSection;
@@ -139,8 +143,11 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
     public void SetShopItems(IReadOnlyList<InventoryItem> items)
     {
-        shopItems.Clear();
-        if (items != null) shopItems.AddRange(items);
+        if (!ReferenceEquals(items, shopItems))
+        {
+            shopItems.Clear();
+            if (items != null) shopItems.AddRange(items);
+        }
         for (int i = 0; i < shopSlots.Count; i++)
         {
             InventoryItem item = i < shopItems.Count ? shopItems[i] : null;
@@ -255,7 +262,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     private Sprite GetItemIcon(InventoryItem item)
     {
         if (item == null) return null;
-        return item.icon ?? item.weaponData?.icon ?? item.armorData?.icon ?? item.usableData?.icon ?? item.itemData?.icon;
+        return item.icon ?? item.weaponData?.icon ?? item.armorData?.icon ?? item.usableData?.icon ?? item.itemData?.icon ?? item.magicData?.icon;
     }
 
     private void OnDisable()
@@ -293,9 +300,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
             CurrentMode = mode;
             ApplyModeVisuals();
             RefreshPlayerCoins();
-            SetShopItems(mode == ShopMode.Sell && playerInventory != null
-                ? playerInventory.Items
-                : null);
+            RefreshShopContents();
             FocusInitialTarget();
             return true;
         }
@@ -312,9 +317,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         shopHud.SetActive(true);
         ApplyModeVisuals();
         RefreshPlayerCoins();
-        SetShopItems(mode == ShopMode.Sell && playerInventory != null
-            ? playerInventory.Items
-            : null);
+        RefreshShopContents();
         Canvas.ForceUpdateCanvases();
         FocusInitialTarget();
         SetShopFocus(0);
@@ -369,11 +372,12 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         for (int i = 0; i < shopSlots.Count; i++)
             shopSlots[i].SetFocused(i == shopFocusIndex);
         ShowSelectedItem(shopFocusIndex);
+        UpdateActionInteractable();
     }
 
     public void HandleSlotSelected(int index)
     {
-        if (isInteractive) ShowSelectedItem(index);
+        if (isInteractive) { ShowSelectedItem(index); UpdateActionInteractable(); }
     }
 
     public void HandleSlotSubmit(int index)
@@ -395,12 +399,106 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         CurrentMode = mode;
         ApplyModeVisuals();
         RefreshPlayerCoins();
+        RefreshShopContents();
     }
 
     public void RefreshPlayerCoins()
     {
         if (playerCoinsText != null)
             playerCoinsText.text = playerStats != null ? Mathf.Max(0, playerStats.runCoins).ToString() : "0";
+    }
+
+    private void RefreshShopContents()
+    {
+        if (CurrentMode == ShopMode.Sell)
+        {
+            SetShopItems(playerInventory != null ? playerInventory.Items : null);
+            return;
+        }
+        shopItems.Clear();
+        buyEntries.Clear();
+        if (merchantData != null && merchantData.stock != null)
+        {
+            foreach (MerchantData.StockEntry entry in merchantData.stock)
+            {
+                if (entry == null || entry.item == null) continue;
+                if (!remainingStock.ContainsKey(entry)) remainingStock.Add(entry, Mathf.Max(0, entry.quantity));
+                if (!entry.infiniteStock && remainingStock[entry] <= 0) continue;
+                InventoryItem display = CreateInventoryItem(entry.item, entry.infiniteStock ? 1 : remainingStock[entry]);
+                if (display != null) { shopItems.Add(display); buyEntries.Add(entry); }
+            }
+        }
+        SetShopItems(shopItems);
+    }
+
+    public bool TryBuy()
+    {
+        if (!IsOpen || CurrentMode != ShopMode.Buy || merchantData == null || playerInventory == null || playerStats == null || shopFocusIndex >= buyEntries.Count) return false;
+        MerchantData.StockEntry entry = buyEntries[shopFocusIndex];
+        if (entry == null || entry.item == null || (!entry.infiniteStock && remainingStock[entry] <= 0)) return false;
+        int price = GetPrice(entry.item, merchantData.buyMultiplier);
+        if (!playerStats.HasCoins(price) || !playerInventory.CanAddItem(entry.item, 1)) return false;
+        if (!playerStats.TryRemoveCoins(price, false)) return false;
+        if (!playerInventory.TryAddItem(entry.item, 1, false)) { playerStats.AddCoins(price, false); return false; }
+        if (!entry.infiniteStock) remainingStock[entry] = Mathf.Max(0, remainingStock[entry] - 1);
+        SaveTransaction(); RefreshAfterTransaction(); return true;
+    }
+
+    public bool TrySell()
+    {
+        if (!IsOpen || CurrentMode != ShopMode.Sell || playerInventory == null || playerStats == null || shopFocusIndex >= shopItems.Count) return false;
+        InventoryItem selected = shopItems[shopFocusIndex];
+        ScriptableObject asset = GetItemAsset(selected);
+        if (asset == null || playerInventory.IsInstanceEquipped(selected.instanceId)) return false;
+        int price = GetPrice(asset, merchantData != null ? merchantData.sellMultiplier : 0.5f);
+        if (playerStats.runCoins > int.MaxValue - price || !playerInventory.TryRemoveItem(asset, 1, out _, false)) return false;
+        playerStats.AddCoins(price, false); SaveTransaction(); RefreshAfterTransaction(); return true;
+    }
+
+    private void RefreshAfterTransaction()
+    {
+        int oldIndex = shopFocusIndex; RefreshPlayerCoins(); RefreshShopContents();
+        if (shopItems.Count > 0) SetShopFocus(Mathf.Clamp(oldIndex, 0, shopItems.Count - 1)); else HideDetailSections();
+        UpdateActionInteractable();
+    }
+
+    private void SaveTransaction() { if (playerStats != null) playerStats.SaveStats(); }
+
+    private void UpdateActionInteractable()
+    {
+        if (shopFocusIndex < 0 || shopFocusIndex >= shopItems.Count) return;
+        Button button = GetActionButton(shopItems[shopFocusIndex]);
+        ScriptableObject asset = GetItemAsset(shopItems[shopFocusIndex]);
+        if (button == null || asset == null) return;
+        button.interactable = CurrentMode == ShopMode.Buy
+            ? playerStats != null && playerStats.HasCoins(GetPrice(asset, merchantData != null ? merchantData.buyMultiplier : 1f)) && playerInventory != null && playerInventory.CanAddItem(asset, 1)
+            : playerInventory != null && !playerInventory.IsInstanceEquipped(shopItems[shopFocusIndex].instanceId);
+    }
+
+    private static ScriptableObject GetItemAsset(InventoryItem item)
+    {
+        if (item == null) return null;
+        if (item.weaponData != null) return item.weaponData;
+        if (item.armorData != null) return item.armorData;
+        if (item.usableData != null) return item.usableData;
+        if (item.itemData != null) return item.itemData;
+        return item.magicData;
+    }
+
+    private static InventoryItem CreateInventoryItem(ScriptableObject asset, int quantity)
+    {
+        if (asset is WeaponItem weapon) return new InventoryItem(weapon, quantity);
+        if (asset is ArmorItemData armor) return new InventoryItem(armor, quantity);
+        if (asset is UsableItemData usable) return new InventoryItem(usable, quantity);
+        if (asset is MagicItemData magic) return new InventoryItem(magic, quantity);
+        if (asset is ItemData item) return new InventoryItem(item, quantity);
+        return null;
+    }
+
+    private static int GetPrice(ScriptableObject asset, float multiplier)
+    {
+        int value = asset is WeaponItem weapon ? weapon.baseValue : asset is ArmorItemData armor ? armor.baseValue : asset is UsableItemData usable ? usable.baseValue : asset is MagicItemData magic ? magic.baseValue : asset is ItemData item ? item.baseValue : 0;
+        return Mathf.Max(1, Mathf.RoundToInt(Mathf.Max(0f, value) * Mathf.Max(0f, multiplier)));
     }
 
     private void ApplyModeVisuals()
@@ -620,7 +718,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         if (focusArea == FocusArea.Grid)
             FocusActionButton(shopFocusIndex);
         else
-            ConfirmRequested?.Invoke(CurrentMode);
+            if (CurrentMode == ShopMode.Buy) TryBuy(); else TrySell();
     }
 
     private void OnCancelPerformed(InputAction.CallbackContext _)

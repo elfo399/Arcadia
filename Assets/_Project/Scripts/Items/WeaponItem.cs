@@ -29,6 +29,7 @@ public class WeaponItem : ScriptableObject
 
     // Display name of the weapon
     public string weaponName;
+    [Min(0)] public int baseValue = 1;
 
     [Header("Visual")]
     // Icon used in UI slots
