@@ -21,6 +21,8 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private GameObject initialFocus;
     [SerializeField] private PlayerController playerController;
     [SerializeField] private PlayerInventory playerInventory;
+    [SerializeField] private PlayerStats playerStats;
+    [SerializeField] private TextMeshProUGUI playerCoinsText;
     [SerializeField] private Animator bookAnimator;
     [SerializeField] private Animator contentAppearAnimator;
     [SerializeField] private CanvasGroup contentGroup;
@@ -142,7 +144,13 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         for (int i = 0; i < shopSlots.Count; i++)
         {
             InventoryItem item = i < shopItems.Count ? shopItems[i] : null;
-            if (item != null) shopSlots[i].Setup(GetItemIcon(item), item.amount);
+            if (item != null)
+            {
+                bool equipped = CurrentMode == ShopMode.Sell
+                    && playerInventory != null
+                    && playerInventory.IsInstanceEquipped(item.instanceId);
+                shopSlots[i].Setup(GetItemIcon(item), item.amount, equipped);
+            }
             else shopSlots[i].Clear();
         }
         SetShopFocus(0);
@@ -284,6 +292,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         {
             CurrentMode = mode;
             ApplyModeVisuals();
+            RefreshPlayerCoins();
             SetShopItems(mode == ShopMode.Sell && playerInventory != null
                 ? playerInventory.Items
                 : null);
@@ -302,6 +311,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
         shopHud.SetActive(true);
         ApplyModeVisuals();
+        RefreshPlayerCoins();
         SetShopItems(mode == ShopMode.Sell && playerInventory != null
             ? playerInventory.Items
             : null);
@@ -384,6 +394,13 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     {
         CurrentMode = mode;
         ApplyModeVisuals();
+        RefreshPlayerCoins();
+    }
+
+    public void RefreshPlayerCoins()
+    {
+        if (playerCoinsText != null)
+            playerCoinsText.text = playerStats != null ? Mathf.Max(0, playerStats.runCoins).ToString() : "0";
     }
 
     private void ApplyModeVisuals()
