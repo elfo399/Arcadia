@@ -81,7 +81,11 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     [Header("Detail Content")]
     [SerializeField] private Image detailImage;
     [SerializeField] private TextMeshProUGUI detailTitle;
-    [SerializeField] private TextMeshProUGUI selectedPriceText;
+    [Header("Prices")]
+    [SerializeField] private TextMeshProUGUI weaponPriceText;
+    [SerializeField] private TextMeshProUGUI shieldPriceText;
+    [SerializeField] private TextMeshProUGUI armorPriceText;
+    [SerializeField] private TextMeshProUGUI itemPriceText;
     [SerializeField] private TextMeshProUGUI weaponDescription;
     [SerializeField] private TextMeshProUGUI weaponDamageText;
     [SerializeField] private TextMeshProUGUI weaponCriticalText;
@@ -247,8 +251,24 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
     private void RefreshSelectedPrice(ScriptableObject asset)
     {
-        if (selectedPriceText == null) return;
-        selectedPriceText.text = asset == null ? string.Empty : GetPrice(asset, CurrentMode == ShopMode.Buy ? (merchantData != null ? merchantData.buyMultiplier : 1f) : (merchantData != null ? merchantData.sellMultiplier : 0.5f)).ToString();
+        if (weaponPriceText != null) weaponPriceText.text = string.Empty;
+        if (shieldPriceText != null) shieldPriceText.text = string.Empty;
+        if (armorPriceText != null) armorPriceText.text = string.Empty;
+        if (itemPriceText != null) itemPriceText.text = string.Empty;
+        if (asset == null) return;
+        float buyMultiplier = merchantData != null ? merchantData.buyMultiplier : 1f;
+        float sellMultiplier = merchantData != null ? merchantData.sellMultiplier : 0.5f;
+        TextMeshProUGUI target = GetPriceText(asset);
+        if (target != null)
+            target.text = GetPrice(asset, CurrentMode == ShopMode.Buy ? buyMultiplier : sellMultiplier).ToString();
+    }
+
+    private TextMeshProUGUI GetPriceText(ScriptableObject asset)
+    {
+        if (asset is WeaponItem weapon)
+            return weapon.category == WeaponCategory.Shield ? shieldPriceText : weaponPriceText;
+        if (asset is ArmorItemData) return armorPriceText;
+        return itemPriceText;
     }
 
     private static void SetText(TextMeshProUGUI target, string value)
