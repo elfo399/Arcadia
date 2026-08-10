@@ -16,7 +16,7 @@ MonoBehaviour:
   startNodeId: intro_hello
   nodes:
   - nodeId: intro_hello
-    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
+    speaker: {fileID: 11400000, guid: 8b3f0d8c6d8b4f0b9a1c2d3e4f5a6b70, type: 2}
     text: Ah, non ti ho mai visto da queste parti.
     portraitOverride: {fileID: 0}
     animationTrigger:
@@ -31,7 +31,7 @@ MonoBehaviour:
     nextNodeId: intro_weapon
     choices: []
   - nodeId: intro_weapon
-    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
+    speaker: {fileID: 11400000, guid: 8b3f0d8c6d8b4f0b9a1c2d3e4f5a6b70, type: 2}
     text: Se hai bisogno di un'arma, sei nel posto giusto.
     portraitOverride: {fileID: 0}
     animationTrigger:
@@ -62,7 +62,7 @@ MonoBehaviour:
     nextNodeId: service_menu
     choices: []
   - nodeId: service_menu
-    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
+    speaker: {fileID: 11400000, guid: 8b3f0d8c6d8b4f0b9a1c2d3e4f5a6b70, type: 2}
     text: Che posso fare per te?
     portraitOverride: {fileID: 0}
     animationTrigger:
@@ -259,7 +259,7 @@ MonoBehaviour:
       unavailableDisplay: 0
       showReadIndicator: 0
   - nodeId: lore_start
-    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
+    speaker: {fileID: 11400000, guid: 8b3f0d8c6d8b4f0b9a1c2d3e4f5a6b70, type: 2}
     text: La torre a nord era una fucina, molto prima che diventasse una rovina.
     portraitOverride: {fileID: 0}
     animationTrigger:
@@ -274,7 +274,7 @@ MonoBehaviour:
     nextNodeId: lore_end
     choices: []
   - nodeId: lore_end
-    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
+    speaker: {fileID: 11400000, guid: 8b3f0d8c6d8b4f0b9a1c2d3e4f5a6b70, type: 2}
     text: Se trovi un martello con il marchio del sole, riportamelo.
     portraitOverride: {fileID: 0}
     animationTrigger:
@@ -289,7 +289,7 @@ MonoBehaviour:
     nextNodeId:
     choices: []
   - nodeId: ancient_runes
-    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
+    speaker: {fileID: 11400000, guid: 8b3f0d8c6d8b4f0b9a1c2d3e4f5a6b70, type: 2}
     text: Hai occhio. Quelle rune legano il ricordo del fuoco alla lama.
     portraitOverride: {fileID: 0}
     animationTrigger:
@@ -304,7 +304,7 @@ MonoBehaviour:
     nextNodeId:
     choices: []
   - nodeId: dark_response
-    speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
+    speaker: {fileID: 11400000, guid: 8b3f0d8c6d8b4f0b9a1c2d3e4f5a6b70, type: 2}
     text: Allora porta il peso della tua scelta. Il ferro non dimentica.
     portraitOverride: {fileID: 0}
     animationTrigger:

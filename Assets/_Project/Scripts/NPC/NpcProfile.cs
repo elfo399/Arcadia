@@ -1,10 +1,8 @@
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Arcadia/NPC/NPC Profile")]
-public sealed class NpcProfile : ScriptableObject
+public sealed class NpcProfile : DialogueSpeakerData
 {
-    public string npcId;
-    public string displayName;
     public DialogueProfile dialogueProfile;
     public MerchantData merchantData;
 }

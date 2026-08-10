@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "DialogueSpeaker", menuName = "Arcadia/Dialogue/Speaker")]
-public sealed class DialogueSpeakerData : ScriptableObject
+public class DialogueSpeakerData : ScriptableObject
 {
     [Tooltip("ID stabile usato dagli asset dialogo e dai binding runtime.")]
     public string speakerId;

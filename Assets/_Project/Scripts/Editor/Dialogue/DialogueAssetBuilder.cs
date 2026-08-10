@@ -12,13 +12,13 @@ public static class DialogueAssetBuilder
 {
     private const string DialogueAssetRoot = "Assets/_Project/Dialogue";
     private const string DialogueSpeakersFolder = DialogueAssetRoot + "/Speakers";
-    private const string BlacksmithFolder = DialogueAssetRoot + "/NPC/Blacksmith_Eldar";
+    private const string BlacksmithFolder = "Assets/_Project/NPC/Blacksmith_Eldar/Dialogues";
     private const string DialogueChoicePrefabPath = "Assets/_Project/Prefabs/UI/choise.prefab";
     private const string DefaultBlacksmithPortraitPath =
         "Assets/_Project/Art/Sprites/Test/Super Asset Bundle #2 - Adventure Time v1.5/Updated Paper Book/Sprites/Content/2 Icons/20.png";
 
     private const string PlayerSpeakerPath = DialogueSpeakersFolder + "/Speaker_Player.asset";
-    private const string BlacksmithSpeakerPath = BlacksmithFolder + "/Speaker_Eldar.asset";
+    private const string BlacksmithSpeakerPath = "Assets/_Project/NPC/Blacksmith_Eldar/NpcProfile_Eldar.asset";
     private const string IntroConversationPath = BlacksmithFolder + "/Dialogue_Eldar_Introduction.asset";
     private const string DefaultConversationPath = BlacksmithFolder + "/Dialogue_Eldar_Default.asset";
     private const string LoreConversationPath = BlacksmithFolder + "/Dialogue_Eldar_Lore.asset";
@@ -364,7 +364,7 @@ public static class DialogueAssetBuilder
             },
             createdAssets);
 
-        DialogueSpeakerData blacksmithSpeaker = LoadOrCreateAsset<DialogueSpeakerData>(
+        NpcProfile blacksmithSpeaker = LoadOrCreateAsset<NpcProfile>(
             BlacksmithSpeakerPath,
             asset =>
             {

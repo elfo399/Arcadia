@@ -4,7 +4,7 @@ using UnityEngine;
 public sealed class NPCInteractable : MonoBehaviour, IInteractable
 {
     [Header("Dialogue")]
-    [SerializeField] private string prompt = "Parla";
+    [SerializeField] private string promptOverride;
     [SerializeField] private NpcProfile npcProfile;
     [Tooltip("Attore principale usato per speaker, animazioni e orientamento.")]
     [SerializeField] private DialogueActor mainSpeakerActor;
@@ -38,7 +38,10 @@ public sealed class NPCInteractable : MonoBehaviour, IInteractable
 
     public string GetPrompt()
     {
-        return string.IsNullOrWhiteSpace(prompt) ? "Parla" : prompt.Trim();
+        if (!string.IsNullOrWhiteSpace(promptOverride))
+            return promptOverride.Trim();
+        string displayName = npcProfile != null ? npcProfile.displayName : null;
+        return string.IsNullOrWhiteSpace(displayName) ? "Parla" : $"Parla con {displayName.Trim()}";
     }
 
     public void Interact(GameObject player)

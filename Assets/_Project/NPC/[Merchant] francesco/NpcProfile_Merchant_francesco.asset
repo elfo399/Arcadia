@@ -9,10 +9,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6692e10136534dc4d8bf62be72ce4d53, type: 3}
-  m_Name: Speaker_Merchant
+  m_Script: {fileID: 11500000, guid: 6f4bc1a53bbd4d1db9c0d1e4b8e7a2c3, type: 3}
+  m_Name: NpcProfile_Merchant_francesco
   m_EditorClassIdentifier: 
-  speakerId: merchant
-  displayName: Mercante
+  speakerId: merchant_francesco
+  displayName: Francesco
   portrait: {fileID: 21300000, guid: 41eea6afa8f808f44b02c35ca8458ea7, type: 3}
   isPlayer: 0
+  dialogueProfile: {fileID: 11400000, guid: df120804975bff246908855db90da152, type: 2}
+  merchantData: {fileID: 11400000, guid: 64c02f2c49c8dd34d96820d9b1b481eb, type: 2}

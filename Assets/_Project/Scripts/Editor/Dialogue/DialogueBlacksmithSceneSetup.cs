@@ -8,7 +8,7 @@ public static class DialogueBlacksmithSceneSetup
 {
     private const string HubScenePath = "Assets/_Project/Scenes/HubSceneV1.unity";
     private const string PlayerSpeakerPath = "Assets/_Project/Dialogue/Speakers/Speaker_Player.asset";
-    private const string BlacksmithSpeakerPath = "Assets/_Project/NPC/Blacksmith_Eldar/Dialogues/Speaker_Eldar.asset";
+    private const string BlacksmithSpeakerPath = "Assets/_Project/NPC/Blacksmith_Eldar/NpcProfile_Eldar.asset";
     private const string BlacksmithProfilePath = "Assets/_Project/NPC/Blacksmith_Eldar/Dialogues/Profile_Eldar.asset";
 
     [MenuItem("Arcadia/Dialogue/Setup Active Hub Blacksmith", priority = 120)]
@@ -56,7 +56,7 @@ public static class DialogueBlacksmithSceneSetup
         DialogueAssetBuilder.CreateBlacksmithExampleAssets();
 
         DialogueSpeakerData playerSpeaker = AssetDatabase.LoadAssetAtPath<DialogueSpeakerData>(PlayerSpeakerPath);
-        DialogueSpeakerData blacksmithSpeaker = AssetDatabase.LoadAssetAtPath<DialogueSpeakerData>(BlacksmithSpeakerPath);
+        NpcProfile blacksmithSpeaker = AssetDatabase.LoadAssetAtPath<NpcProfile>(BlacksmithSpeakerPath);
         DialogueProfile blacksmithProfile = AssetDatabase.LoadAssetAtPath<DialogueProfile>(BlacksmithProfilePath);
         if (playerSpeaker == null || blacksmithSpeaker == null || blacksmithProfile == null)
             throw new InvalidOperationException("Gli asset Dialogue del Fabbro non sono stati generati correttamente.");
@@ -143,7 +143,7 @@ public static class DialogueBlacksmithSceneSetup
         Animator animator = blacksmith.GetComponentInChildren<Animator>(true);
         Undo.RecordObject(actor, "Configure Blacksmith Dialogue Actor");
         var serializedActor = new SerializedObject(actor);
-        SetObjectReference(serializedActor, "speaker", speaker);
+        SetObjectReference(serializedActor, "speaker", null);
         SetObjectReference(serializedActor, "animator", animator);
         SetObjectReference(serializedActor, "focusTransform", blacksmith.transform);
         serializedActor.ApplyModifiedProperties();
@@ -156,7 +156,7 @@ public static class DialogueBlacksmithSceneSetup
 
         Undo.RecordObject(interactable, "Configure Blacksmith Interaction");
         var serializedInteractable = new SerializedObject(interactable);
-        SetString(serializedInteractable, "prompt", "Parla con Eldar");
+        SetString(serializedInteractable, "promptOverride", string.Empty);
         SetObjectReference(serializedInteractable, "npcProfile", AssetDatabase.LoadAssetAtPath<NpcProfile>("Assets/_Project/NPC/Blacksmith_Eldar/NpcProfile_Eldar.asset"));
         SetObjectReference(serializedInteractable, "mainSpeakerActor", actor);
         SetObjectReference(serializedInteractable, "lookTarget", blacksmith.transform);

@@ -16,13 +16,14 @@ public sealed class DialogueActor : MonoBehaviour
     private readonly HashSet<int> warnedTriggerHashes = new HashSet<int>();
     private DialogueSpeakerData registeredSpeaker;
 
-    public DialogueSpeakerData Speaker => speaker;
-    public DialogueSpeakerData SpeakerData => speaker;
+    public DialogueSpeakerData Speaker => ResolveSpeaker();
+    public DialogueSpeakerData SpeakerData => ResolveSpeaker();
     public Animator ActorAnimator => ResolveAnimator();
     public Transform FocusTransform => focusTransform != null ? focusTransform : transform;
 
     private void Awake()
     {
+        ResolveSpeaker();
         ResolveAnimator();
     }
 
@@ -111,6 +112,7 @@ public sealed class DialogueActor : MonoBehaviour
     private void Register()
     {
         Unregister();
+        ResolveSpeaker();
         if (speaker == null)
             return;
 
@@ -140,6 +142,16 @@ public sealed class DialogueActor : MonoBehaviour
         registeredSpeaker = null;
     }
 
+    private DialogueSpeakerData ResolveSpeaker()
+    {
+        NPCInteractable interactable = GetComponent<NPCInteractable>();
+        if (interactable == null)
+            interactable = GetComponentInParent<NPCInteractable>();
+        if (interactable != null && interactable.NpcProfile != null)
+            speaker = interactable.NpcProfile;
+        return speaker;
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetRegistry()
     {
@@ -158,7 +170,7 @@ public sealed class DialogueActor : MonoBehaviour
         if (animator == null)
             animator = GetComponentInChildren<Animator>(true);
 
-        if (speaker == null)
+        if (ResolveSpeaker() == null)
             Debug.LogWarning($"[DialogueActor] Speaker mancante su '{name}'.", this);
 
         if (Application.isPlaying && isActiveAndEnabled && registeredSpeaker != speaker)

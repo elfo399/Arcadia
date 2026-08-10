@@ -90,12 +90,12 @@ public static class InitialHubNpcDialogueBuilder
         string folder = Root + "/" + folderName + "/Dialogues";
         EnsureFolder(folder);
 
-        DialogueSpeakerData speaker = LoadOrCreate(
-            folder + "/" + speakerFileName + ".asset",
+        NpcProfile speaker = LoadOrCreate(
+            Root + "/" + folderName + "/NpcProfile_" + folderName + ".asset",
             () =>
             {
-                DialogueSpeakerData value = ScriptableObject.CreateInstance<DialogueSpeakerData>();
-                value.name = speakerFileName;
+                NpcProfile value = ScriptableObject.CreateInstance<NpcProfile>();
+                value.name = "NpcProfile_" + folderName;
                 value.speakerId = speakerId;
                 value.displayName = displayName;
                 value.isPlayer = false;
@@ -115,7 +115,7 @@ public static class InitialHubNpcDialogueBuilder
             () => CreateConversation(speaker, conversationPrefix + "_lore", conversationPrefix + "_service_menu",
                 serviceChoiceId, serviceLabel, serviceId, loreChoiceId, loreLabel, loreText));
 
-        LoadOrCreate(
+        DialogueProfile profile = LoadOrCreate(
             folder + "/" + profileFileName + ".asset",
             () =>
             {
@@ -147,6 +147,10 @@ public static class InitialHubNpcDialogueBuilder
                 value.fallbackConversation = fallback;
                 return value;
             });
+        speaker.dialogueProfile = profile;
+        if (folderName == "Merchant")
+            speaker.merchantData = AssetDatabase.LoadAssetAtPath<MerchantData>(Root + "/Merchant/Shop/Merchant_Eldar.asset");
+        EditorUtility.SetDirty(speaker);
     }
 
     private static DialogueConversation CreateIntroduction(
