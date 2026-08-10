@@ -18,6 +18,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private const float PhysicalDefensePerEndurance = 0.5f;
     private const float MagicDefensePerMind = 0.5f;
     public static PlayerStats instance;
+    public static Func<SavedMerchantStockData[]> MerchantStockSnapshotProvider;
 
     [Header("Health")]
     public float maxHealth = 100f;
@@ -154,6 +155,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     /// are considered applied.
     /// </summary>
     public bool IsPersistentStateReady => loadedQuestStateApplied && loadedInventoryStateApplied;
+    public GameData LoadedDataSnapshot => loadedDataCache;
     public int EffectiveVigor => Mathf.Max(1, vigor + temporaryVigorBonus);
     public int EffectiveMind => Mathf.Max(1, mind + temporaryMindBonus);
     public int EffectiveEndurance => Mathf.Max(1, endurance + temporaryEnduranceBonus);
@@ -779,6 +781,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
                 selectedChoiceKeys = dialogueHistory.ExportSelectedChoiceKeys()
             }
         };
+        if (MerchantStockSnapshotProvider != null)
+            data.merchantStocks = MerchantStockSnapshotProvider();
 
         var questManager = GetCachedQuestManager();
         if (questManager != null)

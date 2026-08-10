@@ -476,6 +476,30 @@ public class PlayerInventory : MonoBehaviour
         return true;
     }
 
+    public bool TryRemoveInstance(string instanceId, int amount, out int remainingAmount, bool save = true)
+    {
+        remainingAmount = 0;
+        if (string.IsNullOrEmpty(instanceId) || amount <= 0) return false;
+        for (int i = 0; i < items.Count; i++)
+        {
+            InventoryItem item = items[i];
+            if (item == null || !string.Equals(item.instanceId, instanceId, System.StringComparison.Ordinal)) continue;
+            if (item.amount < amount) return false;
+            item.amount -= amount;
+            remainingAmount = item.amount;
+            if (item.amount <= 0)
+            {
+                ClearRemovedItemFromLoadouts(item);
+                items.RemoveAt(i);
+            }
+            SyncMagicInventorySlots();
+            SyncEquippedReferences();
+            if (save) RequestInventorySave();
+            return true;
+        }
+        return false;
+    }
+
     public bool TryConsumeItem(ItemData itemData, int amount, out int remainingTotal)
     {
         return TryRemoveItem(

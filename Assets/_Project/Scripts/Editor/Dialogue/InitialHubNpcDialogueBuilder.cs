@@ -9,7 +9,7 @@ using UnityEngine;
 /// </summary>
 public static class InitialHubNpcDialogueBuilder
 {
-    private const string Root = "Assets/_Project/Dialogue/NPC";
+    private const string Root = "Assets/_Project/NPC";
 
     [MenuItem("Arcadia/Dialogue/Create Initial Hub NPC Dialogues", priority = 111)]
     public static void CreateInitialHubNpcDialogues()
@@ -87,7 +87,7 @@ public static class InitialHubNpcDialogueBuilder
         string loreLabel,
         string loreText)
     {
-        string folder = Root + "/" + folderName;
+        string folder = Root + "/" + folderName + "/Dialogues";
         EnsureFolder(folder);
 
         DialogueSpeakerData speaker = LoadOrCreate(

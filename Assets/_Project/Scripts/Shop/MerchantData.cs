@@ -8,6 +8,7 @@ public sealed class MerchantData : ScriptableObject
     [Serializable]
     public sealed class StockEntry
     {
+        public string entryId;
         public ScriptableObject item;
         [Min(0)] public int quantity = 1;
         public bool infiniteStock = true;

@@ -54,6 +54,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     private readonly List<InventoryItem> shopItems = new List<InventoryItem>();
     private readonly List<MerchantData.StockEntry> buyEntries = new List<MerchantData.StockEntry>();
     private readonly Dictionary<MerchantData.StockEntry, int> remainingStock = new Dictionary<MerchantData.StockEntry, int>();
+    private bool stockLoaded;
     [SerializeField] private GameObject weaponSection;
     [SerializeField] private GameObject shieldSection;
     [SerializeField] private GameObject armorSection;
@@ -80,6 +81,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     [Header("Detail Content")]
     [SerializeField] private Image detailImage;
     [SerializeField] private TextMeshProUGUI detailTitle;
+    [SerializeField] private TextMeshProUGUI selectedPriceText;
     [SerializeField] private TextMeshProUGUI weaponDescription;
     [SerializeField] private TextMeshProUGUI weaponDamageText;
     [SerializeField] private TextMeshProUGUI weaponCriticalText;
@@ -115,6 +117,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     {
         confirmCallback = OnConfirmPerformed;
         cancelCallback = OnCancelPerformed;
+        PlayerStats.MerchantStockSnapshotProvider = CreateMerchantStockSave;
 
         if (shopHud != null)
             shopHud.SetActive(false);
@@ -166,8 +169,9 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     private void ShowSelectedItem(int index)
     {
         HideDetailSections();
-        if (index < 0 || index >= shopItems.Count || shopItems[index] == null) return;
+        if (index < 0 || index >= shopItems.Count || shopItems[index] == null) { RefreshSelectedPrice(null); return; }
         InventoryItem item = shopItems[index];
+        RefreshSelectedPrice(GetItemAsset(item));
         Sprite icon = GetItemIcon(item);
         if (detailImage != null)
         {
@@ -238,6 +242,13 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         }
         if (detailTitle != null) detailTitle.text = string.Empty;
         ClearDetailTexts();
+        RefreshSelectedPrice(null);
+    }
+
+    private void RefreshSelectedPrice(ScriptableObject asset)
+    {
+        if (selectedPriceText == null) return;
+        selectedPriceText.text = asset == null ? string.Empty : GetPrice(asset, CurrentMode == ShopMode.Buy ? (merchantData != null ? merchantData.buyMultiplier : 1f) : (merchantData != null ? merchantData.sellMultiplier : 0.5f)).ToString();
     }
 
     private static void SetText(TextMeshProUGUI target, string value)
@@ -271,6 +282,12 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
             CloseShopInternal(notifyClosed: false);
         else if (isClosing)
             FinishClose(notifyClosed: false);
+    }
+
+    private void OnDestroy()
+    {
+        if (PlayerStats.MerchantStockSnapshotProvider != null)
+            PlayerStats.MerchantStockSnapshotProvider = null;
     }
 
     public bool OpenShop()
@@ -410,6 +427,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
     private void RefreshShopContents()
     {
+        LoadMerchantStockOnce();
         if (CurrentMode == ShopMode.Sell)
         {
             SetShopItems(playerInventory != null ? playerInventory.Items : null);
@@ -451,8 +469,50 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         ScriptableObject asset = GetItemAsset(selected);
         if (asset == null || playerInventory.IsInstanceEquipped(selected.instanceId)) return false;
         int price = GetPrice(asset, merchantData != null ? merchantData.sellMultiplier : 0.5f);
-        if (playerStats.runCoins > int.MaxValue - price || !playerInventory.TryRemoveItem(asset, 1, out _, false)) return false;
+        if (playerStats.runCoins > int.MaxValue - price) return false;
+        bool removed = (selected.weaponData != null || selected.armorData != null)
+            ? playerInventory.TryRemoveInstance(selected.instanceId, 1, out _, false)
+            : playerInventory.TryRemoveItem(asset, 1, out _, false);
+        if (!removed) return false;
         playerStats.AddCoins(price, false); SaveTransaction(); RefreshAfterTransaction(); return true;
+    }
+
+    private void LoadMerchantStockOnce()
+    {
+        if (stockLoaded) return;
+        stockLoaded = true;
+        if (merchantData == null || merchantData.stock == null) return;
+        SavedMerchantStockData[] saved = playerStats != null && playerStats.LoadedDataSnapshot != null
+            ? playerStats.LoadedDataSnapshot.merchantStocks : null;
+        for (int i = 0; i < merchantData.stock.Count; i++)
+        {
+            MerchantData.StockEntry entry = merchantData.stock[i];
+            if (entry == null || entry.infiniteStock) continue;
+            int quantity = Mathf.Max(0, entry.quantity);
+            if (saved != null)
+                for (int j = 0; j < saved.Length; j++)
+                    if (saved[j] != null && saved[j].merchantId == merchantData.merchantId && saved[j].entryId == GetEntryId(entry, i)) { quantity = Mathf.Max(0, saved[j].remainingQuantity); break; }
+            remainingStock[entry] = quantity;
+        }
+    }
+
+    private SavedMerchantStockData[] CreateMerchantStockSave()
+    {
+        if (merchantData == null || merchantData.stock == null) return System.Array.Empty<SavedMerchantStockData>();
+        List<SavedMerchantStockData> result = new List<SavedMerchantStockData>();
+        for (int i = 0; i < merchantData.stock.Count; i++)
+        {
+            MerchantData.StockEntry entry = merchantData.stock[i];
+            if (entry == null || entry.infiniteStock) continue;
+            int remaining = remainingStock.ContainsKey(entry) ? remainingStock[entry] : entry.quantity;
+            result.Add(new SavedMerchantStockData { merchantId = merchantData.merchantId, entryId = GetEntryId(entry, i), remainingQuantity = Mathf.Max(0, remaining) });
+        }
+        return result.ToArray();
+    }
+
+    private static string GetEntryId(MerchantData.StockEntry entry, int index)
+    {
+        return !string.IsNullOrWhiteSpace(entry.entryId) ? entry.entryId : "entry_" + index.ToString();
     }
 
     private void RefreshAfterTransaction()

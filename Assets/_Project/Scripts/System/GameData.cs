@@ -75,6 +75,14 @@ public class SavedPlayerInventoryData
 }
 
 [System.Serializable]
+public class SavedMerchantStockData
+{
+    public string merchantId;
+    public string entryId;
+    public int remainingQuantity;
+}
+
+[System.Serializable]
 public class SavedDialogueHistoryData
 {
     public string[] readNodeKeys;
@@ -135,6 +143,7 @@ public class GameData
     public SavedQuestData[] quests;
     // Inventory + equipment/loadout
     public SavedPlayerInventoryData playerInventory;
+    public SavedMerchantStockData[] merchantStocks;
 
     // Narrative state. Arrays remain JsonUtility-compatible; runtime systems
     // may use sets and explicitly import/export them.

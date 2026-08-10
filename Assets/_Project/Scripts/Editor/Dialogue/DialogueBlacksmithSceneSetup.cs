@@ -8,8 +8,8 @@ public static class DialogueBlacksmithSceneSetup
 {
     private const string HubScenePath = "Assets/_Project/Scenes/HubSceneV1.unity";
     private const string PlayerSpeakerPath = "Assets/_Project/Dialogue/Speakers/Speaker_Player.asset";
-    private const string BlacksmithSpeakerPath = "Assets/_Project/Dialogue/NPC/Blacksmith_Eldar/Speaker_Eldar.asset";
-    private const string BlacksmithProfilePath = "Assets/_Project/Dialogue/NPC/Blacksmith_Eldar/Profile_Eldar.asset";
+    private const string BlacksmithSpeakerPath = "Assets/_Project/NPC/Blacksmith_Eldar/Dialogues/Speaker_Eldar.asset";
+    private const string BlacksmithProfilePath = "Assets/_Project/NPC/Blacksmith_Eldar/Dialogues/Profile_Eldar.asset";
 
     [MenuItem("Arcadia/Dialogue/Setup Active Hub Blacksmith", priority = 120)]
     public static void SetupActiveHubBlacksmith()
