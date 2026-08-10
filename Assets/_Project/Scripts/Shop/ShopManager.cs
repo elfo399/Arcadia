@@ -52,8 +52,6 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     private readonly List<InventorySlot> shopSlots = new List<InventorySlot>();
     private readonly List<InventoryItem> shopItems = new List<InventoryItem>();
     private readonly List<MerchantData.StockEntry> buyEntries = new List<MerchantData.StockEntry>();
-    private readonly Dictionary<MerchantData.StockEntry, int> remainingStock = new Dictionary<MerchantData.StockEntry, int>();
-    private bool stockLoaded;
     [SerializeField] private GameObject weaponSection;
     [SerializeField] private GameObject shieldSection;
     [SerializeField] private GameObject armorSection;
@@ -124,7 +122,6 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     {
         confirmCallback = OnConfirmPerformed;
         cancelCallback = OnCancelPerformed;
-        PlayerStats.MerchantStockSnapshotProvider = CreateMerchantStockSave;
 
         if (shopHud != null)
             shopHud.SetActive(false);
@@ -314,11 +311,6 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
             FinishClose(notifyClosed: false);
     }
 
-    private void OnDestroy()
-    {
-        if (PlayerStats.MerchantStockSnapshotProvider != null)
-            PlayerStats.MerchantStockSnapshotProvider = null;
-    }
 
     public bool OpenShop()
     {
@@ -367,8 +359,6 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         controls = playerController.Controls;
         CurrentMode = mode;
         currentMerchant = merchantData;
-        remainingStock.Clear();
-        stockLoaded = false;
         IsOpen = true;
         isInteractive = false;
         openingFrame = Time.frameCount;
@@ -472,7 +462,6 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
     private void RefreshShopContents()
     {
-        LoadMerchantStockOnce();
         if (CurrentMode == ShopMode.Sell)
         {
             SetShopItems(playerInventory != null ? playerInventory.Items : null);
@@ -482,12 +471,14 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         buyEntries.Clear();
         if (currentMerchant != null && currentMerchant.stock != null)
         {
-            foreach (MerchantData.StockEntry entry in currentMerchant.stock)
+            for (int i = 0; i < currentMerchant.stock.Count; i++)
             {
+                MerchantData.StockEntry entry = currentMerchant.stock[i];
                 if (entry == null || entry.item == null) continue;
-                if (!remainingStock.ContainsKey(entry)) remainingStock.Add(entry, Mathf.Max(0, entry.quantity));
-                if (!entry.infiniteStock && remainingStock[entry] <= 0) continue;
-                InventoryItem display = CreateInventoryItem(entry.item, entry.infiniteStock ? 1 : remainingStock[entry]);
+                int remaining = playerStats != null && playerStats.MerchantStockState != null
+                    ? playerStats.MerchantStockState.GetRemaining(currentMerchant, entry, currentMerchant.stock.IndexOf(entry)) : entry.quantity;
+                if (!entry.infiniteStock && remaining <= 0) continue;
+                InventoryItem display = CreateInventoryItem(entry.item, entry.infiniteStock ? 1 : remaining);
                 if (display != null) { shopItems.Add(display); buyEntries.Add(entry); }
             }
         }
@@ -498,12 +489,14 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     {
         if (!IsOpen || CurrentMode != ShopMode.Buy || currentMerchant == null || playerInventory == null || playerStats == null || shopFocusIndex >= buyEntries.Count) return false;
         MerchantData.StockEntry entry = buyEntries[shopFocusIndex];
-        if (entry == null || entry.item == null || (!entry.infiniteStock && remainingStock[entry] <= 0)) return false;
+        if (entry == null || entry.item == null) return false;
+        int entryIndex = currentMerchant.stock.IndexOf(entry);
+        if (!entry.infiniteStock && playerStats.MerchantStockState.GetRemaining(currentMerchant, entry, entryIndex) <= 0) return false;
         int price = GetPrice(entry.item, currentMerchant.buyMultiplier);
         if (!playerStats.HasCoins(price) || !playerInventory.CanAddItem(entry.item, 1)) return false;
         if (!playerStats.TryRemoveCoins(price, false)) return false;
         if (!playerInventory.TryAddItem(entry.item, 1, false)) { playerStats.AddCoins(price, false); return false; }
-        if (!entry.infiniteStock) remainingStock[entry] = Mathf.Max(0, remainingStock[entry] - 1);
+        if (!entry.infiniteStock) playerStats.MerchantStockState.Decrement(currentMerchant, entry, entryIndex);
         SaveTransaction(); RefreshAfterTransaction(); return true;
     }
 
@@ -522,43 +515,6 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         playerStats.AddCoins(price, false); SaveTransaction(); RefreshAfterTransaction(); return true;
     }
 
-    private void LoadMerchantStockOnce()
-    {
-        if (stockLoaded) return;
-        stockLoaded = true;
-        if (currentMerchant == null || currentMerchant.stock == null) return;
-        SavedMerchantStockData[] saved = playerStats != null && playerStats.LoadedDataSnapshot != null
-            ? playerStats.LoadedDataSnapshot.merchantStocks : null;
-        for (int i = 0; i < currentMerchant.stock.Count; i++)
-        {
-            MerchantData.StockEntry entry = currentMerchant.stock[i];
-            if (entry == null || entry.infiniteStock) continue;
-            int quantity = Mathf.Max(0, entry.quantity);
-            if (saved != null)
-                for (int j = 0; j < saved.Length; j++)
-                    if (saved[j] != null && saved[j].merchantId == currentMerchant.merchantId && saved[j].entryId == GetEntryId(entry, i)) { quantity = Mathf.Max(0, saved[j].remainingQuantity); break; }
-            remainingStock[entry] = quantity;
-        }
-    }
-
-    private SavedMerchantStockData[] CreateMerchantStockSave()
-    {
-        if (currentMerchant == null || currentMerchant.stock == null) return System.Array.Empty<SavedMerchantStockData>();
-        List<SavedMerchantStockData> result = new List<SavedMerchantStockData>();
-        for (int i = 0; i < currentMerchant.stock.Count; i++)
-        {
-            MerchantData.StockEntry entry = currentMerchant.stock[i];
-            if (entry == null || entry.infiniteStock) continue;
-            int remaining = remainingStock.ContainsKey(entry) ? remainingStock[entry] : entry.quantity;
-            result.Add(new SavedMerchantStockData { merchantId = currentMerchant.merchantId, entryId = GetEntryId(entry, i), remainingQuantity = Mathf.Max(0, remaining) });
-        }
-        return result.ToArray();
-    }
-
-    private static string GetEntryId(MerchantData.StockEntry entry, int index)
-    {
-        return !string.IsNullOrWhiteSpace(entry.entryId) ? entry.entryId : "entry_" + index.ToString();
-    }
 
     private void RefreshAfterTransaction()
     {

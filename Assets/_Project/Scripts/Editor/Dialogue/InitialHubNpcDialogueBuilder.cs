@@ -15,23 +15,6 @@ public static class InitialHubNpcDialogueBuilder
     public static void CreateInitialHubNpcDialogues()
     {
         CreateNpc(
-            folderName: "Merchant",
-            speakerFileName: "Speaker_Merchant",
-            profileFileName: "Profile_Merchant",
-            displayName: "Mercante",
-            speakerId: "merchant",
-            flagId: "met_merchant",
-            conversationPrefix: "merchant",
-            introGreeting: "Benvenuto. Cerchi qualcosa per il tuo viaggio?",
-            introFarewell: "Dai un'occhiata alla mia merce quando vuoi.",
-            serviceChoiceId: "merchant_service_Buy",
-            serviceLabel: "Compra",
-            serviceId: "merchant_buy",
-            loreChoiceId: "merchant_lore",
-            loreLabel: "Parlami del mercato.",
-            loreText: "Il mercato cambia volto ogni giorno, ma una buona merce trova sempre il suo acquirente.");
-
-        CreateNpc(
             folderName: "Mage",
             speakerFileName: "Speaker_Mage",
             profileFileName: "Profile_Mage",

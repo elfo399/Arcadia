@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5884b0f7a7c1081468bf7cce940b2367, type: 3}
   m_Name: Dialogue_Merchant_Lore_francesco
   m_EditorClassIdentifier: 
-  conversationId: merchant_lore
-  startNodeId: merchant_service_menu
+  conversationId: merchant_francesco_lore
+  startNodeId: merchant_francesco_service_menu
   nodes:
-  - nodeId: merchant_service_menu
+  - nodeId: merchant_francesco_service_menu
     speaker: {fileID: 11400000, guid: 0fb42ed6355a5fd41b2f7a133f7dd397, type: 2}
     text: Che posso fare per te?
     portraitOverride: {fileID: 0}
@@ -30,7 +30,7 @@ MonoBehaviour:
     actionsOnExit: []
     nextNodeId: 
     choices:
-    - choiceId: merchant_service_Buy
+    - choiceId: merchant_francesco_service_buy
       text: Compra
       playerSpokenText: 
       conditions:
@@ -60,7 +60,7 @@ MonoBehaviour:
       playerSpeaksChoice: 0
       unavailableDisplay: 0
       showReadIndicator: 0
-    - choiceId: merchant_service_Sell
+    - choiceId: merchant_francesco_service_sell
       text: Vendi
       playerSpokenText: 
       conditions:
@@ -90,7 +90,7 @@ MonoBehaviour:
       playerSpeaksChoice: 0
       unavailableDisplay: 0
       showReadIndicator: 0
-    - choiceId: merchant_talk
+    - choiceId: merchant_francesco_talk
       text: Parla.
       playerSpokenText: Vorrei saperne di piu.
       conditions:
@@ -99,12 +99,12 @@ MonoBehaviour:
         conditions: []
         groups: []
       actions: []
-      nextNodeId: merchant_lore
-      returnNodeId: merchant_service_menu
+      nextNodeId: merchant_francesco_lore
+      returnNodeId: merchant_francesco_service_menu
       playerSpeaksChoice: 1
       unavailableDisplay: 0
       showReadIndicator: 0
-    - choiceId: merchant_lore
+    - choiceId: merchant_francesco_lore
       text: Parlami del mercato.
       playerSpokenText: 
       conditions:
@@ -113,12 +113,12 @@ MonoBehaviour:
         conditions: []
         groups: []
       actions: []
-      nextNodeId: merchant_lore
-      returnNodeId: merchant_service_menu
+      nextNodeId: merchant_francesco_lore
+      returnNodeId: merchant_francesco_service_menu
       playerSpeaksChoice: 1
       unavailableDisplay: 0
       showReadIndicator: 1
-    - choiceId: merchant_exit
+    - choiceId: merchant_francesco_exit
       text: Esci.
       playerSpokenText: 
       conditions:
@@ -132,7 +132,7 @@ MonoBehaviour:
       playerSpeaksChoice: 0
       unavailableDisplay: 0
       showReadIndicator: 0
-  - nodeId: merchant_lore
+  - nodeId: merchant_francesco_lore
     speaker: {fileID: 11400000, guid: 0fb42ed6355a5fd41b2f7a133f7dd397, type: 2}
     text: Il mercato cambia volto ogni giorno, ma una buona merce trova sempre il
       suo acquirente.
