@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using TMPro;
 
 public enum ShopMode
 {
@@ -13,14 +14,19 @@ public enum ShopMode
 
 public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 {
+    private enum FocusArea { Grid, Action }
+
     [Header("Scene References")]
     [SerializeField] private GameObject shopHud;
     [SerializeField] private GameObject initialFocus;
+    [SerializeField] private PlayerController playerController;
+    [SerializeField] private PlayerInventory playerInventory;
     [SerializeField] private Animator bookAnimator;
     [SerializeField] private Animator contentAppearAnimator;
     [SerializeField] private CanvasGroup contentGroup;
     [SerializeField] private InventorySlot slotPrefab;
     [SerializeField] private Transform slotParent;
+    [SerializeField] private GridLayoutGroup slotGrid;
     [SerializeField] [Min(0)] private int initialSlotCount = 30;
 
     [Header("Initial State")]
@@ -32,7 +38,6 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] [Min(0f)] private float bookCloseDuration = 0.6666666f;
 
     private readonly object gameplayLockOwner = new object();
-    private PlayerController playerController;
     private PlayerControls controls;
     private Action<InputAction.CallbackContext> confirmCallback;
     private Action<InputAction.CallbackContext> cancelCallback;
@@ -40,6 +45,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     private Coroutine contentAppearRoutine;
     private Coroutine closeRoutine;
     private bool isClosing;
+    private bool isInteractive;
     private readonly List<InventorySlot> shopSlots = new List<InventorySlot>();
     private readonly List<InventoryItem> shopItems = new List<InventoryItem>();
     [SerializeField] private GameObject weaponSection;
@@ -48,7 +54,48 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private GameObject itemSection;
     [SerializeField] private GameObject commonTitle;
     [SerializeField] private GameObject commonImage;
+    [SerializeField] private Button weaponBuyButton;
+    [SerializeField] private Button weaponSellButton;
+    [SerializeField] private Button shieldBuyButton;
+    [SerializeField] private Button shieldSellButton;
+    [SerializeField] private Button armorBuyButton;
+    [SerializeField] private Button armorSellButton;
+    [SerializeField] private Button itemBuyButton;
+    [SerializeField] private Button itemSellButton;
+    [SerializeField] private SegmentedButtonSelectionUI weaponBuySelection;
+    [SerializeField] private SegmentedButtonSelectionUI weaponSellSelection;
+    [SerializeField] private SegmentedButtonSelectionUI shieldBuySelection;
+    [SerializeField] private SegmentedButtonSelectionUI shieldSellSelection;
+    [SerializeField] private SegmentedButtonSelectionUI armorBuySelection;
+    [SerializeField] private SegmentedButtonSelectionUI armorSellSelection;
+    [SerializeField] private SegmentedButtonSelectionUI itemBuySelection;
+    [SerializeField] private SegmentedButtonSelectionUI itemSellSelection;
+
+    [Header("Detail Content")]
+    [SerializeField] private Image detailImage;
+    [SerializeField] private TextMeshProUGUI detailTitle;
+    [SerializeField] private TextMeshProUGUI weaponDescription;
+    [SerializeField] private TextMeshProUGUI weaponDamageText;
+    [SerializeField] private TextMeshProUGUI weaponCriticalText;
+    [SerializeField] private TextMeshProUGUI weaponWeightText;
+    [SerializeField] private TextMeshProUGUI weaponScalingText;
+    [SerializeField] private TextMeshProUGUI weaponRequirementsText;
+    [SerializeField] private TextMeshProUGUI shieldDescription;
+    [SerializeField] private TextMeshProUGUI shieldDamageText;
+    [SerializeField] private TextMeshProUGUI shieldCriticalText;
+    [SerializeField] private TextMeshProUGUI shieldWeightText;
+    [SerializeField] private TextMeshProUGUI shieldScalingText;
+    [SerializeField] private TextMeshProUGUI shieldRequirementsText;
+    [SerializeField] private TextMeshProUGUI shieldPhysicalDefenseText;
+    [SerializeField] private TextMeshProUGUI shieldMagicDefenseText;
+    [SerializeField] private TextMeshProUGUI armorDescription;
+    [SerializeField] private TextMeshProUGUI armorWeightText;
+    [SerializeField] private TextMeshProUGUI armorPhysicalDefenseText;
+    [SerializeField] private TextMeshProUGUI armorMagicDefenseText;
+    [SerializeField] private TextMeshProUGUI itemDescription;
     private int shopFocusIndex;
+    private FocusArea focusArea = FocusArea.Grid;
+    private SegmentedButtonSelectionUI activeActionSelection;
     private float lastNavigationTime = -999f;
     private const float NavigationRepeatCooldown = 0.20f;
 
@@ -75,23 +122,16 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         if (slotPrefab == null || slotParent == null || initialSlotCount <= 0)
             return;
 
-        int existing = slotParent.GetComponentsInChildren<InventorySlot>(true).Length;
-        for (int i = existing; i < initialSlotCount; i++)
+        shopSlots.Clear();
+        for (int i = 0; i < initialSlotCount; i++)
         {
             InventorySlot slot = Instantiate(slotPrefab, slotParent);
             slot.name = $"InvSlot_{i:00}";
             slot.SetDisplayOnly(false);
             slot.Init(i, this);
             slot.Clear();
-        }
-
-        shopSlots.Clear();
-        shopSlots.AddRange(slotParent.GetComponentsInChildren<InventorySlot>(true));
-        for (int i = 0; i < shopSlots.Count; i++)
-        {
-            shopSlots[i].SetDisplayOnly(false);
-            shopSlots[i].Init(i, this);
-            shopSlots[i].SetFocused(false);
+            slot.SetFocused(false);
+            shopSlots.Add(slot);
         }
     }
 
@@ -113,14 +153,59 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         HideDetailSections();
         if (index < 0 || index >= shopItems.Count || shopItems[index] == null) return;
         InventoryItem item = shopItems[index];
+        Sprite icon = GetItemIcon(item);
+        if (detailImage != null)
+        {
+            detailImage.sprite = icon;
+            detailImage.enabled = icon != null;
+            detailImage.preserveAspect = true;
+        }
+        if (detailTitle != null) detailTitle.text = item.title ?? string.Empty;
         if (commonTitle != null) commonTitle.SetActive(true);
         if (commonImage != null) commonImage.SetActive(true);
         if (item.weaponData != null)
-            (item.weaponData.category == WeaponCategory.Shield ? shieldSection : weaponSection)?.SetActive(true);
+        {
+            WeaponItem weapon = item.weaponData;
+            if (detailTitle != null && !string.IsNullOrEmpty(weapon.weaponName))
+                detailTitle.text = weapon.weaponName;
+            if (weapon.category == WeaponCategory.Shield)
+            {
+                shieldSection?.SetActive(true);
+                SetText(shieldDescription, weapon.description);
+                SetText(shieldDamageText, weapon.physicalDamage.ToString());
+                SetText(shieldCriticalText, weapon.criticalHit.ToString("0.##"));
+                SetText(shieldWeightText, weapon.weight.ToString("0.##"));
+                SetText(shieldScalingText, weapon.GetScalingLabel());
+                SetText(shieldRequirementsText, weapon.GetRequirementsLabel());
+                SetText(shieldPhysicalDefenseText, Mathf.RoundToInt(Mathf.Clamp01(weapon.physicalBlockPercent) * 100f).ToString());
+                SetText(shieldMagicDefenseText, Mathf.RoundToInt(Mathf.Clamp01(weapon.magicBlockPercent) * 100f).ToString());
+            }
+            else
+            {
+                weaponSection?.SetActive(true);
+                SetText(weaponDescription, weapon.description);
+                SetText(weaponDamageText, weapon.physicalDamage.ToString());
+                SetText(weaponCriticalText, weapon.criticalHit.ToString("0.##"));
+                SetText(weaponWeightText, weapon.weight.ToString("0.##"));
+                SetText(weaponScalingText, weapon.GetScalingLabel());
+                SetText(weaponRequirementsText, weapon.GetRequirementsLabel());
+            }
+        }
         else if (item.armorData != null)
+        {
             armorSection?.SetActive(true);
+            ArmorItemData armor = item.armorData;
+            if (detailTitle != null && !string.IsNullOrEmpty(armor.itemName)) detailTitle.text = armor.itemName;
+            SetText(armorDescription, armor.description);
+            SetText(armorWeightText, armor.weight.ToString("0.##"));
+            SetText(armorPhysicalDefenseText, armor.physicalDefense.ToString());
+            SetText(armorMagicDefenseText, armor.magicDefense.ToString());
+        }
         else
+        {
             itemSection?.SetActive(true);
+            SetText(itemDescription, item.description);
+        }
     }
 
     private void HideDetailSections()
@@ -131,6 +216,32 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         shieldSection?.SetActive(false);
         armorSection?.SetActive(false);
         itemSection?.SetActive(false);
+        if (detailImage != null)
+        {
+            detailImage.sprite = null;
+            detailImage.enabled = false;
+        }
+        if (detailTitle != null) detailTitle.text = string.Empty;
+        ClearDetailTexts();
+    }
+
+    private static void SetText(TextMeshProUGUI target, string value)
+    {
+        if (target != null) target.text = value ?? string.Empty;
+    }
+
+    private void ClearDetailTexts()
+    {
+        TextMeshProUGUI[] fields =
+        {
+            weaponDescription, weaponDamageText, weaponCriticalText, weaponWeightText,
+            weaponScalingText, weaponRequirementsText, shieldDescription, shieldDamageText,
+            shieldCriticalText, shieldWeightText, shieldScalingText, shieldRequirementsText,
+            shieldPhysicalDefenseText, shieldMagicDefenseText, armorDescription, armorWeightText,
+            armorPhysicalDefenseText, armorMagicDefenseText, itemDescription
+        };
+        for (int i = 0; i < fields.Length; i++)
+            if (fields[i] != null) fields[i].text = string.Empty;
     }
 
     private Sprite GetItemIcon(InventoryItem item)
@@ -149,10 +260,10 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
     public bool OpenShop()
     {
-        return OpenShop(FindObjectOfType<PlayerController>(), initialMode);
+        return OpenShop(initialMode);
     }
 
-    public bool OpenShop(PlayerController controller, ShopMode mode = ShopMode.Buy)
+    public bool OpenShop(ShopMode mode = ShopMode.Buy)
     {
         if (isClosing)
             return false;
@@ -163,7 +274,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
             return false;
         }
 
-        if (controller == null || controller.Controls == null)
+        if (playerController == null || playerController.Controls == null)
         {
             Debug.LogWarning("[ShopManager] PlayerController o PlayerControls non disponibili.", this);
             return false;
@@ -172,20 +283,28 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         if (IsOpen)
         {
             CurrentMode = mode;
+            ApplyModeVisuals();
+            SetShopItems(mode == ShopMode.Sell && playerInventory != null
+                ? playerInventory.Items
+                : null);
             FocusInitialTarget();
             return true;
         }
 
-        playerController = controller;
-        controls = controller.Controls;
+        controls = playerController.Controls;
         CurrentMode = mode;
         IsOpen = true;
+        isInteractive = false;
         openingFrame = Time.frameCount;
 
         playerController.AcquireGameplayInputLock(gameplayLockOwner);
         SubscribeInput();
 
         shopHud.SetActive(true);
+        ApplyModeVisuals();
+        SetShopItems(mode == ShopMode.Sell && playerInventory != null
+            ? playerInventory.Items
+            : null);
         Canvas.ForceUpdateCanvases();
         FocusInitialTarget();
         SetShopFocus(0);
@@ -195,7 +314,8 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
     private void Update()
     {
-        if (!IsOpen || controls == null || Time.unscaledTime < lastNavigationTime + NavigationRepeatCooldown)
+        if (!IsOpen || !isInteractive || focusArea != FocusArea.Grid || controls == null
+            || Time.unscaledTime < lastNavigationTime + NavigationRepeatCooldown)
             return;
 
         Vector2 navigation = controls.Player.Move.ReadValue<Vector2>();
@@ -223,9 +343,8 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     {
         if (shopSlots.Count == 0) return;
         int columns = 5;
-        GridLayoutGroup grid = slotParent != null ? slotParent.GetComponent<GridLayoutGroup>() : null;
-        if (grid != null && grid.constraint == GridLayoutGroup.Constraint.FixedColumnCount)
-            columns = Mathf.Max(1, grid.constraintCount);
+        if (slotGrid != null && slotGrid.constraint == GridLayoutGroup.Constraint.FixedColumnCount)
+            columns = Mathf.Max(1, slotGrid.constraintCount);
         int next = shopFocusIndex + direction * columns;
         next %= shopSlots.Count;
         if (next < 0) next += shopSlots.Count;
@@ -235,15 +354,27 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     private void SetShopFocus(int index)
     {
         if (shopSlots.Count == 0) return;
+        focusArea = FocusArea.Grid;
         shopFocusIndex = Mathf.Clamp(index, 0, shopSlots.Count - 1);
         for (int i = 0; i < shopSlots.Count; i++)
             shopSlots[i].SetFocused(i == shopFocusIndex);
         ShowSelectedItem(shopFocusIndex);
     }
 
-    public void HandleSlotSelected(int index) => ShowSelectedItem(index);
-    public void HandleSlotSubmit(int index) => ConfirmRequested?.Invoke(CurrentMode);
-    public void HandleSlotPointerDown(int index) => SetShopFocus(index);
+    public void HandleSlotSelected(int index)
+    {
+        if (isInteractive) ShowSelectedItem(index);
+    }
+
+    public void HandleSlotSubmit(int index)
+    {
+        if (isInteractive) FocusActionButton(index);
+    }
+
+    public void HandleSlotPointerDown(int index)
+    {
+        if (isInteractive) SetShopFocus(index);
+    }
     public void HandleSlotBeginDrag(int index, PointerEventData eventData) { }
     public void HandleSlotDrag(PointerEventData eventData) { }
     public void HandleSlotEndDrag() { }
@@ -252,10 +383,33 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     public void SetMode(ShopMode mode)
     {
         CurrentMode = mode;
+        ApplyModeVisuals();
+    }
+
+    private void ApplyModeVisuals()
+    {
+        bool buy = CurrentMode == ShopMode.Buy;
+        SetButtonActive(weaponBuyButton, buy);
+        SetButtonActive(shieldBuyButton, buy);
+        SetButtonActive(armorBuyButton, buy);
+        SetButtonActive(itemBuyButton, buy);
+        SetButtonActive(weaponSellButton, !buy);
+        SetButtonActive(shieldSellButton, !buy);
+        SetButtonActive(armorSellButton, !buy);
+        SetButtonActive(itemSellButton, !buy);
+    }
+
+    private static void SetButtonActive(Button button, bool active)
+    {
+        if (button != null)
+            button.gameObject.SetActive(active);
     }
 
     public void CloseShop()
     {
+        if (!isInteractive)
+            return;
+
         CloseShopInternal(notifyClosed: true);
     }
 
@@ -266,6 +420,8 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
         IsOpen = false;
         isClosing = true;
+        isInteractive = false;
+        ClearActionFocusVisual();
         UnsubscribeInput();
         StopContentAppearRoutineOnly();
 
@@ -324,6 +480,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
             shopHud.SetActive(false);
 
         isClosing = false;
+        isInteractive = false;
         closeRoutine = null;
 
         // The service reopens the dialogue from Closed while this lock is still
@@ -335,33 +492,40 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
             playerController.ReleaseGameplayInputLock(gameplayLockOwner);
 
         controls = null;
-        playerController = null;
         openingFrame = -1;
     }
 
     private System.Collections.IEnumerator PlayContentAppearAnimation()
     {
-        if (contentAppearAnimator == null || string.IsNullOrWhiteSpace(contentAppearStateName))
-            yield break;
-
         if (contentAppearDelay > 0f)
             yield return new WaitForSecondsRealtime(contentAppearDelay);
         if (!IsOpen)
             yield break;
 
-        GameObject animationObject = contentAppearAnimator.gameObject;
-        animationObject.SetActive(true);
         ShowContentGroup();
-        contentAppearAnimator.enabled = true;
-        contentAppearAnimator.updateMode = AnimatorUpdateMode.UnscaledTime;
-        contentAppearAnimator.Play(contentAppearStateName, 0, 0f);
-        contentAppearAnimator.Update(0f);
+        if (contentAppearAnimator != null && !string.IsNullOrWhiteSpace(contentAppearStateName))
+        {
+            GameObject animationObject = contentAppearAnimator.gameObject;
+            animationObject.SetActive(true);
+            contentAppearAnimator.enabled = true;
+            contentAppearAnimator.updateMode = AnimatorUpdateMode.UnscaledTime;
+            contentAppearAnimator.Play(contentAppearStateName, 0, 0f);
+            contentAppearAnimator.Update(0f);
 
-        if (contentAppearDuration > 0f)
-            yield return new WaitForSecondsRealtime(contentAppearDuration);
+            if (contentAppearDuration > 0f)
+                yield return new WaitForSecondsRealtime(contentAppearDuration);
 
-        HideContentAppearAnimation();
+            HideContentAppearAnimation();
+        }
+
         contentAppearRoutine = null;
+        if (IsOpen && !isClosing)
+        {
+            isInteractive = true;
+            SetContentInteraction(true);
+            lastNavigationTime = Time.unscaledTime;
+            FocusInitialTarget();
+        }
     }
 
     private void StopContentAppearRoutineOnly()
@@ -397,8 +561,16 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
             return;
 
         contentGroup.alpha = 1f;
-        contentGroup.interactable = true;
-        contentGroup.blocksRaycasts = true;
+        SetContentInteraction(false);
+    }
+
+    private void SetContentInteraction(bool enabled)
+    {
+        if (contentGroup == null)
+            return;
+
+        contentGroup.interactable = enabled;
+        contentGroup.blocksRaycasts = enabled;
     }
 
     private void SubscribeInput()
@@ -425,18 +597,86 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
 
     private void OnConfirmPerformed(InputAction.CallbackContext _)
     {
-        if (!IsOpen || openingFrame == Time.frameCount)
+        if (!IsOpen || !isInteractive || openingFrame == Time.frameCount)
             return;
 
-        ConfirmRequested?.Invoke(CurrentMode);
+        if (focusArea == FocusArea.Grid)
+            FocusActionButton(shopFocusIndex);
+        else
+            ConfirmRequested?.Invoke(CurrentMode);
     }
 
     private void OnCancelPerformed(InputAction.CallbackContext _)
     {
-        if (!IsOpen || openingFrame == Time.frameCount)
+        if (!IsOpen || !isInteractive || openingFrame == Time.frameCount)
             return;
 
+        if (focusArea == FocusArea.Action)
+        {
+            ReturnFocusToGrid();
+            return;
+        }
+
         CloseShop();
+    }
+
+    private void FocusActionButton(int index)
+    {
+        if (index < 0 || index >= shopItems.Count || shopItems[index] == null)
+            return;
+
+        Button button = GetActionButton(shopItems[index]);
+        if (button == null || !button.gameObject.activeInHierarchy || !button.interactable)
+            return;
+
+        focusArea = FocusArea.Action;
+        ShowSelectedItem(index);
+        ClearActionFocusVisual();
+        activeActionSelection = GetActionSelection(shopItems[index]);
+        activeActionSelection?.SetFocused(true);
+        button.Select();
+        if (EventSystem.current != null)
+            EventSystem.current.SetSelectedGameObject(button.gameObject);
+    }
+
+    private Button GetActionButton(InventoryItem item)
+    {
+        bool buy = CurrentMode == ShopMode.Buy;
+        if (item.weaponData != null)
+            return item.weaponData.category == WeaponCategory.Shield
+                ? (buy ? shieldBuyButton : shieldSellButton)
+                : (buy ? weaponBuyButton : weaponSellButton);
+        if (item.armorData != null)
+            return buy ? armorBuyButton : armorSellButton;
+        return buy ? itemBuyButton : itemSellButton;
+    }
+
+    private SegmentedButtonSelectionUI GetActionSelection(InventoryItem item)
+    {
+        bool buy = CurrentMode == ShopMode.Buy;
+        if (item.weaponData != null)
+            return item.weaponData.category == WeaponCategory.Shield
+                ? (buy ? shieldBuySelection : shieldSellSelection)
+                : (buy ? weaponBuySelection : weaponSellSelection);
+        if (item.armorData != null)
+            return buy ? armorBuySelection : armorSellSelection;
+        return buy ? itemBuySelection : itemSellSelection;
+    }
+
+    private void ClearActionFocusVisual()
+    {
+        if (activeActionSelection != null)
+            activeActionSelection.SetFocused(false);
+        activeActionSelection = null;
+    }
+
+    private void ReturnFocusToGrid()
+    {
+        ClearActionFocusVisual();
+        focusArea = FocusArea.Grid;
+        ShowSelectedItem(shopFocusIndex);
+        if (EventSystem.current != null && shopFocusIndex >= 0 && shopFocusIndex < shopSlots.Count)
+            EventSystem.current.SetSelectedGameObject(shopSlots[shopFocusIndex].gameObject);
     }
 
     private void FocusInitialTarget()
@@ -444,16 +684,7 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
         if (EventSystem.current == null)
             return;
 
-        GameObject focusTarget = initialFocus;
-        Selectable selectable = initialFocus != null
-            ? initialFocus.GetComponentInChildren<Selectable>(includeInactive: false)
-            : null;
-        if (selectable == null && shopHud != null)
-            selectable = shopHud.GetComponentInChildren<Selectable>(includeInactive: false);
-        if (selectable != null)
-            focusTarget = selectable.gameObject;
-
-        if (focusTarget != null)
-            EventSystem.current.SetSelectedGameObject(focusTarget);
+        if (initialFocus != null)
+            EventSystem.current.SetSelectedGameObject(initialFocus);
     }
 }

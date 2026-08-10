@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5884b0f7a7c1081468bf7cce940b2367, type: 3}
   m_Name: Dialogue_Mercante_Introduction
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   conversationId: merchant_introduction
   startNodeId: merchant_intro_greeting
   nodes:
@@ -19,7 +19,7 @@ MonoBehaviour:
     speaker: {fileID: 11400000, guid: ec286caf710d2bd4091c2163980e7462, type: 2}
     text: Benvenuto. Cerchi qualcosa per il tuo viaggio?
     portraitOverride: {fileID: 0}
-    animationTrigger: 
+    animationTrigger:
     voiceClip: {fileID: 0}
     conditions:
       logic: 0
@@ -34,7 +34,7 @@ MonoBehaviour:
     speaker: {fileID: 11400000, guid: ec286caf710d2bd4091c2163980e7462, type: 2}
     text: Dai un'occhiata alla mia merce quando vuoi.
     portraitOverride: {fileID: 0}
-    animationTrigger: 
+    animationTrigger:
     voiceClip: {fileID: 0}
     conditions:
       logic: 0
@@ -55,9 +55,9 @@ MonoBehaviour:
         magic: {fileID: 0}
         usable: {fileID: 0}
       questDefinition: {fileID: 0}
-      serviceId: 
-      teleportTargetId: 
-      teleportSceneName: 
+      serviceId:
+      teleportTargetId:
+      teleportSceneName:
       useTeleportTargetRotation: 1
     nextNodeId: merchant_service_menu
     choices: []
@@ -65,7 +65,7 @@ MonoBehaviour:
     speaker: {fileID: 11400000, guid: ec286caf710d2bd4091c2163980e7462, type: 2}
     text: Che posso fare per te?
     portraitOverride: {fileID: 0}
-    animationTrigger: 
+    animationTrigger:
     voiceClip: {fileID: 0}
     conditions:
       logic: 0
@@ -74,11 +74,11 @@ MonoBehaviour:
       groups: []
     actionsOnEnter: []
     actionsOnExit: []
-    nextNodeId: 
+    nextNodeId:
     choices:
-    - choiceId: merchant_service
-      text: Compra / Vendi
-      playerSpokenText: 
+    - choiceId: merchant_service_Buy
+      text: Compra
+      playerSpokenText:
       conditions:
         logic: 0
         negate: 0
@@ -88,7 +88,7 @@ MonoBehaviour:
       - type: 17
         amount: 1
         stopOnFailure: 1
-        id: 
+        id:
         item:
           itemType: 0
           item: {fileID: 0}
@@ -97,12 +97,42 @@ MonoBehaviour:
           magic: {fileID: 0}
           usable: {fileID: 0}
         questDefinition: {fileID: 0}
-        serviceId: merchant
-        teleportTargetId: 
-        teleportSceneName: 
+        serviceId: merchant_buy
+        teleportTargetId:
+        teleportSceneName:
         useTeleportTargetRotation: 1
-      nextNodeId: 
-      returnNodeId: 
+      nextNodeId:
+      returnNodeId:
+      playerSpeaksChoice: 0
+      unavailableDisplay: 0
+      showReadIndicator: 0
+    - choiceId: merchant_service_Sell
+      text: Vendi
+      playerSpokenText:
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions:
+      - type: 17
+        amount: 0
+        stopOnFailure: 0
+        id:
+        item:
+          itemType: 0
+          item: {fileID: 0}
+          weapon: {fileID: 0}
+          armor: {fileID: 0}
+          magic: {fileID: 0}
+          usable: {fileID: 0}
+        questDefinition: {fileID: 0}
+        serviceId: merchant_sell
+        teleportTargetId:
+        teleportSceneName:
+        useTeleportTargetRotation: 0
+      nextNodeId:
+      returnNodeId:
       playerSpeaksChoice: 0
       unavailableDisplay: 0
       showReadIndicator: 0
@@ -122,7 +152,7 @@ MonoBehaviour:
       showReadIndicator: 0
     - choiceId: merchant_lore
       text: Parlami del mercato.
-      playerSpokenText: 
+      playerSpokenText:
       conditions:
         logic: 0
         negate: 0
@@ -136,15 +166,15 @@ MonoBehaviour:
       showReadIndicator: 1
     - choiceId: merchant_exit
       text: Esci.
-      playerSpokenText: 
+      playerSpokenText:
       conditions:
         logic: 0
         negate: 0
         conditions: []
         groups: []
       actions: []
-      nextNodeId: 
-      returnNodeId: 
+      nextNodeId:
+      returnNodeId:
       playerSpeaksChoice: 0
       unavailableDisplay: 0
       showReadIndicator: 0
@@ -153,7 +183,7 @@ MonoBehaviour:
     text: Il mercato cambia volto ogni giorno, ma una buona merce trova sempre il
       suo acquirente.
     portraitOverride: {fileID: 0}
-    animationTrigger: 
+    animationTrigger:
     voiceClip: {fileID: 0}
     conditions:
       logic: 0
@@ -162,7 +192,7 @@ MonoBehaviour:
       groups: []
     actionsOnEnter: []
     actionsOnExit: []
-    nextNodeId: 
+    nextNodeId:
     choices: []
   references:
     version: 2

@@ -778,7 +778,7 @@ public static class DialogueAssetBuilder
                 choices = new List<DialogueChoice>
                 {
                     ServiceChoice("upgrade", "Potenzia equipaggiamento", "blacksmith_upgrade"),
-                    ServiceChoice("buy", "Compra", "merchant"),
+                    ServiceChoice("buy", "Compra", "merchant_buy"),
                     new DialogueChoice
                     {
                         choiceId = "talk",

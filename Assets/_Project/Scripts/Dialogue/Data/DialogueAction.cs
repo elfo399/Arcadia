@@ -33,20 +33,15 @@ public sealed class DialogueAction
     [Tooltip("Se attivo, interrompe il batch quando questa action fallisce.")]
     public bool stopOnFailure;
 
-    [Header("ID")]
     [Tooltip("Story flag o quest ID, secondo il tipo selezionato.")]
     public string id;
 
-    [Header("Item")]
     public DialogueItemReference item = new DialogueItemReference();
 
-    [Header("Quest")]
     public QuestDefinition questDefinition;
 
-    [Header("NPC Service")]
     public string serviceId;
 
-    [Header("Teleport")]
     public string teleportTargetId;
     [Tooltip("Vuoto = scena corrente.")]
     public string teleportSceneName;

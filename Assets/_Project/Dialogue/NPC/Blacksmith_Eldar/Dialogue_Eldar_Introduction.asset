@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5884b0f7a7c1081468bf7cce940b2367, type: 3}
   m_Name: Dialogue_Blacksmith_Introduction
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   conversationId: blacksmith_introduction
   startNodeId: intro_hello
   nodes:
@@ -19,7 +19,7 @@ MonoBehaviour:
     speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
     text: Ah, non ti ho mai visto da queste parti.
     portraitOverride: {fileID: 0}
-    animationTrigger: 
+    animationTrigger:
     voiceClip: {fileID: 0}
     conditions:
       logic: 0
@@ -34,7 +34,7 @@ MonoBehaviour:
     speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
     text: Se hai bisogno di un'arma, sei nel posto giusto.
     portraitOverride: {fileID: 0}
-    animationTrigger: 
+    animationTrigger:
     voiceClip: {fileID: 0}
     conditions:
       logic: 0
@@ -55,9 +55,9 @@ MonoBehaviour:
         magic: {fileID: 0}
         usable: {fileID: 0}
       questDefinition: {fileID: 0}
-      serviceId: 
-      teleportTargetId: 
-      teleportSceneName: 
+      serviceId:
+      teleportTargetId:
+      teleportSceneName:
       useTeleportTargetRotation: 1
     nextNodeId: service_menu
     choices: []
@@ -65,7 +65,7 @@ MonoBehaviour:
     speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
     text: Che posso fare per te?
     portraitOverride: {fileID: 0}
-    animationTrigger: 
+    animationTrigger:
     voiceClip: {fileID: 0}
     conditions:
       logic: 0
@@ -74,7 +74,7 @@ MonoBehaviour:
       groups: []
     actionsOnEnter: []
     actionsOnExit: []
-    nextNodeId: 
+    nextNodeId:
     choices:
     - choiceId: upgrade
       text: Potenzia equipaggiamento
@@ -88,7 +88,7 @@ MonoBehaviour:
       - type: 17
         amount: 1
         stopOnFailure: 1
-        id: 
+        id:
         item:
           itemType: 0
           item: {fileID: 0}
@@ -98,11 +98,11 @@ MonoBehaviour:
           usable: {fileID: 0}
         questDefinition: {fileID: 0}
         serviceId: blacksmith_upgrade
-        teleportTargetId: 
-        teleportSceneName: 
+        teleportTargetId:
+        teleportSceneName:
         useTeleportTargetRotation: 1
-      nextNodeId: 
-      returnNodeId: 
+      nextNodeId:
+      returnNodeId:
       playerSpeaksChoice: 0
       unavailableDisplay: 0
       showReadIndicator: 0
@@ -118,7 +118,7 @@ MonoBehaviour:
       - type: 17
         amount: 1
         stopOnFailure: 1
-        id: 
+        id:
         item:
           itemType: 0
           item: {fileID: 0}
@@ -127,12 +127,12 @@ MonoBehaviour:
           magic: {fileID: 0}
           usable: {fileID: 0}
         questDefinition: {fileID: 0}
-        serviceId: merchant
-        teleportTargetId: 
-        teleportSceneName: 
+        serviceId: merchant_buy
+        teleportTargetId:
+        teleportSceneName:
         useTeleportTargetRotation: 1
-      nextNodeId: 
-      returnNodeId: 
+      nextNodeId:
+      returnNodeId:
       playerSpeaksChoice: 0
       unavailableDisplay: 0
       showReadIndicator: 0
@@ -162,7 +162,7 @@ MonoBehaviour:
           comparison: 3
           value: 20
           playerAttribute: 5
-          id: 
+          id:
           questState: 1
           expected: 1
           item:
@@ -172,9 +172,9 @@ MonoBehaviour:
             armor: {fileID: 0}
             magic: {fileID: 0}
             usable: {fileID: 0}
-          conversationId: 
-          nodeId: 
-          choiceId: 
+          conversationId:
+          nodeId:
+          choiceId:
         groups: []
       actions: []
       nextNodeId: ancient_runes
@@ -194,7 +194,7 @@ MonoBehaviour:
       - type: 2
         amount: 5
         stopOnFailure: 0
-        id: 
+        id:
         item:
           itemType: 0
           item: {fileID: 0}
@@ -203,14 +203,14 @@ MonoBehaviour:
           magic: {fileID: 0}
           usable: {fileID: 0}
         questDefinition: {fileID: 0}
-        serviceId: 
-        teleportTargetId: 
-        teleportSceneName: 
+        serviceId:
+        teleportTargetId:
+        teleportSceneName:
         useTeleportTargetRotation: 1
       - type: 0
         amount: -2
         stopOnFailure: 0
-        id: 
+        id:
         item:
           itemType: 0
           item: {fileID: 0}
@@ -219,9 +219,9 @@ MonoBehaviour:
           magic: {fileID: 0}
           usable: {fileID: 0}
         questDefinition: {fileID: 0}
-        serviceId: 
-        teleportTargetId: 
-        teleportSceneName: 
+        serviceId:
+        teleportTargetId:
+        teleportSceneName:
         useTeleportTargetRotation: 1
       - type: 11
         amount: 1
@@ -235,9 +235,9 @@ MonoBehaviour:
           magic: {fileID: 0}
           usable: {fileID: 0}
         questDefinition: {fileID: 0}
-        serviceId: 
-        teleportTargetId: 
-        teleportSceneName: 
+        serviceId:
+        teleportTargetId:
+        teleportSceneName:
         useTeleportTargetRotation: 1
       nextNodeId: dark_response
       returnNodeId: service_menu
@@ -253,8 +253,8 @@ MonoBehaviour:
         conditions: []
         groups: []
       actions: []
-      nextNodeId: 
-      returnNodeId: 
+      nextNodeId:
+      returnNodeId:
       playerSpeaksChoice: 0
       unavailableDisplay: 0
       showReadIndicator: 0
@@ -262,7 +262,7 @@ MonoBehaviour:
     speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
     text: La torre a nord era una fucina, molto prima che diventasse una rovina.
     portraitOverride: {fileID: 0}
-    animationTrigger: 
+    animationTrigger:
     voiceClip: {fileID: 0}
     conditions:
       logic: 0
@@ -277,7 +277,7 @@ MonoBehaviour:
     speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
     text: Se trovi un martello con il marchio del sole, riportamelo.
     portraitOverride: {fileID: 0}
-    animationTrigger: 
+    animationTrigger:
     voiceClip: {fileID: 0}
     conditions:
       logic: 0
@@ -286,13 +286,13 @@ MonoBehaviour:
       groups: []
     actionsOnEnter: []
     actionsOnExit: []
-    nextNodeId: 
+    nextNodeId:
     choices: []
   - nodeId: ancient_runes
     speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
     text: Hai occhio. Quelle rune legano il ricordo del fuoco alla lama.
     portraitOverride: {fileID: 0}
-    animationTrigger: 
+    animationTrigger:
     voiceClip: {fileID: 0}
     conditions:
       logic: 0
@@ -301,13 +301,13 @@ MonoBehaviour:
       groups: []
     actionsOnEnter: []
     actionsOnExit: []
-    nextNodeId: 
+    nextNodeId:
     choices: []
   - nodeId: dark_response
     speaker: {fileID: 11400000, guid: 4a70289f702c3344186d12e3e6ce8bd1, type: 2}
     text: Allora porta il peso della tua scelta. Il ferro non dimentica.
     portraitOverride: {fileID: 0}
-    animationTrigger: 
+    animationTrigger:
     voiceClip: {fileID: 0}
     conditions:
       logic: 0
@@ -316,7 +316,7 @@ MonoBehaviour:
       groups: []
     actionsOnEnter: []
     actionsOnExit: []
-    nextNodeId: 
+    nextNodeId:
     choices: []
   references:
     version: 2

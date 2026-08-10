@@ -3,6 +3,7 @@ using UnityEngine;
 public sealed class MerchantService : NpcServiceBehaviour
 {
     [SerializeField] private ShopManager shopManager;
+    [SerializeField] private ShopMode openMode = ShopMode.Buy;
 
     private NpcServiceContext activeContext;
 
@@ -11,17 +12,11 @@ public sealed class MerchantService : NpcServiceBehaviour
         if (shopManager == null || context == null || context.Player == null)
             return false;
 
-        PlayerController controller = context.Player.GetComponent<PlayerController>();
-        if (controller == null)
-            controller = context.Player.GetComponentInParent<PlayerController>();
-        if (controller == null)
-            return false;
-
         activeContext = context;
         shopManager.Closed -= OnShopClosed;
         shopManager.Closed += OnShopClosed;
 
-        if (shopManager.OpenShop(controller, ShopMode.Buy))
+        if (shopManager.OpenShop(openMode))
             return true;
 
         shopManager.Closed -= OnShopClosed;

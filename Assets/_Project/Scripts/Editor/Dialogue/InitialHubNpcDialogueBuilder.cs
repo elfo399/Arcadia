@@ -24,9 +24,9 @@ public static class InitialHubNpcDialogueBuilder
             conversationPrefix: "merchant",
             introGreeting: "Benvenuto. Cerchi qualcosa per il tuo viaggio?",
             introFarewell: "Dai un'occhiata alla mia merce quando vuoi.",
-            serviceChoiceId: "merchant_service",
-            serviceLabel: "Compra / Vendi",
-            serviceId: "merchant",
+            serviceChoiceId: "merchant_service_Buy",
+            serviceLabel: "Compra",
+            serviceId: "merchant_buy",
             loreChoiceId: "merchant_lore",
             loreLabel: "Parlami del mercato.",
             loreText: "Il mercato cambia volto ogni giorno, ma una buona merce trova sempre il suo acquirente.");
@@ -217,39 +217,58 @@ public static class InitialHubNpcDialogueBuilder
                 nodeId = menuId,
                 speaker = speaker,
                 text = "Che posso fare per te?",
-                choices = new List<DialogueChoice>
-                {
-                    ServiceChoice(serviceChoiceId, serviceLabel, serviceId),
-                    new DialogueChoice
-                    {
-                        choiceId = prefix + "_talk",
-                        text = "Parla.",
-                        playerSpokenText = "Vorrei saperne di piu.",
-                        nextNodeId = loreNodeId,
-                        returnNodeId = menuId,
-                        playerSpeaksChoice = true,
-                        showReadIndicator = false
-                    },
-                    new DialogueChoice
-                    {
-                        choiceId = loreChoiceId,
-                        text = loreLabel,
-                        nextNodeId = loreNodeId,
-                        returnNodeId = menuId,
-                        playerSpeaksChoice = true,
-                        showReadIndicator = true
-                    },
-                    new DialogueChoice
-                    {
-                        choiceId = prefix + "_exit",
-                        text = "Esci.",
-                        playerSpeaksChoice = false,
-                        showReadIndicator = false
-                    }
-                }
+                choices = BuildMenuChoices(prefix, menuId, loreNodeId, serviceChoiceId,
+                    serviceLabel, serviceId, loreChoiceId, loreLabel)
             },
             Node(loreNodeId, speaker, loreText)
         };
+    }
+
+    private static List<DialogueChoice> BuildMenuChoices(
+        string prefix,
+        string menuId,
+        string loreNodeId,
+        string serviceChoiceId,
+        string serviceLabel,
+        string serviceId,
+        string loreChoiceId,
+        string loreLabel)
+    {
+        var choices = new List<DialogueChoice>
+        {
+            ServiceChoice(serviceChoiceId, serviceLabel, serviceId)
+        };
+
+        if (prefix == "merchant")
+            choices.Add(ServiceChoice("merchant_service_Sell", "Vendi", "merchant_sell"));
+
+        choices.Add(new DialogueChoice
+        {
+            choiceId = prefix + "_talk",
+            text = "Parla.",
+            playerSpokenText = "Vorrei saperne di piu.",
+            nextNodeId = loreNodeId,
+            returnNodeId = menuId,
+            playerSpeaksChoice = true,
+            showReadIndicator = false
+        });
+        choices.Add(new DialogueChoice
+        {
+            choiceId = loreChoiceId,
+            text = loreLabel,
+            nextNodeId = loreNodeId,
+            returnNodeId = menuId,
+            playerSpeaksChoice = true,
+            showReadIndicator = true
+        });
+        choices.Add(new DialogueChoice
+        {
+            choiceId = prefix + "_exit",
+            text = "Esci.",
+            playerSpeaksChoice = false,
+            showReadIndicator = false
+        });
+        return choices;
     }
 
     private static DialogueChoice ServiceChoice(string choiceId, string text, string serviceId)
