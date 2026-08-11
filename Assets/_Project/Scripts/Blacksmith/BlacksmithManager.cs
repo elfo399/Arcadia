@@ -19,6 +19,9 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Animator bookAnimator;
     [SerializeField] private Animator contentAppearAnimator;
     [SerializeField] private CanvasGroup contentGroup;
+    [SerializeField] private GameObject upgradeModeRoot;
+    [SerializeField] private GameObject craftModeRoot;
+    [SerializeField] private CanvasGroup craftContentGroup;
     [SerializeField] private InventorySlot slotPrefab;
     [SerializeField] private Transform slotParent;
     [SerializeField] private GridLayoutGroup slotGrid;
@@ -52,6 +55,37 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Button upgradeButton;
     [SerializeField] private SegmentedButtonSelectionUI upgradeButtonSelection;
 
+    [Header("Craft List")]
+    [SerializeField] private Transform craftListRoot;
+    [SerializeField] private DialogueChoiceUI craftRecipeRowPrefab;
+
+    [Header("Craft Detail")]
+    [SerializeField] private GameObject craftDetailRoot;
+    [SerializeField] private Image craftDetailImage;
+    [SerializeField] private TextMeshProUGUI craftDetailTitle;
+    [SerializeField] private GameObject craftWeaponSection;
+    [SerializeField] private GameObject craftShieldSection;
+    [SerializeField] private TextMeshProUGUI craftWeaponDamageText;
+    [SerializeField] private TextMeshProUGUI craftWeaponCriticalText;
+    [SerializeField] private TextMeshProUGUI craftWeaponWeightText;
+    [SerializeField] private TextMeshProUGUI craftWeaponScalingText;
+    [SerializeField] private TextMeshProUGUI craftWeaponRequirementText;
+    [SerializeField] private TextMeshProUGUI craftShieldDamageText;
+    [SerializeField] private TextMeshProUGUI craftShieldCriticalText;
+    [SerializeField] private TextMeshProUGUI craftShieldWeightText;
+    [SerializeField] private TextMeshProUGUI craftShieldScalingText;
+    [SerializeField] private TextMeshProUGUI craftShieldRequirementText;
+    [SerializeField] private TextMeshProUGUI craftShieldPhysicalDefenseText;
+    [SerializeField] private TextMeshProUGUI craftShieldMagicDefenseText;
+
+    [Header("Craft Requirements")]
+    [SerializeField] private Transform craftMaterialsRoot;
+    [SerializeField] private QuestRewardItemUI craftMaterialRowPrefab;
+    [SerializeField] private GameObject craftPriceRoot;
+    [SerializeField] private TextMeshProUGUI craftPriceText;
+    [SerializeField] private Button craftButton;
+    [SerializeField] private SegmentedButtonSelectionUI craftButtonSelection;
+
     [Header("Initial State")]
     [SerializeField] private string contentAppearStateName = "Transition";
     [SerializeField, Min(0f)] private float contentAppearDelay = 0.5833333f;
@@ -74,7 +108,11 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     private readonly List<InventorySlot> blacksmithSlots = new List<InventorySlot>();
     private readonly List<InventoryItem> upgradeItems = new List<InventoryItem>();
     private readonly List<QuestRewardItemUI> materialRows = new List<QuestRewardItemUI>();
+    private readonly List<CraftingRecipeData> visibleCraftRecipes = new List<CraftingRecipeData>();
+    private readonly List<DialogueChoiceUI> craftRecipeRows = new List<DialogueChoiceUI>();
+    private readonly List<QuestRewardItemUI> craftMaterialRows = new List<QuestRewardItemUI>();
     private int selectedUpgradeIndex = -1;
+    private int selectedCraftIndex = -1;
     private int blacksmithFocusIndex = -1;
     private int openingFrame = -1;
     private float lastNavigationTime = -999f;
@@ -82,8 +120,11 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     private Coroutine contentAppearRoutine;
     private Coroutine closeRoutine;
     private Coroutine upgradeButtonFocusRoutine;
+    private Coroutine craftButtonFocusRoutine;
     private int lastUpgradeActivationFrame = -1;
     private int upgradeButtonFocusEnteredFrame = -1;
+    private int lastCraftActivationFrame = -1;
+    private int craftButtonFocusEnteredFrame = -1;
     private FocusArea focusArea = FocusArea.Grid;
     private bool isClosing;
     private bool isInteractive;
@@ -97,15 +138,19 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             blacksmithHud.SetActive(false);
         EnsureBlacksmithSlots();
         ResolveUpgradeRequirementReferences();
+        ResolveCraftReferences();
         HideContentAppearAnimation();
-        HideContentGroup();
+        HideAllContentGroups();
         HideUpgradeSections();
+        HideCraftSections();
     }
 
     private void OnDestroy()
     {
         if (upgradeButton != null)
             upgradeButton.onClick.RemoveListener(OnUpgradeButtonClicked);
+        if (craftButton != null)
+            craftButton.onClick.RemoveListener(OnCraftButtonClicked);
     }
 
     public bool OpenBlacksmith(BlacksmithMode mode, NpcServiceContext context)
@@ -133,13 +178,15 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         isInteractive = false;
         isClosing = false;
         focusArea = FocusArea.Grid;
-        ClearUpgradeButtonFocusVisual();
+        ClearActionFocusVisuals();
         openingFrame = Time.frameCount;
         playerController.AcquireGameplayInputLock(gameplayLockOwner);
         SubscribeInput();
+        ApplyModeRoots();
+        HideContentGroup();
         if (blacksmithHud != null)
             blacksmithHud.SetActive(true);
-        RefreshBlacksmithGrid();
+        RefreshCurrentMode();
         Canvas.ForceUpdateCanvases();
         FocusInitialTarget();
         contentAppearRoutine = StartCoroutine(PlayContentAppearAnimation());
@@ -156,7 +203,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         isClosing = true;
         isInteractive = false;
         focusArea = FocusArea.Grid;
-        ClearUpgradeButtonFocusVisual();
+        ClearActionFocusVisuals();
         UnsubscribeInput();
         StopContentAppearRoutineOnly();
 
@@ -182,8 +229,13 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         if (upgradeButtonFocusRoutine != null)
             StopCoroutine(upgradeButtonFocusRoutine);
         upgradeButtonFocusRoutine = null;
+        if (craftButtonFocusRoutine != null)
+            StopCoroutine(craftButtonFocusRoutine);
+        craftButtonFocusRoutine = null;
         focusArea = FocusArea.Grid;
-        ClearUpgradeButtonFocusVisual();
+        ClearActionFocusVisuals();
+        ClearCraftRecipeRows();
+        ClearGeneratedCraftMaterialRows();
         if (closeRoutine != null)
             StopCoroutine(closeRoutine);
         closeRoutine = null;
@@ -201,6 +253,19 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             return;
 
         Vector2 navigation = controls.Player.Move.ReadValue<Vector2>();
+        if (CurrentMode == BlacksmithMode.Craft)
+        {
+            if (navigation.y > 0.5f)
+                MoveCraftFocus(-1);
+            else if (navigation.y < -0.5f)
+                MoveCraftFocus(1);
+            else
+                return;
+
+            lastNavigationTime = Time.unscaledTime;
+            return;
+        }
+
         if (navigation.x > 0.5f)
             MoveBlacksmithFocusHorizontal(1);
         else if (navigation.x < -0.5f)
@@ -231,6 +296,123 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             slot.SetFocused(false);
             blacksmithSlots.Add(slot);
         }
+    }
+
+    private void ApplyModeRoots()
+    {
+        if (upgradeModeRoot != null)
+            upgradeModeRoot.SetActive(CurrentMode == BlacksmithMode.Upgrade);
+        if (craftModeRoot != null)
+            craftModeRoot.SetActive(CurrentMode == BlacksmithMode.Craft);
+    }
+
+    private void RefreshCurrentMode()
+    {
+        if (CurrentMode == BlacksmithMode.Craft)
+            RefreshCraftingList();
+        else
+            RefreshBlacksmithGrid();
+    }
+
+    private void RefreshCraftingList()
+    {
+        int previousIndex = selectedCraftIndex;
+        ClearCraftRecipeRows();
+        visibleCraftRecipes.Clear();
+
+        for (int i = 0; i < recipes.Count; i++)
+        {
+            CraftingRecipeData recipe = recipes[i];
+            if (recipe == null || recipe.resultWeapon == null || !recipe.resultWeapon.canCraft
+                || recipe.resultWeapon.category == WeaponCategory.Unarmed || !IsRecipeUnlocked(recipe))
+                continue;
+
+            visibleCraftRecipes.Add(recipe);
+        }
+
+        for (int i = 0; i < visibleCraftRecipes.Count; i++)
+        {
+            if (craftListRoot == null || craftRecipeRowPrefab == null)
+                break;
+
+            int recipeIndex = i;
+            CraftingRecipeData recipe = visibleCraftRecipes[i];
+            DialogueChoiceUI row = Instantiate(craftRecipeRowPrefab, craftListRoot, false);
+            row.name = $"CraftRecipe_{i:00}";
+            row.gameObject.SetActive(true);
+            row.Bind(GetCraftRecipeDisplayName(recipe), true, false);
+
+            Navigation navigation = row.Button.navigation;
+            navigation.mode = Navigation.Mode.None;
+            row.Button.navigation = navigation;
+            row.Button.onClick.AddListener(() => HandleCraftRecipeSubmit(recipeIndex));
+            craftRecipeRows.Add(row);
+        }
+
+        int nextIndex = visibleCraftRecipes.Count > 0
+            ? Mathf.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, visibleCraftRecipes.Count - 1)
+            : -1;
+        SetCraftFocus(nextIndex);
+    }
+
+    private static string GetCraftRecipeDisplayName(CraftingRecipeData recipe)
+    {
+        return recipe != null && recipe.resultWeapon != null
+            ? WeaponUpgradeCalculator.GetDisplayName(recipe.resultWeapon, recipe.startingUpgradeLevel)
+            : string.Empty;
+    }
+
+    private void ClearCraftRecipeRows()
+    {
+        for (int i = 0; i < craftRecipeRows.Count; i++)
+        {
+            if (craftRecipeRows[i] != null)
+                Destroy(craftRecipeRows[i].gameObject);
+        }
+
+        craftRecipeRows.Clear();
+    }
+
+    private CraftingRecipeData SelectedCraftRecipe => selectedCraftIndex >= 0
+        && selectedCraftIndex < visibleCraftRecipes.Count
+            ? visibleCraftRecipes[selectedCraftIndex]
+            : null;
+
+    private void HandleCraftRecipeSubmit(int index)
+    {
+        if (!isInteractive || index < 0 || index >= visibleCraftRecipes.Count)
+            return;
+
+        if (selectedCraftIndex != index)
+            SetCraftFocus(index);
+        TryFocusCraftButton();
+    }
+
+    private void SetCraftFocus(int index)
+    {
+        focusArea = FocusArea.Grid;
+        ClearActionFocusVisuals();
+        selectedCraftIndex = index >= 0 && index < visibleCraftRecipes.Count ? index : -1;
+        RefreshCraftDetails();
+
+        if (EventSystem.current == null || selectedCraftIndex < 0
+            || selectedCraftIndex >= craftRecipeRows.Count)
+            return;
+
+        GameObject target = craftRecipeRows[selectedCraftIndex].gameObject;
+        if (EventSystem.current.currentSelectedGameObject != target)
+            EventSystem.current.SetSelectedGameObject(target);
+    }
+
+    private void MoveCraftFocus(int direction)
+    {
+        if (visibleCraftRecipes.Count == 0)
+            return;
+
+        int next = selectedCraftIndex + (direction >= 0 ? 1 : -1);
+        if (next >= visibleCraftRecipes.Count) next = 0;
+        if (next < 0) next = visibleCraftRecipes.Count - 1;
+        SetCraftFocus(next);
     }
 
     private void RefreshBlacksmithGrid()
@@ -438,6 +620,159 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         HideUpgradeRequirements();
     }
 
+    private void ResolveCraftReferences()
+    {
+        if (craftButton != null)
+        {
+            craftButton.onClick.RemoveListener(OnCraftButtonClicked);
+            craftButton.onClick.AddListener(OnCraftButtonClicked);
+        }
+    }
+
+    private void RefreshCraftDetails()
+    {
+        if (craftDetailRoot != null)
+            craftDetailRoot.SetActive(true);
+
+        HideCraftSections();
+
+        CraftingRecipeData recipe = SelectedCraftRecipe;
+        if (recipe == null || recipe.resultWeapon == null)
+            return;
+
+        WeaponItem weapon = recipe.resultWeapon;
+        int level = WeaponUpgradeRules.ClampLevel(weapon, recipe.startingUpgradeLevel);
+        EffectiveWeaponStats stats = WeaponUpgradeCalculator.GetStats(weapon, level);
+
+        if (craftDetailImage != null)
+        {
+            craftDetailImage.sprite = weapon.icon;
+            craftDetailImage.enabled = weapon.icon != null;
+            craftDetailImage.preserveAspect = true;
+        }
+        SetDetailText(craftDetailTitle, WeaponUpgradeCalculator.GetDisplayName(weapon, level));
+
+        if (weapon.category == WeaponCategory.Shield)
+        {
+            if (craftShieldSection != null)
+                craftShieldSection.SetActive(true);
+
+            SetDetailText(craftShieldDamageText, stats.PhysicalDamage.ToString());
+            SetDetailText(craftShieldCriticalText, stats.CriticalHit.ToString("0.##"));
+            SetDetailText(craftShieldWeightText, weapon.weight.ToString("0.##"));
+            SetDetailText(craftShieldScalingText, GetScalingLabel(stats, stats, false));
+            SetDetailText(craftShieldRequirementText, weapon.GetRequirementsLabel());
+            SetDetailText(craftShieldPhysicalDefenseText,
+                Mathf.RoundToInt(stats.PhysicalBlockPercent * 100f) + "%");
+            SetDetailText(craftShieldMagicDefenseText,
+                Mathf.RoundToInt(stats.MagicBlockPercent * 100f) + "%");
+        }
+        else
+        {
+            if (craftWeaponSection != null)
+                craftWeaponSection.SetActive(true);
+
+            SetDetailText(craftWeaponDamageText, stats.PhysicalDamage.ToString());
+            SetDetailText(craftWeaponCriticalText, stats.CriticalHit.ToString("0.##"));
+            SetDetailText(craftWeaponWeightText, weapon.weight.ToString("0.##"));
+            SetDetailText(craftWeaponScalingText, GetScalingLabel(stats, stats, false));
+            SetDetailText(craftWeaponRequirementText, weapon.GetRequirementsLabel());
+        }
+
+        RefreshCraftRequirements(recipe);
+    }
+
+    private void HideCraftSections()
+    {
+        if (craftWeaponSection != null) craftWeaponSection.SetActive(false);
+        if (craftShieldSection != null) craftShieldSection.SetActive(false);
+        if (craftDetailImage != null)
+        {
+            craftDetailImage.sprite = null;
+            craftDetailImage.enabled = false;
+        }
+        SetDetailText(craftDetailTitle, string.Empty);
+
+        TextMeshProUGUI[] fields =
+        {
+            craftWeaponDamageText, craftWeaponCriticalText, craftWeaponWeightText,
+            craftWeaponScalingText, craftWeaponRequirementText, craftShieldDamageText,
+            craftShieldCriticalText, craftShieldWeightText, craftShieldScalingText,
+            craftShieldRequirementText, craftShieldPhysicalDefenseText,
+            craftShieldMagicDefenseText
+        };
+        for (int i = 0; i < fields.Length; i++)
+            SetDetailText(fields[i], string.Empty);
+
+        HideCraftRequirements();
+    }
+
+    private void RefreshCraftRequirements(CraftingRecipeData recipe)
+    {
+        BlacksmithCraftCheck check = recipe != null ? CanCraft(recipe) : new BlacksmithCraftCheck();
+        List<BlacksmithRequirementStatus> requirements = check.Materials
+            ?? new List<BlacksmithRequirementStatus>();
+
+        if (craftPriceRoot != null)
+            craftPriceRoot.SetActive(check.CoinCost > 0);
+        SetDetailText(craftPriceText, check.CoinCost > 0 ? check.CoinCost.ToString("N0") : string.Empty);
+
+        ClearGeneratedCraftMaterialRows();
+        for (int i = 0; i < requirements.Count; i++)
+        {
+            if (craftMaterialsRoot == null || craftMaterialRowPrefab == null)
+                break;
+
+            QuestRewardItemUI row = Instantiate(craftMaterialRowPrefab, craftMaterialsRoot, false);
+            row.name = $"CraftMaterial_{i:00}";
+            row.gameObject.SetActive(true);
+            BlacksmithRequirementStatus requirement = requirements[i];
+            row.SetRequirementData(
+                requirement.item != null ? requirement.item.icon : null,
+                requirement.item != null ? requirement.item.itemName : string.Empty,
+                requirement.owned,
+                requirement.required);
+            craftMaterialRows.Add(row);
+        }
+
+        if (craftMaterialsRoot != null)
+            craftMaterialsRoot.gameObject.SetActive(requirements.Count > 0
+                && craftMaterialRows.Count == requirements.Count);
+
+        if (craftButton != null)
+        {
+            craftButton.gameObject.SetActive(recipe != null);
+            craftButton.interactable = recipe != null && check.IsValid;
+        }
+    }
+
+    private void ClearGeneratedCraftMaterialRows()
+    {
+        for (int i = 0; i < craftMaterialRows.Count; i++)
+        {
+            if (craftMaterialRows[i] != null)
+                Destroy(craftMaterialRows[i].gameObject);
+        }
+
+        craftMaterialRows.Clear();
+    }
+
+    private void HideCraftRequirements()
+    {
+        if (craftMaterialsRoot != null)
+            craftMaterialsRoot.gameObject.SetActive(false);
+        if (craftPriceRoot != null)
+            craftPriceRoot.SetActive(false);
+        SetDetailText(craftPriceText, string.Empty);
+        if (craftButton != null)
+        {
+            craftButton.gameObject.SetActive(false);
+            craftButton.interactable = false;
+        }
+
+        ClearGeneratedCraftMaterialRows();
+    }
+
     private void ResolveUpgradeRequirementReferences()
     {
         if (upgradeButtonSelection == null && upgradeButton != null)
@@ -550,6 +885,23 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             RefreshBlacksmithGrid();
         else
             RefreshUpgradeDetails();
+    }
+
+    private void OnCraftButtonClicked()
+    {
+        CraftingRecipeData recipe = SelectedCraftRecipe;
+        if (recipe == null || lastCraftActivationFrame == Time.frameCount
+            || craftButtonFocusEnteredFrame == Time.frameCount)
+            return;
+
+        lastCraftActivationFrame = Time.frameCount;
+        focusArea = FocusArea.Grid;
+        ClearCraftButtonFocusVisual();
+
+        if (TryCraft(recipe, out _))
+            RefreshCraftingList();
+        else
+            RefreshCraftDetails();
     }
 
     private void ClearDetailTextFields()
@@ -686,8 +1038,23 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     {
         if (!IsOpen || !isInteractive || openingFrame == Time.frameCount)
             return;
-        if (lastUpgradeActivationFrame == Time.frameCount)
+        if (lastUpgradeActivationFrame == Time.frameCount || lastCraftActivationFrame == Time.frameCount)
             return;
+
+        if (CurrentMode == BlacksmithMode.Craft)
+        {
+            if (IsCraftButtonFocused())
+            {
+                if (craftButtonFocusEnteredFrame == Time.frameCount)
+                    return;
+                OnCraftButtonClicked();
+                return;
+            }
+
+            if (SelectedCraftRecipe != null)
+                TryFocusCraftButton();
+            return;
+        }
 
         if (IsUpgradeButtonFocused())
         {
@@ -741,7 +1108,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
     private bool IsUpgradeButtonFocused()
     {
-        return focusArea == FocusArea.Action;
+        return CurrentMode == BlacksmithMode.Upgrade && focusArea == FocusArea.Action;
     }
 
     private void ClearUpgradeButtonFocusVisual()
@@ -749,12 +1116,72 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         upgradeButtonSelection?.SetFocused(false);
     }
 
+    private bool TryFocusCraftButton()
+    {
+        if (craftButton == null || !craftButton.gameObject.activeInHierarchy || !craftButton.interactable)
+            return false;
+        if (EventSystem.current == null)
+            return false;
+
+        if (focusArea != FocusArea.Action)
+            craftButtonFocusEnteredFrame = Time.frameCount;
+        focusArea = FocusArea.Action;
+        craftButtonSelection?.SetFocused(true);
+
+        if (craftButtonFocusRoutine != null)
+            StopCoroutine(craftButtonFocusRoutine);
+        craftButtonFocusRoutine = StartCoroutine(KeepCraftButtonFocusedAfterSubmit());
+        return true;
+    }
+
+    private System.Collections.IEnumerator KeepCraftButtonFocusedAfterSubmit()
+    {
+        yield return null;
+        craftButtonFocusRoutine = null;
+        if (IsOpen && isInteractive && IsCraftButtonFocused() && craftButton != null
+            && craftButton.gameObject.activeInHierarchy && craftButton.interactable
+            && EventSystem.current != null)
+        {
+            craftButton.Select();
+            if (EventSystem.current.currentSelectedGameObject != craftButton.gameObject)
+                EventSystem.current.SetSelectedGameObject(craftButton.gameObject);
+        }
+    }
+
+    private bool IsCraftButtonFocused()
+    {
+        return CurrentMode == BlacksmithMode.Craft && focusArea == FocusArea.Action;
+    }
+
+    private void ClearCraftButtonFocusVisual()
+    {
+        craftButtonSelection?.SetFocused(false);
+    }
+
+    private void ClearActionFocusVisuals()
+    {
+        ClearUpgradeButtonFocusVisual();
+        ClearCraftButtonFocusVisual();
+    }
+
     private void ReturnFocusToGrid()
     {
         focusArea = FocusArea.Grid;
-        ClearUpgradeButtonFocusVisual();
-        if (EventSystem.current == null || selectedUpgradeIndex < 0
-            || selectedUpgradeIndex >= blacksmithSlots.Count)
+        ClearActionFocusVisuals();
+        if (EventSystem.current == null)
+            return;
+
+        if (CurrentMode == BlacksmithMode.Craft)
+        {
+            if (selectedCraftIndex < 0 || selectedCraftIndex >= craftRecipeRows.Count)
+                return;
+            GameObject craftTarget = craftRecipeRows[selectedCraftIndex].gameObject;
+            if (EventSystem.current.currentSelectedGameObject != craftTarget)
+                EventSystem.current.SetSelectedGameObject(craftTarget);
+            return;
+        }
+
+        if (selectedUpgradeIndex < 0 || selectedUpgradeIndex >= blacksmithSlots.Count)
             return;
 
         GameObject target = blacksmithSlots[selectedUpgradeIndex].gameObject;
@@ -778,6 +1205,13 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
     private void FocusInitialTarget()
     {
+        if (CurrentMode == BlacksmithMode.Craft)
+        {
+            if (visibleCraftRecipes.Count > 0)
+                SetCraftFocus(0);
+            return;
+        }
+
         if (upgradeItems.Count > 0)
         {
             SetBlacksmithFocus(0);
@@ -903,27 +1337,42 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
     private void HideContentGroup()
     {
-        if (contentGroup == null)
-            return;
-        contentGroup.alpha = 0f;
-        contentGroup.interactable = false;
-        contentGroup.blocksRaycasts = false;
+        SetContentGroupState(GetActiveContentGroup(), 0f, false);
+    }
+
+    private void HideAllContentGroups()
+    {
+        SetContentGroupState(contentGroup, 0f, false);
+        SetContentGroupState(craftContentGroup, 0f, false);
     }
 
     private void ShowContentGroup()
     {
-        if (contentGroup == null)
-            return;
-        contentGroup.alpha = 1f;
+        SetContentGroupState(GetActiveContentGroup(), 1f, false);
         SetContentInteraction(false);
     }
 
     private void SetContentInteraction(bool enabled)
     {
-        if (contentGroup == null)
+        CanvasGroup activeGroup = GetActiveContentGroup();
+        if (activeGroup == null)
             return;
-        contentGroup.interactable = enabled;
-        contentGroup.blocksRaycasts = enabled;
+        activeGroup.interactable = enabled;
+        activeGroup.blocksRaycasts = enabled;
+    }
+
+    private CanvasGroup GetActiveContentGroup()
+    {
+        return CurrentMode == BlacksmithMode.Craft ? craftContentGroup : contentGroup;
+    }
+
+    private static void SetContentGroupState(CanvasGroup group, float alpha, bool interactive)
+    {
+        if (group == null)
+            return;
+        group.alpha = alpha;
+        group.interactable = interactive;
+        group.blocksRaycasts = interactive;
     }
 
     public BlacksmithUpgradeCheck CanUpgrade(InventoryItem item)
