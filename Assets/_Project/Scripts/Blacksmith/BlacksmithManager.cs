@@ -244,6 +244,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             {
                 InventoryItem item = inventoryItems[i];
                 if (item != null && item.weaponData != null
+                    && item.weaponData.canUpgrade
                     && item.weaponData.category != WeaponCategory.Unarmed)
                     upgradeItems.Add(item);
             }
@@ -368,10 +369,19 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
                 ? WeaponUpgradeCalculator.GetDisplayName(item)
                 : item.title ?? string.Empty;
 
+        if (item.weaponData == null)
+        {
+            RefreshUpgradeRequirements(item);
+            return;
+        }
+
         WeaponItem weapon = item.weaponData;
         int currentLevel = WeaponUpgradeRules.ClampLevel(weapon, item.upgradeLevel);
         int maxLevel = WeaponUpgradeRules.GetMaxLevel(weapon.rarity);
-        bool hasNextLevel = currentLevel < maxLevel;
+        bool hasNextLevel = weapon != null
+            && weapon.canUpgrade
+            && weapon.category != WeaponCategory.Unarmed
+            && currentLevel < maxLevel;
         int nextLevel = hasNextLevel ? currentLevel + 1 : currentLevel;
         EffectiveWeaponStats currentStats = WeaponUpgradeCalculator.GetStats(weapon, currentLevel);
         EffectiveWeaponStats nextStats = hasNextLevel
@@ -641,6 +651,12 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     {
         string currentLabel = GetUpgradeLevelLabel(item);
         if (currentLabel == "MAX" || item == null || item.weaponData == null)
+            return currentLabel;
+
+        WeaponItem weapon = item.weaponData;
+        int currentLevel = WeaponUpgradeRules.ClampLevel(weapon, item.upgradeLevel);
+        int maxLevel = WeaponUpgradeRules.GetMaxLevel(weapon.rarity);
+        if (!weapon.canUpgrade || weapon.category == WeaponCategory.Unarmed || currentLevel >= maxLevel)
             return currentLabel;
 
         return currentLabel + FormatPreviewDelta(1f, "0");
@@ -923,18 +939,30 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
         WeaponItem weapon = item.weaponData;
         check.CurrentLevel = WeaponUpgradeRules.ClampLevel(weapon, item.upgradeLevel);
-        check.TargetLevel = check.CurrentLevel + 1;
         check.MaxLevel = WeaponUpgradeRules.GetMaxLevel(weapon.rarity);
         check.IsMaxLevel = check.CurrentLevel >= check.MaxLevel;
-        check.CoinCost = WeaponUpgradeCalculator.GetUpgradeCoinCost(weapon, check.TargetLevel);
+        check.TargetLevel = check.IsMaxLevel ? check.CurrentLevel : check.CurrentLevel + 1;
+
+        if (!weapon.canUpgrade || weapon.category == WeaponCategory.Unarmed)
+        {
+            check.FailureReason = "Arma non upgradeabile.";
+            return check;
+        }
+
+        if (check.IsMaxLevel)
+        {
+            check.FailureReason = "Livello massimo raggiunto.";
+            return check;
+        }
 
         if (inventory == null || stats == null)
+        {
             check.FailureReason = "Dipendenze player mancanti.";
-        else if (!weapon.canUpgrade || weapon.category == WeaponCategory.Unarmed)
-            check.FailureReason = "Arma non upgradeabile.";
-        else if (check.IsMaxLevel)
-            check.FailureReason = "Livello massimo raggiunto.";
-        else if (!stats.HasCoins(check.CoinCost))
+            return check;
+        }
+
+        check.CoinCost = WeaponUpgradeCalculator.GetUpgradeCoinCost(weapon, check.TargetLevel);
+        if (!stats.HasCoins(check.CoinCost))
             check.FailureReason = "Monete insufficienti.";
 
         List<UpgradeMaterialRequirement> requirements = WeaponUpgradeCalculator.GetUpgradeMaterialRequirements(weapon, check.TargetLevel);
