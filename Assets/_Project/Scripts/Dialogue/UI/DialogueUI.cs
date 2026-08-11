@@ -68,6 +68,7 @@ public sealed class DialogueUI : MonoBehaviour
     private bool warnedAboutChoiceConfiguration;
     private bool warnedAboutChoiceLabel;
     private GameObject lastObservedChoiceSelection;
+    private int choicePresentationFrame = -1;
 
     /// <summary>Raised once when the current line finishes, naturally or through CompleteLine.</summary>
     public event Action LineCompleted;
@@ -324,6 +325,7 @@ public sealed class DialogueUI : MonoBehaviour
         ResetChoiceScroll();
         RefreshChoiceScrollbarVisibility();
         ConfigureVerticalNavigation();
+        choicePresentationFrame = Time.frameCount;
         SelectFirstEnabledChoice();
     }
 
@@ -333,7 +335,7 @@ public sealed class DialogueUI : MonoBehaviour
     /// </summary>
     public bool MoveSelection(int direction)
     {
-        if (direction == 0 || runtimeChoiceButtons.Count == 0)
+        if (!AreChoicesReadyForInput() || direction == 0 || runtimeChoiceButtons.Count == 0)
             return false;
 
         SynchronizeSelectionFromEventSystem();
@@ -356,7 +358,7 @@ public sealed class DialogueUI : MonoBehaviour
     /// <summary>Selects the currently focused enabled choice.</summary>
     public bool ConfirmSelection()
     {
-        if (runtimeChoiceButtons.Count == 0)
+        if (!AreChoicesReadyForInput() || runtimeChoiceButtons.Count == 0)
             return false;
 
         SynchronizeSelectionFromEventSystem();
@@ -392,6 +394,7 @@ public sealed class DialogueUI : MonoBehaviour
         runtimeChoiceButtons.Clear();
         selectedChoiceIndex = -1;
         lastObservedChoiceSelection = null;
+        choicePresentationFrame = -1;
         choiceSelectedCallback = null;
 
         if (choicesRoot != null)
@@ -508,6 +511,12 @@ public sealed class DialogueUI : MonoBehaviour
 
     private void ActivateChoice(RuntimeChoiceButton runtimeButton)
     {
+        // Completing a typewriter line can create and select the first choice
+        // while the EventSystem is still processing that same Submit input.
+        // Never let the input that revealed the choices also answer one.
+        if (!AreChoicesReadyForInput())
+            return;
+
         int index = runtimeChoiceButtons.IndexOf(runtimeButton);
         if (!IsChoiceEnabled(index))
             return;
@@ -519,6 +528,11 @@ public sealed class DialogueUI : MonoBehaviour
         // select the same branch twice while the manager changes node.
         ClearChoices();
         callback?.Invoke(choice);
+    }
+
+    private bool AreChoicesReadyForInput()
+    {
+        return choicePresentationFrame >= 0 && Time.frameCount > choicePresentationFrame;
     }
 
     private void ConfigureVerticalNavigation()

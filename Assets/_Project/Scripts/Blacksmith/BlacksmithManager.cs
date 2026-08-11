@@ -8,6 +8,8 @@ using TMPro;
 
 public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 {
+    private enum FocusArea { Grid, Action }
+
     [Header("Blacksmith UI")]
     [SerializeField] private GameObject blacksmithHud;
     [SerializeField] private GameObject initialFocus;
@@ -47,6 +49,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private GameObject priceRoot;
     [SerializeField] private TextMeshProUGUI priceText;
     [SerializeField] private Button upgradeButton;
+    [SerializeField] private SegmentedButtonSelectionUI upgradeButtonSelection;
 
     [Header("Initial State")]
     [SerializeField] private string contentAppearStateName = "Transition";
@@ -77,6 +80,10 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     private const float NavigationRepeatCooldown = 0.20f;
     private Coroutine contentAppearRoutine;
     private Coroutine closeRoutine;
+    private Coroutine upgradeButtonFocusRoutine;
+    private int lastUpgradeActivationFrame = -1;
+    private int upgradeButtonFocusEnteredFrame = -1;
+    private FocusArea focusArea = FocusArea.Grid;
     private bool isClosing;
     private bool isInteractive;
 
@@ -124,6 +131,8 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         IsOpen = true;
         isInteractive = false;
         isClosing = false;
+        focusArea = FocusArea.Grid;
+        ClearUpgradeButtonFocusVisual();
         openingFrame = Time.frameCount;
         playerController.AcquireGameplayInputLock(gameplayLockOwner);
         SubscribeInput();
@@ -145,6 +154,8 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         ActiveContext = null;
         isClosing = true;
         isInteractive = false;
+        focusArea = FocusArea.Grid;
+        ClearUpgradeButtonFocusVisual();
         UnsubscribeInput();
         StopContentAppearRoutineOnly();
 
@@ -167,6 +178,11 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     {
         UnsubscribeInput();
         StopContentAppearRoutineOnly();
+        if (upgradeButtonFocusRoutine != null)
+            StopCoroutine(upgradeButtonFocusRoutine);
+        upgradeButtonFocusRoutine = null;
+        focusArea = FocusArea.Grid;
+        ClearUpgradeButtonFocusVisual();
         if (closeRoutine != null)
             StopCoroutine(closeRoutine);
         closeRoutine = null;
@@ -179,7 +195,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
     private void Update()
     {
-        if (!IsOpen || !isInteractive || controls == null
+        if (!IsOpen || !isInteractive || focusArea != FocusArea.Grid || controls == null
             || Time.unscaledTime < lastNavigationTime + NavigationRepeatCooldown)
             return;
 
@@ -255,13 +271,26 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         ? upgradeItems[selectedUpgradeIndex]
         : null;
 
-    public void HandleSlotPointerDown(int index) { if (isInteractive) SelectUpgradeItem(index); }
+    public void HandleSlotPointerDown(int index) { if (isInteractive) SetBlacksmithFocus(index); }
     public void HandleSlotBeginDrag(int index, PointerEventData eventData) { }
     public void HandleSlotDrag(PointerEventData eventData) { }
     public void HandleSlotEndDrag() { }
     public void HandleSlotDrop(int targetIndex) { }
-    public void HandleSlotSelected(int index) { if (isInteractive) SelectUpgradeItem(index); }
-    public void HandleSlotSubmit(int index) { if (isInteractive) SelectUpgradeItem(index); }
+    public void HandleSlotSelected(int index)
+    {
+        if (isInteractive && focusArea == FocusArea.Grid)
+            SelectUpgradeItem(index);
+    }
+
+    public void HandleSlotSubmit(int index)
+    {
+        if (!isInteractive || index < 0 || index >= upgradeItems.Count)
+            return;
+
+        if (selectedUpgradeIndex != index)
+            SetBlacksmithFocus(index);
+        TryFocusUpgradeButton();
+    }
 
     private void SelectUpgradeItem(int index)
     {
@@ -272,6 +301,8 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
     private void SetBlacksmithFocus(int index)
     {
+        focusArea = FocusArea.Grid;
+        ClearUpgradeButtonFocusVisual();
         selectedUpgradeIndex = index >= 0 && index < upgradeItems.Count ? index : -1;
         blacksmithFocusIndex = selectedUpgradeIndex;
         for (int i = 0; i < blacksmithSlots.Count; i++)
@@ -281,7 +312,11 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
         if (EventSystem.current != null && selectedUpgradeIndex >= 0
             && selectedUpgradeIndex < blacksmithSlots.Count)
-            EventSystem.current.SetSelectedGameObject(blacksmithSlots[selectedUpgradeIndex].gameObject);
+        {
+            GameObject target = blacksmithSlots[selectedUpgradeIndex].gameObject;
+            if (EventSystem.current.currentSelectedGameObject != target)
+                EventSystem.current.SetSelectedGameObject(target);
+        }
     }
 
     private void MoveBlacksmithFocusHorizontal(int direction)
@@ -384,6 +419,9 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
     private void ResolveUpgradeRequirementReferences()
     {
+        if (upgradeButtonSelection == null && upgradeButton != null)
+            upgradeButtonSelection = upgradeButton.GetComponent<SegmentedButtonSelectionUI>();
+
         if (materialsRoot != null)
         {
             QuestRewardItemUI[] authoredRows = materialsRoot.GetComponentsInChildren<QuestRewardItemUI>(true);
@@ -479,8 +517,13 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     private void OnUpgradeButtonClicked()
     {
         InventoryItem item = SelectedUpgradeItem;
-        if (item == null)
+        if (item == null || lastUpgradeActivationFrame == Time.frameCount
+            || upgradeButtonFocusEnteredFrame == Time.frameCount)
             return;
+
+        lastUpgradeActivationFrame = Time.frameCount;
+        focusArea = FocusArea.Grid;
+        ClearUpgradeButtonFocusVisual();
 
         if (TryUpgrade(item, out _))
             RefreshBlacksmithGrid();
@@ -545,16 +588,92 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     {
         if (!IsOpen || !isInteractive || openingFrame == Time.frameCount)
             return;
+        if (lastUpgradeActivationFrame == Time.frameCount)
+            return;
+
+        if (IsUpgradeButtonFocused())
+        {
+            if (upgradeButtonFocusEnteredFrame == Time.frameCount)
+                return;
+            OnUpgradeButtonClicked();
+            return;
+        }
 
         InventoryItem selected = SelectedUpgradeItem;
-        if (selected != null)
-            ConfirmRequested?.Invoke(selected);
+        if (selected == null)
+            return;
+
+        if (TryFocusUpgradeButton())
+            return;
+
+        ConfirmRequested?.Invoke(selected);
+    }
+
+    private bool TryFocusUpgradeButton()
+    {
+        if (upgradeButton == null || !upgradeButton.gameObject.activeInHierarchy || !upgradeButton.interactable)
+            return false;
+        if (EventSystem.current == null)
+            return false;
+
+        if (focusArea != FocusArea.Action)
+            upgradeButtonFocusEnteredFrame = Time.frameCount;
+        focusArea = FocusArea.Action;
+        upgradeButtonSelection?.SetFocused(true);
+
+        if (upgradeButtonFocusRoutine != null)
+            StopCoroutine(upgradeButtonFocusRoutine);
+        upgradeButtonFocusRoutine = StartCoroutine(KeepUpgradeButtonFocusedAfterSubmit());
+        return true;
+    }
+
+    private System.Collections.IEnumerator KeepUpgradeButtonFocusedAfterSubmit()
+    {
+        yield return null;
+        upgradeButtonFocusRoutine = null;
+        if (IsOpen && isInteractive && focusArea == FocusArea.Action && upgradeButton != null
+            && upgradeButton.gameObject.activeInHierarchy && upgradeButton.interactable
+            && EventSystem.current != null)
+        {
+            upgradeButton.Select();
+            if (EventSystem.current.currentSelectedGameObject != upgradeButton.gameObject)
+                EventSystem.current.SetSelectedGameObject(upgradeButton.gameObject);
+        }
+    }
+
+    private bool IsUpgradeButtonFocused()
+    {
+        return focusArea == FocusArea.Action;
+    }
+
+    private void ClearUpgradeButtonFocusVisual()
+    {
+        upgradeButtonSelection?.SetFocused(false);
+    }
+
+    private void ReturnFocusToGrid()
+    {
+        focusArea = FocusArea.Grid;
+        ClearUpgradeButtonFocusVisual();
+        if (EventSystem.current == null || selectedUpgradeIndex < 0
+            || selectedUpgradeIndex >= blacksmithSlots.Count)
+            return;
+
+        GameObject target = blacksmithSlots[selectedUpgradeIndex].gameObject;
+        if (EventSystem.current.currentSelectedGameObject != target)
+            EventSystem.current.SetSelectedGameObject(target);
     }
 
     private void OnCancelPerformed(InputAction.CallbackContext _)
     {
         if (!IsOpen || !isInteractive || openingFrame == Time.frameCount)
             return;
+
+        if (focusArea == FocusArea.Action)
+        {
+            ReturnFocusToGrid();
+            return;
+        }
 
         CloseBlacksmith();
     }
