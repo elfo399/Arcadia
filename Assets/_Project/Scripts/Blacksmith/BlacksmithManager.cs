@@ -34,12 +34,12 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private TextMeshProUGUI weaponCriticalText;
     [SerializeField] private TextMeshProUGUI weaponWeightText;
     [SerializeField] private TextMeshProUGUI weaponScalingText;
-    [SerializeField] private TextMeshProUGUI weaponRequirementsText;
+    [SerializeField] private TextMeshProUGUI weaponLevelText;
     [SerializeField] private TextMeshProUGUI shieldDamageText;
     [SerializeField] private TextMeshProUGUI shieldCriticalText;
     [SerializeField] private TextMeshProUGUI shieldWeightText;
     [SerializeField] private TextMeshProUGUI shieldScalingText;
-    [SerializeField] private TextMeshProUGUI shieldRequirementsText;
+    [SerializeField] private TextMeshProUGUI shieldLevelText;
     [SerializeField] private TextMeshProUGUI shieldPhysicalDefenseText;
     [SerializeField] private TextMeshProUGUI shieldMagicDefenseText;
 
@@ -378,7 +378,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             SetDetailText(shieldCriticalText, effective.CriticalHit.ToString("0.##"));
             SetDetailText(shieldWeightText, shield.weight.ToString("0.##"));
             SetDetailText(shieldScalingText, GetScalingLabel(effective));
-            SetDetailText(shieldRequirementsText, shield.GetRequirementsLabel());
+            SetDetailText(shieldLevelText, GetUpgradeLevelLabel(item));
             SetDetailText(shieldPhysicalDefenseText,
                 Mathf.RoundToInt(effective.PhysicalBlockPercent * 100f).ToString());
             SetDetailText(shieldMagicDefenseText,
@@ -395,7 +395,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             SetDetailText(weaponCriticalText, effective.CriticalHit.ToString("0.##"));
             SetDetailText(weaponWeightText, weapon.weight.ToString("0.##"));
             SetDetailText(weaponScalingText, GetScalingLabel(effective));
-            SetDetailText(weaponRequirementsText, weapon.GetRequirementsLabel());
+            SetDetailText(weaponLevelText, GetUpgradeLevelLabel(item));
         }
 
         RefreshUpgradeRequirements(item);
@@ -536,8 +536,8 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         TextMeshProUGUI[] fields =
         {
             weaponDamageText, weaponCriticalText, weaponWeightText, weaponScalingText,
-            weaponRequirementsText, shieldDamageText, shieldCriticalText, shieldWeightText,
-            shieldScalingText, shieldRequirementsText, shieldPhysicalDefenseText,
+            weaponLevelText, shieldDamageText, shieldCriticalText, shieldWeightText,
+            shieldScalingText, shieldLevelText, shieldPhysicalDefenseText,
             shieldMagicDefenseText
         };
         for (int i = 0; i < fields.Length; i++)
@@ -562,6 +562,16 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         if (stats.FaithScalingRank != WeaponItem.ScalingRank.None)
             parts.Add("FAI " + stats.FaithScalingRank);
         return string.Join(" / ", parts);
+    }
+
+    private static string GetUpgradeLevelLabel(InventoryItem item)
+    {
+        if (item == null || item.weaponData == null)
+            return string.Empty;
+
+        int level = WeaponUpgradeRules.ClampLevel(item.weaponData, item.upgradeLevel);
+        int maxLevel = WeaponUpgradeRules.GetMaxLevel(item.weaponData.rarity);
+        return level >= maxLevel ? "MAX" : level.ToString();
     }
 
     private void SubscribeInput()

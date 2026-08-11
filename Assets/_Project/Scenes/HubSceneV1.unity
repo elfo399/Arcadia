@@ -2653,12 +2653,12 @@ MonoBehaviour:
   weaponCriticalText: {fileID: 132668434}
   weaponWeightText: {fileID: 964368418}
   weaponScalingText: {fileID: 1763374819}
-  weaponRequirementsText: {fileID: 1564749224}
+  weaponLevelText: {fileID: 1564749224}
   shieldDamageText: {fileID: 1686635530}
   shieldCriticalText: {fileID: 1989450200}
   shieldWeightText: {fileID: 640062739}
   shieldScalingText: {fileID: 1566681414}
-  shieldRequirementsText: {fileID: 823518981}
+  shieldLevelText: {fileID: 823518981}
   shieldPhysicalDefenseText: {fileID: 1430244862}
   shieldMagicDefenseText: {fileID: 1985815322}
   materialsRoot: {fileID: 1701114212}
@@ -9979,7 +9979,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Requirement
+  m_text: Level
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: b25c29823643287408334dc8fbdb123a, type: 2}
   m_sharedMaterial: {fileID: -2696735748968900360, guid: b25c29823643287408334dc8fbdb123a, type: 2}
@@ -25102,7 +25102,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Requirement
+  m_text: Level
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: b25c29823643287408334dc8fbdb123a, type: 2}
   m_sharedMaterial: {fileID: -2696735748968900360, guid: b25c29823643287408334dc8fbdb123a, type: 2}
