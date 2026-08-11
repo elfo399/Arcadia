@@ -42,6 +42,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private TextMeshProUGUI shieldLevelText;
     [SerializeField] private TextMeshProUGUI shieldPhysicalDefenseText;
     [SerializeField] private TextMeshProUGUI shieldMagicDefenseText;
+    [SerializeField] private Color upgradePreviewColor = new Color(0.3647059f, 0.73333335f, 0.3882353f, 1f);
 
     [Header("Upgrade Requirements")]
     [SerializeField] private Transform materialsRoot;
@@ -367,35 +368,45 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
                 ? WeaponUpgradeCalculator.GetDisplayName(item)
                 : item.title ?? string.Empty;
 
-        if (item.weaponData != null && item.weaponData.category == WeaponCategory.Shield)
+        WeaponItem weapon = item.weaponData;
+        int currentLevel = WeaponUpgradeRules.ClampLevel(weapon, item.upgradeLevel);
+        int maxLevel = WeaponUpgradeRules.GetMaxLevel(weapon.rarity);
+        bool hasNextLevel = currentLevel < maxLevel;
+        int nextLevel = hasNextLevel ? currentLevel + 1 : currentLevel;
+        EffectiveWeaponStats currentStats = WeaponUpgradeCalculator.GetStats(weapon, currentLevel);
+        EffectiveWeaponStats nextStats = hasNextLevel
+            ? WeaponUpgradeCalculator.GetStats(weapon, nextLevel)
+            : currentStats;
+
+        if (weapon.category == WeaponCategory.Shield)
         {
             if (shieldSection != null)
                 shieldSection.SetActive(true);
 
-            WeaponItem shield = item.weaponData;
-            EffectiveWeaponStats effective = WeaponUpgradeCalculator.GetStats(item);
-            SetDetailText(shieldDamageText, effective.PhysicalDamage.ToString());
-            SetDetailText(shieldCriticalText, effective.CriticalHit.ToString("0.##"));
-            SetDetailText(shieldWeightText, shield.weight.ToString("0.##"));
-            SetDetailText(shieldScalingText, GetScalingLabel(effective));
-            SetDetailText(shieldLevelText, GetUpgradeLevelLabel(item));
+            SetDetailText(shieldDamageText,
+                FormatPreviewInt(currentStats.PhysicalDamage, nextStats.PhysicalDamage, hasNextLevel));
+            SetDetailText(shieldCriticalText,
+                FormatPreviewFloat(currentStats.CriticalHit, nextStats.CriticalHit, hasNextLevel));
+            SetDetailText(shieldWeightText, weapon.weight.ToString("0.##"));
+            SetDetailText(shieldScalingText, GetScalingLabel(currentStats, nextStats, hasNextLevel));
+            SetDetailText(shieldLevelText, GetUpgradeLevelPreviewLabel(item));
             SetDetailText(shieldPhysicalDefenseText,
-                Mathf.RoundToInt(effective.PhysicalBlockPercent * 100f).ToString());
+                FormatPreviewPercent(currentStats.PhysicalBlockPercent, nextStats.PhysicalBlockPercent, hasNextLevel));
             SetDetailText(shieldMagicDefenseText,
-                Mathf.RoundToInt(effective.MagicBlockPercent * 100f).ToString());
+                FormatPreviewPercent(currentStats.MagicBlockPercent, nextStats.MagicBlockPercent, hasNextLevel));
         }
-        else if (item.weaponData != null)
+        else
         {
             if (weaponSection != null)
                 weaponSection.SetActive(true);
 
-            WeaponItem weapon = item.weaponData;
-            EffectiveWeaponStats effective = WeaponUpgradeCalculator.GetStats(item);
-            SetDetailText(weaponDamageText, effective.PhysicalDamage.ToString());
-            SetDetailText(weaponCriticalText, effective.CriticalHit.ToString("0.##"));
+            SetDetailText(weaponDamageText,
+                FormatPreviewInt(currentStats.PhysicalDamage, nextStats.PhysicalDamage, hasNextLevel));
+            SetDetailText(weaponCriticalText,
+                FormatPreviewFloat(currentStats.CriticalHit, nextStats.CriticalHit, hasNextLevel));
             SetDetailText(weaponWeightText, weapon.weight.ToString("0.##"));
-            SetDetailText(weaponScalingText, GetScalingLabel(effective));
-            SetDetailText(weaponLevelText, GetUpgradeLevelLabel(item));
+            SetDetailText(weaponScalingText, GetScalingLabel(currentStats, nextStats, hasNextLevel));
+            SetDetailText(weaponLevelText, GetUpgradeLevelPreviewLabel(item));
         }
 
         RefreshUpgradeRequirements(item);
@@ -550,18 +561,70 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             target.text = value ?? string.Empty;
     }
 
-    private static string GetScalingLabel(EffectiveWeaponStats stats)
+    private string GetScalingLabel(
+        EffectiveWeaponStats currentStats,
+        EffectiveWeaponStats nextStats,
+        bool hasNextLevel)
     {
         var parts = new List<string>();
-        if (stats.StrengthScalingRank != WeaponItem.ScalingRank.None)
-            parts.Add("STR " + stats.StrengthScalingRank);
-        if (stats.DexterityScalingRank != WeaponItem.ScalingRank.None)
-            parts.Add("DEX " + stats.DexterityScalingRank);
-        if (stats.IntelligenceScalingRank != WeaponItem.ScalingRank.None)
-            parts.Add("INT " + stats.IntelligenceScalingRank);
-        if (stats.FaithScalingRank != WeaponItem.ScalingRank.None)
-            parts.Add("FAI " + stats.FaithScalingRank);
+        AddScalingPreview(parts, "STR", currentStats.StrengthScalingRank, nextStats.StrengthScalingRank, hasNextLevel);
+        AddScalingPreview(parts, "DEX", currentStats.DexterityScalingRank, nextStats.DexterityScalingRank, hasNextLevel);
+        AddScalingPreview(parts, "INT", currentStats.IntelligenceScalingRank, nextStats.IntelligenceScalingRank, hasNextLevel);
+        AddScalingPreview(parts, "FAI", currentStats.FaithScalingRank, nextStats.FaithScalingRank, hasNextLevel);
         return string.Join(" / ", parts);
+    }
+
+    private void AddScalingPreview(
+        List<string> parts,
+        string label,
+        WeaponItem.ScalingRank currentRank,
+        WeaponItem.ScalingRank nextRank,
+        bool hasNextLevel)
+    {
+        if (currentRank == WeaponItem.ScalingRank.None)
+            return;
+
+        string value = label + " " + currentRank;
+        if (hasNextLevel && nextRank != currentRank && nextRank != WeaponItem.ScalingRank.None)
+        {
+            string color = ColorUtility.ToHtmlStringRGB(upgradePreviewColor);
+            value += $" <color=#{color}>(\u2192 {nextRank})</color>";
+        }
+
+        parts.Add(value);
+    }
+
+    private string FormatPreviewInt(int currentValue, int nextValue, bool hasNextLevel)
+    {
+        return currentValue + (hasNextLevel
+            ? FormatPreviewDelta(nextValue - currentValue, "0")
+            : string.Empty);
+    }
+
+    private string FormatPreviewFloat(float currentValue, float nextValue, bool hasNextLevel)
+    {
+        return currentValue.ToString("0.##") + (hasNextLevel
+            ? FormatPreviewDelta(nextValue - currentValue, "0.##")
+            : string.Empty);
+    }
+
+    private string FormatPreviewPercent(float currentValue, float nextValue, bool hasNextLevel)
+    {
+        int currentPercent = Mathf.RoundToInt(currentValue * 100f);
+        int nextPercent = Mathf.RoundToInt(nextValue * 100f);
+        return currentPercent + "%" + (hasNextLevel
+            ? FormatPreviewDelta(nextPercent - currentPercent, "0", "%")
+            : string.Empty);
+    }
+
+    private string FormatPreviewDelta(float delta, string numberFormat, string suffix = "")
+    {
+        if (Mathf.Approximately(delta, 0f))
+            return string.Empty;
+
+        string sign = delta > 0f ? "+" : string.Empty;
+        string color = ColorUtility.ToHtmlStringRGB(upgradePreviewColor);
+        return $" <color=#{color}>({sign}{delta.ToString(numberFormat)}{suffix})</color>";
     }
 
     private static string GetUpgradeLevelLabel(InventoryItem item)
@@ -572,6 +635,15 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         int level = WeaponUpgradeRules.ClampLevel(item.weaponData, item.upgradeLevel);
         int maxLevel = WeaponUpgradeRules.GetMaxLevel(item.weaponData.rarity);
         return level >= maxLevel ? "MAX" : level.ToString();
+    }
+
+    private string GetUpgradeLevelPreviewLabel(InventoryItem item)
+    {
+        string currentLabel = GetUpgradeLevelLabel(item);
+        if (currentLabel == "MAX" || item == null || item.weaponData == null)
+            return currentLabel;
+
+        return currentLabel + FormatPreviewDelta(1f, "0");
     }
 
     private void SubscribeInput()
