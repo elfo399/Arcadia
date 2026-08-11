@@ -14,7 +14,6 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private PlayerController playerController;
     [SerializeField] private PlayerInventory playerInventory;
     [SerializeField] private PlayerStats playerStats;
-    [SerializeField] private TextMeshProUGUI playerCoinsText;
     [SerializeField] private Animator bookAnimator;
     [SerializeField] private Animator contentAppearAnimator;
     [SerializeField] private CanvasGroup contentGroup;
@@ -22,6 +21,25 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private Transform slotParent;
     [SerializeField] private GridLayoutGroup slotGrid;
     [SerializeField, Min(0)] private int initialSlotCount = 30;
+
+    [Header("Upgrade Detail")]
+    [SerializeField] private GameObject detailRoot;
+    [SerializeField] private Image detailImage;
+    [SerializeField] private TextMeshProUGUI detailTitle;
+    [SerializeField] private GameObject weaponSection;
+    [SerializeField] private GameObject shieldSection;
+    [SerializeField] private TextMeshProUGUI weaponDamageText;
+    [SerializeField] private TextMeshProUGUI weaponCriticalText;
+    [SerializeField] private TextMeshProUGUI weaponWeightText;
+    [SerializeField] private TextMeshProUGUI weaponScalingText;
+    [SerializeField] private TextMeshProUGUI weaponRequirementsText;
+    [SerializeField] private TextMeshProUGUI shieldDamageText;
+    [SerializeField] private TextMeshProUGUI shieldCriticalText;
+    [SerializeField] private TextMeshProUGUI shieldWeightText;
+    [SerializeField] private TextMeshProUGUI shieldScalingText;
+    [SerializeField] private TextMeshProUGUI shieldRequirementsText;
+    [SerializeField] private TextMeshProUGUI shieldPhysicalDefenseText;
+    [SerializeField] private TextMeshProUGUI shieldMagicDefenseText;
 
     [Header("Initial State")]
     [SerializeField] private string contentAppearStateName = "Transition";
@@ -64,6 +82,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         EnsureBlacksmithSlots();
         HideContentAppearAnimation();
         HideContentGroup();
+        HideUpgradeSections();
     }
 
     public bool OpenBlacksmith(BlacksmithMode mode, NpcServiceContext context)
@@ -215,7 +234,6 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         Debug.Log($"[BlacksmithManager] Refresh mode={CurrentMode}, inventory={playerInventory?.Items.Count ?? 0}, weapons={upgradeItems.Count}, slots={blacksmithSlots.Count}.", this);
 
         SetBlacksmithFocus(upgradeItems.Count > 0 ? 0 : -1);
-        RefreshPlayerCoins();
     }
 
     public InventoryItem SelectedUpgradeItem => selectedUpgradeIndex >= 0 && selectedUpgradeIndex < upgradeItems.Count
@@ -244,6 +262,8 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         for (int i = 0; i < blacksmithSlots.Count; i++)
             blacksmithSlots[i].SetFocused(i == selectedUpgradeIndex);
 
+        RefreshUpgradeDetails();
+
         if (EventSystem.current != null && selectedUpgradeIndex >= 0
             && selectedUpgradeIndex < blacksmithSlots.Count)
             EventSystem.current.SetSelectedGameObject(blacksmithSlots[selectedUpgradeIndex].gameObject);
@@ -271,6 +291,110 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
         int next = Mathf.Clamp(blacksmithFocusIndex + direction * columns, 0, upgradeItems.Count - 1);
         SetBlacksmithFocus(next);
+    }
+
+    private void RefreshUpgradeDetails()
+    {
+        if (detailRoot != null)
+            detailRoot.SetActive(true);
+
+        HideUpgradeSections();
+
+        InventoryItem item = SelectedUpgradeItem;
+        if (item == null)
+            return;
+
+        Sprite icon = GetItemIcon(item);
+        if (detailImage != null)
+        {
+            detailImage.sprite = icon;
+            detailImage.enabled = icon != null;
+            detailImage.preserveAspect = true;
+        }
+
+        if (detailTitle != null)
+            detailTitle.text = item.weaponData != null
+                ? WeaponUpgradeCalculator.GetDisplayName(item)
+                : item.title ?? string.Empty;
+
+        if (item.weaponData != null && item.weaponData.category == WeaponCategory.Shield)
+        {
+            if (shieldSection != null)
+                shieldSection.SetActive(true);
+
+            WeaponItem shield = item.weaponData;
+            EffectiveWeaponStats effective = WeaponUpgradeCalculator.GetStats(item);
+            SetDetailText(shieldDamageText, effective.PhysicalDamage.ToString());
+            SetDetailText(shieldCriticalText, effective.CriticalHit.ToString("0.##"));
+            SetDetailText(shieldWeightText, shield.weight.ToString("0.##"));
+            SetDetailText(shieldScalingText, GetScalingLabel(effective));
+            SetDetailText(shieldRequirementsText, shield.GetRequirementsLabel());
+            SetDetailText(shieldPhysicalDefenseText,
+                Mathf.RoundToInt(effective.PhysicalBlockPercent * 100f).ToString());
+            SetDetailText(shieldMagicDefenseText,
+                Mathf.RoundToInt(effective.MagicBlockPercent * 100f).ToString());
+        }
+        else if (item.weaponData != null)
+        {
+            if (weaponSection != null)
+                weaponSection.SetActive(true);
+
+            WeaponItem weapon = item.weaponData;
+            EffectiveWeaponStats effective = WeaponUpgradeCalculator.GetStats(item);
+            SetDetailText(weaponDamageText, effective.PhysicalDamage.ToString());
+            SetDetailText(weaponCriticalText, effective.CriticalHit.ToString("0.##"));
+            SetDetailText(weaponWeightText, weapon.weight.ToString("0.##"));
+            SetDetailText(weaponScalingText, GetScalingLabel(effective));
+            SetDetailText(weaponRequirementsText, weapon.GetRequirementsLabel());
+        }
+    }
+
+    private void HideUpgradeSections()
+    {
+        if (weaponSection != null) weaponSection.SetActive(false);
+        if (shieldSection != null) shieldSection.SetActive(false);
+        if (detailImage != null)
+        {
+            detailImage.sprite = null;
+            detailImage.enabled = false;
+        }
+        if (detailTitle != null)
+            detailTitle.text = string.Empty;
+
+        ClearDetailTextFields();
+    }
+
+    private void ClearDetailTextFields()
+    {
+        TextMeshProUGUI[] fields =
+        {
+            weaponDamageText, weaponCriticalText, weaponWeightText, weaponScalingText,
+            weaponRequirementsText, shieldDamageText, shieldCriticalText, shieldWeightText,
+            shieldScalingText, shieldRequirementsText, shieldPhysicalDefenseText,
+            shieldMagicDefenseText
+        };
+        for (int i = 0; i < fields.Length; i++)
+            SetDetailText(fields[i], string.Empty);
+    }
+
+    private static void SetDetailText(TextMeshProUGUI target, string value)
+    {
+        if (target != null)
+            target.text = value ?? string.Empty;
+    }
+
+    private static string GetScalingLabel(EffectiveWeaponStats stats)
+    {
+        var parts = new List<string>();
+        if (stats.StrengthScalingRank != WeaponItem.ScalingRank.None)
+            parts.Add("STR " + stats.StrengthScalingRank);
+        if (stats.DexterityScalingRank != WeaponItem.ScalingRank.None)
+            parts.Add("DEX " + stats.DexterityScalingRank);
+        if (stats.IntelligenceScalingRank != WeaponItem.ScalingRank.None)
+            parts.Add("INT " + stats.IntelligenceScalingRank);
+        if (stats.FaithScalingRank != WeaponItem.ScalingRank.None)
+            parts.Add("FAI " + stats.FaithScalingRank);
+        return string.Join(" / ", parts);
     }
 
     private void SubscribeInput()
@@ -321,12 +445,6 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
         if (EventSystem.current != null && initialFocus != null)
             EventSystem.current.SetSelectedGameObject(initialFocus);
-    }
-
-    private void RefreshPlayerCoins()
-    {
-        if (playerCoinsText != null)
-            playerCoinsText.text = playerStats != null ? Mathf.Max(0, playerStats.runCoins).ToString() : "0";
     }
 
     private static Sprite GetItemIcon(InventoryItem item)
