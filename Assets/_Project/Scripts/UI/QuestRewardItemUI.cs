@@ -29,6 +29,24 @@ public class QuestRewardItemUI : MonoBehaviour
         if (itemNameText != null) itemNameText.text = string.IsNullOrWhiteSpace(itemName) ? string.Empty : itemName;
     }
 
+    public void SetRequirementData(Sprite icon, string itemName, int owned, int required)
+    {
+        ResolveReferences();
+
+        if (iconImage != null)
+        {
+            iconImage.sprite = icon;
+            iconImage.enabled = icon != null;
+        }
+
+        if (typeText != null)
+            typeText.text = itemName ?? string.Empty;
+        if (amountText != null)
+            amountText.text = $"{Mathf.Max(0, owned)}/{Mathf.Max(0, required)}";
+        if (itemNameText != null)
+            itemNameText.text = string.Empty;
+    }
+
     private void ResolveReferences()
     {
         // Tutti i riferimenti sono assegnati esplicitamente nel prefab.

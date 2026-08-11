@@ -41,6 +41,13 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private TextMeshProUGUI shieldPhysicalDefenseText;
     [SerializeField] private TextMeshProUGUI shieldMagicDefenseText;
 
+    [Header("Upgrade Requirements")]
+    [SerializeField] private Transform materialsRoot;
+    [SerializeField] private QuestRewardItemUI materialRowPrefab;
+    [SerializeField] private GameObject priceRoot;
+    [SerializeField] private TextMeshProUGUI priceText;
+    [SerializeField] private Button upgradeButton;
+
     [Header("Initial State")]
     [SerializeField] private string contentAppearStateName = "Transition";
     [SerializeField, Min(0f)] private float contentAppearDelay = 0.5833333f;
@@ -62,6 +69,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     private Action<InputAction.CallbackContext> cancelCallback;
     private readonly List<InventorySlot> blacksmithSlots = new List<InventorySlot>();
     private readonly List<InventoryItem> upgradeItems = new List<InventoryItem>();
+    private readonly List<QuestRewardItemUI> materialRows = new List<QuestRewardItemUI>();
     private int selectedUpgradeIndex = -1;
     private int blacksmithFocusIndex = -1;
     private int openingFrame = -1;
@@ -80,9 +88,16 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         if (blacksmithHud != null)
             blacksmithHud.SetActive(false);
         EnsureBlacksmithSlots();
+        ResolveUpgradeRequirementReferences();
         HideContentAppearAnimation();
         HideContentGroup();
         HideUpgradeSections();
+    }
+
+    private void OnDestroy()
+    {
+        if (upgradeButton != null)
+            upgradeButton.onClick.RemoveListener(OnUpgradeButtonClicked);
     }
 
     public bool OpenBlacksmith(BlacksmithMode mode, NpcServiceContext context)
@@ -347,6 +362,8 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             SetDetailText(weaponScalingText, GetScalingLabel(effective));
             SetDetailText(weaponRequirementsText, weapon.GetRequirementsLabel());
         }
+
+        RefreshUpgradeRequirements(item);
     }
 
     private void HideUpgradeSections()
@@ -362,6 +379,113 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             detailTitle.text = string.Empty;
 
         ClearDetailTextFields();
+        HideUpgradeRequirements();
+    }
+
+    private void ResolveUpgradeRequirementReferences()
+    {
+        if (materialsRoot != null)
+        {
+            QuestRewardItemUI[] authoredRows = materialsRoot.GetComponentsInChildren<QuestRewardItemUI>(true);
+            for (int i = 0; i < authoredRows.Length; i++)
+            {
+                authoredRows[i].gameObject.SetActive(false);
+                Destroy(authoredRows[i].gameObject);
+            }
+        }
+
+        if (upgradeButton != null)
+        {
+            upgradeButton.onClick.RemoveListener(OnUpgradeButtonClicked);
+            upgradeButton.onClick.AddListener(OnUpgradeButtonClicked);
+        }
+    }
+
+    private void RefreshUpgradeRequirements(InventoryItem item)
+    {
+        BlacksmithUpgradeCheck check = item != null ? CanUpgrade(item) : new BlacksmithUpgradeCheck();
+        List<BlacksmithRequirementStatus> requirements = check.Materials ?? new List<BlacksmithRequirementStatus>();
+
+        if (priceRoot != null)
+            priceRoot.SetActive(check.CoinCost > 0);
+        if (priceText != null)
+            priceText.text = check.CoinCost > 0 ? check.CoinCost.ToString("N0") : string.Empty;
+
+        ClearGeneratedMaterialRows();
+        for (int i = 0; i < requirements.Count; i++)
+        {
+            if (materialsRoot == null || materialRowPrefab == null)
+                break;
+
+            QuestRewardItemUI row = Instantiate(materialRowPrefab, materialsRoot, false);
+            row.name = $"Material_{i:00}";
+            row.gameObject.SetActive(true);
+            materialRows.Add(row);
+        }
+
+        if (materialsRoot != null)
+            materialsRoot.gameObject.SetActive(requirements.Count > 0 && materialRows.Count == requirements.Count);
+
+        for (int i = 0; i < materialRows.Count; i++)
+        {
+            bool visible = i < requirements.Count;
+            materialRows[i].gameObject.SetActive(visible);
+            if (!visible)
+                continue;
+
+            BlacksmithRequirementStatus requirement = requirements[i];
+            materialRows[i].SetRequirementData(
+                requirement.item != null ? requirement.item.icon : null,
+                requirement.item != null ? requirement.item.itemName : string.Empty,
+                requirement.owned,
+                requirement.required);
+        }
+
+        if (upgradeButton != null)
+        {
+            upgradeButton.gameObject.SetActive(item != null);
+            upgradeButton.interactable = item != null && check.IsValid;
+        }
+    }
+
+    private void ClearGeneratedMaterialRows()
+    {
+        for (int i = 0; i < materialRows.Count; i++)
+        {
+            if (materialRows[i] != null)
+                Destroy(materialRows[i].gameObject);
+        }
+
+        materialRows.Clear();
+    }
+
+    private void HideUpgradeRequirements()
+    {
+        if (materialsRoot != null)
+            materialsRoot.gameObject.SetActive(false);
+        if (priceRoot != null)
+            priceRoot.SetActive(false);
+        if (priceText != null)
+            priceText.text = string.Empty;
+        if (upgradeButton != null)
+        {
+            upgradeButton.gameObject.SetActive(false);
+            upgradeButton.interactable = false;
+        }
+
+        ClearGeneratedMaterialRows();
+    }
+
+    private void OnUpgradeButtonClicked()
+    {
+        InventoryItem item = SelectedUpgradeItem;
+        if (item == null)
+            return;
+
+        if (TryUpgrade(item, out _))
+            RefreshBlacksmithGrid();
+        else
+            RefreshUpgradeDetails();
     }
 
     private void ClearDetailTextFields()
