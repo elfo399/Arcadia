@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using TMPro;
 
@@ -34,17 +35,30 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     public bool IsOpen { get; private set; }
     public NpcServiceContext ActiveContext { get; private set; }
     public IReadOnlyList<CraftingRecipeData> Recipes => recipes;
+    public event Action<InventoryItem> ConfirmRequested;
     public event Action Closed;
 
+    private readonly object gameplayLockOwner = new object();
+    private PlayerControls controls;
+    private Action<InputAction.CallbackContext> confirmCallback;
+    private Action<InputAction.CallbackContext> cancelCallback;
     private readonly List<InventorySlot> blacksmithSlots = new List<InventorySlot>();
     private readonly List<InventoryItem> upgradeItems = new List<InventoryItem>();
     private int selectedUpgradeIndex = -1;
+    private int blacksmithFocusIndex = -1;
+    private int openingFrame = -1;
+    private float lastNavigationTime = -999f;
+    private const float NavigationRepeatCooldown = 0.20f;
     private Coroutine contentAppearRoutine;
     private Coroutine closeRoutine;
     private bool isClosing;
+    private bool isInteractive;
 
     private void Awake()
     {
+        confirmCallback = OnConfirmPerformed;
+        cancelCallback = OnCancelPerformed;
+
         if (blacksmithHud != null)
             blacksmithHud.SetActive(false);
         EnsureBlacksmithSlots();
@@ -62,13 +76,26 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         CurrentMode = mode;
         ActiveContext = context;
         playerController = context.Player.GetComponent<PlayerController>() ?? playerController;
+        if (playerController == null || playerController.Controls == null)
+        {
+            Debug.LogWarning("[BlacksmithManager] PlayerController o PlayerControls non disponibili.", this);
+            ActiveContext = null;
+            return false;
+        }
+
+        controls = playerController.Controls;
         playerInventory = context.PlayerInventory;
         playerStats = context.PlayerStats;
+        playerStats.TryEnsurePersistentStateReady();
         IsOpen = true;
+        isInteractive = false;
         isClosing = false;
-        RefreshBlacksmithGrid();
+        openingFrame = Time.frameCount;
+        playerController.AcquireGameplayInputLock(gameplayLockOwner);
+        SubscribeInput();
         if (blacksmithHud != null)
             blacksmithHud.SetActive(true);
+        RefreshBlacksmithGrid();
         Canvas.ForceUpdateCanvases();
         FocusInitialTarget();
         contentAppearRoutine = StartCoroutine(PlayContentAppearAnimation());
@@ -83,23 +110,58 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         IsOpen = false;
         ActiveContext = null;
         isClosing = true;
+        isInteractive = false;
+        UnsubscribeInput();
         StopContentAppearRoutineOnly();
 
         if (EventSystem.current != null)
             EventSystem.current.SetSelectedGameObject(null);
+
+        if (!isActiveAndEnabled)
+        {
+            isClosing = false;
+            if (blacksmithHud != null)
+                blacksmithHud.SetActive(false);
+            ReleaseGameplayInputLock();
+            return;
+        }
 
         closeRoutine = StartCoroutine(RunCloseAnimations());
     }
 
     private void OnDisable()
     {
+        UnsubscribeInput();
         StopContentAppearRoutineOnly();
         if (closeRoutine != null)
             StopCoroutine(closeRoutine);
         closeRoutine = null;
+        isInteractive = false;
         isClosing = false;
         if (blacksmithHud != null)
             blacksmithHud.SetActive(false);
+        ReleaseGameplayInputLock();
+    }
+
+    private void Update()
+    {
+        if (!IsOpen || !isInteractive || controls == null
+            || Time.unscaledTime < lastNavigationTime + NavigationRepeatCooldown)
+            return;
+
+        Vector2 navigation = controls.Player.Move.ReadValue<Vector2>();
+        if (navigation.x > 0.5f)
+            MoveBlacksmithFocusHorizontal(1);
+        else if (navigation.x < -0.5f)
+            MoveBlacksmithFocusHorizontal(-1);
+        else if (navigation.y > 0.5f)
+            MoveBlacksmithFocusVertical(-1);
+        else if (navigation.y < -0.5f)
+            MoveBlacksmithFocusVertical(1);
+        else
+            return;
+
+        lastNavigationTime = Time.unscaledTime;
     }
 
     private void EnsureBlacksmithSlots()
@@ -124,13 +186,13 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     {
         upgradeItems.Clear();
         selectedUpgradeIndex = -1;
-        if (playerInventory != null && CurrentMode == BlacksmithMode.Upgrade)
+        if (playerInventory != null)
         {
             IReadOnlyList<InventoryItem> inventoryItems = playerInventory.Items;
             for (int i = 0; i < inventoryItems.Count; i++)
             {
                 InventoryItem item = inventoryItems[i];
-                if (item != null && item.weaponData != null && item.weaponData.canUpgrade
+                if (item != null && item.weaponData != null
                     && item.weaponData.category != WeaponCategory.Unarmed)
                     upgradeItems.Add(item);
             }
@@ -140,10 +202,17 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         {
             InventoryItem item = i < upgradeItems.Count ? upgradeItems[i] : null;
             if (item != null)
-                blacksmithSlots[i].Setup(GetItemIcon(item), item.amount, playerInventory != null && playerInventory.IsInstanceEquipped(item.instanceId));
+            {
+                Sprite icon = GetItemIcon(item);
+                if (icon == null)
+                    Debug.LogWarning($"[BlacksmithManager] Icona mancante per '{item.weaponData.name}' instance '{item.instanceId}'.", this);
+                blacksmithSlots[i].Setup(icon, item.amount, playerInventory != null && playerInventory.IsInstanceEquipped(item.instanceId));
+            }
             else
                 blacksmithSlots[i].Clear();
         }
+
+        Debug.Log($"[BlacksmithManager] Refresh mode={CurrentMode}, inventory={playerInventory?.Items.Count ?? 0}, weapons={upgradeItems.Count}, slots={blacksmithSlots.Count}.", this);
 
         SetBlacksmithFocus(upgradeItems.Count > 0 ? 0 : -1);
         RefreshPlayerCoins();
@@ -153,13 +222,13 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         ? upgradeItems[selectedUpgradeIndex]
         : null;
 
-    public void HandleSlotPointerDown(int index) { SelectUpgradeItem(index); }
+    public void HandleSlotPointerDown(int index) { if (isInteractive) SelectUpgradeItem(index); }
     public void HandleSlotBeginDrag(int index, PointerEventData eventData) { }
     public void HandleSlotDrag(PointerEventData eventData) { }
     public void HandleSlotEndDrag() { }
     public void HandleSlotDrop(int targetIndex) { }
-    public void HandleSlotSelected(int index) { SelectUpgradeItem(index); }
-    public void HandleSlotSubmit(int index) { SelectUpgradeItem(index); }
+    public void HandleSlotSelected(int index) { if (isInteractive) SelectUpgradeItem(index); }
+    public void HandleSlotSubmit(int index) { if (isInteractive) SelectUpgradeItem(index); }
 
     private void SelectUpgradeItem(int index)
     {
@@ -171,12 +240,75 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     private void SetBlacksmithFocus(int index)
     {
         selectedUpgradeIndex = index >= 0 && index < upgradeItems.Count ? index : -1;
+        blacksmithFocusIndex = selectedUpgradeIndex;
         for (int i = 0; i < blacksmithSlots.Count; i++)
             blacksmithSlots[i].SetFocused(i == selectedUpgradeIndex);
 
         if (EventSystem.current != null && selectedUpgradeIndex >= 0
             && selectedUpgradeIndex < blacksmithSlots.Count)
             EventSystem.current.SetSelectedGameObject(blacksmithSlots[selectedUpgradeIndex].gameObject);
+    }
+
+    private void MoveBlacksmithFocusHorizontal(int direction)
+    {
+        if (upgradeItems.Count == 0)
+            return;
+
+        int next = blacksmithFocusIndex + (direction >= 0 ? 1 : -1);
+        if (next >= upgradeItems.Count) next = 0;
+        if (next < 0) next = upgradeItems.Count - 1;
+        SetBlacksmithFocus(next);
+    }
+
+    private void MoveBlacksmithFocusVertical(int direction)
+    {
+        if (upgradeItems.Count == 0)
+            return;
+
+        int columns = 5;
+        if (slotGrid != null && slotGrid.constraint == GridLayoutGroup.Constraint.FixedColumnCount)
+            columns = Mathf.Max(1, slotGrid.constraintCount);
+
+        int next = Mathf.Clamp(blacksmithFocusIndex + direction * columns, 0, upgradeItems.Count - 1);
+        SetBlacksmithFocus(next);
+    }
+
+    private void SubscribeInput()
+    {
+        if (controls == null)
+            return;
+
+        controls.Player.Jump.performed -= confirmCallback;
+        controls.Player.Jump.performed += confirmCallback;
+        controls.Player.SprintOrDodge.performed -= cancelCallback;
+        controls.Player.SprintOrDodge.performed += cancelCallback;
+    }
+
+    private void UnsubscribeInput()
+    {
+        if (controls == null)
+            return;
+
+        controls.Player.Jump.performed -= confirmCallback;
+        controls.Player.SprintOrDodge.performed -= cancelCallback;
+    }
+
+    private void OnConfirmPerformed(InputAction.CallbackContext _)
+    {
+        if (!IsOpen || !isInteractive || openingFrame == Time.frameCount)
+            return;
+
+        InventoryItem selected = SelectedUpgradeItem;
+        if (selected != null)
+            ConfirmRequested?.Invoke(selected);
+    }
+
+    private void OnCancelPerformed(InputAction.CallbackContext _)
+    {
+        if (!IsOpen || !isInteractive || openingFrame == Time.frameCount)
+            return;
+
+        CloseBlacksmith();
     }
 
     private void FocusInitialTarget()
@@ -230,7 +362,9 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         contentAppearRoutine = null;
         if (IsOpen && !isClosing)
         {
+            isInteractive = true;
             SetContentInteraction(true);
+            lastNavigationTime = Time.unscaledTime;
             FocusInitialTarget();
         }
     }
@@ -276,8 +410,20 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         if (blacksmithHud != null)
             blacksmithHud.SetActive(false);
         isClosing = false;
+        isInteractive = false;
         closeRoutine = null;
         Closed?.Invoke();
+        ReleaseGameplayInputLock();
+        controls = null;
+        openingFrame = -1;
+    }
+
+    private void ReleaseGameplayInputLock()
+    {
+        if (playerController != null)
+            playerController.ReleaseGameplayInputLock(gameplayLockOwner);
+        controls = null;
+        openingFrame = -1;
     }
 
     private void StopContentAppearRoutineOnly()
