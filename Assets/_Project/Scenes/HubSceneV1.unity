@@ -81544,6 +81544,97 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1990750080}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2147400301
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2147400302}
+  - component: {fileID: 2147400303}
+  - component: {fileID: 2147400304}
+  m_Layer: 0
+  m_Name: MagicManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2147400302
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2147400301}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1990750080}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2147400303
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2147400301}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b3c6a9f5e1f467c5d0a9f3a8e4cb2633, type: 3}
+  m_Name: ''
+  m_EditorClassIdentifier: ''
+  magicHud: {fileID: 0}
+  playerController: {fileID: 1149146438}
+  playerInventory: {fileID: 1149146443}
+  playerStats: {fileID: 1149146436}
+  recipeListRoot: {fileID: 0}
+  recipeRowPrefab: {fileID: 0}
+  recipes:
+  - {fileID: 11400000, guid: c34265a13d80f3719c6bf5f49087ef3f, type: 2}
+  - {fileID: 11400000, guid: c45376b24e91f482ad70f605a198f040, type: 2}
+  detailRoot: {fileID: 0}
+  detailImage: {fileID: 0}
+  detailTitle: {fileID: 0}
+  detailDescription: {fileID: 0}
+  scalingText: {fileID: 0}
+  requirementsText: {fileID: 0}
+  manaCostText: {fileID: 0}
+  attackRoot: {fileID: 0}
+  damageText: {fileID: 0}
+  criticalText: {fileID: 0}
+  boostRoot: {fileID: 0}
+  boostAttributeText: {fileID: 0}
+  boostAmountText: {fileID: 0}
+  boostDurationText: {fileID: 0}
+  healingRoot: {fileID: 0}
+  healingTypeText: {fileID: 0}
+  healingAmountText: {fileID: 0}
+  materialsRoot: {fileID: 0}
+  materialRowPrefab: {fileID: 0}
+  priceRoot: {fileID: 0}
+  priceText: {fileID: 0}
+  actionButton: {fileID: 0}
+  actionButtonLabel: {fileID: 0}
+--- !u!114 &2147400304
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2147400301}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4d7baf6f2f578d6e1b0a4b9f5dc3744, type: 3}
+  m_Name: ''
+  m_EditorClassIdentifier: ''
+  serviceId: magic
+  magicManager: {fileID: 2147400303}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

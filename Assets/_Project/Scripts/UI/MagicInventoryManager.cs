@@ -495,7 +495,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         SetText(ResolveText(attackDamageText, magicDamageText), magic.magicDamage.ToString());
         SetText(ResolveText(attackCriticalText, magicCriticalText), magic.criticalHit.ToString("0.##"));
         if (magicScalingText != null) magicScalingText.text = magic.scaling ?? string.Empty;
-        if (magicRequirementsText != null) magicRequirementsText.text = magic.requirements ?? string.Empty;
+        if (magicRequirementsText != null) magicRequirementsText.text = magic.GetRequirementsLabel();
         SetText(boostAttributeText, FormatBoostAttribute(magic.boostAttribute));
         SetText(boostAmountText, FormatSignedAmount(magic.boostAmount));
         SetText(boostDurationText, FormatDuration(magic.boostDurationSeconds));

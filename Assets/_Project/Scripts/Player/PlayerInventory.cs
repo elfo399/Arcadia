@@ -1423,6 +1423,40 @@ public class PlayerInventory : MonoBehaviour
         return data;
     }
 
+    public SavedInventoryItemData CreateSaveDataForItem(InventoryItem it)
+    {
+        if (it == null) return null;
+        string itemType = "item";
+        string assetName = string.Empty;
+        string itemName = string.Empty;
+
+        if (it.weaponData != null) { itemType = "weapon"; assetName = it.weaponData.name; itemName = it.weaponData.weaponName; }
+        else if (it.magicData != null) { itemType = "magic"; assetName = it.magicData.name; itemName = it.magicData.magicName; }
+        else if (it.armorData != null) { itemType = "armor"; assetName = it.armorData.name; itemName = it.armorData.itemName; }
+        else if (it.usableData != null) { itemType = "usable"; assetName = it.usableData.name; itemName = it.usableData.itemName; }
+        else if (it.itemData != null) { itemType = "item"; assetName = it.itemData.name; itemName = it.itemData.itemName; }
+        else return null;
+
+        return new SavedInventoryItemData
+        {
+            itemType = itemType,
+            assetName = assetName,
+            itemName = string.IsNullOrWhiteSpace(itemName) ? it.title : itemName,
+            instanceId = it.instanceId,
+            upgradeLevel = it.weaponData != null ? WeaponUpgradeRules.ClampLevel(it.weaponData, it.upgradeLevel) : 0,
+            amount = Mathf.Max(1, it.amount),
+            title = it.title,
+            description = it.description
+        };
+    }
+
+    public InventoryItem RestoreInventoryItemFromSaveData(SavedInventoryItemData saved)
+    {
+        if (saved == null) return null;
+        InventoryItem restored = DeserializeInventoryItem(saved, BuildAssetLookups());
+        return restored;
+    }
+
     public void ApplySaveData(SavedPlayerInventoryData data)
     {
         if (data == null) return;

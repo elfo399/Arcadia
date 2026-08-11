@@ -5,5 +5,6 @@ public enum QuestRewardType
     Usable,
     Magic,
     Armor,
-    Experience
+    Experience,
+    MagicBlueprint
 }

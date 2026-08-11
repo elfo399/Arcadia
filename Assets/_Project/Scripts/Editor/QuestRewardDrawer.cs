@@ -69,6 +69,9 @@ public class QuestRewardDrawerBase : PropertyDrawer
             case QuestRewardType.Magic:
                 EditorGUI.PropertyField(row, property.FindPropertyRelative("magicAsset"), new GUIContent("Magic"));
                 break;
+            case QuestRewardType.MagicBlueprint:
+                EditorGUI.PropertyField(row, property.FindPropertyRelative("magicBlueprintAsset"), new GUIContent("Magic Blueprint"));
+                break;
             case QuestRewardType.Armor:
                 EditorGUI.PropertyField(row, property.FindPropertyRelative("armorAsset"), new GUIContent("Armor"));
                 break;

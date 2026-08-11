@@ -4,7 +4,7 @@ using UnityEngine;
 public partial class QuestManager
 {
     public enum JournalPadSection { List, Detail }
-    private enum QuestRewardKind { Item, Weapon, Usable, Magic, Armor, Experience }
+    private enum QuestRewardKind { Item, Weapon, Usable, Magic, MagicBlueprint, Armor, Experience }
 
     private JournalPadSection currentJournalPadSection = JournalPadSection.List;
     private int journalPadListIndex;
@@ -382,6 +382,14 @@ public partial class QuestManager
                     if (!WouldStackMagic(inventory, magic, magicStacks))
                         magicAdditional += 1;
                     break;
+                case QuestRewardKind.MagicBlueprint:
+                    if (stats == null || reward.magicBlueprintAsset == null || reward.magicBlueprintAsset.recipe == null
+                        || string.IsNullOrWhiteSpace(reward.magicBlueprintAsset.recipe.recipeId))
+                    {
+                        failureReason = DescribeQuestReward(reward, i) + ": blueprint asset non risolto.";
+                        return false;
+                    }
+                    break;
             }
         }
 
@@ -477,6 +485,12 @@ public partial class QuestManager
                 case QuestRewardKind.Magic:
                     if (!TryResolveMagicReward(reward, out var magic)) return false;
                     AddOrStackMagicReward(inventory, magic, amount);
+                    break;
+                case QuestRewardKind.MagicBlueprint:
+                    if (stats == null || reward.magicBlueprintAsset == null || reward.magicBlueprintAsset.recipe == null)
+                        return false;
+                    if (!stats.IsMagicRecipeUnlocked(reward.magicBlueprintAsset.recipe.recipeId))
+                        reward.magicBlueprintAsset.Unlock(stats);
                     break;
             }
         }
@@ -676,6 +690,7 @@ public partial class QuestManager
             case QuestRewardType.Weapon: kind = QuestRewardKind.Weapon; return true;
             case QuestRewardType.Usable: kind = QuestRewardKind.Usable; return true;
             case QuestRewardType.Magic: kind = QuestRewardKind.Magic; return true;
+            case QuestRewardType.MagicBlueprint: kind = QuestRewardKind.MagicBlueprint; return true;
             case QuestRewardType.Armor: kind = QuestRewardKind.Armor; return true;
             case QuestRewardType.Experience: kind = QuestRewardKind.Experience; return true;
             case QuestRewardType.Item: kind = QuestRewardKind.Item; break;
@@ -683,6 +698,7 @@ public partial class QuestManager
 
         string raw = string.IsNullOrWhiteSpace(reward.type) ? string.Empty : reward.type.Trim().ToLowerInvariant();
         if (raw.Contains("weapon")) { kind = QuestRewardKind.Weapon; return true; }
+        if (raw.Contains("blueprint")) { kind = QuestRewardKind.MagicBlueprint; return true; }
         if (raw.Contains("usable") || raw.Contains("consumable") || raw.Contains("potion")) { kind = QuestRewardKind.Usable; return true; }
         if (raw.Contains("magic") || raw.Contains("spell") || raw.Contains("magia")) { kind = QuestRewardKind.Magic; return true; }
         if (raw.Contains("armor") || raw.Contains("helmet") || raw.Contains("chestplate") || raw.Contains("leggings") || raw.Contains("boots")) { kind = QuestRewardKind.Armor; return true; }

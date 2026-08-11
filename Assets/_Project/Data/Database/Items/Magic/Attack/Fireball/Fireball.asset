@@ -25,6 +25,9 @@ MonoBehaviour:
   criticalHit: 1
   scaling: INT C
   requirements: INT 10+
+  statRequirements:
+  - attribute: 5
+    requiredValue: 10
   manaCost: 12
   castTime: 0.35
   castCooldown: 0.45

@@ -3,7 +3,7 @@ using System.IO;
 
 public static class SaveSystem
 {
-    public const int CurrentSaveVersion = 3;
+    public const int CurrentSaveVersion = 4;
     public const string SinglePlayerId = "player";
     public const string DefaultPlayerName = "Player";
 
@@ -354,6 +354,12 @@ public static class SaveSystem
                 case 2:
                     EnsureNarrativeCollections(data);
                     data.saveVersion = 3;
+                    break;
+
+                case 3:
+                    // Magic progression and storage are optional additions;
+                    // null fields intentionally migrate to empty runtime state.
+                    data.saveVersion = 4;
                     break;
 
                 default:

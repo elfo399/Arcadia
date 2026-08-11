@@ -52,6 +52,7 @@ public partial class QuestManager : MonoBehaviour
         public UsableItemData usableAsset;
         public ItemData itemAsset;
         public MagicItemData magicAsset;
+        public MagicBlueprintData magicBlueprintAsset;
         public ArmorItemData armorAsset;
     }
 
@@ -852,6 +853,7 @@ public partial class QuestManager : MonoBehaviour
                 usableAsset = entry.usableAsset,
                 itemAsset = entry.itemAsset,
                 magicAsset = entry.magicAsset,
+                magicBlueprintAsset = entry.magicBlueprintAsset,
                 armorAsset = entry.armorAsset
             });
         }
@@ -957,6 +959,7 @@ public partial class QuestManager : MonoBehaviour
                 usableAsset = reward.usableAsset,
                 itemAsset = reward.itemAsset,
                 magicAsset = reward.magicAsset,
+                magicBlueprintAsset = reward.magicBlueprintAsset,
                 armorAsset = reward.armorAsset
             });
         }
@@ -1028,6 +1031,8 @@ public partial class QuestManager : MonoBehaviour
             QuestRewardType.Usable => reward.usableAsset != null ? reward.usableAsset.icon : null,
             QuestRewardType.Item => reward.itemAsset != null ? reward.itemAsset.icon : null,
             QuestRewardType.Magic => reward.magicAsset != null ? reward.magicAsset.icon : null,
+            QuestRewardType.MagicBlueprint => reward.magicBlueprintAsset != null && reward.magicBlueprintAsset.recipe != null
+                && reward.magicBlueprintAsset.recipe.resultMagic != null ? reward.magicBlueprintAsset.recipe.resultMagic.icon : null,
             QuestRewardType.Armor => reward.armorAsset != null ? reward.armorAsset.icon : null,
             _ => null
         };
@@ -1055,6 +1060,9 @@ public partial class QuestManager : MonoBehaviour
             QuestRewardType.Usable => reward.usableAsset != null ? reward.usableAsset.itemName : string.Empty,
             QuestRewardType.Item => reward.itemAsset != null ? reward.itemAsset.itemName : string.Empty,
             QuestRewardType.Magic => reward.magicAsset != null ? reward.magicAsset.magicName : string.Empty,
+            QuestRewardType.MagicBlueprint => reward.magicBlueprintAsset != null && reward.magicBlueprintAsset.recipe != null
+                ? reward.magicBlueprintAsset.recipe.resultMagic != null ? reward.magicBlueprintAsset.recipe.resultMagic.magicName : reward.magicBlueprintAsset.recipe.recipeId
+                : string.Empty,
             QuestRewardType.Armor => reward.armorAsset != null ? reward.armorAsset.itemName : string.Empty,
             _ => string.Empty
         };

@@ -18,6 +18,7 @@ public class SavedQuestRewardData
     public string type;
     public int amount;
     public string itemName;
+    public string magicBlueprintRecipeId;
 }
 
 [System.Serializable]
@@ -90,6 +91,20 @@ public class SavedBlacksmithData
 }
 
 [System.Serializable]
+public class SavedMagicProgressionData
+{
+    public string[] unlockedRecipeIds;
+    public string[] learnedRecipeIds;
+}
+
+[System.Serializable]
+public class SavedStorageData
+{
+    public SavedInventoryItemData[] items;
+    public SavedInventoryItemData[] magicItems;
+}
+
+[System.Serializable]
 public class SavedDialogueHistoryData
 {
     public string[] readNodeKeys;
@@ -152,6 +167,8 @@ public class GameData
     public SavedPlayerInventoryData playerInventory;
     public SavedMerchantStockData[] merchantStocks;
     public SavedBlacksmithData blacksmith;
+    public SavedMagicProgressionData magicProgression;
+    public SavedStorageData storage;
 
     // Narrative state. Arrays remain JsonUtility-compatible; runtime systems
     // may use sets and explicitly import/export them.
