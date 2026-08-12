@@ -31,13 +31,16 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private GameObject attackStatsRoot;
     [SerializeField] private TextMeshProUGUI attackDamageText;
     [SerializeField] private TextMeshProUGUI attackCriticalText;
+    [SerializeField] private TextMeshProUGUI attackManaCostText;
     [SerializeField] private GameObject boostStatsRoot;
     [SerializeField] private TextMeshProUGUI boostAttributeText;
     [SerializeField] private TextMeshProUGUI boostAmountText;
     [SerializeField] private TextMeshProUGUI boostDurationText;
+    [SerializeField] private TextMeshProUGUI boostManaCostText;
     [SerializeField] private GameObject healingStatsRoot;
     [SerializeField] private TextMeshProUGUI healingTypeText;
     [SerializeField] private TextMeshProUGUI healingAmountText;
+    [SerializeField] private TextMeshProUGUI healingManaCostText;
     [FormerlySerializedAs("equipMagicButton")]
     [SerializeField] private Button equipButton;
 
@@ -494,13 +497,16 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         UpdateMagicTypeSections(magic);
         SetText(ResolveText(attackDamageText, magicDamageText), magic.magicDamage.ToString());
         SetText(ResolveText(attackCriticalText, magicCriticalText), magic.criticalHit.ToString("0.##"));
+        SetText(attackManaCostText, magic.manaCost.ToString("0.##"));
         if (magicScalingText != null) magicScalingText.text = magic.scaling ?? string.Empty;
         if (magicRequirementsText != null) magicRequirementsText.text = magic.GetRequirementsLabel();
         SetText(boostAttributeText, FormatBoostAttribute(magic.boostAttribute));
         SetText(boostAmountText, FormatSignedAmount(magic.boostAmount));
         SetText(boostDurationText, FormatDuration(magic.boostDurationSeconds));
+        SetText(boostManaCostText, magic.manaCost.ToString("0.##"));
         SetText(healingTypeText, FormatHealingType(magic.effectType));
         SetText(healingAmountText, magic.healAmount.ToString());
+        SetText(healingManaCostText, magic.manaCost.ToString("0.##"));
         UpdateEquipButtonState();
     }
 
@@ -518,11 +524,14 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         if (magicRequirementsText != null) magicRequirementsText.text = string.Empty;
         SetText(attackDamageText, string.Empty);
         SetText(attackCriticalText, string.Empty);
+        SetText(attackManaCostText, string.Empty);
         SetText(boostAttributeText, string.Empty);
         SetText(boostAmountText, string.Empty);
         SetText(boostDurationText, string.Empty);
+        SetText(boostManaCostText, string.Empty);
         SetText(healingTypeText, string.Empty);
         SetText(healingAmountText, string.Empty);
+        SetText(healingManaCostText, string.Empty);
     }
 
     private void UpdateMagicTypeSections(MagicItemData magic)
