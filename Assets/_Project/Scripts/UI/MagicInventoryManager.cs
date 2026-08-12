@@ -497,16 +497,16 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         UpdateMagicTypeSections(magic);
         SetText(ResolveText(attackDamageText, magicDamageText), magic.magicDamage.ToString());
         SetText(ResolveText(attackCriticalText, magicCriticalText), magic.criticalHit.ToString("0.##"));
-        SetText(attackManaCostText, magic.manaCost.ToString("0.##"));
+        SetText(attackManaCostText, MagicItemData.FormatCompact(magic.manaCost));
         if (magicScalingText != null) magicScalingText.text = magic.scaling ?? string.Empty;
         if (magicRequirementsText != null) magicRequirementsText.text = magic.GetRequirementsLabel();
-        SetText(boostAttributeText, FormatBoostAttribute(magic.boostAttribute));
-        SetText(boostAmountText, FormatSignedAmount(magic.boostAmount));
-        SetText(boostDurationText, FormatDuration(magic.boostDurationSeconds));
-        SetText(boostManaCostText, magic.manaCost.ToString("0.##"));
-        SetText(healingTypeText, FormatHealingType(magic.effectType));
+        SetText(boostAttributeText, MagicItemData.FormatBoostAttribute(magic.boostAttribute));
+        SetText(boostAmountText, MagicItemData.FormatSignedAmount(magic.boostAmount));
+        SetText(boostDurationText, MagicItemData.FormatDuration(magic.boostDurationSeconds));
+        SetText(boostManaCostText, MagicItemData.FormatCompact(magic.manaCost));
+        SetText(healingTypeText, MagicItemData.FormatHealingType(magic.effectType));
         SetText(healingAmountText, magic.healAmount.ToString());
-        SetText(healingManaCostText, magic.manaCost.ToString("0.##"));
+        SetText(healingManaCostText, MagicItemData.FormatCompact(magic.manaCost));
         UpdateEquipButtonState();
     }
 
@@ -536,11 +536,9 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     private void UpdateMagicTypeSections(MagicItemData magic)
     {
-        bool attack = magic != null && magic.effectType == MagicItemData.MagicEffectType.Damage;
-        bool boost = magic != null && magic.effectType == MagicItemData.MagicEffectType.BoostAttribute;
-        bool healing = magic != null
-                       && (magic.effectType == MagicItemData.MagicEffectType.HealHealth
-                           || magic.effectType == MagicItemData.MagicEffectType.RestoreMana);
+        bool attack = magic != null && magic.IsVisualCategory(MagicItemData.MagicCategory.Attack);
+        bool boost = magic != null && magic.IsVisualCategory(MagicItemData.MagicCategory.Boost);
+        bool healing = magic != null && magic.IsVisualCategory(MagicItemData.MagicCategory.Healing);
 
         SetMagicStatsRoots(attack, boost, healing);
     }
@@ -561,41 +559,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     {
         if (target != null)
             target.text = value ?? string.Empty;
-    }
-
-    private static string FormatBoostAttribute(MagicItemData.BoostAttribute attribute)
-    {
-        switch (attribute)
-        {
-            case MagicItemData.BoostAttribute.Vigor: return "Vigor";
-            case MagicItemData.BoostAttribute.Mind: return "Mind";
-            case MagicItemData.BoostAttribute.Endurance: return "Endurance";
-            case MagicItemData.BoostAttribute.Strength: return "Strength";
-            case MagicItemData.BoostAttribute.Dexterity: return "Dexterity";
-            case MagicItemData.BoostAttribute.Intelligence: return "Intelligence";
-            case MagicItemData.BoostAttribute.Faith: return "Faith";
-            default: return string.Empty;
-        }
-    }
-
-    private static string FormatSignedAmount(int amount)
-    {
-        return amount > 0 ? $"+{amount}" : amount.ToString();
-    }
-
-    private static string FormatDuration(float seconds)
-    {
-        return seconds > 0f ? $"{seconds:0.##}s" : string.Empty;
-    }
-
-    private static string FormatHealingType(MagicItemData.MagicEffectType effectType)
-    {
-        switch (effectType)
-        {
-            case MagicItemData.MagicEffectType.HealHealth: return "Health";
-            case MagicItemData.MagicEffectType.RestoreMana: return "Mana";
-            default: return string.Empty;
-        }
     }
 
     private void UpdateEquipButtonState()

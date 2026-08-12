@@ -39,6 +39,51 @@ public class MagicItemData : ScriptableObject
     public MagicCategory category = MagicCategory.Attack;
     public MagicEffectType effectType = MagicEffectType.Damage;
 
+    public bool IsVisualCategory(MagicCategory visualCategory)
+    {
+        return category == visualCategory;
+    }
+
+    public static string FormatCompact(float value)
+    {
+        return value.ToString("0.##");
+    }
+
+    public static string FormatSignedAmount(int amount)
+    {
+        return amount > 0 ? $"+{amount}" : amount.ToString();
+    }
+
+    public static string FormatBoostAttribute(BoostAttribute attribute)
+    {
+        switch (attribute)
+        {
+            case BoostAttribute.Vigor: return "Vigor";
+            case BoostAttribute.Mind: return "Mind";
+            case BoostAttribute.Endurance: return "Endurance";
+            case BoostAttribute.Strength: return "Strength";
+            case BoostAttribute.Dexterity: return "Dexterity";
+            case BoostAttribute.Intelligence: return "Intelligence";
+            case BoostAttribute.Faith: return "Faith";
+            default: return string.Empty;
+        }
+    }
+
+    public static string FormatDuration(float seconds)
+    {
+        return seconds > 0f ? $"{FormatCompact(seconds)}s" : string.Empty;
+    }
+
+    public static string FormatHealingType(MagicEffectType effectType)
+    {
+        switch (effectType)
+        {
+            case MagicEffectType.HealHealth: return "Health";
+            case MagicEffectType.RestoreMana: return "Mana";
+            default: return string.Empty;
+        }
+    }
+
     [Header("Stats")]
     public int magicDamage = 10;
     public int healAmount = 0;

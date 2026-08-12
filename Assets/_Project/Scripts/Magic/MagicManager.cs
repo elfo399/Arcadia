@@ -23,8 +23,6 @@ public sealed class MagicManager : MonoBehaviour
 
     [Header("Detail")]
     [SerializeField] private GameObject detailRoot;
-    [SerializeField] private Image detailImage;
-    [SerializeField] private TextMeshProUGUI detailTitle;
     [SerializeField] private TextMeshProUGUI scalingText;
     [SerializeField] private TextMeshProUGUI requirementsText;
 
@@ -389,26 +387,24 @@ public sealed class MagicManager : MonoBehaviour
         MagicRecipeData recipe = SelectedRecipe;
         MagicItemData magic = recipe != null ? recipe.resultMagic : null;
         if (detailRoot != null) detailRoot.SetActive(magic != null);
-        if (detailImage != null) detailImage.sprite = magic != null ? magic.icon : null;
-        if (detailTitle != null) detailTitle.text = magic != null ? magic.magicName : string.Empty;
         if (scalingText != null) scalingText.text = magic != null ? magic.scaling : string.Empty;
         if (requirementsText != null) requirementsText.text = magic != null ? magic.GetRequirementsLabel() : string.Empty;
-        bool attack = magic != null && magic.category == MagicItemData.MagicCategory.Attack;
-        bool boost = magic != null && magic.category == MagicItemData.MagicCategory.Boost;
-        bool healing = magic != null && magic.category == MagicItemData.MagicCategory.Healing;
+        bool attack = magic != null && magic.IsVisualCategory(MagicItemData.MagicCategory.Attack);
+        bool boost = magic != null && magic.IsVisualCategory(MagicItemData.MagicCategory.Boost);
+        bool healing = magic != null && magic.IsVisualCategory(MagicItemData.MagicCategory.Healing);
         if (attackRoot != null) attackRoot.SetActive(attack);
         if (boostRoot != null) boostRoot.SetActive(boost);
         if (healingRoot != null) healingRoot.SetActive(healing);
         if (damageText != null) damageText.text = attack ? magic.magicDamage.ToString() : string.Empty;
-        if (criticalText != null) criticalText.text = attack ? magic.criticalHit.ToString("0.##") : string.Empty;
-        if (attackManaCostText != null) attackManaCostText.text = attack ? magic.manaCost.ToString("0.##") : string.Empty;
-        if (boostAttributeText != null) boostAttributeText.text = boost ? magic.boostAttribute.ToString() : string.Empty;
-        if (boostAmountText != null) boostAmountText.text = boost ? magic.boostAmount.ToString() : string.Empty;
-        if (boostDurationText != null) boostDurationText.text = boost ? magic.boostDurationSeconds.ToString("0.##") : string.Empty;
-        if (boostManaCostText != null) boostManaCostText.text = boost ? magic.manaCost.ToString("0.##") : string.Empty;
-        if (healingTypeText != null) healingTypeText.text = healing ? magic.effectType.ToString() : string.Empty;
+        if (criticalText != null) criticalText.text = attack ? MagicItemData.FormatCompact(magic.criticalHit) : string.Empty;
+        if (attackManaCostText != null) attackManaCostText.text = attack ? MagicItemData.FormatCompact(magic.manaCost) : string.Empty;
+        if (boostAttributeText != null) boostAttributeText.text = boost ? MagicItemData.FormatBoostAttribute(magic.boostAttribute) : string.Empty;
+        if (boostAmountText != null) boostAmountText.text = boost ? MagicItemData.FormatSignedAmount(magic.boostAmount) : string.Empty;
+        if (boostDurationText != null) boostDurationText.text = boost ? MagicItemData.FormatDuration(magic.boostDurationSeconds) : string.Empty;
+        if (boostManaCostText != null) boostManaCostText.text = boost ? MagicItemData.FormatCompact(magic.manaCost) : string.Empty;
+        if (healingTypeText != null) healingTypeText.text = healing ? MagicItemData.FormatHealingType(magic.effectType) : string.Empty;
         if (healingAmountText != null) healingAmountText.text = healing ? magic.healAmount.ToString() : string.Empty;
-        if (healingManaCostText != null) healingManaCostText.text = healing ? magic.manaCost.ToString("0.##") : string.Empty;
+        if (healingManaCostText != null) healingManaCostText.text = healing ? MagicItemData.FormatCompact(magic.manaCost) : string.Empty;
         RefreshRequirementsAndAction();
     }
 
