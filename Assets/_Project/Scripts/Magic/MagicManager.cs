@@ -6,9 +6,10 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-public sealed class MagicManager : MonoBehaviour
+public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
 {
-    private enum FocusArea { List, Action }
+    private enum MagicView { Learn, Prepare }
+    private enum FocusArea { LearnList, LearnAction, PrepareList, PrepareSlots }
 
     [Header("Magic UI")]
     [SerializeField] private GameObject magicHud;
@@ -62,22 +63,31 @@ public sealed class MagicManager : MonoBehaviour
     [SerializeField] private DialogueChoiceUI equipMagicRowPrefab;
     [SerializeField] private Transform equipSlotRoot;
     [SerializeField] private InventorySlot equipSlotPrefab;
+    // Editor/bootstrap fallback only; once PlayerStats is available the domain
+    // RunMagicCapacity is the sole gameplay capacity source.
     [SerializeField, Min(0)] private int equipSlotCount = 6;
 
     private readonly List<MagicRecipeData> visibleRecipes = new List<MagicRecipeData>();
     private readonly List<DialogueChoiceUI> recipeRows = new List<DialogueChoiceUI>();
     private readonly List<QuestRewardItemUI> materialRows = new List<QuestRewardItemUI>();
+    private readonly List<MagicRecipeData> preparedRecipeRows = new List<MagicRecipeData>();
+    private readonly List<DialogueChoiceUI> preparedRows = new List<DialogueChoiceUI>();
     private readonly List<InventorySlot> equipSlots = new List<InventorySlot>();
+    private readonly HashSet<string> resolveWarnings = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     private readonly object gameplayLockOwner = new object();
     private PlayerControls controls;
     private Action<InputAction.CallbackContext> confirmCallback;
     private Action<InputAction.CallbackContext> cancelCallback;
     private int selectedRecipeIndex = -1;
+    private int selectedPreparedRecipeIndex = -1;
+    private int armedPreparedRecipeIndex = -1;
+    private int selectedPreparedSlotIndex;
     private int openingFrame = -1;
     private int lastActionActivationFrame = -1;
     private int actionFocusEnteredFrame = -1;
     private float lastNavigationTime = -999f;
-    private FocusArea focusArea = FocusArea.List;
+    private MagicView currentView = MagicView.Learn;
+    private FocusArea focusArea = FocusArea.LearnList;
     private bool isInteractive;
     private bool isClosing;
 
@@ -88,6 +98,8 @@ public sealed class MagicManager : MonoBehaviour
 
     private MagicRecipeData SelectedRecipe => selectedRecipeIndex >= 0 && selectedRecipeIndex < visibleRecipes.Count
         ? visibleRecipes[selectedRecipeIndex] : null;
+    private MagicRecipeData ArmedPreparedRecipe => armedPreparedRecipeIndex >= 0 && armedPreparedRecipeIndex < preparedRecipeRows.Count
+        ? preparedRecipeRows[armedPreparedRecipeIndex] : null;
 
     private void Awake()
     {
@@ -100,18 +112,19 @@ public sealed class MagicManager : MonoBehaviour
 
     private void EnsureEquipSlots()
     {
-        if (equipSlotRoot == null || equipSlotPrefab == null || equipSlotCount <= 0)
+        int capacity = GetRunMagicCapacity();
+        if (equipSlotRoot == null || equipSlotPrefab == null || capacity <= 0)
             return;
 
         if (equipSlots.Count == 0)
             equipSlots.AddRange(equipSlotRoot.GetComponentsInChildren<InventorySlot>(true));
 
-        while (equipSlots.Count < equipSlotCount)
+        while (equipSlots.Count < capacity)
         {
             InventorySlot slot = Instantiate(equipSlotPrefab, equipSlotRoot);
             slot.name = $"Magic Slot {equipSlots.Count + 1}";
-            slot.Init(equipSlots.Count, null);
-            slot.SetDisplayOnly(true);
+            slot.Init(equipSlots.Count, this);
+            slot.SetDisplayOnly(false);
             slot.Clear();
             slot.gameObject.SetActive(true);
             equipSlots.Add(slot);
@@ -120,13 +133,24 @@ public sealed class MagicManager : MonoBehaviour
         for (int i = 0; i < equipSlots.Count; i++)
         {
             if (equipSlots[i] != null)
-                equipSlots[i].gameObject.SetActive(i < equipSlotCount);
+            {
+                equipSlots[i].Init(i, this);
+                equipSlots[i].SetDisplayOnly(false);
+                equipSlots[i].gameObject.SetActive(i < capacity);
+            }
         }
     }
 
     private void OnDestroy()
     {
         if (actionButton != null) actionButton.onClick.RemoveListener(OnActionButtonClicked);
+    }
+
+    private void Start()
+    {
+        // Enforce the run-loadout rule also for any legacy physical magic
+        // restored before the magic UI is opened.
+        RefreshPreparedMagicState();
     }
 
     private void OnDisable()
@@ -138,6 +162,7 @@ public sealed class MagicManager : MonoBehaviour
         isClosing = false;
         ActiveContext = null;
         ClearRows();
+        ClearPreparedRows();
         if (magicHud != null) magicHud.SetActive(false);
     }
 
@@ -161,12 +186,12 @@ public sealed class MagicManager : MonoBehaviour
         IsOpen = true;
         isClosing = false;
         isInteractive = false;
-        focusArea = FocusArea.List;
+        focusArea = FocusArea.LearnList;
         openingFrame = Time.frameCount;
         playerController.AcquireGameplayInputLock(gameplayLockOwner);
         SubscribeInput();
         if (magicHud != null) magicHud.SetActive(true);
-        RefreshRecipeList();
+        SetMagicView(MagicView.Learn, refresh: true, focus: true);
         isInteractive = true;
         return true;
     }
@@ -181,6 +206,7 @@ public sealed class MagicManager : MonoBehaviour
         if (EventSystem.current != null && IsOwnedSelection(EventSystem.current.currentSelectedGameObject))
             EventSystem.current.SetSelectedGameObject(null);
         ClearRows();
+        ClearPreparedRows();
         if (magicHud != null) magicHud.SetActive(false);
         if (playerController != null) playerController.ReleaseGameplayInputLock(gameplayLockOwner);
         ActiveContext = null;
@@ -192,8 +218,20 @@ public sealed class MagicManager : MonoBehaviour
     {
         if (!IsOpen || !isInteractive || controls == null || Time.unscaledTime < lastNavigationTime + 0.20f) return;
         Vector2 move = controls.Player.Move.ReadValue<Vector2>();
+        if (Mathf.Abs(move.x) > 0.5f)
+        {
+            HandleHorizontalNavigation(move.x > 0.5f ? 1 : -1);
+            lastNavigationTime = Time.unscaledTime;
+            return;
+        }
+
         if (Mathf.Abs(move.y) <= 0.5f) return;
-        MoveRecipeFocus(move.y > 0.5f ? -1 : 1);
+        if (focusArea == FocusArea.PrepareList)
+            MovePreparedRecipeFocus(move.y > 0.5f ? -1 : 1);
+        else if (focusArea == FocusArea.PrepareSlots)
+            SetPreparedSlotFocus(selectedPreparedSlotIndex + (move.y > 0.5f ? -1 : 1));
+        else
+            MoveRecipeFocus(move.y > 0.5f ? -1 : 1);
         lastNavigationTime = Time.unscaledTime;
     }
 
@@ -262,24 +300,149 @@ public sealed class MagicManager : MonoBehaviour
         for (int i = 0; i < recipes.Count; i++)
         {
             MagicRecipeData recipe = recipes[i];
-            if (recipe == null || recipe.resultMagic == null || string.IsNullOrWhiteSpace(recipe.recipeId)
-                || !playerStats.KnowsMagicRecipe(recipe.recipeId) || !ids.Add(recipe.recipeId.Trim()))
+            if (recipe == null || recipe.resultMagic == null || string.IsNullOrWhiteSpace(recipe.recipeId))
+                continue;
+            if (!ids.Add(recipe.recipeId.Trim()))
+                continue;
+            if (ResolvePlayerStats()?.KnowsMagicRecipe(recipe.recipeId) != true)
                 continue;
             result.Add(recipe.resultMagic);
         }
         return result;
     }
 
-    public bool SetRunMagicAtSlot(int slot, MagicRecipeData recipe)
+    /// <summary>
+    /// Returns the six run-preparation entries in their authoritative domain order.
+    /// Null entries are empty or stale selections; no physical InventoryItem is created.
+    /// </summary>
+    public MagicItemData[] GetPreparedMagicLayout()
     {
-        return recipe != null && playerStats != null && recipe.resultMagic != null
-            && playerStats.KnowsMagicRecipe(recipe.recipeId)
-            && playerStats.SetRunMagicAtSlot(slot, recipe.recipeId);
+        int capacity = GetRunMagicCapacity();
+        var result = new MagicItemData[capacity];
+        PlayerStats stats = ResolvePlayerStats();
+        if (stats == null)
+            return result;
+
+        string[] selection = stats.GetRunMagicSelection();
+        int count = Mathf.Min(capacity, selection != null ? selection.Length : 0);
+        for (int i = 0; i < count; i++)
+        {
+            if (string.IsNullOrWhiteSpace(selection[i]))
+                continue;
+
+            if (TryResolvePreparedRecipe(selection[i], out MagicRecipeData recipe))
+            {
+                result[i] = recipe.resultMagic;
+                continue;
+            }
+
+            // Legacy or malformed selection: remove only the invalid run entry.
+            stats.RemoveRunMagicAtSlot(i);
+        }
+
+        return result;
     }
 
-    public bool RemoveRunMagicAtSlot(int slot) => playerStats != null && playerStats.RemoveRunMagicAtSlot(slot);
-    public string[] GetRunMagicSelection() => playerStats != null ? playerStats.GetRunMagicSelection() : Array.Empty<string>();
-    public void ClearRunMagicSelection() => playerStats?.ClearRunMagicSelection();
+    public bool IsMagicPrepared(MagicItemData magic)
+    {
+        if (magic == null)
+            return false;
+
+        MagicItemData[] layout = GetPreparedMagicLayout();
+        for (int i = 0; i < layout.Length; i++)
+            if (layout[i] == magic)
+                return true;
+        return false;
+    }
+
+    public int GetRunMagicCapacity()
+    {
+        PlayerStats stats = ResolvePlayerStats();
+        return stats != null ? Mathf.Max(0, stats.RunMagicCapacity) : Mathf.Max(0, equipSlotCount);
+    }
+
+    public bool SetRunMagicAtSlot(int slot, MagicRecipeData recipe)
+    {
+        PlayerStats stats = ResolvePlayerStats();
+        bool changed = recipe != null && stats != null && recipe.resultMagic != null
+            && stats.KnowsMagicRecipe(recipe.recipeId)
+            && stats.SetRunMagicAtSlot(slot, recipe.recipeId);
+        if (changed)
+            RefreshPreparedMagicState();
+        return changed;
+    }
+
+    public bool RemoveRunMagicAtSlot(int slot)
+    {
+        PlayerStats stats = ResolvePlayerStats();
+        bool changed = stats != null && stats.RemoveRunMagicAtSlot(slot);
+        if (changed)
+            RefreshPreparedMagicState();
+        return changed;
+    }
+
+    public string[] GetRunMagicSelection()
+    {
+        PlayerStats stats = ResolvePlayerStats();
+        return stats != null ? stats.GetRunMagicSelection() : Array.Empty<string>();
+    }
+
+    public void ClearRunMagicSelection()
+    {
+        ResolvePlayerStats()?.ClearRunMagicSelection();
+        RefreshPreparedMagicState();
+    }
+
+    private PlayerStats ResolvePlayerStats()
+    {
+        return playerStats != null ? playerStats : PlayerStats.instance;
+    }
+
+    private PlayerInventory ResolvePlayerInventory()
+    {
+        if (playerInventory != null)
+            return playerInventory;
+
+        PlayerStats stats = ResolvePlayerStats();
+        return stats != null ? stats.GetComponent<PlayerInventory>() : null;
+    }
+
+    private bool TryResolvePreparedRecipe(string recipeId, out MagicRecipeData recipe)
+    {
+        recipe = null;
+        if (string.IsNullOrWhiteSpace(recipeId) || recipes == null)
+            return false;
+
+        string normalized = recipeId.Trim();
+        for (int i = 0; i < recipes.Count; i++)
+        {
+            MagicRecipeData candidate = recipes[i];
+            if (candidate == null || string.IsNullOrWhiteSpace(candidate.recipeId)
+                || !string.Equals(candidate.recipeId.Trim(), normalized, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            PlayerStats stats = ResolvePlayerStats();
+            if (candidate.resultMagic == null || stats == null || !stats.KnowsMagicRecipe(candidate.recipeId))
+                break;
+
+            recipe = candidate;
+            return true;
+        }
+
+        if (resolveWarnings.Add(normalized))
+            Debug.LogWarning($"[MagicManager] Run magic selection non risolvibile: '{normalized}'. L'entry viene rimossa.", this);
+        return false;
+    }
+
+    private void RefreshPreparedMagicState()
+    {
+        PlayerInventory inventory = ResolvePlayerInventory();
+        if (inventory != null)
+            inventory.ValidateMagicLoadoutAgainstPrepared(GetPreparedMagicLayout());
+
+        if (IsOpen && currentView == MagicView.Prepare)
+            RefreshPrepareView();
+    }
 
     public bool CanConvertMagicToBlueprintFragment(string instanceId)
     {
@@ -402,11 +565,203 @@ public sealed class MagicManager : MonoBehaviour
         return recipe != null && recipe.resultMagic != null && !string.IsNullOrWhiteSpace(recipe.recipeId) && IsRecipeAvailable(recipe);
     }
 
+    public void ShowLearnView()
+    {
+        if (IsOpen)
+            SetMagicView(MagicView.Learn, refresh: true, focus: true);
+    }
+
+    public void ShowPrepareView()
+    {
+        if (IsOpen)
+            SetMagicView(MagicView.Prepare, refresh: true, focus: true);
+    }
+
+    private void SetMagicView(MagicView view, bool refresh, bool focus)
+    {
+        if (EventSystem.current != null && IsOwnedSelection(EventSystem.current.currentSelectedGameObject))
+            EventSystem.current.SetSelectedGameObject(null);
+
+        currentView = view;
+        if (learnRoot != null) learnRoot.SetActive(view == MagicView.Learn);
+        if (equipRoot != null) equipRoot.SetActive(view == MagicView.Prepare);
+
+        if (view == MagicView.Learn)
+        {
+            ClearPreparedRows();
+            preparedRecipeRows.Clear();
+            armedPreparedRecipeIndex = -1;
+            selectedPreparedRecipeIndex = -1;
+            if (refresh) RefreshRecipeList();
+            if (focus) SetRecipeFocus(selectedRecipeIndex < 0 ? 0 : selectedRecipeIndex);
+            return;
+        }
+
+        ClearRows();
+        if (refresh) RefreshPrepareView();
+        if (focus) SetPreparedRecipeFocus(selectedPreparedRecipeIndex < 0 ? 0 : selectedPreparedRecipeIndex, toggleArmed: false);
+    }
+
+    private void HandleHorizontalNavigation(int direction)
+    {
+        if (currentView == MagicView.Learn)
+        {
+            if (direction > 0)
+                SetMagicView(MagicView.Prepare, refresh: true, focus: true);
+            return;
+        }
+
+        if (focusArea == FocusArea.PrepareSlots)
+        {
+            if (direction < 0)
+                FocusPreparedList();
+            return;
+        }
+
+        if (direction < 0)
+            SetMagicView(MagicView.Learn, refresh: true, focus: true);
+        else
+            FocusPreparedSlots();
+    }
+
+    private void RefreshPrepareView()
+    {
+        EnsureEquipSlots();
+        RefreshPreparedRecipeRows();
+        RefreshPreparedSlots();
+    }
+
+    private void RefreshPreparedRecipeRows()
+    {
+        int previousFocus = selectedPreparedRecipeIndex;
+        ClearPreparedRows();
+        preparedRecipeRows.Clear();
+
+        PlayerStats stats = ResolvePlayerStats();
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < recipes.Count; i++)
+        {
+            MagicRecipeData recipe = recipes[i];
+            if (recipe == null || recipe.resultMagic == null || string.IsNullOrWhiteSpace(recipe.recipeId))
+                continue;
+
+            if (!ids.Add(recipe.recipeId.Trim()))
+            {
+                Debug.LogWarning($"[MagicManager] Recipe ID duplicato ignorato in PREPARA: '{recipe.recipeId}'.", this);
+                continue;
+            }
+            if (stats == null || !stats.KnowsMagicRecipe(recipe.recipeId))
+                continue;
+
+            preparedRecipeRows.Add(recipe);
+        }
+
+        for (int i = 0; i < preparedRecipeRows.Count && equipMagicListRoot != null && equipMagicRowPrefab != null; i++)
+        {
+            int index = i;
+            DialogueChoiceUI row = Instantiate(equipMagicRowPrefab, equipMagicListRoot, false);
+            row.name = "PreparedMagic_" + i.ToString("00");
+            row.gameObject.SetActive(true);
+            row.Bind(GetRecipeName(preparedRecipeRows[i]), true, false);
+            Navigation navigation = row.Button.navigation;
+            navigation.mode = Navigation.Mode.None;
+            row.Button.navigation = navigation;
+            row.Button.onClick.AddListener(() => SetPreparedRecipeFocus(index, toggleArmed: true));
+            preparedRows.Add(row);
+        }
+
+        selectedPreparedRecipeIndex = preparedRecipeRows.Count == 0
+            ? -1
+            : Mathf.Clamp(previousFocus < 0 ? 0 : previousFocus, 0, preparedRecipeRows.Count - 1);
+        if (armedPreparedRecipeIndex >= preparedRecipeRows.Count)
+            armedPreparedRecipeIndex = -1;
+    }
+
+    private void RefreshPreparedSlots()
+    {
+        EnsureEquipSlots();
+        MagicItemData[] layout = GetPreparedMagicLayout();
+        int capacity = layout.Length;
+        selectedPreparedSlotIndex = capacity == 0 ? -1 : Mathf.Clamp(selectedPreparedSlotIndex, 0, capacity - 1);
+
+        for (int i = 0; i < equipSlots.Count; i++)
+        {
+            InventorySlot slot = equipSlots[i];
+            if (slot == null) continue;
+
+            bool active = i < capacity;
+            slot.gameObject.SetActive(active);
+            if (!active) continue;
+
+            MagicItemData magic = layout[i];
+            if (magic != null)
+                slot.Setup(magic.icon, 1);
+            else
+                slot.Clear();
+            slot.SetFocused(focusArea == FocusArea.PrepareSlots && i == selectedPreparedSlotIndex);
+        }
+    }
+
+    private void SetPreparedRecipeFocus(int index, bool toggleArmed)
+    {
+        if (preparedRecipeRows.Count == 0)
+        {
+            selectedPreparedRecipeIndex = -1;
+            armedPreparedRecipeIndex = -1;
+            return;
+        }
+
+        index = (index % preparedRecipeRows.Count + preparedRecipeRows.Count) % preparedRecipeRows.Count;
+        if (toggleArmed)
+            armedPreparedRecipeIndex = armedPreparedRecipeIndex == index ? -1 : index;
+
+        selectedPreparedRecipeIndex = index;
+        focusArea = FocusArea.PrepareList;
+        if (EventSystem.current != null && index < preparedRows.Count)
+            EventSystem.current.SetSelectedGameObject(preparedRows[index].gameObject);
+        RefreshPreparedSlots();
+    }
+
+    private void MovePreparedRecipeFocus(int direction)
+    {
+        if (preparedRecipeRows.Count > 0)
+            SetPreparedRecipeFocus(selectedPreparedRecipeIndex + direction, toggleArmed: false);
+    }
+
+    private void FocusPreparedList()
+    {
+        focusArea = FocusArea.PrepareList;
+        SetPreparedRecipeFocus(selectedPreparedRecipeIndex < 0 ? 0 : selectedPreparedRecipeIndex, toggleArmed: false);
+    }
+
+    private void FocusPreparedSlots()
+    {
+        if (equipSlots.Count == 0)
+            return;
+        focusArea = FocusArea.PrepareSlots;
+        SetPreparedSlotFocus(selectedPreparedSlotIndex < 0 ? 0 : selectedPreparedSlotIndex);
+    }
+
+    private void SetPreparedSlotFocus(int index)
+    {
+        int capacity = GetRunMagicCapacity();
+        if (capacity <= 0)
+            return;
+
+        selectedPreparedSlotIndex = (index % capacity + capacity) % capacity;
+        focusArea = FocusArea.PrepareSlots;
+        for (int i = 0; i < equipSlots.Count; i++)
+            if (equipSlots[i] != null)
+                equipSlots[i].SetFocused(i == selectedPreparedSlotIndex);
+        if (EventSystem.current != null && selectedPreparedSlotIndex < equipSlots.Count && equipSlots[selectedPreparedSlotIndex] != null)
+            EventSystem.current.SetSelectedGameObject(equipSlots[selectedPreparedSlotIndex].gameObject);
+    }
+
     private void SetRecipeFocus(int index)
     {
         if (visibleRecipes.Count == 0) { selectedRecipeIndex = -1; RefreshSelectedRecipe(); return; }
         selectedRecipeIndex = (index % visibleRecipes.Count + visibleRecipes.Count) % visibleRecipes.Count;
-        focusArea = FocusArea.List;
+        focusArea = FocusArea.LearnList;
         actionFocusEnteredFrame = -1;
         RefreshSelectedRecipe();
         if (EventSystem.current != null && selectedRecipeIndex < recipeRows.Count)
@@ -495,14 +850,38 @@ public sealed class MagicManager : MonoBehaviour
     private void OnConfirmPerformed(InputAction.CallbackContext _)
     {
         if (!IsOpen || !isInteractive || Time.frameCount == openingFrame) return;
-        if (focusArea == FocusArea.Action)
+        if (focusArea == FocusArea.LearnAction)
         {
             if (actionButton != null && actionButton.interactable) OnActionButtonClicked();
             return;
         }
+
+        if (focusArea == FocusArea.PrepareList)
+        {
+            if (selectedPreparedRecipeIndex < 0)
+                return;
+
+            if (armedPreparedRecipeIndex == selectedPreparedRecipeIndex)
+            {
+                armedPreparedRecipeIndex = -1;
+                RefreshPreparedSlots();
+                return;
+            }
+
+            armedPreparedRecipeIndex = selectedPreparedRecipeIndex;
+            FocusPreparedSlots();
+            return;
+        }
+
+        if (focusArea == FocusArea.PrepareSlots)
+        {
+            ApplyPreparedSlotSelection(selectedPreparedSlotIndex);
+            return;
+        }
+
         if (actionButton != null && actionButton.gameObject.activeInHierarchy)
         {
-            focusArea = FocusArea.Action;
+            focusArea = FocusArea.LearnAction;
             actionFocusEnteredFrame = Time.frameCount;
             EventSystem.current?.SetSelectedGameObject(actionButton.gameObject);
         }
@@ -511,12 +890,62 @@ public sealed class MagicManager : MonoBehaviour
     private void OnCancelPerformed(InputAction.CallbackContext _)
     {
         if (!IsOpen || !isInteractive) return;
-        if (focusArea == FocusArea.Action && Time.frameCount != actionFocusEnteredFrame)
+        if (focusArea == FocusArea.LearnAction && Time.frameCount != actionFocusEnteredFrame)
         {
             SetRecipeFocus(selectedRecipeIndex);
             return;
         }
+
+        if (focusArea == FocusArea.PrepareSlots)
+        {
+            FocusPreparedList();
+            return;
+        }
+
+        if (focusArea == FocusArea.PrepareList)
+        {
+            SetMagicView(MagicView.Learn, refresh: true, focus: true);
+            return;
+        }
+
         CloseMagic();
+    }
+
+    public void HandleSlotPointerDown(int index)
+    {
+        if (IsOpen && currentView == MagicView.Prepare)
+            ApplyPreparedSlotSelection(index);
+    }
+
+    public void HandleSlotBeginDrag(int index, PointerEventData eventData) { }
+    public void HandleSlotDrag(PointerEventData eventData) { }
+    public void HandleSlotEndDrag() { }
+    public void HandleSlotDrop(int targetIndex) { }
+
+    public void HandleSlotSelected(int index)
+    {
+        if (IsOpen && currentView == MagicView.Prepare)
+            SetPreparedSlotFocus(index);
+    }
+
+    public void HandleSlotSubmit(int index)
+    {
+        if (IsOpen && currentView == MagicView.Prepare)
+            ApplyPreparedSlotSelection(index);
+    }
+
+    private void ApplyPreparedSlotSelection(int slotIndex)
+    {
+        int capacity = GetRunMagicCapacity();
+        if (slotIndex < 0 || slotIndex >= capacity)
+            return;
+
+        SetPreparedSlotFocus(slotIndex);
+        MagicRecipeData recipe = ArmedPreparedRecipe;
+        if (recipe != null)
+            SetRunMagicAtSlot(slotIndex, recipe);
+        else
+            RemoveRunMagicAtSlot(slotIndex);
     }
 
     private void SubscribeInput()
@@ -542,6 +971,26 @@ public sealed class MagicManager : MonoBehaviour
         recipeRows.Clear();
     }
 
+    private void ClearPreparedRows()
+    {
+        if (EventSystem.current != null)
+        {
+            GameObject selected = EventSystem.current.currentSelectedGameObject;
+            for (int i = 0; i < preparedRows.Count; i++)
+            {
+                if (preparedRows[i] != null && selected == preparedRows[i].gameObject)
+                {
+                    EventSystem.current.SetSelectedGameObject(null);
+                    break;
+                }
+            }
+        }
+
+        for (int i = 0; i < preparedRows.Count; i++)
+            if (preparedRows[i] != null) Destroy(preparedRows[i].gameObject);
+        preparedRows.Clear();
+    }
+
     private void ClearMaterialRows()
     {
         for (int i = 0; i < materialRows.Count; i++)
@@ -555,6 +1004,10 @@ public sealed class MagicManager : MonoBehaviour
         if (actionButton != null && selected == actionButton.gameObject) return true;
         for (int i = 0; i < recipeRows.Count; i++)
             if (recipeRows[i] != null && selected == recipeRows[i].gameObject) return true;
+        for (int i = 0; i < preparedRows.Count; i++)
+            if (preparedRows[i] != null && selected == preparedRows[i].gameObject) return true;
+        for (int i = 0; i < equipSlots.Count; i++)
+            if (equipSlots[i] != null && selected == equipSlots[i].gameObject) return true;
         return false;
     }
 

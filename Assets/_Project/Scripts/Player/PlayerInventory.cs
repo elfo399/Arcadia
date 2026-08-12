@@ -747,6 +747,55 @@ public class PlayerInventory : MonoBehaviour
         SyncEquippedReferences();
     }
 
+    /// <summary>
+    /// Equips a magic selected by RunMagicSelectionState. Prepared magic is
+    /// knowledge/loadout state, therefore it deliberately carries no physical
+    /// inventory instance id.
+    /// </summary>
+    public void SetPreparedMagicAtSlot(int slot, MagicItemData magic)
+    {
+        EnsureLoadoutSize();
+        slot = Mathf.Clamp(slot, 0, magicLoadout.Length - 1);
+        magicLoadout[slot] = magic;
+        magicInstanceIds[slot] = null;
+        currentMagicIndex = slot;
+        SyncEquippedReferences();
+    }
+
+    /// <summary>
+    /// Clears only equipped combat magic that is no longer present in the
+    /// authoritative prepared-magic layout. Physical magic loot is untouched.
+    /// </summary>
+    public void ValidateMagicLoadoutAgainstPrepared(IReadOnlyList<MagicItemData> preparedMagic)
+    {
+        EnsureLoadoutSize();
+        bool changed = false;
+        for (int i = 0; i < magicLoadout.Length; i++)
+        {
+            MagicItemData equipped = magicLoadout[i];
+            if (equipped == null || ContainsMagic(preparedMagic, equipped))
+                continue;
+
+            magicLoadout[i] = null;
+            magicInstanceIds[i] = null;
+            changed = true;
+        }
+
+        if (changed)
+            SyncEquippedReferences();
+    }
+
+    private static bool ContainsMagic(IReadOnlyList<MagicItemData> source, MagicItemData magic)
+    {
+        if (source == null || magic == null)
+            return false;
+
+        for (int i = 0; i < source.Count; i++)
+            if (source[i] == magic)
+                return true;
+        return false;
+    }
+
     public bool CycleRightWeapon(int direction = 1)
     {
         EnsureLoadoutSize();
