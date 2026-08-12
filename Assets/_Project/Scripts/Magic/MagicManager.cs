@@ -55,9 +55,19 @@ public sealed class MagicManager : MonoBehaviour
     [SerializeField] private Button actionButton;
     [SerializeField] private TextMeshProUGUI actionButtonLabel;
 
+    [Header("Equip Magic Layout")]
+    [SerializeField] private GameObject learnRoot;
+    [SerializeField] private GameObject equipRoot;
+    [SerializeField] private Transform equipMagicListRoot;
+    [SerializeField] private DialogueChoiceUI equipMagicRowPrefab;
+    [SerializeField] private Transform equipSlotRoot;
+    [SerializeField] private InventorySlot equipSlotPrefab;
+    [SerializeField, Min(0)] private int equipSlotCount = 6;
+
     private readonly List<MagicRecipeData> visibleRecipes = new List<MagicRecipeData>();
     private readonly List<DialogueChoiceUI> recipeRows = new List<DialogueChoiceUI>();
     private readonly List<QuestRewardItemUI> materialRows = new List<QuestRewardItemUI>();
+    private readonly List<InventorySlot> equipSlots = new List<InventorySlot>();
     private readonly object gameplayLockOwner = new object();
     private PlayerControls controls;
     private Action<InputAction.CallbackContext> confirmCallback;
@@ -85,6 +95,33 @@ public sealed class MagicManager : MonoBehaviour
         cancelCallback = OnCancelPerformed;
         if (magicHud != null) magicHud.SetActive(false);
         if (actionButton != null) actionButton.onClick.AddListener(OnActionButtonClicked);
+        EnsureEquipSlots();
+    }
+
+    private void EnsureEquipSlots()
+    {
+        if (equipSlotRoot == null || equipSlotPrefab == null || equipSlotCount <= 0)
+            return;
+
+        if (equipSlots.Count == 0)
+            equipSlots.AddRange(equipSlotRoot.GetComponentsInChildren<InventorySlot>(true));
+
+        while (equipSlots.Count < equipSlotCount)
+        {
+            InventorySlot slot = Instantiate(equipSlotPrefab, equipSlotRoot);
+            slot.name = $"Magic Slot {equipSlots.Count + 1}";
+            slot.Init(equipSlots.Count, null);
+            slot.SetDisplayOnly(true);
+            slot.Clear();
+            slot.gameObject.SetActive(true);
+            equipSlots.Add(slot);
+        }
+
+        for (int i = 0; i < equipSlots.Count; i++)
+        {
+            if (equipSlots[i] != null)
+                equipSlots[i].gameObject.SetActive(i < equipSlotCount);
+        }
     }
 
     private void OnDestroy()
