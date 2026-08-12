@@ -25,26 +25,27 @@ public sealed class MagicManager : MonoBehaviour
     [SerializeField] private GameObject detailRoot;
     [SerializeField] private Image detailImage;
     [SerializeField] private TextMeshProUGUI detailTitle;
-    [SerializeField] private TextMeshProUGUI detailDescription;
     [SerializeField] private TextMeshProUGUI scalingText;
     [SerializeField] private TextMeshProUGUI requirementsText;
-    [SerializeField] private TextMeshProUGUI manaCostText;
 
     [Header("Attack")]
     [SerializeField] private GameObject attackRoot;
     [SerializeField] private TextMeshProUGUI damageText;
     [SerializeField] private TextMeshProUGUI criticalText;
+    [SerializeField] private TextMeshProUGUI attackManaCostText;
 
     [Header("Boost")]
     [SerializeField] private GameObject boostRoot;
     [SerializeField] private TextMeshProUGUI boostAttributeText;
     [SerializeField] private TextMeshProUGUI boostAmountText;
     [SerializeField] private TextMeshProUGUI boostDurationText;
+    [SerializeField] private TextMeshProUGUI boostManaCostText;
 
     [Header("Healing")]
     [SerializeField] private GameObject healingRoot;
     [SerializeField] private TextMeshProUGUI healingTypeText;
     [SerializeField] private TextMeshProUGUI healingAmountText;
+    [SerializeField] private TextMeshProUGUI healingManaCostText;
 
     [Header("Requirements")]
     [SerializeField] private Transform materialsRoot;
@@ -390,10 +391,8 @@ public sealed class MagicManager : MonoBehaviour
         if (detailRoot != null) detailRoot.SetActive(magic != null);
         if (detailImage != null) detailImage.sprite = magic != null ? magic.icon : null;
         if (detailTitle != null) detailTitle.text = magic != null ? magic.magicName : string.Empty;
-        if (detailDescription != null) detailDescription.text = magic != null ? magic.description : string.Empty;
         if (scalingText != null) scalingText.text = magic != null ? magic.scaling : string.Empty;
         if (requirementsText != null) requirementsText.text = magic != null ? magic.GetRequirementsLabel() : string.Empty;
-        if (manaCostText != null) manaCostText.text = magic != null ? magic.manaCost.ToString("0.##") : string.Empty;
         bool attack = magic != null && magic.category == MagicItemData.MagicCategory.Attack;
         bool boost = magic != null && magic.category == MagicItemData.MagicCategory.Boost;
         bool healing = magic != null && magic.category == MagicItemData.MagicCategory.Healing;
@@ -402,11 +401,14 @@ public sealed class MagicManager : MonoBehaviour
         if (healingRoot != null) healingRoot.SetActive(healing);
         if (damageText != null) damageText.text = attack ? magic.magicDamage.ToString() : string.Empty;
         if (criticalText != null) criticalText.text = attack ? magic.criticalHit.ToString("0.##") : string.Empty;
+        if (attackManaCostText != null) attackManaCostText.text = attack ? magic.manaCost.ToString("0.##") : string.Empty;
         if (boostAttributeText != null) boostAttributeText.text = boost ? magic.boostAttribute.ToString() : string.Empty;
         if (boostAmountText != null) boostAmountText.text = boost ? magic.boostAmount.ToString() : string.Empty;
         if (boostDurationText != null) boostDurationText.text = boost ? magic.boostDurationSeconds.ToString("0.##") : string.Empty;
+        if (boostManaCostText != null) boostManaCostText.text = boost ? magic.manaCost.ToString("0.##") : string.Empty;
         if (healingTypeText != null) healingTypeText.text = healing ? magic.effectType.ToString() : string.Empty;
         if (healingAmountText != null) healingAmountText.text = healing ? magic.healAmount.ToString() : string.Empty;
+        if (healingManaCostText != null) healingManaCostText.text = healing ? magic.manaCost.ToString("0.##") : string.Empty;
         RefreshRequirementsAndAction();
     }
 
