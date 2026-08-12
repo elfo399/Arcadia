@@ -279,6 +279,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         if (!playerInventory.TryEquipMagicInventorySlot(slotIndex, targetIndex))
             return;
 
+        RefreshMagicInventory();
         equipmentManager?.RefreshEquipmentCross();
         equipmentManager.CloseEquipGrid();
     }
@@ -321,7 +322,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         for (int i = 0; i < slots.Count; i++)
         {
             if (i < currentMagic.Count && currentMagic[i] != null)
-                slots[i].Setup(currentMagic[i].icon, 1, IsMagicEquipped(currentMagic[i]));
+                slots[i].Setup(currentMagic[i].icon, 1, playerInventory != null && playerInventory.IsMagicInventorySlotEquipped(i));
             else
                 slots[i].Clear();
 
@@ -545,17 +546,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         return equipButton != null
                && equipButton.gameObject.activeInHierarchy
                && equipButton.interactable;
-    }
-
-    private bool IsMagicEquipped(MagicItemData magic)
-    {
-        if (playerInventory == null || magic == null || playerInventory.magicLoadout == null)
-            return false;
-
-        for (int i = 0; i < playerInventory.magicLoadout.Length; i++)
-            if (playerInventory.magicLoadout[i] == magic)
-                return true;
-        return false;
     }
 
     private void CreateDragPreview(Sprite icon, PointerEventData eventData, Vector2 iconSize)

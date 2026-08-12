@@ -83,6 +83,9 @@ public class PlayerInventory : MonoBehaviour
     public int MagicInventoryCapacity => Mathf.Max(1, magicInventoryCapacity);
     public int NormalUsedSlots => CountUsedSlots(magic: false);
     public int MagicUsedSlots => CountOccupiedMagicInventorySlots();
+    public IReadOnlyList<MagicRecipeData> MagicRecipes => itemDatabase != null
+        ? itemDatabase.MagicRecipes
+        : System.Array.Empty<MagicRecipeData>();
     public bool IsInitialized { get; private set; }
     private ItemDatabase cachedLookupDatabase;
     private (Dictionary<string, WeaponItem> weapons, Dictionary<string, MagicItemData> magics, Dictionary<string, ArmorItemData> armors, Dictionary<string, UsableItemData> usables, Dictionary<string, ItemData> items) cachedAssetLookups;
@@ -719,6 +722,8 @@ public class PlayerInventory : MonoBehaviour
         slot = Mathf.Clamp(slot, 0, magicLoadout.Length - 1);
         if (magic != null && !IsMagicInInventoryLayout(magic, instanceId))
             return;
+        if (magic != null)
+            ClearOtherCombatMagicSlotsForFoundInstance(instanceId, slot);
         MoveMagicWithInventorySync(magic, instanceId, magicLoadout, magicInstanceIds, slot);
         currentMagicIndex = slot;
         SyncEquippedReferences();
@@ -752,6 +757,8 @@ public class PlayerInventory : MonoBehaviour
         slot = Mathf.Clamp(slot, 0, magicLoadout.Length - 1);
         if (magic != null && !IsMagicInInventoryLayout(magic, instanceId))
             return;
+        if (magic != null)
+            ClearOtherCombatMagicSlotsForFoundInstance(instanceId, slot);
         magicLoadout[slot] = magic;
         magicInstanceIds[slot] = string.IsNullOrWhiteSpace(instanceId) ? null : instanceId;
         currentMagicIndex = slot;
@@ -765,8 +772,13 @@ public class PlayerInventory : MonoBehaviour
             return false;
 
         MagicInventorySlotView source = layout[inventorySlot];
+        if (source.Source == MagicInventorySlotSource.Found && string.IsNullOrWhiteSpace(source.InstanceId))
+            return false;
+
         EnsureLoadoutSize();
         combatSlot = Mathf.Clamp(combatSlot, 0, magicLoadout.Length - 1);
+        if (source.Source == MagicInventorySlotSource.Found)
+            ClearOtherCombatMagicSlotsForFoundInstance(source.InstanceId, combatSlot);
         magicLoadout[combatSlot] = source.Magic;
         magicInstanceIds[combatSlot] = source.Source == MagicInventorySlotSource.Found ? source.InstanceId : null;
         currentMagicIndex = combatSlot;
@@ -781,10 +793,14 @@ public class PlayerInventory : MonoBehaviour
 
         EnsureLoadoutSize();
         bool changed = false;
+        var equippedFoundInstances = new HashSet<string>(System.StringComparer.Ordinal);
         for (int i = 0; i < magicLoadout.Length; i++)
         {
             MagicItemData equipped = magicLoadout[i];
-            if (equipped == null || IsMagicInLayout(layout, equipped, magicInstanceIds[i]))
+            string instanceId = magicInstanceIds[i];
+            bool duplicateFoundInstance = !string.IsNullOrWhiteSpace(instanceId)
+                && !equippedFoundInstances.Add(instanceId);
+            if (equipped == null || (!duplicateFoundInstance && IsMagicInLayout(layout, equipped, instanceId)))
                 continue;
 
             magicLoadout[i] = null;
@@ -1133,6 +1149,32 @@ public class PlayerInventory : MonoBehaviour
         return true;
     }
 
+    public bool IsMagicInventorySlotEquipped(int inventorySlot)
+    {
+        if (!TryGetMagicInventoryLayout(out MagicInventorySlotView[] layout)
+            || inventorySlot < 0 || inventorySlot >= layout.Length || layout[inventorySlot].Magic == null)
+            return false;
+
+        MagicInventorySlotView entry = layout[inventorySlot];
+        EnsureLoadoutSize();
+        for (int i = 0; i < magicLoadout.Length; i++)
+        {
+            if (magicLoadout[i] != entry.Magic)
+                continue;
+
+            if (entry.Source == MagicInventorySlotSource.Found
+                && !string.IsNullOrWhiteSpace(entry.InstanceId)
+                && string.Equals(magicInstanceIds[i], entry.InstanceId, System.StringComparison.Ordinal))
+                return true;
+
+            if (entry.Source == MagicInventorySlotSource.Prepared
+                && string.IsNullOrWhiteSpace(magicInstanceIds[i]))
+                return true;
+        }
+
+        return false;
+    }
+
     public bool TrySetPreparedMagicAtSlot(int slotIndex, string recipeId, System.Func<string, bool> learnedResolver)
     {
         SyncMagicInventoryLayout();
@@ -1364,6 +1406,21 @@ public class PlayerInventory : MonoBehaviour
         if (!TryGetMagicInventoryLayout(out MagicInventorySlotView[] layout))
             return false;
         return IsMagicInLayout(layout, magic, instanceId);
+    }
+
+    private void ClearOtherCombatMagicSlotsForFoundInstance(string instanceId, int targetSlot)
+    {
+        if (string.IsNullOrWhiteSpace(instanceId))
+            return;
+
+        for (int i = 0; i < magicInstanceIds.Length; i++)
+        {
+            if (i == targetSlot || !string.Equals(magicInstanceIds[i], instanceId, System.StringComparison.Ordinal))
+                continue;
+
+            magicLoadout[i] = null;
+            magicInstanceIds[i] = null;
+        }
     }
 
     private static bool IsMagicInLayout(IReadOnlyList<MagicInventorySlotView> layout, MagicItemData magic, string instanceId)

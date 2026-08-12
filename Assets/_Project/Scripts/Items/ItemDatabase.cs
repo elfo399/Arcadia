@@ -18,8 +18,9 @@ public class ItemDatabase : ScriptableObject
     [Header("Magics")]
     public List<MagicItemData> magics = new();
 
-    [Tooltip("Catalogo condiviso delle recipe: risolve le magie PREPARED anche nel GameScene.")]
-    public List<MagicRecipeData> magicRecipes = new();
+    [SerializeField, Tooltip("Catalogo condiviso delle recipe: risolve le magie PREPARED anche nel GameScene.")]
+    private List<MagicRecipeData> magicRecipes = new();
+    public IReadOnlyList<MagicRecipeData> MagicRecipes => magicRecipes;
 
     [Header("Armors")]
     public List<ArmorItemData> armors = new();
@@ -63,6 +64,7 @@ public class ItemDatabase : ScriptableObject
             return false;
 
         string normalized = recipeId.Trim();
+        int matchingEntries = 0;
         for (int i = 0; i < magicRecipes.Count; i++)
         {
             MagicRecipeData candidate = magicRecipes[i];
@@ -70,14 +72,22 @@ public class ItemDatabase : ScriptableObject
                 || !string.Equals(candidate.recipeId.Trim(), normalized, System.StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            if (recipe != null)
+            matchingEntries++;
+            if (matchingEntries > 1)
+                Debug.LogWarning($"[ItemDatabase] Magic recipe ID duplicato: '{normalized}'. Uso la prima entry valida.", this);
+            if (candidate.resultMagic == null)
             {
-                Debug.LogWarning($"[ItemDatabase] Magic recipe ID duplicato: '{normalized}'. Uso la prima entry.", this);
+                Debug.LogWarning($"[ItemDatabase] Magic recipe '{normalized}' ignorata: resultMagic mancante.", this);
                 continue;
             }
+
+            if (recipe != null)
+                continue;
             recipe = candidate;
         }
 
+        if (recipe == null && matchingEntries > 0)
+            Debug.LogWarning($"[ItemDatabase] Magic recipe '{normalized}' configurata ma non valida.", this);
         return recipe != null;
     }
 }

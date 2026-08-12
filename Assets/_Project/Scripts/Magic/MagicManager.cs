@@ -20,7 +20,6 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     [Header("Recipe List")]
     [SerializeField] private Transform recipeListRoot;
     [SerializeField] private DialogueChoiceUI recipeRowPrefab;
-    [SerializeField] private List<MagicRecipeData> recipes = new List<MagicRecipeData>();
 
     [Header("Detail")]
     [SerializeField] private GameObject detailRoot;
@@ -92,13 +91,22 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
 
     public bool IsOpen { get; private set; }
     public NpcServiceContext ActiveContext { get; private set; }
-    public IReadOnlyList<MagicRecipeData> Recipes => recipes;
+    public IReadOnlyList<MagicRecipeData> Recipes => MagicRecipeCatalog;
     public event Action Closed;
 
     private MagicRecipeData SelectedRecipe => selectedRecipeIndex >= 0 && selectedRecipeIndex < visibleRecipes.Count
         ? visibleRecipes[selectedRecipeIndex] : null;
     private MagicRecipeData ArmedPreparedRecipe => armedPreparedRecipeIndex >= 0 && armedPreparedRecipeIndex < preparedRecipeRows.Count
         ? preparedRecipeRows[armedPreparedRecipeIndex] : null;
+
+    private IReadOnlyList<MagicRecipeData> MagicRecipeCatalog
+    {
+        get
+        {
+            PlayerInventory inventory = ResolvePlayerInventory();
+            return inventory != null ? inventory.MagicRecipes : Array.Empty<MagicRecipeData>();
+        }
+    }
 
     private void Awake()
     {
@@ -294,16 +302,18 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     public IReadOnlyList<MagicItemData> GetLearnedMagic()
     {
         var result = new List<MagicItemData>();
-        if (playerStats == null || recipes == null) return result;
+        PlayerStats stats = ResolvePlayerStats();
+        if (stats == null) return result;
+        IReadOnlyList<MagicRecipeData> catalog = MagicRecipeCatalog;
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < recipes.Count; i++)
+        for (int i = 0; i < catalog.Count; i++)
         {
-            MagicRecipeData recipe = recipes[i];
+            MagicRecipeData recipe = catalog[i];
             if (recipe == null || recipe.resultMagic == null || string.IsNullOrWhiteSpace(recipe.recipeId))
                 continue;
             if (!ids.Add(recipe.recipeId.Trim()))
                 continue;
-            if (ResolvePlayerStats()?.KnowsMagicRecipe(recipe.recipeId) != true)
+            if (!stats.KnowsMagicRecipe(recipe.recipeId))
                 continue;
             result.Add(recipe.resultMagic);
         }
@@ -390,54 +400,62 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
 
     public bool CanConvertMagicToBlueprintFragment(string instanceId)
     {
-        if (playerInventory == null || playerStats == null || !playerInventory.TryGetItemByInstanceId(instanceId, out InventoryItem item)
+        PlayerInventory inventory = ResolvePlayerInventory();
+        PlayerStats stats = ResolvePlayerStats();
+        if (inventory == null || stats == null || !inventory.TryGetItemByInstanceId(instanceId, out InventoryItem item)
             || item == null || item.magicData == null)
             return false;
         MagicRecipeData recipe = FindRecipeForMagic(item.magicData);
         return recipe != null && recipe.unlockType == MagicRecipeUnlockType.Blueprint
-            && !playerStats.IsMagicRecipeUnlocked(recipe.recipeId)
-            && !playerStats.KnowsMagicRecipe(recipe.recipeId)
-            && playerStats.GetMagicBlueprintFragments(recipe.recipeId) < recipe.blueprintFragmentsRequired;
+            && !stats.IsMagicRecipeUnlocked(recipe.recipeId)
+            && !stats.KnowsMagicRecipe(recipe.recipeId)
+            && stats.GetMagicBlueprintFragments(recipe.recipeId) < recipe.blueprintFragmentsRequired;
     }
 
     public bool TryConvertMagicToBlueprintFragment(string instanceId)
     {
         if (!CanConvertMagicToBlueprintFragment(instanceId)) return false;
-        playerInventory.TryGetItemByInstanceId(instanceId, out InventoryItem item);
+        PlayerInventory inventory = ResolvePlayerInventory();
+        PlayerStats stats = ResolvePlayerStats();
+        if (inventory == null || stats == null || !inventory.TryGetItemByInstanceId(instanceId, out InventoryItem item))
+            return false;
         MagicRecipeData recipe = FindRecipeForMagic(item.magicData);
-        if (!playerInventory.TryRemoveInstance(instanceId, 1, out int remaining, save: false)) return false;
+        if (recipe == null || !inventory.TryRemoveInstance(instanceId, 1, out int remaining, save: false)) return false;
 
-        if (playerStats.TryAddMagicBlueprintFragment(recipe.recipeId, recipe.blueprintFragmentsRequired, save: false))
+        if (stats.TryAddMagicBlueprintFragment(recipe.recipeId, recipe.blueprintFragmentsRequired, save: false))
         {
-            playerStats.SaveStatsImmediate();
+            stats.SaveStatsImmediate();
             return true;
         }
 
         if (remaining > 0)
-            playerInventory.TryAdjustInstanceAmount(instanceId, 1, out _, save: false);
+            inventory.TryAdjustInstanceAmount(instanceId, 1, out _, save: false);
         else
         {
             InventoryItem restored = new InventoryItem(item.magicData, 1);
             restored.instanceId = instanceId;
-            playerInventory.TryAddItemInstance(restored, save: false);
+            inventory.TryAddItemInstance(restored, save: false);
         }
         return false;
     }
 
     private MagicRecipeData FindRecipeForMagic(MagicItemData magic)
     {
-        if (magic == null || recipes == null) return null;
-        for (int i = 0; i < recipes.Count; i++)
-            if (recipes[i] != null && recipes[i].resultMagic == magic)
-                return recipes[i];
+        if (magic == null) return null;
+        IReadOnlyList<MagicRecipeData> catalog = MagicRecipeCatalog;
+        for (int i = 0; i < catalog.Count; i++)
+            if (catalog[i] != null && !string.IsNullOrWhiteSpace(catalog[i].recipeId)
+                && catalog[i].resultMagic == magic)
+                return catalog[i];
         return null;
     }
 
     private bool IsRecipeAvailable(MagicRecipeData recipe)
     {
+        PlayerStats stats = ResolvePlayerStats();
         return recipe != null && recipe.resultMagic != null && !string.IsNullOrWhiteSpace(recipe.recipeId)
                && (recipe.unlockType == MagicRecipeUnlockType.Default
-                   || (playerStats != null && playerStats.IsMagicRecipeUnlocked(recipe.recipeId)));
+                   || (stats != null && stats.IsMagicRecipeUnlocked(recipe.recipeId)));
     }
 
     private bool BuildMaterialStatuses(List<MagicMaterialRequirement> requirements, List<MagicRequirementStatus> output)
@@ -474,9 +492,10 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         ClearRows();
         visibleRecipes.Clear();
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < recipes.Count; i++)
+        IReadOnlyList<MagicRecipeData> catalog = MagicRecipeCatalog;
+        for (int i = 0; i < catalog.Count; i++)
         {
-            MagicRecipeData recipe = recipes[i];
+            MagicRecipeData recipe = catalog[i];
             if (!IsRecipeVisible(recipe)) continue;
             if (!ids.Add(recipe.recipeId.Trim()))
             {
@@ -583,9 +602,10 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
 
         PlayerStats stats = ResolvePlayerStats();
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < recipes.Count; i++)
+        IReadOnlyList<MagicRecipeData> catalog = MagicRecipeCatalog;
+        for (int i = 0; i < catalog.Count; i++)
         {
-            MagicRecipeData recipe = recipes[i];
+            MagicRecipeData recipe = catalog[i];
             if (recipe == null || recipe.resultMagic == null || string.IsNullOrWhiteSpace(recipe.recipeId))
                 continue;
 
