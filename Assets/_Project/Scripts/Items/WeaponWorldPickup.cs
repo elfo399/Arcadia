@@ -32,8 +32,8 @@ public class WeaponWorldPickup : MonoBehaviour, IInteractable
             return;
         }
 
-        inventory.AddWeaponInstance(weapon, instanceId);
-        Destroy(gameObject);
+        if (inventory.TryAddWeaponInstance(weapon, instanceId))
+            Destroy(gameObject);
     }
 
     public string GetPrompt()

@@ -248,15 +248,24 @@ public class PlayerInventory : MonoBehaviour
         return HasWeaponInstanceInInventory(instanceId, weapon);
     }
 
-    public void AddWeaponInstance(WeaponItem weapon, string instanceId)
+    /// <summary>
+    /// Adds the specific weapon instance represented by a world pickup. The
+    /// caller-provided instance id is preserved so a stale duplicate pickup
+    /// can be recognised on subsequent interactions.
+    /// </summary>
+    public bool TryAddWeaponInstance(WeaponItem weapon, string instanceId, bool save = true)
     {
-        if (weapon == null || string.IsNullOrWhiteSpace(instanceId)) return;
-        if (HasWeaponInstanceInInventory(instanceId, weapon)) return;
+        if (weapon == null || string.IsNullOrWhiteSpace(instanceId)) return false;
+        if (HasWeaponInstanceInInventory(instanceId, weapon) || IsInstanceKnown(instanceId)) return false;
+        if (!CanAddItem(weapon, 1)) return false;
 
-        var restored = new InventoryItem(weapon, 1);
-        restored.instanceId = instanceId;
-        items.Add(restored);
+        var pickup = new InventoryItem(weapon, 1);
+        pickup.instanceId = instanceId;
+        items.Add(pickup);
+        SyncEquippedReferences();
         RaiseCollectItemEvent(weapon.name, "weapon", 1);
+        if (save) RequestInventorySave();
+        return true;
     }
 
     private void ClearWeaponInstanceFromLoadouts(string instanceId)
@@ -786,18 +795,16 @@ public class PlayerInventory : MonoBehaviour
     }
 
     /// <summary>
-    /// Adds a concrete inventory entry while enforcing gameplay capacity by
-    /// default. Capacity may be bypassed only by tightly controlled rollback
-    /// paths that restore state immediately after their own mutation.
+    /// Adds a concrete inventory entry while enforcing gameplay capacity.
     /// </summary>
-    public bool TryAddItemInstance(InventoryItem item, bool save = true, bool enforceCapacity = true)
+    public bool TryAddItemInstance(InventoryItem item, bool save = true)
     {
         if (item == null || item.amount <= 0) return false;
         if (!string.IsNullOrWhiteSpace(item.instanceId) && IsInstanceKnown(item.instanceId)) return false;
 
         ScriptableObject asset = GetAssetForInventoryItem(item);
         if (asset == null) return false;
-        if (enforceCapacity && !CanAddItem(asset, item.amount)) return false;
+        if (!CanAddItem(asset, item.amount)) return false;
 
         InventoryItem existing = FindStackableInventoryItem(asset);
         if (existing != null)
@@ -813,6 +820,36 @@ public class PlayerInventory : MonoBehaviour
         SyncMagicInventorySlots();
         SyncEquippedReferences();
         if (save) RequestInventorySave();
+        return true;
+    }
+
+    /// <summary>
+    /// Restores material quantities that were just removed by a failed run
+    /// transaction. This is intentionally internal and silent: it does not
+    /// invoke gameplay pickup events, save, or enforce capacity because it
+    /// restores the immediately previous inventory state.
+    /// </summary>
+    internal bool TryRestoreItemAmountSilently(ItemData item, int amount)
+    {
+        if (item == null || item.category != ItemCategory.Material || amount <= 0) return false;
+
+        InventoryItem existing = FindStackableGenericItem(item);
+        if (existing != null)
+        {
+            if (Mathf.Max(0, existing.amount) > int.MaxValue - amount)
+            {
+                Debug.LogError($"[PlayerInventory] Rollback materiale rifiutato: overflow per {item.name}.", this);
+                return false;
+            }
+
+            existing.amount += amount;
+        }
+        else
+        {
+            items.Add(new InventoryItem(item, amount));
+        }
+
+        SyncEquippedReferences();
         return true;
     }
 

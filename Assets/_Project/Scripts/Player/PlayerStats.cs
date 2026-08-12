@@ -706,7 +706,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (inventory == null || removed == null) return;
         for (int i = removed.Count - 1; i >= 0; i--)
         {
-            if (!inventory.TryAddItem(removed[i].Key, removed[i].Value, save: false))
+            if (!inventory.TryRestoreItemAmountSilently(removed[i].Key, removed[i].Value))
                 Debug.LogError("[PlayerStats] Rollback del Material Storage fallito: inventario non ripristinato.");
         }
     }
