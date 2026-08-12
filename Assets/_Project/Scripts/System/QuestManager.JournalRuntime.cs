@@ -489,8 +489,11 @@ public partial class QuestManager
                 case QuestRewardKind.MagicBlueprint:
                     if (stats == null || reward.magicBlueprintAsset == null || reward.magicBlueprintAsset.recipe == null)
                         return false;
-                    if (!stats.IsMagicRecipeUnlocked(reward.magicBlueprintAsset.recipe.recipeId))
-                        reward.magicBlueprintAsset.Unlock(stats);
+                    string recipeId = reward.magicBlueprintAsset.recipe.recipeId;
+                    if (string.IsNullOrWhiteSpace(recipeId))
+                        return false;
+                    if (!stats.IsMagicRecipeUnlocked(recipeId))
+                        stats.UnlockMagicRecipe(recipeId, save: false);
                     break;
             }
         }
@@ -524,6 +527,7 @@ public partial class QuestManager
 
         ClampJournalPadIndices();
         NotifyChanged();
+        PlayerStats.instance?.SaveStats();
     }
 
     private static bool IsMagicInventoryItem(InventoryItem item)

@@ -53,6 +53,7 @@ public partial class QuestManager : MonoBehaviour
         public ItemData itemAsset;
         public MagicItemData magicAsset;
         public MagicBlueprintData magicBlueprintAsset;
+        public string magicBlueprintRecipeId;
         public ArmorItemData armorAsset;
     }
 
@@ -854,6 +855,7 @@ public partial class QuestManager : MonoBehaviour
                 itemAsset = entry.itemAsset,
                 magicAsset = entry.magicAsset,
                 magicBlueprintAsset = entry.magicBlueprintAsset,
+                magicBlueprintRecipeId = entry.magicBlueprintRecipeId,
                 armorAsset = entry.armorAsset
             });
         }
@@ -960,6 +962,7 @@ public partial class QuestManager : MonoBehaviour
                 itemAsset = reward.itemAsset,
                 magicAsset = reward.magicAsset,
                 magicBlueprintAsset = reward.magicBlueprintAsset,
+                magicBlueprintRecipeId = ResolveMagicBlueprintRecipeId(reward),
                 armorAsset = reward.armorAsset
             });
         }
@@ -1014,6 +1017,8 @@ public partial class QuestManager : MonoBehaviour
                 usableAsset = reward.usableAsset,
                 itemAsset = reward.itemAsset,
                 magicAsset = reward.magicAsset,
+                magicBlueprintAsset = reward.magicBlueprintAsset,
+                magicBlueprintRecipeId = reward.magicBlueprintRecipeId,
                 armorAsset = reward.armorAsset
             });
         }
@@ -1062,10 +1067,20 @@ public partial class QuestManager : MonoBehaviour
             QuestRewardType.Magic => reward.magicAsset != null ? reward.magicAsset.magicName : string.Empty,
             QuestRewardType.MagicBlueprint => reward.magicBlueprintAsset != null && reward.magicBlueprintAsset.recipe != null
                 ? reward.magicBlueprintAsset.recipe.resultMagic != null ? reward.magicBlueprintAsset.recipe.resultMagic.magicName : reward.magicBlueprintAsset.recipe.recipeId
-                : string.Empty,
+                : reward.magicBlueprintRecipeId ?? string.Empty,
             QuestRewardType.Armor => reward.armorAsset != null ? reward.armorAsset.itemName : string.Empty,
             _ => string.Empty
         };
+    }
+
+    private static string ResolveMagicBlueprintRecipeId(QuestRewardData reward)
+    {
+        if (reward == null) return string.Empty;
+        if (!string.IsNullOrWhiteSpace(reward.magicBlueprintRecipeId))
+            return reward.magicBlueprintRecipeId;
+        return reward.magicBlueprintAsset != null && reward.magicBlueprintAsset.recipe != null
+            ? reward.magicBlueprintAsset.recipe.recipeId
+            : string.Empty;
     }
 
     private static bool FillIfEmpty(ref string target, string source)

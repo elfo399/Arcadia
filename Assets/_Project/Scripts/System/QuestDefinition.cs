@@ -91,6 +91,7 @@ public class QuestDefinition : ScriptableObject
                 itemAsset = reward.itemAsset,
                 magicAsset = reward.magicAsset,
                 magicBlueprintAsset = reward.magicBlueprintAsset,
+                magicBlueprintRecipeId = reward.magicBlueprintRecipeId,
                 armorAsset = reward.armorAsset
             });
         }

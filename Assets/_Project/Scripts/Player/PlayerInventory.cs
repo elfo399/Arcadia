@@ -535,6 +535,101 @@ public class PlayerInventory : MonoBehaviour
         return false;
     }
 
+    public bool TryGetItemByInstanceId(string instanceId, out InventoryItem item)
+    {
+        item = null;
+        if (string.IsNullOrWhiteSpace(instanceId)) return false;
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            InventoryItem candidate = items[i];
+            if (candidate == null || !string.Equals(candidate.instanceId, instanceId, System.StringComparison.Ordinal))
+                continue;
+
+            item = candidate;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Stacca l'istanza senza modificarne amount o metadata. Serve ai transfer
+    /// atomici full-stack e agli oggetti non stackabili.
+    /// </summary>
+    public bool TryDetachInstance(string instanceId, out InventoryItem item, bool save = true)
+    {
+        item = null;
+        if (!string.IsNullOrWhiteSpace(instanceId))
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                InventoryItem candidate = items[i];
+                if (candidate == null || !string.Equals(candidate.instanceId, instanceId, System.StringComparison.Ordinal))
+                    continue;
+
+                item = candidate;
+                items.RemoveAt(i);
+                ClearRemovedItemFromLoadouts(candidate);
+                SyncMagicInventorySlots();
+                SyncEquippedReferences();
+                if (save) RequestInventorySave();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public bool TryAdjustInstanceAmount(string instanceId, int delta, out int newAmount, bool save = true)
+    {
+        newAmount = 0;
+        if (string.IsNullOrWhiteSpace(instanceId) || delta == 0)
+            return false;
+
+        if (!TryGetItemByInstanceId(instanceId, out InventoryItem item))
+            return false;
+
+        long updated = (long)item.amount + delta;
+        if (updated <= 0 || updated > int.MaxValue)
+            return false;
+
+        item.amount = (int)updated;
+        newAmount = item.amount;
+        SyncMagicInventorySlots();
+        SyncEquippedReferences();
+        if (save) RequestInventorySave();
+        return true;
+    }
+
+    public void ClearRunInventory(bool save = false)
+    {
+        items.Clear();
+        magicInventorySlots.Clear();
+
+        EnsureLoadoutSize();
+        System.Array.Clear(rightLoadout, 0, rightLoadout.Length);
+        System.Array.Clear(leftLoadout, 0, leftLoadout.Length);
+        System.Array.Clear(magicLoadout, 0, magicLoadout.Length);
+        System.Array.Clear(usableLoadout, 0, usableLoadout.Length);
+        System.Array.Clear(armorLoadout, 0, armorLoadout.Length);
+        System.Array.Clear(rightInstanceIds, 0, rightInstanceIds.Length);
+        System.Array.Clear(leftInstanceIds, 0, leftInstanceIds.Length);
+        System.Array.Clear(magicInstanceIds, 0, magicInstanceIds.Length);
+        System.Array.Clear(usableInstanceIds, 0, usableInstanceIds.Length);
+        System.Array.Clear(armorInstanceIds, 0, armorInstanceIds.Length);
+
+        currentRightIndex = 0;
+        currentLeftIndex = 0;
+        currentMagicIndex = 0;
+        currentUsableIndex = 0;
+        SyncMagicInventorySlots();
+        SyncEquippedReferences();
+
+        if (save)
+            RequestInventorySave();
+    }
+
     public bool TryConsumeItem(ItemData itemData, int amount, out int remainingTotal)
     {
         return TryRemoveItem(
@@ -667,10 +762,10 @@ public class PlayerInventory : MonoBehaviour
     public bool TryAddItemInstance(InventoryItem item, bool save = true)
     {
         if (item == null || item.amount <= 0) return false;
+        if (!string.IsNullOrWhiteSpace(item.instanceId) && IsInstanceKnown(item.instanceId)) return false;
         if (item.weaponData != null || item.armorData != null)
         {
             if (items.Count >= int.MaxValue || string.IsNullOrWhiteSpace(item.instanceId)) return false;
-            if (IsInstanceKnown(item.instanceId)) return false;
         }
         else if (item.itemData != null || item.magicData != null || item.usableData != null)
         {

@@ -40,6 +40,41 @@ public sealed class PersistentStorageState
         return TryRemove(magicItems, instanceId, out magic);
     }
 
+    public bool TryAdjustInstanceAmount(string instanceId, int delta, out int newAmount)
+    {
+        newAmount = 0;
+        if (string.IsNullOrWhiteSpace(instanceId) || delta == 0)
+            return false;
+
+        if (TryAdjustAmount(items, instanceId, delta, out newAmount))
+            return true;
+        return TryAdjustAmount(magicItems, instanceId, delta, out newAmount);
+    }
+
+    /// <summary>
+    /// Crea uno stack separato senza passare dalla serializzazione. Il costruttore
+    /// assegna un nuovo instanceId; le metadata runtime vengono poi preservate.
+    /// </summary>
+    public static InventoryItem CreateSplitStack(InventoryItem source, int amount)
+    {
+        if (source == null || amount <= 0 || amount > source.amount)
+            return null;
+
+        InventoryItem split;
+        if (source.magicData != null)
+            split = new InventoryItem(source.magicData, amount, source.title, source.description);
+        else if (source.usableData != null)
+            split = new InventoryItem(source.usableData, amount, source.title, source.description);
+        else if (source.itemData != null)
+            split = new InventoryItem(source.itemData, amount, source.title, source.description);
+        else
+            return null;
+
+        split.icon = source.icon;
+        split.upgradeLevel = source.upgradeLevel;
+        return split;
+    }
+
     public bool ContainsInstance(string instanceId)
     {
         return Find(instanceId) != null;
@@ -115,6 +150,30 @@ public sealed class PersistentStorageState
             source.RemoveAt(i);
             return true;
         }
+        return false;
+    }
+
+    private static bool TryAdjustAmount(List<InventoryItem> source, string instanceId, int delta, out int newAmount)
+    {
+        newAmount = 0;
+        if (source == null || string.IsNullOrWhiteSpace(instanceId))
+            return false;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            InventoryItem item = source[i];
+            if (item == null || !string.Equals(item.instanceId, instanceId, StringComparison.Ordinal))
+                continue;
+
+            long updated = (long)item.amount + delta;
+            if (updated <= 0 || updated > int.MaxValue)
+                return false;
+
+            item.amount = (int)updated;
+            newAmount = item.amount;
+            return true;
+        }
+
         return false;
     }
 

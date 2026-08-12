@@ -125,6 +125,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private bool saveQueued = false;
     private Coroutine delayedUiRefreshRoutine;
     private bool inspectorStartingClassAppliedThisSession;
+    private bool deathInProgress;
     private int temporaryVigorBonus;
     private int temporaryMindBonus;
     private int temporaryEnduranceBonus;
@@ -660,83 +661,143 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public bool TryStoreInventoryItem(string instanceId)
     {
-        return TryStoreInventoryItemInternal(instanceId, magic: false);
+        return TryStoreInventoryItemInternal(instanceId, magic: false, amount: -1);
+    }
+
+    /// <summary>Store the requested quantity; the legacy overload stores the full instance.</summary>
+    public bool TryStoreInventoryItem(string instanceId, int amount)
+    {
+        return TryStoreInventoryItemInternal(instanceId, magic: false, amount);
     }
 
     public bool TryStoreMagicItem(string instanceId)
     {
-        return TryStoreInventoryItemInternal(instanceId, magic: true);
+        return TryStoreInventoryItemInternal(instanceId, magic: true, amount: -1);
+    }
+
+    /// <summary>Store the requested quantity; the legacy overload stores the full stack.</summary>
+    public bool TryStoreMagicItem(string instanceId, int amount)
+    {
+        return TryStoreInventoryItemInternal(instanceId, magic: true, amount);
     }
 
     public bool TryWithdrawStoredItem(string instanceId)
     {
-        return TryWithdrawStoredItemInternal(instanceId, magic: false);
+        return TryWithdrawStoredItemInternal(instanceId, magic: false, amount: -1);
+    }
+
+    /// <summary>Withdraw the requested quantity; the legacy overload withdraws the full instance.</summary>
+    public bool TryWithdrawStoredItem(string instanceId, int amount)
+    {
+        return TryWithdrawStoredItemInternal(instanceId, magic: false, amount);
     }
 
     public bool TryWithdrawStoredMagic(string instanceId)
     {
-        return TryWithdrawStoredItemInternal(instanceId, magic: true);
+        return TryWithdrawStoredItemInternal(instanceId, magic: true, amount: -1);
     }
 
-    private bool TryStoreInventoryItemInternal(string instanceId, bool magic)
+    /// <summary>Withdraw the requested quantity; the legacy overload withdraws the full stack.</summary>
+    public bool TryWithdrawStoredMagic(string instanceId, int amount)
+    {
+        return TryWithdrawStoredItemInternal(instanceId, magic: true, amount);
+    }
+
+    private bool TryStoreInventoryItemInternal(string instanceId, bool magic, int amount)
     {
         PlayerInventory inventory = GetCachedPlayerInventory();
         if (inventory == null || string.IsNullOrWhiteSpace(instanceId)) return false;
 
-        InventoryItem candidate = null;
-        IReadOnlyList<InventoryItem> source = inventory.Items;
-        for (int i = 0; i < source.Count; i++)
-        {
-            InventoryItem item = source[i];
-            if (item != null && string.Equals(item.instanceId, instanceId, StringComparison.Ordinal))
-            {
-                candidate = item;
-                break;
-            }
-        }
+        if (!inventory.TryGetItemByInstanceId(instanceId, out InventoryItem candidate)) return false;
 
         if (candidate == null || (candidate.magicData != null) != magic) return false;
-        if (!storageState.CanAdd(candidate)) return false;
-        if (!inventory.TryRemoveInstance(candidate.instanceId, candidate.amount, out _, save: false)) return false;
-
-        bool added = magic ? storageState.TryAddMagic(candidate) : storageState.TryAddItem(candidate);
-        if (!added)
-        {
-            inventory.TryAddItemInstance(candidate, save: false);
+        bool stackable = candidate.magicData != null || candidate.usableData != null || candidate.itemData != null;
+        int transferAmount = amount < 0 ? candidate.amount : amount;
+        if (transferAmount <= 0 || transferAmount > candidate.amount)
             return false;
+        if (!stackable && transferAmount != 1)
+            return false;
+
+        if (transferAmount == candidate.amount)
+        {
+            if (!storageState.CanAdd(candidate)) return false;
+            bool addedFull = magic ? storageState.TryAddMagic(candidate) : storageState.TryAddItem(candidate);
+            if (!addedFull) return false;
+
+            if (!inventory.TryDetachInstance(candidate.instanceId, out _, save: false))
+            {
+                if (magic) storageState.TryRemoveMagic(candidate.instanceId, out _);
+                else storageState.TryRemoveItem(candidate.instanceId, out _);
+                return false;
+            }
+        }
+        else
+        {
+            InventoryItem split = PersistentStorageState.CreateSplitStack(candidate, transferAmount);
+            if (split == null || !storageState.CanAdd(split)) return false;
+            bool addedPartial = magic ? storageState.TryAddMagic(split) : storageState.TryAddItem(split);
+            if (!addedPartial)
+                return false;
+
+            if (!inventory.TryAdjustInstanceAmount(candidate.instanceId, -transferAmount, out _, save: false))
+            {
+                if (magic) storageState.TryRemoveMagic(split.instanceId, out _);
+                else storageState.TryRemoveItem(split.instanceId, out _);
+                return false;
+            }
         }
 
         SaveStats();
         return true;
     }
 
-    private bool TryWithdrawStoredItemInternal(string instanceId, bool magic)
+    private bool TryWithdrawStoredItemInternal(string instanceId, bool magic, int amount)
     {
         PlayerInventory inventory = GetCachedPlayerInventory();
         if (inventory == null || string.IsNullOrWhiteSpace(instanceId)) return false;
 
         InventoryItem candidate = storageState.Find(instanceId);
         if (candidate == null || (candidate.magicData != null) != magic) return false;
+        bool stackable = candidate.magicData != null || candidate.usableData != null || candidate.itemData != null;
+        int transferAmount = amount < 0 ? candidate.amount : amount;
+        if (transferAmount <= 0 || transferAmount > candidate.amount)
+            return false;
+        if (!stackable && transferAmount != 1)
+            return false;
+
         ScriptableObject asset = candidate.magicData as ScriptableObject
                                  ?? candidate.weaponData as ScriptableObject
                                  ?? candidate.armorData as ScriptableObject
                                  ?? candidate.usableData as ScriptableObject
                                  ?? candidate.itemData as ScriptableObject;
-        if (asset == null || !inventory.CanAddItem(asset, candidate.amount)) return false;
+        if (asset == null || !inventory.CanAddItem(asset, transferAmount)) return false;
 
-        InventoryItem removedItemValue;
-        bool removed;
-        if (magic)
-            removed = storageState.TryRemoveMagic(instanceId, out removedItemValue);
-        else
-            removed = storageState.TryRemoveItem(instanceId, out removedItemValue);
-        if (!removed || removedItemValue == null) return false;
-
-        if (!inventory.TryAddItemInstance(removedItemValue, save: false))
+        if (transferAmount == candidate.amount)
         {
-            if (magic) storageState.TryAddMagic(removedItemValue);
-            else storageState.TryAddItem(removedItemValue);
-            return false;
+            InventoryItem removedItemValue;
+            bool removed = magic
+                ? storageState.TryRemoveMagic(instanceId, out removedItemValue)
+                : storageState.TryRemoveItem(instanceId, out removedItemValue);
+            if (!removed || removedItemValue == null) return false;
+
+            if (!inventory.TryAddItemInstance(removedItemValue, save: false))
+            {
+                if (magic) storageState.TryAddMagic(removedItemValue);
+                else storageState.TryAddItem(removedItemValue);
+                return false;
+            }
+        }
+        else
+        {
+            InventoryItem split = PersistentStorageState.CreateSplitStack(candidate, transferAmount);
+            if (split == null) return false;
+            if (!storageState.TryAdjustInstanceAmount(instanceId, -transferAmount, out _)) return false;
+
+            if (!inventory.TryAddItemInstance(split, save: false))
+            {
+                storageState.TryAdjustInstanceAmount(instanceId, transferAmount, out _);
+                return false;
+            }
         }
 
         SaveStats();
@@ -1648,6 +1709,13 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     void Die()
     {
+        if (deathInProgress)
+            return;
+
+        deathInProgress = true;
+        PlayerInventory inventory = GetCachedPlayerInventory();
+        if (inventory != null)
+            inventory.ClearRunInventory(save: false);
         ResetRunWallet();
         ClearDungeonCheckpoint();
         SaveStatsImmediate();
@@ -1805,8 +1873,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
                 type = ResolveSavedQuestRewardType(r),
                 amount = r.amount,
                 itemName = ResolveSavedQuestRewardItemName(r),
-                magicBlueprintRecipeId = r.magicBlueprintAsset != null && r.magicBlueprintAsset.recipe != null
-                    ? r.magicBlueprintAsset.recipe.recipeId : string.Empty
+                magicBlueprintRecipeId = !string.IsNullOrWhiteSpace(r.magicBlueprintRecipeId)
+                    ? r.magicBlueprintRecipeId
+                    : r.magicBlueprintAsset != null && r.magicBlueprintAsset.recipe != null
+                        ? r.magicBlueprintAsset.recipe.recipeId : string.Empty
             };
         }
 
@@ -1951,6 +2021,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
                 type = r.type,
                 amount = r.amount,
                 itemName = r.itemName,
+                magicBlueprintRecipeId = r.magicBlueprintRecipeId,
                 rewardType = ParseSavedQuestRewardType(r.type)
             });
         }
@@ -1997,7 +2068,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             case QuestRewardType.Item: return reward.itemAsset != null ? reward.itemAsset.itemName : string.Empty;
             case QuestRewardType.Magic: return reward.magicAsset != null ? reward.magicAsset.magicName : string.Empty;
             case QuestRewardType.MagicBlueprint: return reward.magicBlueprintAsset != null && reward.magicBlueprintAsset.recipe != null
-                ? reward.magicBlueprintAsset.recipe.recipeId : string.Empty;
+                ? reward.magicBlueprintAsset.recipe.recipeId : reward.magicBlueprintRecipeId ?? string.Empty;
             case QuestRewardType.Armor: return reward.armorAsset != null ? reward.armorAsset.itemName : string.Empty;
             default: return string.Empty;
         }
