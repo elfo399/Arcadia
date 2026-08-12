@@ -22,7 +22,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private readonly BlacksmithProgressionState blacksmithProgression = new BlacksmithProgressionState();
     private readonly MagicProgressionState magicProgression = new MagicProgressionState();
     private readonly MaterialStorageState materialStorageState = new MaterialStorageState();
-    private readonly RunMagicSelectionState runMagicSelection = new RunMagicSelectionState(PlayerInventory.DefaultMagicInventoryCapacity);
 
     [Header("Health")]
     public float maxHealth = 100f;
@@ -166,7 +165,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public BlacksmithProgressionState BlacksmithProgression => blacksmithProgression;
     public MagicProgressionState MagicProgression => magicProgression;
     public MaterialStorageState MaterialStorage => materialStorageState;
-    public int RunMagicCapacity => runMagicSelection.Capacity;
+    public int RunMagicCapacity => GetCachedPlayerInventory() != null
+        ? GetCachedPlayerInventory().MagicInventoryCapacity
+        : PlayerInventory.DefaultMagicInventoryCapacity;
     public int EffectiveVigor => Mathf.Max(1, vigor + temporaryVigorBonus);
     public int EffectiveMind => Mathf.Max(1, mind + temporaryMindBonus);
     public int EffectiveEndurance => Mathf.Max(1, endurance + temporaryEnduranceBonus);
@@ -781,16 +782,29 @@ public class PlayerStats : MonoBehaviour, IDamageable
         return changed;
     }
 
-    public string[] GetRunMagicSelection() => runMagicSelection.Export();
+    public string[] GetRunMagicSelection()
+    {
+        PlayerInventory inventory = GetCachedPlayerInventory();
+        return inventory != null ? inventory.ExportPreparedMagicRecipeIds() : System.Array.Empty<string>();
+    }
 
     public bool SetRunMagicAtSlot(int slot, string recipeId)
     {
-        return runMagicSelection.SetAtSlot(slot, recipeId, KnowsMagicRecipe);
+        PlayerInventory inventory = GetCachedPlayerInventory();
+        return inventory != null && inventory.TrySetPreparedMagicAtSlot(slot, recipeId, KnowsMagicRecipe);
     }
 
-    public bool RemoveRunMagicAtSlot(int slot) => runMagicSelection.RemoveAtSlot(slot);
+    public bool RemoveRunMagicAtSlot(int slot)
+    {
+        PlayerInventory inventory = GetCachedPlayerInventory();
+        return inventory != null && inventory.RemovePreparedMagicAtSlot(slot);
+    }
 
-    public void ClearRunMagicSelection() => runMagicSelection.Clear();
+    public void ClearRunMagicSelection()
+    {
+        PlayerInventory inventory = GetCachedPlayerInventory();
+        if (inventory != null) inventory.ClearPreparedMagic();
+    }
 
     public bool IsMagicRecipeUnlocked(string recipeId) => magicProgression.IsRecipeUnlocked(recipeId);
     public bool KnowsMagicRecipe(string recipeId) => magicProgression.KnowsRecipe(recipeId);
@@ -1711,7 +1725,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
         PlayerInventory inventory = GetCachedPlayerInventory();
         if (inventory != null)
             inventory.ClearRunInventory(save: false);
-        runMagicSelection.Clear();
         ResetRunWallet();
         ClearDungeonCheckpoint();
         SaveStatsImmediate();

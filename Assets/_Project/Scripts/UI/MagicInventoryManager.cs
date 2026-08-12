@@ -11,7 +11,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private InventorySlot slotPrefab;
     [SerializeField] private Transform magicSlotParent;
     [SerializeField] private int magicInitialSlotCount = PlayerInventory.DefaultMagicInventoryCapacity;
-    [SerializeField] private MagicManager magicManager;
 
     [Header("Magic Empty State")]
     [Tooltip("Object shown when the player does not own any magic.")]
@@ -105,12 +104,9 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         CancelActiveDrag();
     }
 
-    public int GetCapacity() => magicManager != null ? magicManager.GetRunMagicCapacity() : magicInitialSlotCount;
-
-    public void SetMagicManager(MagicManager manager)
-    {
-        magicManager = manager != null ? manager : magicManager;
-    }
+    public int GetCapacity() => playerInventory != null
+        ? playerInventory.MagicInventoryCapacity
+        : magicInitialSlotCount;
 
     public void SetPlayerInventory(PlayerInventory inventory)
     {
@@ -125,14 +121,14 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     public void ShowMagicTab()
     {
-        RefreshPreparedMagic();
+        RefreshMagicInventory();
         SetEquipButtonState(false, false);
     }
 
     public void PrepareMagicEquipSelectionView()
     {
         equipmentManager?.ShowMagicPanel();
-        RefreshPreparedMagic();
+        RefreshMagicInventory();
         UpdateEquipButtonState();
     }
 
@@ -151,8 +147,8 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     public void HandleSlotBeginDrag(int index, PointerEventData eventData)
     {
         if (!slotInputEnabled) return;
-        // Prepared magic follows RunMagicSelectionState order. Dragging cannot
-        // mutate the visual list independently from that domain state.
+        // The unified layout has a domain-defined order. Dragging cannot mutate
+        // this visual projection independently from the player inventory.
         return;
     }
 
@@ -279,12 +275,9 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         if (equipmentManager.CurrentEquipTarget != EquipmentManager.EquipTarget.Top) return;
 
         currentSelectedIndex = targetIndex;
-        var magic = currentMagic[targetIndex];
-        if (magic == null) return;
-        if (magicManager == null || !magicManager.IsMagicPrepared(magic)) return;
-
         int slotIndex = equipmentManager.CurrentTopIndex;
-        playerInventory.SetPreparedMagicAtSlot(slotIndex, magic);
+        if (!playerInventory.TryEquipMagicInventorySlot(slotIndex, targetIndex))
+            return;
 
         equipmentManager?.RefreshEquipmentCross();
         equipmentManager.CloseEquipGrid();
@@ -299,18 +292,19 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         UpdateEquipButtonState();
     }
 
-    public void RefreshPreparedMagic()
+    public void RefreshMagicInventory()
     {
+        if (playerInventory == null || !playerInventory.TryGetMagicInventoryLayout(out MagicInventorySlotView[] layout))
+            return; // Fail-safe: unresolved prepared recipes must not clear UI/equipped magic.
+
         currentMagic.Clear();
-        if (magicManager != null)
-            currentMagic.AddRange(magicManager.GetPreparedMagicLayout());
-        if (playerInventory != null)
-            playerInventory.ValidateMagicLoadoutAgainstPrepared(currentMagic);
+        for (int i = 0; i < layout.Length; i++)
+            currentMagic.Add(layout[i].Magic);
 
         // Attiva prima la griglia: al primo ingresso questo permette ad Awake degli
         // InventorySlot di terminare prima che Setup assegni le icone.
         UpdateMagicEmptyState(HasAnyMagic());
-        RefreshSlotsFromPreparedMagic();
+        RefreshSlotsFromMagicInventory();
 
         currentSelectedIndex = -1;
         ClearPadFocus();
@@ -318,7 +312,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         UpdateEquipButtonState();
     }
 
-    private void RefreshSlotsFromPreparedMagic()
+    private void RefreshSlotsFromMagicInventory()
     {
         int activeSlotCount = Mathf.Max(1, currentMagic.Count);
         EnsureSlots(activeSlotCount);

@@ -18,6 +18,9 @@ public class ItemDatabase : ScriptableObject
     [Header("Magics")]
     public List<MagicItemData> magics = new();
 
+    [Tooltip("Catalogo condiviso delle recipe: risolve le magie PREPARED anche nel GameScene.")]
+    public List<MagicRecipeData> magicRecipes = new();
+
     [Header("Armors")]
     public List<ArmorItemData> armors = new();
 
@@ -51,5 +54,30 @@ public class ItemDatabase : ScriptableObject
         }
 
         return result;
+    }
+
+    public bool TryGetMagicRecipe(string recipeId, out MagicRecipeData recipe)
+    {
+        recipe = null;
+        if (string.IsNullOrWhiteSpace(recipeId) || magicRecipes == null)
+            return false;
+
+        string normalized = recipeId.Trim();
+        for (int i = 0; i < magicRecipes.Count; i++)
+        {
+            MagicRecipeData candidate = magicRecipes[i];
+            if (candidate == null || string.IsNullOrWhiteSpace(candidate.recipeId)
+                || !string.Equals(candidate.recipeId.Trim(), normalized, System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (recipe != null)
+            {
+                Debug.LogWarning($"[ItemDatabase] Magic recipe ID duplicato: '{normalized}'. Uso la prima entry.", this);
+                continue;
+            }
+            recipe = candidate;
+        }
+
+        return recipe != null;
     }
 }

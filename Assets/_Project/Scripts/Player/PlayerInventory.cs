@@ -75,12 +75,14 @@ public class PlayerInventory : MonoBehaviour
     [SerializeField, Min(1)] private int magicInventoryCapacity = DefaultMagicInventoryCapacity;
 
     private readonly List<InventoryItem> items = new();
-    private readonly List<InventoryItem> magicInventorySlots = new();
+    // The only authoritative magic capacity/layout. Prepared entries reference
+    // recipe ids; found entries reference real InventoryItem instance ids.
+    private readonly List<MagicInventorySlotState> magicInventoryLayout = new();
     public IReadOnlyList<InventoryItem> Items => items;
     public int NormalInventoryCapacity => Mathf.Max(1, normalInventoryCapacity);
     public int MagicInventoryCapacity => Mathf.Max(1, magicInventoryCapacity);
     public int NormalUsedSlots => CountUsedSlots(magic: false);
-    public int MagicUsedSlots => CountUsedSlots(magic: true);
+    public int MagicUsedSlots => CountOccupiedMagicInventorySlots();
     public bool IsInitialized { get; private set; }
     private ItemDatabase cachedLookupDatabase;
     private (Dictionary<string, WeaponItem> weapons, Dictionary<string, MagicItemData> magics, Dictionary<string, ArmorItemData> armors, Dictionary<string, UsableItemData> usables, Dictionary<string, ItemData> items) cachedAssetLookups;
@@ -126,6 +128,7 @@ public class PlayerInventory : MonoBehaviour
         currentLeftIndex = SelectInitialIndex(leftLoadout);
         currentMagicIndex = SelectInitialIndex(magicLoadout);
         currentUsableIndex = SelectInitialIndex(usableLoadout);
+        SyncMagicInventoryLayout();
         SyncEquippedReferences();
         IsInitialized = true;
     }
@@ -439,7 +442,11 @@ public class PlayerInventory : MonoBehaviour
             return false;
 
         if (existing != null)
+        {
+            if (itemAsset is MagicItemData && !IsFoundMagicInLayout(existing.instanceId))
+                return false;
             return Mathf.Max(0, existing.amount) <= int.MaxValue - amount;
+        }
 
         return itemAsset is MagicItemData
             ? HasFreeMagicInventorySlots()
@@ -536,7 +543,7 @@ public class PlayerInventory : MonoBehaviour
         remainingTotal = GetTotalItemAmount(itemAsset);
         if (itemAsset is not ItemData)
         {
-            SyncMagicInventorySlots();
+            SyncMagicInventoryLayout();
             SyncEquippedReferences();
         }
         if (save)
@@ -560,7 +567,7 @@ public class PlayerInventory : MonoBehaviour
                 ClearRemovedItemFromLoadouts(item);
                 items.RemoveAt(i);
             }
-            SyncMagicInventorySlots();
+            SyncMagicInventoryLayout();
             SyncEquippedReferences();
             if (save) RequestInventorySave();
             return true;
@@ -604,7 +611,7 @@ public class PlayerInventory : MonoBehaviour
                 item = candidate;
                 items.RemoveAt(i);
                 ClearRemovedItemFromLoadouts(candidate);
-                SyncMagicInventorySlots();
+                SyncMagicInventoryLayout();
                 SyncEquippedReferences();
                 if (save) RequestInventorySave();
                 return true;
@@ -629,7 +636,7 @@ public class PlayerInventory : MonoBehaviour
 
         item.amount = (int)updated;
         newAmount = item.amount;
-        SyncMagicInventorySlots();
+        SyncMagicInventoryLayout();
         SyncEquippedReferences();
         if (save) RequestInventorySave();
         return true;
@@ -638,7 +645,7 @@ public class PlayerInventory : MonoBehaviour
     public void ClearRunInventory(bool save = false)
     {
         items.Clear();
-        magicInventorySlots.Clear();
+        magicInventoryLayout.Clear();
 
         EnsureLoadoutSize();
         System.Array.Clear(rightLoadout, 0, rightLoadout.Length);
@@ -656,7 +663,7 @@ public class PlayerInventory : MonoBehaviour
         currentLeftIndex = 0;
         currentMagicIndex = 0;
         currentUsableIndex = 0;
-        SyncMagicInventorySlots();
+        SyncMagicInventoryLayout();
         SyncEquippedReferences();
 
         if (save)
@@ -710,6 +717,8 @@ public class PlayerInventory : MonoBehaviour
     {
         EnsureLoadoutSize();
         slot = Mathf.Clamp(slot, 0, magicLoadout.Length - 1);
+        if (magic != null && !IsMagicInInventoryLayout(magic, instanceId))
+            return;
         MoveMagicWithInventorySync(magic, instanceId, magicLoadout, magicInstanceIds, slot);
         currentMagicIndex = slot;
         SyncEquippedReferences();
@@ -741,39 +750,41 @@ public class PlayerInventory : MonoBehaviour
     {
         EnsureLoadoutSize();
         slot = Mathf.Clamp(slot, 0, magicLoadout.Length - 1);
+        if (magic != null && !IsMagicInInventoryLayout(magic, instanceId))
+            return;
         magicLoadout[slot] = magic;
         magicInstanceIds[slot] = string.IsNullOrWhiteSpace(instanceId) ? null : instanceId;
         currentMagicIndex = slot;
         SyncEquippedReferences();
     }
 
-    /// <summary>
-    /// Equips a magic selected by RunMagicSelectionState. Prepared magic is
-    /// knowledge/loadout state, therefore it deliberately carries no physical
-    /// inventory instance id.
-    /// </summary>
-    public void SetPreparedMagicAtSlot(int slot, MagicItemData magic)
+    public bool TryEquipMagicInventorySlot(int combatSlot, int inventorySlot)
     {
+        if (!TryGetMagicInventoryLayout(out MagicInventorySlotView[] layout)
+            || inventorySlot < 0 || inventorySlot >= layout.Length || layout[inventorySlot].Magic == null)
+            return false;
+
+        MagicInventorySlotView source = layout[inventorySlot];
         EnsureLoadoutSize();
-        slot = Mathf.Clamp(slot, 0, magicLoadout.Length - 1);
-        magicLoadout[slot] = magic;
-        magicInstanceIds[slot] = null;
-        currentMagicIndex = slot;
+        combatSlot = Mathf.Clamp(combatSlot, 0, magicLoadout.Length - 1);
+        magicLoadout[combatSlot] = source.Magic;
+        magicInstanceIds[combatSlot] = source.Source == MagicInventorySlotSource.Found ? source.InstanceId : null;
+        currentMagicIndex = combatSlot;
         SyncEquippedReferences();
+        return true;
     }
 
-    /// <summary>
-    /// Clears only equipped combat magic that is no longer present in the
-    /// authoritative prepared-magic layout. Physical magic loot is untouched.
-    /// </summary>
-    public void ValidateMagicLoadoutAgainstPrepared(IReadOnlyList<MagicItemData> preparedMagic)
+    public void ValidateMagicLoadoutAgainstMagicInventory()
     {
+        if (!TryGetMagicInventoryLayout(out MagicInventorySlotView[] layout))
+            return; // Missing shared recipe resolver is fail-safe: preserve combat loadout.
+
         EnsureLoadoutSize();
         bool changed = false;
         for (int i = 0; i < magicLoadout.Length; i++)
         {
             MagicItemData equipped = magicLoadout[i];
-            if (equipped == null || ContainsMagic(preparedMagic, equipped))
+            if (equipped == null || IsMagicInLayout(layout, equipped, magicInstanceIds[i]))
                 continue;
 
             magicLoadout[i] = null;
@@ -783,17 +794,6 @@ public class PlayerInventory : MonoBehaviour
 
         if (changed)
             SyncEquippedReferences();
-    }
-
-    private static bool ContainsMagic(IReadOnlyList<MagicItemData> source, MagicItemData magic)
-    {
-        if (source == null || magic == null)
-            return false;
-
-        for (int i = 0; i < source.Count; i++)
-            if (source[i] == magic)
-                return true;
-        return false;
     }
 
     public bool CycleRightWeapon(int direction = 1)
@@ -868,7 +868,7 @@ public class PlayerInventory : MonoBehaviour
             if ((item.weaponData != null || item.armorData != null) && string.IsNullOrWhiteSpace(item.instanceId)) return false;
             items.Add(item);
         }
-        SyncMagicInventorySlots();
+        SyncMagicInventoryLayout();
         SyncEquippedReferences();
         if (save) RequestInventorySave();
         return true;
@@ -1005,6 +1005,8 @@ public class PlayerInventory : MonoBehaviour
         InventoryItem existing = FindStackableMagicItem(magic);
         if (existing != null)
         {
+            if (!IsFoundMagicInLayout(existing.instanceId))
+                return false;
             int added = SaturatingAddToStack(existing, amount);
             if (added <= 0)
                 return false;
@@ -1012,7 +1014,14 @@ public class PlayerInventory : MonoBehaviour
             return true;
         }
 
-        items.Add(new InventoryItem(magic, amount));
+        SyncMagicInventoryLayout();
+        int emptySlot = GetFirstEmptyMagicInventorySlot();
+        if (emptySlot < 0)
+            return false;
+
+        var foundMagic = new InventoryItem(magic, amount);
+        items.Add(foundMagic);
+        magicInventoryLayout[emptySlot].SetFound(foundMagic.instanceId);
         RaiseCollectItemEvent(magic.name, "magic", amount);
         return true;
     }
@@ -1089,30 +1098,103 @@ public class PlayerInventory : MonoBehaviour
     {
         items.Clear();
         if (newItems != null) items.AddRange(newItems);
-        SyncMagicInventorySlots();
+        SyncMagicInventoryLayout();
+        ValidateMagicLoadoutAgainstMagicInventory();
     }
 
-    public List<InventoryItem> GetMagicInventorySlotLayout(int minSlotCount)
+    public bool TryGetMagicInventoryLayout(out MagicInventorySlotView[] layout)
     {
-        SyncMagicInventorySlots(minSlotCount);
-        return new List<InventoryItem>(magicInventorySlots);
-    }
-
-    public void SetMagicInventorySlotLayout(IReadOnlyList<InventoryItem> slotLayout, int minSlotCount)
-    {
-        magicInventorySlots.Clear();
-
-        if (slotLayout != null)
+        SyncMagicInventoryLayout();
+        layout = new MagicInventorySlotView[MagicInventoryCapacity];
+        for (int i = 0; i < magicInventoryLayout.Count; i++)
         {
-            for (int i = 0; i < slotLayout.Count; i++)
+            MagicInventorySlotState slot = magicInventoryLayout[i];
+            if (slot == null || slot.Source == MagicInventorySlotSource.Empty)
+                continue;
+
+            if (slot.Source == MagicInventorySlotSource.Found)
             {
-                var item = slotLayout[i];
-                magicInventorySlots.Add(item != null && item.magicData != null ? item : null);
+                if (TryGetItemByInstanceId(slot.InstanceId, out InventoryItem item) && item.magicData != null)
+                    layout[i] = new MagicInventorySlotView(slot.Source, item.magicData, null, slot.InstanceId);
+                continue;
             }
+
+            if (itemDatabase == null || !itemDatabase.TryGetMagicRecipe(slot.RecipeId, out MagicRecipeData recipe)
+                || recipe == null || recipe.resultMagic == null)
+            {
+                Debug.LogWarning($"[PlayerInventory] Magic inventory non risolvibile per recipe '{slot.RecipeId}'. Nessuna modifica applicata.", this);
+                layout = null;
+                return false;
+            }
+
+            layout[i] = new MagicInventorySlotView(slot.Source, recipe.resultMagic, slot.RecipeId, null);
         }
 
-        SyncMagicInventorySlots(minSlotCount);
-        ApplyMagicInventorySlotOrderToItems();
+        return true;
+    }
+
+    public bool TrySetPreparedMagicAtSlot(int slotIndex, string recipeId, System.Func<string, bool> learnedResolver)
+    {
+        SyncMagicInventoryLayout();
+        if (slotIndex < 0 || slotIndex >= magicInventoryLayout.Count || string.IsNullOrWhiteSpace(recipeId)
+            || learnedResolver == null || !learnedResolver(recipeId)
+            || itemDatabase == null || !itemDatabase.TryGetMagicRecipe(recipeId, out MagicRecipeData recipe)
+            || recipe == null || recipe.resultMagic == null)
+            return false;
+
+        MagicInventorySlotState target = magicInventoryLayout[slotIndex];
+        if (target.Source == MagicInventorySlotSource.Found)
+            return false;
+
+        string normalized = recipeId.Trim();
+        for (int i = 0; i < magicInventoryLayout.Count; i++)
+        {
+            if (i == slotIndex || magicInventoryLayout[i].Source != MagicInventorySlotSource.Prepared)
+                continue;
+            if (string.Equals(magicInventoryLayout[i].RecipeId, normalized, System.StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        target.SetPrepared(normalized);
+        ValidateMagicLoadoutAgainstMagicInventory();
+        return true;
+    }
+
+    public bool RemovePreparedMagicAtSlot(int slotIndex)
+    {
+        SyncMagicInventoryLayout();
+        if (slotIndex < 0 || slotIndex >= magicInventoryLayout.Count
+            || magicInventoryLayout[slotIndex].Source != MagicInventorySlotSource.Prepared)
+            return false;
+
+        magicInventoryLayout[slotIndex].Clear();
+        ValidateMagicLoadoutAgainstMagicInventory();
+        return true;
+    }
+
+    public void ClearPreparedMagic()
+    {
+        SyncMagicInventoryLayout();
+        bool changed = false;
+        for (int i = 0; i < magicInventoryLayout.Count; i++)
+        {
+            if (magicInventoryLayout[i].Source != MagicInventorySlotSource.Prepared)
+                continue;
+            magicInventoryLayout[i].Clear();
+            changed = true;
+        }
+        if (changed)
+            ValidateMagicLoadoutAgainstMagicInventory();
+    }
+
+    public string[] ExportPreparedMagicRecipeIds()
+    {
+        SyncMagicInventoryLayout();
+        var result = new string[magicInventoryLayout.Count];
+        for (int i = 0; i < magicInventoryLayout.Count; i++)
+            if (magicInventoryLayout[i].Source == MagicInventorySlotSource.Prepared)
+                result[i] = magicInventoryLayout[i].RecipeId;
+        return result;
     }
 
     private static bool InventoryItemMatchesAsset(InventoryItem item, ScriptableObject itemAsset)
@@ -1201,80 +1283,105 @@ public class PlayerInventory : MonoBehaviour
         return null;
     }
 
-    private void SyncMagicInventorySlots(int minSlotCount = 0)
+    private void SyncMagicInventoryLayout()
     {
-        var validMagicItems = new HashSet<InventoryItem>();
-        for (int i = 0; i < items.Count; i++)
-        {
-            var item = items[i];
-            if (item != null && item.magicData != null)
-                validMagicItems.Add(item);
-        }
+        int capacity = MagicInventoryCapacity;
+        while (magicInventoryLayout.Count < capacity)
+            magicInventoryLayout.Add(new MagicInventorySlotState());
+        if (magicInventoryLayout.Count > capacity)
+            magicInventoryLayout.RemoveRange(capacity, magicInventoryLayout.Count - capacity);
 
-        if (magicInventorySlots.Count == 0)
+        var assignedInstances = new HashSet<string>(System.StringComparer.Ordinal);
+        for (int i = 0; i < magicInventoryLayout.Count; i++)
         {
-            for (int i = 0; i < items.Count; i++)
+            MagicInventorySlotState slot = magicInventoryLayout[i];
+            if (slot == null)
             {
-                var item = items[i];
-                if (item != null && item.magicData != null)
-                    magicInventorySlots.Add(item);
+                magicInventoryLayout[i] = new MagicInventorySlotState();
+                continue;
             }
-        }
-        else
-        {
-            for (int i = 0; i < magicInventorySlots.Count; i++)
-            {
-                var item = magicInventorySlots[i];
-                if (item == null || item.magicData == null || !validMagicItems.Contains(item))
-                    magicInventorySlots[i] = null;
-            }
-        }
-
-        for (int i = 0; i < items.Count; i++)
-        {
-            var item = items[i];
-            if (item == null || item.magicData == null || magicInventorySlots.Contains(item))
+            if (slot.Source != MagicInventorySlotSource.Found)
                 continue;
 
-            int emptyIndex = magicInventorySlots.IndexOf(null);
-            if (emptyIndex >= 0)
-                magicInventorySlots[emptyIndex] = item;
-            else
-                magicInventorySlots.Add(item);
+            if (string.IsNullOrWhiteSpace(slot.InstanceId)
+                || !assignedInstances.Add(slot.InstanceId)
+                || !TryGetItemByInstanceId(slot.InstanceId, out InventoryItem item)
+                || item.magicData == null)
+                slot.Clear();
         }
 
-        int required = Mathf.Max(0, minSlotCount);
-        while (magicInventorySlots.Count < required)
-            magicInventorySlots.Add(null);
+        for (int i = 0; i < items.Count; i++)
+        {
+            InventoryItem item = items[i];
+            if (item == null || item.magicData == null || string.IsNullOrWhiteSpace(item.instanceId)
+                || assignedInstances.Contains(item.instanceId))
+                continue;
+
+            int emptySlot = GetFirstEmptyMagicInventorySlot();
+            if (emptySlot < 0)
+            {
+                Debug.LogWarning("[PlayerInventory] Magic fisica senza slot nel layout unificato: capacity esaurita.", this);
+                continue;
+            }
+
+            magicInventoryLayout[emptySlot].SetFound(item.instanceId);
+            assignedInstances.Add(item.instanceId);
+        }
     }
 
-    private void ApplyMagicInventorySlotOrderToItems()
+    private int GetFirstEmptyMagicInventorySlot()
     {
-        var orderedMagicItems = new List<InventoryItem>();
-        for (int i = 0; i < magicInventorySlots.Count; i++)
-        {
-            var item = magicInventorySlots[i];
-            if (item != null && item.magicData != null && items.Contains(item) && !orderedMagicItems.Contains(item))
-                orderedMagicItems.Add(item);
-        }
+        for (int i = 0; i < magicInventoryLayout.Count; i++)
+            if (magicInventoryLayout[i].Source == MagicInventorySlotSource.Empty)
+                return i;
+        return -1;
+    }
 
-        for (int i = 0; i < items.Count; i++)
-        {
-            var item = items[i];
-            if (item != null && item.magicData != null && !orderedMagicItems.Contains(item))
-                orderedMagicItems.Add(item);
-        }
+    private int CountOccupiedMagicInventorySlots()
+    {
+        SyncMagicInventoryLayout();
+        int count = 0;
+        for (int i = 0; i < magicInventoryLayout.Count; i++)
+            if (magicInventoryLayout[i].Source != MagicInventorySlotSource.Empty)
+                count++;
+        return count;
+    }
 
-        int magicIndex = 0;
-        for (int i = 0; i < items.Count && magicIndex < orderedMagicItems.Count; i++)
+    private bool IsFoundMagicInLayout(string instanceId)
+    {
+        if (string.IsNullOrWhiteSpace(instanceId))
+            return false;
+        SyncMagicInventoryLayout();
+        for (int i = 0; i < magicInventoryLayout.Count; i++)
+            if (magicInventoryLayout[i].Source == MagicInventorySlotSource.Found
+                && string.Equals(magicInventoryLayout[i].InstanceId, instanceId, System.StringComparison.Ordinal))
+                return true;
+        return false;
+    }
+
+    private bool IsMagicInInventoryLayout(MagicItemData magic, string instanceId)
+    {
+        if (!TryGetMagicInventoryLayout(out MagicInventorySlotView[] layout))
+            return false;
+        return IsMagicInLayout(layout, magic, instanceId);
+    }
+
+    private static bool IsMagicInLayout(IReadOnlyList<MagicInventorySlotView> layout, MagicItemData magic, string instanceId)
+    {
+        if (layout == null || magic == null)
+            return false;
+        for (int i = 0; i < layout.Count; i++)
         {
-            var item = items[i];
-            if (item == null || item.magicData == null)
+            MagicInventorySlotView slot = layout[i];
+            if (slot.Magic != magic)
                 continue;
-
-            items[i] = orderedMagicItems[magicIndex];
-            magicIndex++;
+            if (string.IsNullOrWhiteSpace(instanceId))
+                return slot.Source == MagicInventorySlotSource.Prepared;
+            if (slot.Source == MagicInventorySlotSource.Found
+                && string.Equals(slot.InstanceId, instanceId, System.StringComparison.Ordinal))
+                return true;
         }
+        return false;
     }
 
     private InventoryItem FindStackableUsableItem(UsableItemData usable)
@@ -1762,7 +1869,8 @@ public class PlayerInventory : MonoBehaviour
         currentLeftIndex = Mathf.Clamp(data.currentLeftIndex, 0, leftLoadout.Length - 1);
         currentMagicIndex = Mathf.Clamp(data.currentMagicIndex, 0, magicLoadout.Length - 1);
         currentUsableIndex = Mathf.Clamp(data.currentUsableIndex, 0, usableLoadout.Length - 1);
-        SyncMagicInventorySlots();
+        SyncMagicInventoryLayout();
+        ValidateMagicLoadoutAgainstMagicInventory();
         SyncEquippedReferences();
     }
 

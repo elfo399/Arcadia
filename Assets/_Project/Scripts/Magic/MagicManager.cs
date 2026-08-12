@@ -73,7 +73,6 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     private readonly List<MagicRecipeData> preparedRecipeRows = new List<MagicRecipeData>();
     private readonly List<DialogueChoiceUI> preparedRows = new List<DialogueChoiceUI>();
     private readonly List<InventorySlot> equipSlots = new List<InventorySlot>();
-    private readonly HashSet<string> resolveWarnings = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     private readonly object gameplayLockOwner = new object();
     private PlayerControls controls;
     private Action<InputAction.CallbackContext> confirmCallback;
@@ -311,52 +310,24 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         return result;
     }
 
-    /// <summary>
-    /// Returns the six run-preparation entries in their authoritative domain order.
-    /// Null entries are empty or stale selections; no physical InventoryItem is created.
-    /// </summary>
-    public MagicItemData[] GetPreparedMagicLayout()
+    /// <summary>Projection of the shared magic inventory; this manager never owns the layout.</summary>
+    public MagicItemData[] GetMagicInventoryLayout()
     {
-        int capacity = GetRunMagicCapacity();
-        var result = new MagicItemData[capacity];
-        PlayerStats stats = ResolvePlayerStats();
-        if (stats == null)
-            return result;
+        PlayerInventory inventory = ResolvePlayerInventory();
+        if (inventory == null || !inventory.TryGetMagicInventoryLayout(out MagicInventorySlotView[] layout))
+            return Array.Empty<MagicItemData>();
 
-        string[] selection = stats.GetRunMagicSelection();
-        int count = Mathf.Min(capacity, selection != null ? selection.Length : 0);
-        for (int i = 0; i < count; i++)
-        {
-            if (string.IsNullOrWhiteSpace(selection[i]))
-                continue;
-
-            if (TryResolvePreparedRecipe(selection[i], out MagicRecipeData recipe))
-            {
-                result[i] = recipe.resultMagic;
-                continue;
-            }
-
-            // Legacy or malformed selection: remove only the invalid run entry.
-            stats.RemoveRunMagicAtSlot(i);
-        }
-
-        return result;
-    }
-
-    public bool IsMagicPrepared(MagicItemData magic)
-    {
-        if (magic == null)
-            return false;
-
-        MagicItemData[] layout = GetPreparedMagicLayout();
+        var result = new MagicItemData[layout.Length];
         for (int i = 0; i < layout.Length; i++)
-            if (layout[i] == magic)
-                return true;
-        return false;
+            result[i] = layout[i].Magic;
+        return result;
     }
 
     public int GetRunMagicCapacity()
     {
+        PlayerInventory inventory = ResolvePlayerInventory();
+        if (inventory != null)
+            return inventory.MagicInventoryCapacity;
         PlayerStats stats = ResolvePlayerStats();
         return stats != null ? Mathf.Max(0, stats.RunMagicCapacity) : Mathf.Max(0, equipSlotCount);
     }
@@ -407,38 +378,11 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         return stats != null ? stats.GetComponent<PlayerInventory>() : null;
     }
 
-    private bool TryResolvePreparedRecipe(string recipeId, out MagicRecipeData recipe)
-    {
-        recipe = null;
-        if (string.IsNullOrWhiteSpace(recipeId) || recipes == null)
-            return false;
-
-        string normalized = recipeId.Trim();
-        for (int i = 0; i < recipes.Count; i++)
-        {
-            MagicRecipeData candidate = recipes[i];
-            if (candidate == null || string.IsNullOrWhiteSpace(candidate.recipeId)
-                || !string.Equals(candidate.recipeId.Trim(), normalized, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            PlayerStats stats = ResolvePlayerStats();
-            if (candidate.resultMagic == null || stats == null || !stats.KnowsMagicRecipe(candidate.recipeId))
-                break;
-
-            recipe = candidate;
-            return true;
-        }
-
-        if (resolveWarnings.Add(normalized))
-            Debug.LogWarning($"[MagicManager] Run magic selection non risolvibile: '{normalized}'. L'entry viene rimossa.", this);
-        return false;
-    }
-
     private void RefreshPreparedMagicState()
     {
         PlayerInventory inventory = ResolvePlayerInventory();
         if (inventory != null)
-            inventory.ValidateMagicLoadoutAgainstPrepared(GetPreparedMagicLayout());
+            inventory.ValidateMagicLoadoutAgainstMagicInventory();
 
         if (IsOpen && currentView == MagicView.Prepare)
             RefreshPrepareView();
@@ -680,7 +624,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     private void RefreshPreparedSlots()
     {
         EnsureEquipSlots();
-        MagicItemData[] layout = GetPreparedMagicLayout();
+        MagicItemData[] layout = GetMagicInventoryLayout();
         int capacity = layout.Length;
         selectedPreparedSlotIndex = capacity == 0 ? -1 : Mathf.Clamp(selectedPreparedSlotIndex, 0, capacity - 1);
 
