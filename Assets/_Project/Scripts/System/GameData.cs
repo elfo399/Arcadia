@@ -88,6 +88,7 @@ public class SavedMerchantStockData
 public class SavedBlacksmithData
 {
     public string[] knownRecipeIds;
+    public SavedBlueprintFragmentData[] blueprintFragments;
 }
 
 [System.Serializable]
@@ -95,6 +96,27 @@ public class SavedMagicProgressionData
 {
     public string[] unlockedRecipeIds;
     public string[] learnedRecipeIds;
+    public SavedBlueprintFragmentData[] blueprintFragments;
+}
+
+[System.Serializable]
+public class SavedBlueprintFragmentData
+{
+    public string recipeId;
+    public int fragments;
+}
+
+[System.Serializable]
+public class SavedMaterialStackData
+{
+    public string assetName;
+    public int amount;
+}
+
+[System.Serializable]
+public class SavedMaterialStorageData
+{
+    public SavedMaterialStackData[] materials;
 }
 
 [System.Serializable]
@@ -168,6 +190,8 @@ public class GameData
     public SavedMerchantStockData[] merchantStocks;
     public SavedBlacksmithData blacksmith;
     public SavedMagicProgressionData magicProgression;
+    public SavedMaterialStorageData materialStorage;
+    // Legacy field: read only for migration from the old physical storage.
     public SavedStorageData storage;
 
     // Narrative state. Arrays remain JsonUtility-compatible; runtime systems

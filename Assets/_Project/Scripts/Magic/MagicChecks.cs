@@ -9,8 +9,7 @@ public enum MagicFailureReason
     MissingStats,
     MissingCoins,
     MissingMaterials,
-    NotLearned,
-    NoDestination
+    NotLearned
 }
 
 public sealed class MagicRequirementStatus
@@ -36,20 +35,4 @@ public sealed class MagicLearnCheck
     public int CoinCost;
     public readonly List<MagicRequirementStatus> Materials = new List<MagicRequirementStatus>();
     public readonly List<MagicStatRequirementStatus> Stats = new List<MagicStatRequirementStatus>();
-}
-
-public enum MagicCreateDestination
-{
-    None,
-    PlayerInventory,
-    MagicStorage
-}
-
-public sealed class MagicCreateCheck
-{
-    public bool IsValid;
-    public MagicFailureReason FailureReason;
-    public int CoinCost;
-    public MagicCreateDestination Destination;
-    public readonly List<MagicRequirementStatus> Materials = new List<MagicRequirementStatus>();
 }

@@ -1552,6 +1552,11 @@ public class PlayerInventory : MonoBehaviour
         return restored;
     }
 
+    public ItemData ResolveItemDataByAssetName(string assetName)
+    {
+        return ResolveItem(assetName, BuildAssetLookups().items);
+    }
+
     public void ApplySaveData(SavedPlayerInventoryData data)
     {
         if (data == null) return;

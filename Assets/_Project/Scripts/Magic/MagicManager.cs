@@ -200,7 +200,7 @@ public sealed class MagicManager : MonoBehaviour
         for (int i = 0; i < check.Materials.Count; i++)
         {
             MagicRequirementStatus status = check.Materials[i];
-            if (!playerInventory.TryRemoveItem(status.Item, status.Required, out _, false))
+            if (!playerStats.MaterialStorage.TryRemove(status.Item, status.Required))
             {
                 playerStats.AddCoins(check.CoinCost, false);
                 RestoreMaterials(removedMaterials);
@@ -218,59 +218,75 @@ public sealed class MagicManager : MonoBehaviour
         return true;
     }
 
-    public MagicCreateCheck CanCreateMagic(MagicRecipeData recipe)
+    public IReadOnlyList<MagicItemData> GetLearnedMagic()
     {
-        var check = new MagicCreateCheck { CoinCost = recipe != null ? Mathf.Max(0, recipe.createCoinCost) : 0 };
-        if (recipe == null || recipe.resultMagic == null || string.IsNullOrWhiteSpace(recipe.recipeId))
-            return Fail(check, MagicFailureReason.InvalidRecipe);
-        if (!IsRecipeAvailable(recipe)) return Fail(check, MagicFailureReason.LockedRecipe);
-        if (playerStats == null || playerInventory == null) return Fail(check, MagicFailureReason.InvalidRecipe);
-        if (!playerStats.KnowsMagicRecipe(recipe.recipeId)) return Fail(check, MagicFailureReason.NotLearned);
-        bool materialsSatisfied = BuildMaterialStatuses(recipe.createMaterialRequirements, check.Materials);
-        if (!playerStats.HasCoins(check.CoinCost)) return Fail(check, MagicFailureReason.MissingCoins);
-        if (!materialsSatisfied) return Fail(check, MagicFailureReason.MissingMaterials);
-
-        InventoryItem probe = new InventoryItem(recipe.resultMagic, 1);
-        if (playerInventory.CanAddItem(recipe.resultMagic, 1)) check.Destination = MagicCreateDestination.PlayerInventory;
-        else if (playerStats.StorageState.CanAdd(probe)) check.Destination = MagicCreateDestination.MagicStorage;
-        else return Fail(check, MagicFailureReason.NoDestination);
-        check.IsValid = true;
-        return check;
+        var result = new List<MagicItemData>();
+        if (playerStats == null || recipes == null) return result;
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < recipes.Count; i++)
+        {
+            MagicRecipeData recipe = recipes[i];
+            if (recipe == null || recipe.resultMagic == null || string.IsNullOrWhiteSpace(recipe.recipeId)
+                || !playerStats.KnowsMagicRecipe(recipe.recipeId) || !ids.Add(recipe.recipeId.Trim()))
+                continue;
+            result.Add(recipe.resultMagic);
+        }
+        return result;
     }
 
-    public bool TryCreateMagic(MagicRecipeData recipe, out MagicCreateCheck check)
+    public bool SetRunMagicAtSlot(int slot, MagicRecipeData recipe)
     {
-        check = CanCreateMagic(recipe);
-        if (!check.IsValid) return false;
-        if (!playerStats.TryRemoveCoins(check.CoinCost, false)) return false;
-        var removedMaterials = new List<MagicRequirementStatus>();
-        for (int i = 0; i < check.Materials.Count; i++)
-        {
-            MagicRequirementStatus status = check.Materials[i];
-            if (!playerInventory.TryRemoveItem(status.Item, status.Required, out _, false))
-            {
-                playerStats.AddCoins(check.CoinCost, false);
-                RestoreMaterials(removedMaterials);
-                return false;
-            }
-            removedMaterials.Add(status);
-        }
+        return recipe != null && playerStats != null && recipe.resultMagic != null
+            && playerStats.KnowsMagicRecipe(recipe.recipeId)
+            && playerStats.SetRunMagicAtSlot(slot, recipe.recipeId);
+    }
 
-        bool added;
-        InventoryItem created = new InventoryItem(recipe.resultMagic, 1);
-        if (check.Destination == MagicCreateDestination.PlayerInventory)
-            added = playerInventory.TryAddItem(recipe.resultMagic, 1, false);
-        else
-            added = playerStats.StorageState.TryAddMagic(created);
+    public bool RemoveRunMagicAtSlot(int slot) => playerStats != null && playerStats.RemoveRunMagicAtSlot(slot);
+    public string[] GetRunMagicSelection() => playerStats != null ? playerStats.GetRunMagicSelection() : Array.Empty<string>();
+    public void ClearRunMagicSelection() => playerStats?.ClearRunMagicSelection();
 
-        if (!added)
-        {
-            playerStats.AddCoins(check.CoinCost, false);
-            RestoreMaterials(removedMaterials);
+    public bool CanConvertMagicToBlueprintFragment(string instanceId)
+    {
+        if (playerInventory == null || playerStats == null || !playerInventory.TryGetItemByInstanceId(instanceId, out InventoryItem item)
+            || item == null || item.magicData == null)
             return false;
+        MagicRecipeData recipe = FindRecipeForMagic(item.magicData);
+        return recipe != null && recipe.unlockType == MagicRecipeUnlockType.Blueprint
+            && !playerStats.KnowsMagicRecipe(recipe.recipeId)
+            && playerStats.GetMagicBlueprintFragments(recipe.recipeId) < recipe.blueprintFragmentsRequired;
+    }
+
+    public bool TryConvertMagicToBlueprintFragment(string instanceId)
+    {
+        if (!CanConvertMagicToBlueprintFragment(instanceId)) return false;
+        playerInventory.TryGetItemByInstanceId(instanceId, out InventoryItem item);
+        MagicRecipeData recipe = FindRecipeForMagic(item.magicData);
+        if (!playerInventory.TryRemoveInstance(instanceId, 1, out int remaining, save: false)) return false;
+
+        if (playerStats.TryAddMagicBlueprintFragment(recipe.recipeId, recipe.blueprintFragmentsRequired, save: false))
+        {
+            playerStats.SaveStatsImmediate();
+            return true;
         }
-        playerStats.SaveStats();
-        return true;
+
+        if (remaining > 0)
+            playerInventory.TryAdjustInstanceAmount(instanceId, 1, out _, save: false);
+        else
+        {
+            InventoryItem restored = new InventoryItem(item.magicData, 1);
+            restored.instanceId = instanceId;
+            playerInventory.TryAddItemInstance(restored, save: false);
+        }
+        return false;
+    }
+
+    private MagicRecipeData FindRecipeForMagic(MagicItemData magic)
+    {
+        if (magic == null || recipes == null) return null;
+        for (int i = 0; i < recipes.Count; i++)
+            if (recipes[i] != null && recipes[i].resultMagic == magic)
+                return recipes[i];
+        return null;
     }
 
     private bool IsRecipeAvailable(MagicRecipeData recipe)
@@ -289,7 +305,7 @@ public sealed class MagicManager : MonoBehaviour
             MagicMaterialRequirement req = requirements[i];
             if (req == null || req.item == null) { valid = false; continue; }
             int required = Mathf.Max(1, req.amount);
-            int owned = playerInventory != null ? playerInventory.GetTotalItemAmount(req.item) : 0;
+            int owned = playerStats != null ? playerStats.MaterialStorage.GetAmount(req.item) : 0;
             output.Add(new MagicRequirementStatus { Item = req.item, Required = required, Owned = owned, Satisfied = owned >= required });
             if (owned < required) valid = false;
         }
@@ -299,13 +315,12 @@ public sealed class MagicManager : MonoBehaviour
     private void RestoreMaterials(List<MagicRequirementStatus> removed)
     {
         for (int i = 0; i < removed.Count; i++)
-            playerInventory.TryAddItem(removed[i].Item, removed[i].Required, false);
+            playerStats.MaterialStorage.TryAdd(removed[i].Item, removed[i].Required);
     }
 
     private static T Fail<T>(T check, MagicFailureReason reason) where T : class
     {
         if (check is MagicLearnCheck learn) { learn.FailureReason = reason; learn.IsValid = false; }
-        if (check is MagicCreateCheck create) { create.FailureReason = reason; create.IsValid = false; }
         return check;
     }
 
@@ -401,12 +416,10 @@ public sealed class MagicManager : MonoBehaviour
         bool learned = recipe != null && playerStats != null && playerStats.KnowsMagicRecipe(recipe.recipeId);
         if (learned)
         {
-            MagicCreateCheck check = CanCreateMagic(recipe);
-            if (priceRoot != null) priceRoot.SetActive(true);
-            if (priceText != null) priceText.text = recipe != null ? recipe.createCoinCost.ToString() : string.Empty;
-            CreateMaterialRows(check.Materials);
-            if (actionButtonLabel != null) actionButtonLabel.text = "CREA";
-            if (actionButton != null) actionButton.interactable = check.IsValid;
+            if (priceRoot != null) priceRoot.SetActive(false);
+            if (priceText != null) priceText.text = string.Empty;
+            if (actionButtonLabel != null) actionButtonLabel.text = "GIÀ IMPARATA";
+            if (actionButton != null) actionButton.interactable = false;
         }
         else
         {
@@ -437,8 +450,8 @@ public sealed class MagicManager : MonoBehaviour
         lastActionActivationFrame = Time.frameCount;
         MagicRecipeData recipe = SelectedRecipe;
         if (recipe == null) return;
-        if (playerStats.KnowsMagicRecipe(recipe.recipeId)) TryCreateMagic(recipe, out _);
-        else TryLearnMagic(recipe, out _);
+        if (!playerStats.KnowsMagicRecipe(recipe.recipeId))
+            TryLearnMagic(recipe, out _);
         RefreshRecipeList();
         if (visibleRecipes.Count > 0) SetRecipeFocus(Mathf.Clamp(selectedRecipeIndex, 0, visibleRecipes.Count - 1));
     }

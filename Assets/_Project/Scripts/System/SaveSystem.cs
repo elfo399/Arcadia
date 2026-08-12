@@ -3,7 +3,7 @@ using System.IO;
 
 public static class SaveSystem
 {
-    public const int CurrentSaveVersion = 4;
+    public const int CurrentSaveVersion = 5;
     public const string SinglePlayerId = "player";
     public const string DefaultPlayerName = "Player";
 
@@ -360,6 +360,12 @@ public static class SaveSystem
                     // Magic progression and storage are optional additions;
                     // null fields intentionally migrate to empty runtime state.
                     data.saveVersion = 4;
+                    break;
+
+                case 4:
+                    // PlayerStats migrates old physical storage once the
+                    // ItemDatabase lookup is available.
+                    data.saveVersion = 5;
                     break;
 
                 default:

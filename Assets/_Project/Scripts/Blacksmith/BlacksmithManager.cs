@@ -1418,7 +1418,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         for (int i = 0; i < requirements.Count; i++)
         {
             UpgradeMaterialRequirement requirement = requirements[i];
-            int owned = inventory != null ? inventory.GetTotalItemAmount(requirement.item) : 0;
+            int owned = stats != null ? stats.MaterialStorage.GetAmount(requirement.item) : 0;
             check.Materials.Add(new BlacksmithRequirementStatus
             {
                 item = requirement.item,
@@ -1456,7 +1456,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         for (int i = 0; i < result.Materials.Count; i++)
         {
             BlacksmithRequirementStatus requirement = result.Materials[i];
-            if (inventory.TryRemoveItem(requirement.item, requirement.required, out _, false))
+            if (stats.MaterialStorage.TryRemove(requirement.item, requirement.required))
             {
                 removed.Add(requirement);
                 continue;
@@ -1464,7 +1464,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
             if (result.CoinCost > 0) stats.AddCoins(result.CoinCost, false);
             for (int j = 0; j < removed.Count; j++)
-                inventory.TryAddItem(removed[j].item, removed[j].required, false);
+                stats.MaterialStorage.TryAdd(removed[j].item, removed[j].required);
             result.IsValid = false;
             result.FailureReason = "Transazione materiali fallita.";
             return false;
@@ -1492,7 +1492,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         else if (recipe.resultWeapon == null || !recipe.resultWeapon.canCraft)
             check.FailureReason = "Risultato non forgiabile.";
         else if (!inventory.CanAddItem(recipe.resultWeapon, 1))
-            check.FailureReason = "Inventario pieno.";
+            check.FailureReason = "InventoryFull";
         else if (!stats.HasCoins(recipe.coinCost))
             check.FailureReason = "Monete insufficienti.";
 
@@ -1503,7 +1503,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             {
                 UpgradeMaterialRequirement requirement = recipe.materialRequirements[i];
                 if (requirement == null || requirement.item == null || requirement.amount <= 0) continue;
-                int owned = inventory.GetTotalItemAmount(requirement.item);
+                int owned = stats.MaterialStorage.GetAmount(requirement.item);
                 check.Materials.Add(new BlacksmithRequirementStatus
                 {
                     item = requirement.item,
@@ -1534,7 +1534,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         for (int i = 0; i < result.Materials.Count; i++)
         {
             BlacksmithRequirementStatus requirement = result.Materials[i];
-            if (inventory.TryRemoveItem(requirement.item, requirement.required, out _, false))
+            if (stats.MaterialStorage.TryRemove(requirement.item, requirement.required))
             {
                 removed.Add(requirement);
                 continue;
@@ -1542,7 +1542,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
             if (result.CoinCost > 0) stats.AddCoins(result.CoinCost, false);
             for (int j = 0; j < removed.Count; j++)
-                inventory.TryAddItem(removed[j].item, removed[j].required, false);
+                stats.MaterialStorage.TryAdd(removed[j].item, removed[j].required);
             result.IsValid = false;
             result.FailureReason = "Transazione materiali fallita.";
             return false;
@@ -1554,7 +1554,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         {
             if (result.CoinCost > 0) stats.AddCoins(result.CoinCost, false);
             for (int i = 0; i < removed.Count; i++)
-                inventory.TryAddItem(removed[i].item, removed[i].required, false);
+                stats.MaterialStorage.TryAdd(removed[i].item, removed[i].required);
             result.IsValid = false;
             result.FailureReason = "Impossibile aggiungere l'arma creata.";
             return false;
@@ -1574,6 +1574,58 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     {
         return ActiveContext != null && ActiveContext.PlayerStats != null
             && ActiveContext.PlayerStats.KnowsBlacksmithRecipe(recipeId);
+    }
+
+    public bool CanConvertWeaponToBlueprintFragment(string instanceId)
+    {
+        if (ActiveContext == null || ActiveContext.PlayerInventory == null || ActiveContext.PlayerStats == null
+            || !ActiveContext.PlayerInventory.TryGetItemByInstanceId(instanceId, out InventoryItem item)
+            || item == null || item.weaponData == null)
+            return false;
+
+        CraftingRecipeData recipe = FindRecipeForWeapon(item.weaponData);
+        return recipe != null
+            && (recipe.unlockType == RecipeUnlockType.Blueprint || recipe.unlockType == RecipeUnlockType.BlueprintAndStory)
+            && !ActiveContext.PlayerStats.KnowsBlacksmithRecipe(recipe.recipeId)
+            && ActiveContext.PlayerStats.GetBlacksmithBlueprintFragments(recipe.recipeId) < recipe.blueprintFragmentsRequired;
+    }
+
+    public bool TryConvertWeaponToBlueprintFragment(string instanceId)
+    {
+        if (!CanConvertWeaponToBlueprintFragment(instanceId)) return false;
+        PlayerInventory inventory = ActiveContext.PlayerInventory;
+        PlayerStats stats = ActiveContext.PlayerStats;
+        inventory.TryGetItemByInstanceId(instanceId, out InventoryItem item);
+        CraftingRecipeData recipe = FindRecipeForWeapon(item.weaponData);
+
+        if (!inventory.TryRemoveInstance(instanceId, 1, out int remaining, save: false))
+            return false;
+
+        if (stats.TryAddBlacksmithBlueprintFragment(recipe.recipeId, recipe.blueprintFragmentsRequired, save: false))
+        {
+            stats.SaveStatsImmediate();
+            return true;
+        }
+
+        if (remaining > 0)
+            inventory.TryAdjustInstanceAmount(instanceId, 1, out _, save: false);
+        else
+        {
+            InventoryItem restored = new InventoryItem(item.weaponData, 1);
+            restored.instanceId = instanceId;
+            restored.upgradeLevel = item.upgradeLevel;
+            inventory.TryAddItemInstance(restored, save: false);
+        }
+        return false;
+    }
+
+    private CraftingRecipeData FindRecipeForWeapon(WeaponItem weapon)
+    {
+        if (weapon == null || recipes == null) return null;
+        for (int i = 0; i < recipes.Count; i++)
+            if (recipes[i] != null && recipes[i].resultWeapon == weapon)
+                return recipes[i];
+        return null;
     }
 
     private bool IsRecipeUnlocked(CraftingRecipeData recipe)

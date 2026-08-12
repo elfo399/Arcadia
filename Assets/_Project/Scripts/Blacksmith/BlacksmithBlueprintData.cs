@@ -7,6 +7,6 @@ public sealed class BlacksmithBlueprintData : ScriptableObject
 
     public bool Learn(PlayerStats stats)
     {
-        return stats != null && recipe != null && stats.LearnBlacksmithRecipe(recipe.recipeId);
+        return stats != null && recipe != null && stats.CompleteBlacksmithBlueprint(recipe.recipeId, recipe.blueprintFragmentsRequired);
     }
 }

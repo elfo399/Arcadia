@@ -21,7 +21,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private readonly MerchantStockState merchantStockState = new MerchantStockState();
     private readonly BlacksmithProgressionState blacksmithProgression = new BlacksmithProgressionState();
     private readonly MagicProgressionState magicProgression = new MagicProgressionState();
-    private readonly PersistentStorageState storageState = new PersistentStorageState();
+    private readonly MaterialStorageState materialStorageState = new MaterialStorageState();
+    private readonly RunMagicSelectionState runMagicSelection = new RunMagicSelectionState(12);
 
     [Header("Health")]
     public float maxHealth = 100f;
@@ -164,7 +165,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public MerchantStockState MerchantStockState => merchantStockState;
     public BlacksmithProgressionState BlacksmithProgression => blacksmithProgression;
     public MagicProgressionState MagicProgression => magicProgression;
-    public PersistentStorageState StorageState => storageState;
+    public MaterialStorageState MaterialStorage => materialStorageState;
+    public int RunMagicCapacity => runMagicSelection.Capacity;
     public int EffectiveVigor => Mathf.Max(1, vigor + temporaryVigorBonus);
     public int EffectiveMind => Mathf.Max(1, mind + temporaryMindBonus);
     public int EffectiveEndurance => Mathf.Max(1, endurance + temporaryEnduranceBonus);
@@ -234,6 +236,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         RecalculateDerivedStats(keepCurrentRatio: true);
+        if (deathInProgress && string.Equals(scene.name, "HubScene", StringComparison.OrdinalIgnoreCase))
+        {
+            currentHealth = maxHealth;
+            currentStamina = maxStamina;
+            currentMana = maxMana;
+            currentFlasks = maxFlasks;
+            deathInProgress = false;
+        }
         RefreshArmorTotals();
         UpdateAllUI();
         if (delayedUiRefreshRoutine != null)
@@ -624,6 +634,49 @@ public class PlayerStats : MonoBehaviour, IDamageable
         dungeonCheckpointSeed = string.Empty;
     }
 
+    /// <summary>
+    /// Completes the run transaction: only material stacks are moved to the
+    /// permanent aggregate storage. Every physical non-material item remains
+    /// in PlayerInventory.
+    /// </summary>
+    public bool TryCompleteRun()
+    {
+        PlayerInventory inventory = GetCachedPlayerInventory();
+        if (inventory == null) return false;
+
+        var totals = new Dictionary<ItemData, int>();
+        for (int i = 0; i < inventory.Items.Count; i++)
+        {
+            InventoryItem entry = inventory.Items[i];
+            if (entry == null || entry.itemData == null || entry.itemData.category != ItemCategory.Material || entry.amount <= 0)
+                continue;
+
+            long amount = (long)(totals.TryGetValue(entry.itemData, out int current) ? current : 0) + entry.amount;
+            if (amount > int.MaxValue || amount <= 0) return false;
+            totals[entry.itemData] = (int)amount;
+        }
+
+        foreach (KeyValuePair<ItemData, int> entry in totals)
+            if (!materialStorageState.CanAdd(entry.Key, entry.Value)) return false;
+
+        foreach (KeyValuePair<ItemData, int> entry in totals)
+            materialStorageState.TryAdd(entry.Key, entry.Value);
+
+        foreach (KeyValuePair<ItemData, int> entry in totals)
+        {
+            if (inventory.TryRemoveItem(entry.Key, entry.Value, out _, save: false))
+                continue;
+
+            foreach (KeyValuePair<ItemData, int> rollback in totals)
+                materialStorageState.TryRemove(rollback.Key, rollback.Value);
+            return false;
+        }
+
+        ClearDungeonCheckpoint();
+        SaveStatsImmediate();
+        return true;
+    }
+
     public bool HasStoryFlag(string flagId)
     {
         string normalized = NormalizeStoryFlagId(flagId);
@@ -649,6 +702,23 @@ public class PlayerStats : MonoBehaviour, IDamageable
         return changed;
     }
 
+    public bool CompleteBlacksmithBlueprint(string recipeId, int requiredFragments, bool save = true)
+    {
+        if (string.IsNullOrWhiteSpace(recipeId) || blacksmithProgression.KnowsRecipe(recipeId)) return false;
+        blacksmithProgression.CompleteBlueprint(recipeId, requiredFragments);
+        if (save) SaveStats();
+        return true;
+    }
+
+    public int GetBlacksmithBlueprintFragments(string recipeId) => blacksmithProgression.GetBlueprintFragments(recipeId);
+
+    public bool TryAddBlacksmithBlueprintFragment(string recipeId, int requiredFragments, bool save = true)
+    {
+        bool changed = blacksmithProgression.TryAddBlueprintFragment(recipeId, requiredFragments, out _);
+        if (changed && save) SaveStats();
+        return changed;
+    }
+
     public bool LearnMagicRecipe(string recipeId, bool save = true)
     {
         bool changed = magicProgression.LearnRecipe(recipeId);
@@ -656,153 +726,36 @@ public class PlayerStats : MonoBehaviour, IDamageable
         return changed;
     }
 
+    public bool CompleteMagicBlueprint(string recipeId, int requiredFragments, bool save = true)
+    {
+        if (string.IsNullOrWhiteSpace(recipeId) || magicProgression.IsRecipeUnlocked(recipeId)) return false;
+        magicProgression.CompleteBlueprint(recipeId, requiredFragments);
+        if (save) SaveStats();
+        return true;
+    }
+
+    public int GetMagicBlueprintFragments(string recipeId) => magicProgression.GetBlueprintFragments(recipeId);
+
+    public bool TryAddMagicBlueprintFragment(string recipeId, int requiredFragments, bool save = true)
+    {
+        bool changed = magicProgression.TryAddBlueprintFragment(recipeId, requiredFragments, out _);
+        if (changed && save) SaveStats();
+        return changed;
+    }
+
+    public string[] GetRunMagicSelection() => runMagicSelection.Export();
+
+    public bool SetRunMagicAtSlot(int slot, string recipeId)
+    {
+        return runMagicSelection.SetAtSlot(slot, recipeId, KnowsMagicRecipe);
+    }
+
+    public bool RemoveRunMagicAtSlot(int slot) => runMagicSelection.RemoveAtSlot(slot);
+
+    public void ClearRunMagicSelection() => runMagicSelection.Clear();
+
     public bool IsMagicRecipeUnlocked(string recipeId) => magicProgression.IsRecipeUnlocked(recipeId);
     public bool KnowsMagicRecipe(string recipeId) => magicProgression.KnowsRecipe(recipeId);
-
-    public bool TryStoreInventoryItem(string instanceId)
-    {
-        return TryStoreInventoryItemInternal(instanceId, magic: false, amount: -1);
-    }
-
-    /// <summary>Store the requested quantity; the legacy overload stores the full instance.</summary>
-    public bool TryStoreInventoryItem(string instanceId, int amount)
-    {
-        return TryStoreInventoryItemInternal(instanceId, magic: false, amount);
-    }
-
-    public bool TryStoreMagicItem(string instanceId)
-    {
-        return TryStoreInventoryItemInternal(instanceId, magic: true, amount: -1);
-    }
-
-    /// <summary>Store the requested quantity; the legacy overload stores the full stack.</summary>
-    public bool TryStoreMagicItem(string instanceId, int amount)
-    {
-        return TryStoreInventoryItemInternal(instanceId, magic: true, amount);
-    }
-
-    public bool TryWithdrawStoredItem(string instanceId)
-    {
-        return TryWithdrawStoredItemInternal(instanceId, magic: false, amount: -1);
-    }
-
-    /// <summary>Withdraw the requested quantity; the legacy overload withdraws the full instance.</summary>
-    public bool TryWithdrawStoredItem(string instanceId, int amount)
-    {
-        return TryWithdrawStoredItemInternal(instanceId, magic: false, amount);
-    }
-
-    public bool TryWithdrawStoredMagic(string instanceId)
-    {
-        return TryWithdrawStoredItemInternal(instanceId, magic: true, amount: -1);
-    }
-
-    /// <summary>Withdraw the requested quantity; the legacy overload withdraws the full stack.</summary>
-    public bool TryWithdrawStoredMagic(string instanceId, int amount)
-    {
-        return TryWithdrawStoredItemInternal(instanceId, magic: true, amount);
-    }
-
-    private bool TryStoreInventoryItemInternal(string instanceId, bool magic, int amount)
-    {
-        PlayerInventory inventory = GetCachedPlayerInventory();
-        if (inventory == null || string.IsNullOrWhiteSpace(instanceId)) return false;
-
-        if (!inventory.TryGetItemByInstanceId(instanceId, out InventoryItem candidate)) return false;
-
-        if (candidate == null || (candidate.magicData != null) != magic) return false;
-        bool stackable = candidate.magicData != null || candidate.usableData != null || candidate.itemData != null;
-        int transferAmount = amount < 0 ? candidate.amount : amount;
-        if (transferAmount <= 0 || transferAmount > candidate.amount)
-            return false;
-        if (!stackable && transferAmount != 1)
-            return false;
-
-        if (transferAmount == candidate.amount)
-        {
-            if (!storageState.CanAdd(candidate)) return false;
-            bool addedFull = magic ? storageState.TryAddMagic(candidate) : storageState.TryAddItem(candidate);
-            if (!addedFull) return false;
-
-            if (!inventory.TryDetachInstance(candidate.instanceId, out _, save: false))
-            {
-                if (magic) storageState.TryRemoveMagic(candidate.instanceId, out _);
-                else storageState.TryRemoveItem(candidate.instanceId, out _);
-                return false;
-            }
-        }
-        else
-        {
-            InventoryItem split = PersistentStorageState.CreateSplitStack(candidate, transferAmount);
-            if (split == null || !storageState.CanAdd(split)) return false;
-            bool addedPartial = magic ? storageState.TryAddMagic(split) : storageState.TryAddItem(split);
-            if (!addedPartial)
-                return false;
-
-            if (!inventory.TryAdjustInstanceAmount(candidate.instanceId, -transferAmount, out _, save: false))
-            {
-                if (magic) storageState.TryRemoveMagic(split.instanceId, out _);
-                else storageState.TryRemoveItem(split.instanceId, out _);
-                return false;
-            }
-        }
-
-        SaveStats();
-        return true;
-    }
-
-    private bool TryWithdrawStoredItemInternal(string instanceId, bool magic, int amount)
-    {
-        PlayerInventory inventory = GetCachedPlayerInventory();
-        if (inventory == null || string.IsNullOrWhiteSpace(instanceId)) return false;
-
-        InventoryItem candidate = storageState.Find(instanceId);
-        if (candidate == null || (candidate.magicData != null) != magic) return false;
-        bool stackable = candidate.magicData != null || candidate.usableData != null || candidate.itemData != null;
-        int transferAmount = amount < 0 ? candidate.amount : amount;
-        if (transferAmount <= 0 || transferAmount > candidate.amount)
-            return false;
-        if (!stackable && transferAmount != 1)
-            return false;
-
-        ScriptableObject asset = candidate.magicData as ScriptableObject
-                                 ?? candidate.weaponData as ScriptableObject
-                                 ?? candidate.armorData as ScriptableObject
-                                 ?? candidate.usableData as ScriptableObject
-                                 ?? candidate.itemData as ScriptableObject;
-        if (asset == null || !inventory.CanAddItem(asset, transferAmount)) return false;
-
-        if (transferAmount == candidate.amount)
-        {
-            InventoryItem removedItemValue;
-            bool removed = magic
-                ? storageState.TryRemoveMagic(instanceId, out removedItemValue)
-                : storageState.TryRemoveItem(instanceId, out removedItemValue);
-            if (!removed || removedItemValue == null) return false;
-
-            if (!inventory.TryAddItemInstance(removedItemValue, save: false))
-            {
-                if (magic) storageState.TryAddMagic(removedItemValue);
-                else storageState.TryAddItem(removedItemValue);
-                return false;
-            }
-        }
-        else
-        {
-            InventoryItem split = PersistentStorageState.CreateSplitStack(candidate, transferAmount);
-            if (split == null) return false;
-            if (!storageState.TryAdjustInstanceAmount(instanceId, -transferAmount, out _)) return false;
-
-            if (!inventory.TryAddItemInstance(split, save: false))
-            {
-                storageState.TryAdjustInstanceAmount(instanceId, transferAmount, out _);
-                return false;
-            }
-        }
-
-        SaveStats();
-        return true;
-    }
 
     public bool SetStoryFlag(string flagId, bool save = true)
     {
@@ -970,12 +923,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
         data.merchantStocks = merchantStockState.Export();
         data.blacksmith = new SavedBlacksmithData
         {
-            knownRecipeIds = blacksmithProgression.Export()
+            knownRecipeIds = blacksmithProgression.Export(),
+            blueprintFragments = blacksmithProgression.ExportFragments()
         };
         data.magicProgression = new SavedMagicProgressionData
         {
             unlockedRecipeIds = magicProgression.ExportUnlocked(),
-            learnedRecipeIds = magicProgression.ExportLearned()
+            learnedRecipeIds = magicProgression.ExportLearned(),
+            blueprintFragments = magicProgression.ExportFragments()
         };
 
         var questManager = GetCachedQuestManager();
@@ -1002,11 +957,13 @@ public class PlayerStats : MonoBehaviour, IDamageable
             data.playerInventory = loadedDataCache.playerInventory;
         }
 
-        var playerInventoryForStorage = GetCachedPlayerInventory();
-        if (playerInventoryForStorage != null && loadedStorageStateApplied)
-            data.storage = storageState.Export(playerInventoryForStorage.CreateSaveDataForItem);
-        else if (loadedDataCache != null && loadedDataCache.storage != null)
-            data.storage = loadedDataCache.storage;
+        if (loadedStorageStateApplied)
+            data.materialStorage = materialStorageState.Export(item => item != null ? item.name : string.Empty);
+        else if (loadedDataCache != null && loadedDataCache.materialStorage != null)
+            data.materialStorage = loadedDataCache.materialStorage;
+
+        // Never write the obsolete physical storage back to a migrated save.
+        data.storage = null;
 
         return data;
     }
@@ -1038,7 +995,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         ApplySavedNarrativeState(data);
         loadedQuestStateApplied = data == null || data.quests == null;
         loadedInventoryStateApplied = data == null || data.playerInventory == null;
-        loadedStorageStateApplied = data == null || data.storage == null;
+        loadedStorageStateApplied = data == null || (data.materialStorage == null && data.storage == null);
         if (data != null)
         {
             playerId = SaveSystem.SinglePlayerId;
@@ -1716,6 +1673,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         PlayerInventory inventory = GetCachedPlayerInventory();
         if (inventory != null)
             inventory.ClearRunInventory(save: false);
+        runMagicSelection.Clear();
         ResetRunWallet();
         ClearDungeonCheckpoint();
         SaveStatsImmediate();
@@ -1796,10 +1754,35 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         if (!loadedStorageStateApplied)
         {
-            storageState.Import(
-                loadedDataCache.storage,
-                playerInventory.RestoreInventoryItemFromSaveData);
+            if (loadedDataCache.materialStorage != null)
+            {
+                materialStorageState.Import(
+                    loadedDataCache.materialStorage,
+                    playerInventory.ResolveItemDataByAssetName);
+            }
+            else
+            {
+                MigrateLegacyMaterialStorage(loadedDataCache.storage, playerInventory);
+            }
             loadedStorageStateApplied = true;
+        }
+    }
+
+    private void MigrateLegacyMaterialStorage(SavedStorageData legacyStorage, PlayerInventory inventory)
+    {
+        materialStorageState.Clear();
+        if (legacyStorage == null || legacyStorage.items == null || inventory == null)
+            return;
+
+        for (int i = 0; i < legacyStorage.items.Length; i++)
+        {
+            SavedInventoryItemData saved = legacyStorage.items[i];
+            if (saved == null || !string.Equals(saved.itemType, "item", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            ItemData item = inventory.ResolveItemDataByAssetName(saved.assetName);
+            if (item != null && item.category == ItemCategory.Material)
+                materialStorageState.TryAdd(item, Mathf.Max(1, saved.amount));
         }
     }
 
@@ -2094,12 +2077,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
             savedHistory != null ? savedHistory.selectedChoiceKeys : null);
 
         SavedBlacksmithData savedBlacksmith = data != null ? data.blacksmith : null;
-        blacksmithProgression.Import(savedBlacksmith != null ? savedBlacksmith.knownRecipeIds : null);
+        blacksmithProgression.Import(savedBlacksmith != null ? savedBlacksmith.knownRecipeIds : null,
+            savedBlacksmith != null ? savedBlacksmith.blueprintFragments : null);
 
         SavedMagicProgressionData savedMagic = data != null ? data.magicProgression : null;
         magicProgression.Import(
             savedMagic != null ? savedMagic.unlockedRecipeIds : null,
-            savedMagic != null ? savedMagic.learnedRecipeIds : null);
+            savedMagic != null ? savedMagic.learnedRecipeIds : null,
+            savedMagic != null ? savedMagic.blueprintFragments : null);
     }
 
     private bool TryModifyPersistentValue(ref int currentValue, int amount, bool save)

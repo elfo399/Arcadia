@@ -9,6 +9,7 @@ public sealed class CraftingRecipeData : ScriptableObject
     [Min(0)] public int startingUpgradeLevel;
     [Min(0)] public int coinCost;
     public List<UpgradeMaterialRequirement> materialRequirements = new List<UpgradeMaterialRequirement>();
+    [Min(1)] public int blueprintFragmentsRequired = 3;
     public RecipeUnlockType unlockType = RecipeUnlockType.Default;
     public string storyFlagId;
 
@@ -21,6 +22,7 @@ public sealed class CraftingRecipeData : ScriptableObject
         if (resultWeapon != null)
             startingUpgradeLevel = WeaponUpgradeRules.ClampLevel(resultWeapon, startingUpgradeLevel);
         coinCost = Mathf.Max(0, coinCost);
+        blueprintFragmentsRequired = Mathf.Max(1, blueprintFragmentsRequired);
         if (materialRequirements == null)
             materialRequirements = new List<UpgradeMaterialRequirement>();
     }
