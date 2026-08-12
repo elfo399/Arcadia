@@ -10,7 +10,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     [Header("Magic UI")]
     [SerializeField] private InventorySlot slotPrefab;
     [SerializeField] private Transform magicSlotParent;
-    [SerializeField] private int magicInitialSlotCount = 12;
+    [SerializeField] private int magicInitialSlotCount = PlayerInventory.DefaultMagicInventoryCapacity;
 
     [Header("Magic Empty State")]
     [Tooltip("Object shown when the player does not own any magic.")]

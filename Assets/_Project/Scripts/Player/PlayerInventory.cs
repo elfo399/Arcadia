@@ -8,6 +8,8 @@ using UnityEngine.Serialization;
 /// </summary>
 public class PlayerInventory : MonoBehaviour
 {
+    public const int DefaultMagicInventoryCapacity = 6;
+
     // Weapons and armor are represented by one InventoryItem per copy. This
     // generous per-operation ceiling prevents malformed dialogue data from
     // allocating millions of managed objects in a single frame. Stackable
@@ -70,7 +72,7 @@ public class PlayerInventory : MonoBehaviour
 
     [Header("Gameplay Capacity")]
     [SerializeField, Min(1)] private int normalInventoryCapacity = 30;
-    [SerializeField, Min(1)] private int magicInventoryCapacity = 12;
+    [SerializeField, Min(1)] private int magicInventoryCapacity = DefaultMagicInventoryCapacity;
 
     private readonly List<InventoryItem> items = new();
     private readonly List<InventoryItem> magicInventorySlots = new();

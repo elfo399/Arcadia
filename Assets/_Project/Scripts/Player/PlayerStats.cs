@@ -22,7 +22,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private readonly BlacksmithProgressionState blacksmithProgression = new BlacksmithProgressionState();
     private readonly MagicProgressionState magicProgression = new MagicProgressionState();
     private readonly MaterialStorageState materialStorageState = new MaterialStorageState();
-    private readonly RunMagicSelectionState runMagicSelection = new RunMagicSelectionState(12);
+    private readonly RunMagicSelectionState runMagicSelection = new RunMagicSelectionState(PlayerInventory.DefaultMagicInventoryCapacity);
 
     [Header("Health")]
     public float maxHealth = 100f;
