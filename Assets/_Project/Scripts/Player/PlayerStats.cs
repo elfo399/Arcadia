@@ -657,24 +657,58 @@ public class PlayerStats : MonoBehaviour, IDamageable
         }
 
         foreach (KeyValuePair<ItemData, int> entry in totals)
-            if (!materialStorageState.CanAdd(entry.Key, entry.Value)) return false;
+        {
+            if (entry.Key == null || entry.Key.category != ItemCategory.Material || entry.Value <= 0
+                || inventory.GetTotalItemAmount(entry.Key) < entry.Value
+                || !materialStorageState.CanAdd(entry.Key, entry.Value))
+                return false;
+        }
 
-        foreach (KeyValuePair<ItemData, int> entry in totals)
-            materialStorageState.TryAdd(entry.Key, entry.Value);
-
+        // Phase A: detach every material from the run inventory. Any failed
+        // removal restores all earlier removals before returning.
+        var removed = new List<KeyValuePair<ItemData, int>>();
         foreach (KeyValuePair<ItemData, int> entry in totals)
         {
             if (inventory.TryRemoveItem(entry.Key, entry.Value, out _, save: false))
+            {
+                removed.Add(entry);
                 continue;
+            }
 
-            foreach (KeyValuePair<ItemData, int> rollback in totals)
-                materialStorageState.TryRemove(rollback.Key, rollback.Value);
+            RestoreRunMaterials(inventory, removed);
+            return false;
+        }
+
+        // Phase B: credit permanent storage only after inventory removal is
+        // complete. If a credit fails, both domains are rolled back.
+        var added = new List<KeyValuePair<ItemData, int>>();
+        foreach (KeyValuePair<ItemData, int> entry in removed)
+        {
+            if (materialStorageState.TryAdd(entry.Key, entry.Value))
+            {
+                added.Add(entry);
+                continue;
+            }
+
+            for (int i = added.Count - 1; i >= 0; i--)
+                materialStorageState.TryRemove(added[i].Key, added[i].Value);
+            RestoreRunMaterials(inventory, removed);
             return false;
         }
 
         ClearDungeonCheckpoint();
         SaveStatsImmediate();
         return true;
+    }
+
+    private static void RestoreRunMaterials(PlayerInventory inventory, List<KeyValuePair<ItemData, int>> removed)
+    {
+        if (inventory == null || removed == null) return;
+        for (int i = removed.Count - 1; i >= 0; i--)
+        {
+            if (!inventory.TryAddItem(removed[i].Key, removed[i].Value, save: false))
+                Debug.LogError("[PlayerStats] Rollback del Material Storage fallito: inventario non ripristinato.");
+        }
     }
 
     public bool HasStoryFlag(string flagId)
@@ -704,10 +738,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public bool CompleteBlacksmithBlueprint(string recipeId, int requiredFragments, bool save = true)
     {
-        if (string.IsNullOrWhiteSpace(recipeId) || blacksmithProgression.KnowsRecipe(recipeId)) return false;
+        if (string.IsNullOrWhiteSpace(recipeId)) return false;
+        bool changed = !blacksmithProgression.KnowsRecipe(recipeId)
+                       || blacksmithProgression.GetBlueprintFragments(recipeId) < Mathf.Max(1, requiredFragments);
         blacksmithProgression.CompleteBlueprint(recipeId, requiredFragments);
-        if (save) SaveStats();
-        return true;
+        if (changed && save) SaveStats();
+        return changed;
     }
 
     public int GetBlacksmithBlueprintFragments(string recipeId) => blacksmithProgression.GetBlueprintFragments(recipeId);
@@ -728,10 +764,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public bool CompleteMagicBlueprint(string recipeId, int requiredFragments, bool save = true)
     {
-        if (string.IsNullOrWhiteSpace(recipeId) || magicProgression.IsRecipeUnlocked(recipeId)) return false;
+        if (string.IsNullOrWhiteSpace(recipeId)) return false;
+        bool changed = !magicProgression.IsRecipeUnlocked(recipeId)
+                       || magicProgression.GetBlueprintFragments(recipeId) < Mathf.Max(1, requiredFragments);
         magicProgression.CompleteBlueprint(recipeId, requiredFragments);
-        if (save) SaveStats();
-        return true;
+        if (changed && save) SaveStats();
+        return changed;
     }
 
     public int GetMagicBlueprintFragments(string recipeId) => magicProgression.GetBlueprintFragments(recipeId);

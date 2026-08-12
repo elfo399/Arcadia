@@ -49,7 +49,8 @@ public sealed class MagicProgressionState
         unlocked = false;
         string normalized = Normalize(recipeId);
         int required = Math.Max(1, requiredFragments);
-        if (normalized.Length == 0 || Learned.Contains(normalized) || GetBlueprintFragments(normalized) >= required)
+        if (normalized.Length == 0 || Unlocked.Contains(normalized) || Learned.Contains(normalized)
+            || GetBlueprintFragments(normalized) >= required)
             return false;
 
         Fragments[normalized] = Math.Min(required, GetBlueprintFragments(normalized) + 1);
@@ -63,7 +64,8 @@ public sealed class MagicProgressionState
     {
         string normalized = Normalize(recipeId);
         if (normalized.Length == 0) return;
-        Fragments[normalized] = Math.Max(1, requiredFragments);
+        int required = Math.Max(1, requiredFragments);
+        Fragments[normalized] = Math.Max(GetBlueprintFragments(normalized), required);
         savedBlueprintFragments = ExportFragments();
         UnlockRecipe(normalized);
     }

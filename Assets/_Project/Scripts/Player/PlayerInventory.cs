@@ -68,9 +68,17 @@ public class PlayerInventory : MonoBehaviour
     [Header("Database")]
     [SerializeField] private ItemDatabase itemDatabase;
 
+    [Header("Gameplay Capacity")]
+    [SerializeField, Min(1)] private int normalInventoryCapacity = 30;
+    [SerializeField, Min(1)] private int magicInventoryCapacity = 12;
+
     private readonly List<InventoryItem> items = new();
     private readonly List<InventoryItem> magicInventorySlots = new();
     public IReadOnlyList<InventoryItem> Items => items;
+    public int NormalInventoryCapacity => Mathf.Max(1, normalInventoryCapacity);
+    public int MagicInventoryCapacity => Mathf.Max(1, magicInventoryCapacity);
+    public int NormalUsedSlots => CountUsedSlots(magic: false);
+    public int MagicUsedSlots => CountUsedSlots(magic: true);
     public bool IsInitialized { get; private set; }
     private ItemDatabase cachedLookupDatabase;
     private (Dictionary<string, WeaponItem> weapons, Dictionary<string, MagicItemData> magics, Dictionary<string, ArmorItemData> armors, Dictionary<string, UsableItemData> usables, Dictionary<string, ItemData> items) cachedAssetLookups;
@@ -381,6 +389,16 @@ public class PlayerInventory : MonoBehaviour
         return itemAsset != null && amount > 0 && GetTotalItemAmount(itemAsset) >= amount;
     }
 
+    public bool HasFreeNormalInventorySlots(int requiredSlots = 1)
+    {
+        return requiredSlots >= 0 && NormalUsedSlots <= NormalInventoryCapacity - requiredSlots;
+    }
+
+    public bool HasFreeMagicInventorySlots(int requiredSlots = 1)
+    {
+        return requiredSlots >= 0 && MagicUsedSlots <= MagicInventoryCapacity - requiredSlots;
+    }
+
     /// <summary>
     /// Performs the allocation/overflow checks used by TryAddItem without
     /// mutating the inventory. Dialogue batches can use this to reject invalid
@@ -394,7 +412,8 @@ public class PlayerInventory : MonoBehaviour
         if (itemAsset is WeaponItem || itemAsset is ArmorItemData)
         {
             return amount <= MaxNonStackedItemsPerAddOperation
-                   && items.Count <= int.MaxValue - amount;
+                   && items.Count <= int.MaxValue - amount
+                   && HasFreeNormalInventorySlots(amount);
         }
 
         InventoryItem existing = itemAsset switch
@@ -405,12 +424,15 @@ public class PlayerInventory : MonoBehaviour
             _ => null
         };
 
-        // A missing stack can represent any positive int in one entry. An
-        // existing stack has room until it reaches int.MaxValue.
-        return itemAsset is MagicItemData or UsableItemData or ItemData
-               && (existing != null
-                   ? Mathf.Max(0, existing.amount) < int.MaxValue
-                   : items.Count < int.MaxValue);
+        if (itemAsset is not (MagicItemData or UsableItemData or ItemData))
+            return false;
+
+        if (existing != null)
+            return Mathf.Max(0, existing.amount) <= int.MaxValue - amount;
+
+        return itemAsset is MagicItemData
+            ? HasFreeMagicInventorySlots()
+            : HasFreeNormalInventorySlots();
     }
 
     public bool TryAddItem(ScriptableObject itemAsset, int amount = 1, bool save = true)
@@ -757,28 +779,74 @@ public class PlayerInventory : MonoBehaviour
     }
 
     // Inventory management
-    public void AddItem(InventoryItem item) { if (item != null) items.Add(item); }
+    public void AddItem(InventoryItem item)
+    {
+        if (item != null)
+            TryAddItemInstance(item, save: false);
+    }
 
-    public bool TryAddItemInstance(InventoryItem item, bool save = true)
+    /// <summary>
+    /// Adds a concrete inventory entry while enforcing gameplay capacity by
+    /// default. Capacity may be bypassed only by tightly controlled rollback
+    /// paths that restore state immediately after their own mutation.
+    /// </summary>
+    public bool TryAddItemInstance(InventoryItem item, bool save = true, bool enforceCapacity = true)
     {
         if (item == null || item.amount <= 0) return false;
         if (!string.IsNullOrWhiteSpace(item.instanceId) && IsInstanceKnown(item.instanceId)) return false;
-        if (item.weaponData != null || item.armorData != null)
+
+        ScriptableObject asset = GetAssetForInventoryItem(item);
+        if (asset == null) return false;
+        if (enforceCapacity && !CanAddItem(asset, item.amount)) return false;
+
+        InventoryItem existing = FindStackableInventoryItem(asset);
+        if (existing != null)
         {
-            if (items.Count >= int.MaxValue || string.IsNullOrWhiteSpace(item.instanceId)) return false;
+            if (Mathf.Max(0, existing.amount) > int.MaxValue - item.amount) return false;
+            existing.amount += item.amount;
         }
-        else if (item.itemData != null || item.magicData != null || item.usableData != null)
+        else
         {
-            ScriptableObject asset = item.itemData as ScriptableObject;
-            if (asset == null) asset = item.magicData as ScriptableObject;
-            if (asset == null) asset = item.usableData as ScriptableObject;
-            if (!CanAddItem(asset, item.amount)) return false;
+            if ((item.weaponData != null || item.armorData != null) && string.IsNullOrWhiteSpace(item.instanceId)) return false;
+            items.Add(item);
         }
-        items.Add(item);
         SyncMagicInventorySlots();
         SyncEquippedReferences();
         if (save) RequestInventorySave();
         return true;
+    }
+
+    private int CountUsedSlots(bool magic)
+    {
+        int count = 0;
+        for (int i = 0; i < items.Count; i++)
+        {
+            InventoryItem item = items[i];
+            if (item != null && (item.magicData != null) == magic)
+                count++;
+        }
+        return count;
+    }
+
+    private static ScriptableObject GetAssetForInventoryItem(InventoryItem item)
+    {
+        if (item == null) return null;
+        return item.weaponData as ScriptableObject
+               ?? item.armorData as ScriptableObject
+               ?? item.magicData as ScriptableObject
+               ?? item.usableData as ScriptableObject
+               ?? item.itemData as ScriptableObject;
+    }
+
+    private InventoryItem FindStackableInventoryItem(ScriptableObject asset)
+    {
+        return asset switch
+        {
+            MagicItemData magic => FindStackableMagicItem(magic),
+            UsableItemData usable => FindStackableUsableItem(usable),
+            ItemData item => FindStackableGenericItem(item),
+            _ => null
+        };
     }
 
     private bool IsInstanceKnown(string instanceId)
@@ -790,7 +858,7 @@ public class PlayerInventory : MonoBehaviour
     }
     public void AddWeaponLoot(WeaponItem weapon, int amount = 1)
     {
-        TryAddWeaponLoot(weapon, amount);
+        TryAddItem(weapon, amount);
     }
 
     private bool TryAddWeaponLoot(WeaponItem weapon, int amount)
@@ -814,7 +882,7 @@ public class PlayerInventory : MonoBehaviour
 
     public void AddArmorLoot(ArmorItemData armor, int amount = 1)
     {
-        TryAddArmorLoot(armor, amount);
+        TryAddItem(armor, amount);
     }
 
     private bool TryAddArmorLoot(ArmorItemData armor, int amount)
@@ -838,7 +906,7 @@ public class PlayerInventory : MonoBehaviour
 
     public void AddMagicLoot(MagicItemData magic, int amount = 1)
     {
-        TryAddMagicLoot(magic, amount);
+        TryAddItem(magic, amount);
     }
 
     private bool TryAddMagicLoot(MagicItemData magic, int amount)
@@ -863,7 +931,7 @@ public class PlayerInventory : MonoBehaviour
 
     public void AddUsableLoot(UsableItemData usable, int amount = 1)
     {
-        TryAddUsableLoot(usable, amount);
+        TryAddItem(usable, amount);
     }
 
     private bool TryAddUsableLoot(UsableItemData usable, int amount)
@@ -888,7 +956,7 @@ public class PlayerInventory : MonoBehaviour
 
     public void AddGenericItemLoot(ItemData item, int amount = 1)
     {
-        TryAddGenericItemLoot(item, amount);
+        TryAddItem(item, amount);
     }
 
     private bool TryAddGenericItemLoot(ItemData item, int amount)

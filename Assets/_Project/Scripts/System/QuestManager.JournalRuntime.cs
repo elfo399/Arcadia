@@ -304,7 +304,8 @@ public partial class QuestManager
             return false;
         }
 
-        CountInventoryUsage(inventory.Items, out int normalUsed, out int magicUsed);
+        int normalUsed = inventory.NormalUsedSlots;
+        int magicUsed = inventory.MagicUsedSlots;
 
         int normalAdditional = 0;
         int magicAdditional = 0;
@@ -393,17 +394,17 @@ public partial class QuestManager
             }
         }
 
-        bool normalOk = normalCapacity <= 0 || (normalUsed + normalAdditional) <= normalCapacity;
-        bool magicOk = magicCapacity <= 0 || (magicUsed + magicAdditional) <= magicCapacity;
+        bool normalOk = inventory.HasFreeNormalInventorySlots(normalAdditional);
+        bool magicOk = inventory.HasFreeMagicInventorySlots(magicAdditional);
         if (!normalOk)
         {
-            failureReason = $"Inventario pieno: {normalUsed} usati + {normalAdditional} reward > {normalCapacity}.";
+            failureReason = $"Inventario pieno: {normalUsed} usati + {normalAdditional} reward > {inventory.NormalInventoryCapacity}.";
             return false;
         }
 
         if (!magicOk)
         {
-            failureReason = $"Inventario magie pieno: {magicUsed} usati + {magicAdditional} reward > {magicCapacity}.";
+            failureReason = $"Inventario magie pieno: {magicUsed} usati + {magicAdditional} reward > {inventory.MagicInventoryCapacity}.";
             return false;
         }
 
@@ -467,33 +468,29 @@ public partial class QuestManager
                 case QuestRewardKind.Weapon:
                     if (!TryResolveWeaponReward(reward, out var weapon)) return false;
                     for (int n = 0; n < amount; n++)
-                        inventory.AddItem(new InventoryItem(weapon, 1));
+                        if (!inventory.TryAddItem(weapon, 1, save: false)) return false;
                     break;
                 case QuestRewardKind.Armor:
                     if (!TryResolveArmorReward(reward, out var armor)) return false;
                     for (int n = 0; n < amount; n++)
-                        inventory.AddItem(new InventoryItem(armor, 1));
+                        if (!inventory.TryAddItem(armor, 1, save: false)) return false;
                     break;
                 case QuestRewardKind.Usable:
                     if (!TryResolveUsableReward(reward, out var usable)) return false;
-                    AddOrStackUsableReward(inventory, usable, amount);
+                    if (!inventory.TryAddItem(usable, amount, save: false)) return false;
                     break;
                 case QuestRewardKind.Item:
                     if (!TryResolveItemReward(reward, out var item)) return false;
-                    AddOrStackItemReward(inventory, item, amount);
+                    if (!inventory.TryAddItem(item, amount, save: false)) return false;
                     break;
                 case QuestRewardKind.Magic:
                     if (!TryResolveMagicReward(reward, out var magic)) return false;
-                    AddOrStackMagicReward(inventory, magic, amount);
+                    if (!inventory.TryAddItem(magic, amount, save: false)) return false;
                     break;
                 case QuestRewardKind.MagicBlueprint:
                     if (stats == null || reward.magicBlueprintAsset == null || reward.magicBlueprintAsset.recipe == null)
                         return false;
-                    string recipeId = reward.magicBlueprintAsset.recipe.recipeId;
-                    if (string.IsNullOrWhiteSpace(recipeId))
-                        return false;
-                    if (!stats.IsMagicRecipeUnlocked(recipeId))
-                        stats.UnlockMagicRecipe(recipeId, save: false);
+                    reward.magicBlueprintAsset.Unlock(stats, save: false);
                     break;
             }
         }

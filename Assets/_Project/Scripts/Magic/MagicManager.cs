@@ -252,6 +252,7 @@ public sealed class MagicManager : MonoBehaviour
             return false;
         MagicRecipeData recipe = FindRecipeForMagic(item.magicData);
         return recipe != null && recipe.unlockType == MagicRecipeUnlockType.Blueprint
+            && !playerStats.IsMagicRecipeUnlocked(recipe.recipeId)
             && !playerStats.KnowsMagicRecipe(recipe.recipeId)
             && playerStats.GetMagicBlueprintFragments(recipe.recipeId) < recipe.blueprintFragmentsRequired;
     }

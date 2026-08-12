@@ -57,7 +57,7 @@ public sealed class BlacksmithProgressionState
         string normalized = Normalize(recipeId);
         if (normalized.Length == 0) return;
         int required = Math.Max(1, requiredFragments);
-        Fragments[normalized] = required;
+        Fragments[normalized] = Math.Max(GetBlueprintFragments(normalized), required);
         savedBlueprintFragments = ExportFragments();
         LearnRecipe(normalized);
     }

@@ -7,6 +7,12 @@ public sealed class MagicBlueprintData : ScriptableObject
 
     public bool Unlock(PlayerStats stats)
     {
-        return stats != null && recipe != null && stats.CompleteMagicBlueprint(recipe.recipeId, recipe.blueprintFragmentsRequired);
+        return Unlock(stats, save: true);
+    }
+
+    public bool Unlock(PlayerStats stats, bool save)
+    {
+        return stats != null && recipe != null
+            && stats.CompleteMagicBlueprint(recipe.recipeId, recipe.blueprintFragmentsRequired, save);
     }
 }
