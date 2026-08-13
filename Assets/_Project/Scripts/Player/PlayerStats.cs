@@ -20,6 +20,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public static PlayerStats instance;
     private readonly MerchantStockState merchantStockState = new MerchantStockState();
     private readonly BlacksmithProgressionState blacksmithProgression = new BlacksmithProgressionState();
+    private readonly MagicProgressionState magicProgression = new MagicProgressionState();
+    private readonly MaterialStorageState materialStorageState = new MaterialStorageState();
 
     [Header("Health")]
     public float maxHealth = 100f;
@@ -103,6 +105,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private string dungeonCheckpointSeed = string.Empty;
     private bool loadedQuestStateApplied = false;
     private bool loadedInventoryStateApplied = false;
+    private bool loadedStorageStateApplied = false;
     private float baseMaxHealth;
     private float baseMaxStamina;
     private float baseMaxMana;
@@ -120,8 +123,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
     [SerializeField, Min(0f)] private float minSaveIntervalSeconds = 0.75f;
     private float lastSaveRealtime = -999f;
     private bool saveQueued = false;
+    [NonSerialized] private bool runtimeSaveSuppressedForTesting;
     private Coroutine delayedUiRefreshRoutine;
     private bool inspectorStartingClassAppliedThisSession;
+    private bool deathInProgress;
     private int temporaryVigorBonus;
     private int temporaryMindBonus;
     private int temporaryEnduranceBonus;
@@ -155,10 +160,15 @@ public class PlayerStats : MonoBehaviour, IDamageable
     /// gameplay mutations. Missing legacy save sections use scene defaults and
     /// are considered applied.
     /// </summary>
-    public bool IsPersistentStateReady => loadedQuestStateApplied && loadedInventoryStateApplied;
+    public bool IsPersistentStateReady => loadedQuestStateApplied && loadedInventoryStateApplied && loadedStorageStateApplied;
     public GameData LoadedDataSnapshot => loadedDataCache;
     public MerchantStockState MerchantStockState => merchantStockState;
     public BlacksmithProgressionState BlacksmithProgression => blacksmithProgression;
+    public MagicProgressionState MagicProgression => magicProgression;
+    public MaterialStorageState MaterialStorage => materialStorageState;
+    public int RunMagicCapacity => GetCachedPlayerInventory() != null
+        ? GetCachedPlayerInventory().MagicInventoryCapacity
+        : PlayerInventory.DefaultMagicInventoryCapacity;
     public int EffectiveVigor => Mathf.Max(1, vigor + temporaryVigorBonus);
     public int EffectiveMind => Mathf.Max(1, mind + temporaryMindBonus);
     public int EffectiveEndurance => Mathf.Max(1, endurance + temporaryEnduranceBonus);
@@ -166,6 +176,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public int EffectiveDexterity => Mathf.Max(1, dexterity + temporaryDexterityBonus);
     public int EffectiveIntelligence => Mathf.Max(1, intelligence + temporaryIntelligenceBonus);
     public int EffectiveFaith => Mathf.Max(1, faith + temporaryFaithBonus);
+
+    /// <summary>Debug-only session guard. It is never serialized and does not alter save data.</summary>
+    public void SetRuntimeSaveSuppressedForTesting(bool suppressed)
+    {
+        runtimeSaveSuppressedForTesting = suppressed;
+        if (suppressed)
+            saveQueued = false;
+    }
 
     void Awake()
     {
@@ -228,6 +246,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         RecalculateDerivedStats(keepCurrentRatio: true);
+        if (deathInProgress && string.Equals(scene.name, "HubScene", StringComparison.OrdinalIgnoreCase))
+        {
+            currentHealth = maxHealth;
+            currentStamina = maxStamina;
+            currentMana = maxMana;
+            currentFlasks = maxFlasks;
+            deathInProgress = false;
+        }
         RefreshArmorTotals();
         UpdateAllUI();
         if (delayedUiRefreshRoutine != null)
@@ -618,6 +644,83 @@ public class PlayerStats : MonoBehaviour, IDamageable
         dungeonCheckpointSeed = string.Empty;
     }
 
+    /// <summary>
+    /// Completes the run transaction: only material stacks are moved to the
+    /// permanent aggregate storage. Every physical non-material item remains
+    /// in PlayerInventory.
+    /// </summary>
+    public bool TryCompleteRun()
+    {
+        PlayerInventory inventory = GetCachedPlayerInventory();
+        if (inventory == null) return false;
+
+        var totals = new Dictionary<ItemData, int>();
+        for (int i = 0; i < inventory.Items.Count; i++)
+        {
+            InventoryItem entry = inventory.Items[i];
+            if (entry == null || entry.itemData == null || entry.itemData.category != ItemCategory.Material || entry.amount <= 0)
+                continue;
+
+            long amount = (long)(totals.TryGetValue(entry.itemData, out int current) ? current : 0) + entry.amount;
+            if (amount > int.MaxValue || amount <= 0) return false;
+            totals[entry.itemData] = (int)amount;
+        }
+
+        foreach (KeyValuePair<ItemData, int> entry in totals)
+        {
+            if (entry.Key == null || entry.Key.category != ItemCategory.Material || entry.Value <= 0
+                || inventory.GetTotalItemAmount(entry.Key) < entry.Value
+                || !materialStorageState.CanAdd(entry.Key, entry.Value))
+                return false;
+        }
+
+        // Phase A: detach every material from the run inventory. Any failed
+        // removal restores all earlier removals before returning.
+        var removed = new List<KeyValuePair<ItemData, int>>();
+        foreach (KeyValuePair<ItemData, int> entry in totals)
+        {
+            if (inventory.TryRemoveItem(entry.Key, entry.Value, out _, save: false))
+            {
+                removed.Add(entry);
+                continue;
+            }
+
+            RestoreRunMaterials(inventory, removed);
+            return false;
+        }
+
+        // Phase B: credit permanent storage only after inventory removal is
+        // complete. If a credit fails, both domains are rolled back.
+        var added = new List<KeyValuePair<ItemData, int>>();
+        foreach (KeyValuePair<ItemData, int> entry in removed)
+        {
+            if (materialStorageState.TryAdd(entry.Key, entry.Value))
+            {
+                added.Add(entry);
+                continue;
+            }
+
+            for (int i = added.Count - 1; i >= 0; i--)
+                materialStorageState.TryRemove(added[i].Key, added[i].Value);
+            RestoreRunMaterials(inventory, removed);
+            return false;
+        }
+
+        ClearDungeonCheckpoint();
+        SaveStatsImmediate();
+        return true;
+    }
+
+    private static void RestoreRunMaterials(PlayerInventory inventory, List<KeyValuePair<ItemData, int>> removed)
+    {
+        if (inventory == null || removed == null) return;
+        for (int i = removed.Count - 1; i >= 0; i--)
+        {
+            if (!inventory.TryRestoreItemAmountSilently(removed[i].Key, removed[i].Value))
+                Debug.LogError("[PlayerStats] Rollback del Material Storage fallito: inventario non ripristinato.");
+        }
+    }
+
     public bool HasStoryFlag(string flagId)
     {
         string normalized = NormalizeStoryFlagId(flagId);
@@ -635,6 +738,85 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         return blacksmithProgression.KnowsRecipe(recipeId);
     }
+
+    public bool UnlockMagicRecipe(string recipeId, bool save = true)
+    {
+        bool changed = magicProgression.UnlockRecipe(recipeId);
+        if (changed && save) SaveStats();
+        return changed;
+    }
+
+    public bool CompleteBlacksmithBlueprint(string recipeId, int requiredFragments, bool save = true)
+    {
+        if (string.IsNullOrWhiteSpace(recipeId)) return false;
+        bool changed = !blacksmithProgression.KnowsRecipe(recipeId)
+                       || blacksmithProgression.GetBlueprintFragments(recipeId) < Mathf.Max(1, requiredFragments);
+        blacksmithProgression.CompleteBlueprint(recipeId, requiredFragments);
+        if (changed && save) SaveStats();
+        return changed;
+    }
+
+    public int GetBlacksmithBlueprintFragments(string recipeId) => blacksmithProgression.GetBlueprintFragments(recipeId);
+
+    public bool TryAddBlacksmithBlueprintFragment(string recipeId, int requiredFragments, bool save = true)
+    {
+        bool changed = blacksmithProgression.TryAddBlueprintFragment(recipeId, requiredFragments, out _);
+        if (changed && save) SaveStats();
+        return changed;
+    }
+
+    public bool LearnMagicRecipe(string recipeId, bool save = true)
+    {
+        bool changed = magicProgression.LearnRecipe(recipeId);
+        if (changed && save) SaveStats();
+        return changed;
+    }
+
+    public bool CompleteMagicBlueprint(string recipeId, int requiredFragments, bool save = true)
+    {
+        if (string.IsNullOrWhiteSpace(recipeId)) return false;
+        bool changed = !magicProgression.IsRecipeUnlocked(recipeId)
+                       || magicProgression.GetBlueprintFragments(recipeId) < Mathf.Max(1, requiredFragments);
+        magicProgression.CompleteBlueprint(recipeId, requiredFragments);
+        if (changed && save) SaveStats();
+        return changed;
+    }
+
+    public int GetMagicBlueprintFragments(string recipeId) => magicProgression.GetBlueprintFragments(recipeId);
+
+    public bool TryAddMagicBlueprintFragment(string recipeId, int requiredFragments, bool save = true)
+    {
+        bool changed = magicProgression.TryAddBlueprintFragment(recipeId, requiredFragments, out _);
+        if (changed && save) SaveStats();
+        return changed;
+    }
+
+    public string[] GetRunMagicSelection()
+    {
+        PlayerInventory inventory = GetCachedPlayerInventory();
+        return inventory != null ? inventory.ExportPreparedMagicRecipeIds() : System.Array.Empty<string>();
+    }
+
+    public bool SetRunMagicAtSlot(int slot, string recipeId)
+    {
+        PlayerInventory inventory = GetCachedPlayerInventory();
+        return inventory != null && inventory.TrySetPreparedMagicAtSlot(slot, recipeId, KnowsMagicRecipe);
+    }
+
+    public bool RemoveRunMagicAtSlot(int slot)
+    {
+        PlayerInventory inventory = GetCachedPlayerInventory();
+        return inventory != null && inventory.RemovePreparedMagicAtSlot(slot);
+    }
+
+    public void ClearRunMagicSelection()
+    {
+        PlayerInventory inventory = GetCachedPlayerInventory();
+        if (inventory != null) inventory.ClearPreparedMagic();
+    }
+
+    public bool IsMagicRecipeUnlocked(string recipeId) => magicProgression.IsRecipeUnlocked(recipeId);
+    public bool KnowsMagicRecipe(string recipeId) => magicProgression.KnowsRecipe(recipeId);
 
     public bool SetStoryFlag(string flagId, bool save = true)
     {
@@ -719,6 +901,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     private void RequestSave(bool immediate)
     {
+        if (runtimeSaveSuppressedForTesting)
+        {
+            saveQueued = false;
+            return;
+        }
+
         if (immediate)
         {
             saveQueued = false;
@@ -750,11 +938,13 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         bool questStateWasApplied = loadedQuestStateApplied;
         bool inventoryStateWasApplied = loadedInventoryStateApplied;
+        bool storageStateWasApplied = loadedStorageStateApplied;
         GameData data = BuildGameDataSnapshot();
         SaveSystem.SaveData(data);
         loadedDataCache = data;
         loadedQuestStateApplied = questStateWasApplied;
         loadedInventoryStateApplied = inventoryStateWasApplied;
+        loadedStorageStateApplied = storageStateWasApplied;
         lastSaveRealtime = Time.unscaledTime;
     }
 
@@ -800,7 +990,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
         data.merchantStocks = merchantStockState.Export();
         data.blacksmith = new SavedBlacksmithData
         {
-            knownRecipeIds = blacksmithProgression.Export()
+            knownRecipeIds = blacksmithProgression.Export(),
+            blueprintFragments = blacksmithProgression.ExportFragments()
+        };
+        data.magicProgression = new SavedMagicProgressionData
+        {
+            unlockedRecipeIds = magicProgression.ExportUnlocked(),
+            learnedRecipeIds = magicProgression.ExportLearned(),
+            blueprintFragments = magicProgression.ExportFragments()
         };
 
         var questManager = GetCachedQuestManager();
@@ -827,6 +1024,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
             data.playerInventory = loadedDataCache.playerInventory;
         }
 
+        if (loadedStorageStateApplied)
+            data.materialStorage = materialStorageState.Export();
+        else if (loadedDataCache != null && loadedDataCache.materialStorage != null)
+            data.materialStorage = loadedDataCache.materialStorage;
+
+        // Never write the obsolete physical storage back to a migrated save.
+        data.storage = null;
+
         return data;
     }
 
@@ -845,6 +1050,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             startingClassApplied = false;
             loadedQuestStateApplied = true;
             loadedInventoryStateApplied = true;
+            loadedStorageStateApplied = true;
             Debug.Log("ForceStartData attivo e nessun salvataggio trovato: uso dati iniziali da Inspector/StartingLoadout.");
             return;
         }
@@ -856,6 +1062,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         ApplySavedNarrativeState(data);
         loadedQuestStateApplied = data == null || data.quests == null;
         loadedInventoryStateApplied = data == null || data.playerInventory == null;
+        loadedStorageStateApplied = data == null || (data.materialStorage == null && data.storage == null);
         if (data != null)
         {
             playerId = SaveSystem.SinglePlayerId;
@@ -1526,6 +1733,13 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     void Die()
     {
+        if (deathInProgress)
+            return;
+
+        deathInProgress = true;
+        PlayerInventory inventory = GetCachedPlayerInventory();
+        if (inventory != null)
+            inventory.ClearRunInventory(save: false);
         ResetRunWallet();
         ClearDungeonCheckpoint();
         SaveStatsImmediate();
@@ -1586,18 +1800,56 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     private void ApplyLoadedInventoryStateIfPossible()
     {
-        if (loadedInventoryStateApplied) return;
-        if (loadedDataCache == null || loadedDataCache.playerInventory == null)
+        if (loadedInventoryStateApplied && loadedStorageStateApplied) return;
+        if (loadedDataCache == null)
         {
             loadedInventoryStateApplied = true;
+            loadedStorageStateApplied = true;
             return;
         }
 
         var playerInventory = GetCachedPlayerInventory();
         if (playerInventory == null || !playerInventory.IsInitialized) return;
 
-        playerInventory.ApplySaveData(loadedDataCache.playerInventory);
-        loadedInventoryStateApplied = true;
+        if (!loadedInventoryStateApplied)
+        {
+            if (loadedDataCache.playerInventory != null)
+                playerInventory.ApplySaveData(loadedDataCache.playerInventory);
+            loadedInventoryStateApplied = true;
+        }
+
+        if (!loadedStorageStateApplied)
+        {
+            if (loadedDataCache.materialStorage != null)
+            {
+                materialStorageState.Import(
+                    loadedDataCache.materialStorage,
+                    playerInventory.ResolveItemData);
+            }
+            else
+            {
+                MigrateLegacyMaterialStorage(loadedDataCache.storage, playerInventory);
+            }
+            loadedStorageStateApplied = true;
+        }
+    }
+
+    private void MigrateLegacyMaterialStorage(SavedStorageData legacyStorage, PlayerInventory inventory)
+    {
+        materialStorageState.Clear();
+        if (legacyStorage == null || legacyStorage.items == null || inventory == null)
+            return;
+
+        for (int i = 0; i < legacyStorage.items.Length; i++)
+        {
+            SavedInventoryItemData saved = legacyStorage.items[i];
+            if (saved == null || !string.Equals(saved.itemType, "item", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            ItemData item = inventory.ResolveItemDataByAssetName(saved.assetName);
+            if (item != null && item.category == ItemCategory.Material)
+                materialStorageState.TryAdd(item, Mathf.Max(1, saved.amount));
+        }
     }
 
     private static SavedQuestData[] SerializeQuests(List<QuestManager.QuestData> source)
@@ -1669,7 +1921,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
             {
                 type = ResolveSavedQuestRewardType(r),
                 amount = r.amount,
-                itemName = ResolveSavedQuestRewardItemName(r)
+                itemName = ResolveSavedQuestRewardItemName(r),
+                magicBlueprintRecipeId = !string.IsNullOrWhiteSpace(r.magicBlueprintRecipeId)
+                    ? r.magicBlueprintRecipeId
+                    : r.magicBlueprintAsset != null && r.magicBlueprintAsset.recipe != null
+                        ? r.magicBlueprintAsset.recipe.recipeId : string.Empty
             };
         }
 
@@ -1814,6 +2070,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
                 type = r.type,
                 amount = r.amount,
                 itemName = r.itemName,
+                magicBlueprintRecipeId = r.magicBlueprintRecipeId,
                 rewardType = ParseSavedQuestRewardType(r.type)
             });
         }
@@ -1832,6 +2089,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         string lowered = raw.Trim().ToLowerInvariant();
         if (lowered.Contains("weapon")) return QuestRewardType.Weapon;
         if (lowered.Contains("usable") || lowered.Contains("consumable") || lowered.Contains("potion")) return QuestRewardType.Usable;
+        if (lowered.Contains("blueprint")) return QuestRewardType.MagicBlueprint;
         if (lowered.Contains("magic") || lowered.Contains("spell") || lowered.Contains("magia")) return QuestRewardType.Magic;
         if (lowered.Contains("armor") || lowered.Contains("helmet") || lowered.Contains("chestplate") || lowered.Contains("leggings") || lowered.Contains("boots")) return QuestRewardType.Armor;
         if (lowered.Contains("experience") || lowered == "xp" || lowered.Contains("exp") || lowered.Contains("esperienza")) return QuestRewardType.Experience;
@@ -1858,6 +2116,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
             case QuestRewardType.Usable: return reward.usableAsset != null ? reward.usableAsset.itemName : string.Empty;
             case QuestRewardType.Item: return reward.itemAsset != null ? reward.itemAsset.itemName : string.Empty;
             case QuestRewardType.Magic: return reward.magicAsset != null ? reward.magicAsset.magicName : string.Empty;
+            case QuestRewardType.MagicBlueprint: return reward.magicBlueprintAsset != null && reward.magicBlueprintAsset.recipe != null
+                ? reward.magicBlueprintAsset.recipe.recipeId : reward.magicBlueprintRecipeId ?? string.Empty;
             case QuestRewardType.Armor: return reward.armorAsset != null ? reward.armorAsset.itemName : string.Empty;
             default: return string.Empty;
         }
@@ -1883,7 +2143,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
             savedHistory != null ? savedHistory.selectedChoiceKeys : null);
 
         SavedBlacksmithData savedBlacksmith = data != null ? data.blacksmith : null;
-        blacksmithProgression.Import(savedBlacksmith != null ? savedBlacksmith.knownRecipeIds : null);
+        blacksmithProgression.Import(savedBlacksmith != null ? savedBlacksmith.knownRecipeIds : null,
+            savedBlacksmith != null ? savedBlacksmith.blueprintFragments : null);
+
+        SavedMagicProgressionData savedMagic = data != null ? data.magicProgression : null;
+        magicProgression.Import(
+            savedMagic != null ? savedMagic.unlockedRecipeIds : null,
+            savedMagic != null ? savedMagic.learnedRecipeIds : null,
+            savedMagic != null ? savedMagic.blueprintFragments : null);
     }
 
     private bool TryModifyPersistentValue(ref int currentValue, int amount, bool save)

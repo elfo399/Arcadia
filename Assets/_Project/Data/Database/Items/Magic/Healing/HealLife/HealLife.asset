@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fa321ae8b8623ec469233a3600ae956f, type: 3}
   m_Name: HealLife
   m_EditorClassIdentifier: 
+  definitionId: d265ee4c3be04da2a4fde31a2e8456cc
   magicName: Heal Life
   description: Cura una parte della vita.
   icon: {fileID: 0}
@@ -25,6 +26,9 @@ MonoBehaviour:
   criticalHit: 1
   scaling: FAI C
   requirements: FAI 8+
+  statRequirements:
+  - attribute: 6
+    requiredValue: 8
   manaCost: 14
   castTime: 0.5
   castCooldown: 0.8

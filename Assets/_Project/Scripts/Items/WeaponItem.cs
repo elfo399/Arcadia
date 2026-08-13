@@ -5,6 +5,10 @@ using System.Collections.Generic;
 [CreateAssetMenu(menuName = "RogueLike/Weapon")]
 public class WeaponItem : ScriptableObject
 {
+    [Header("Persistence")]
+    [Tooltip("Stable save identifier. Do not change after this definition ships.")]
+    public string definitionId;
+
     public enum ScalingRank
     {
         None,

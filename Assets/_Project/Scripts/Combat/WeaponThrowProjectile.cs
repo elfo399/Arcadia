@@ -17,6 +17,7 @@ public class WeaponThrowProjectile : MonoBehaviour
     private Transform owner;
     private WeaponItem weapon;
     private string instanceId;
+    private int upgradeLevel;
     private Vector3 direction;
     private int bladeDamage;
     private float bladeChance;
@@ -34,6 +35,7 @@ public class WeaponThrowProjectile : MonoBehaviour
         Transform ownerTransform,
         WeaponItem sourceWeapon,
         string sourceInstanceId,
+        int sourceUpgradeLevel,
         Vector3 fireDirection,
         int computedBladeDamage,
         float projectileSpeed,
@@ -43,6 +45,7 @@ public class WeaponThrowProjectile : MonoBehaviour
         owner = ownerTransform;
         weapon = sourceWeapon;
         instanceId = sourceInstanceId;
+        upgradeLevel = Mathf.Max(0, sourceUpgradeLevel);
         direction = fireDirection.sqrMagnitude > 0.0001f ? fireDirection.normalized : transform.forward;
         bladeDamage = Mathf.Max(1, computedBladeDamage);
         speed = Mathf.Max(0.1f, projectileSpeed);
@@ -227,7 +230,7 @@ public class WeaponThrowProjectile : MonoBehaviour
         }
 
         var pickup = pickupGo.AddComponent<WeaponWorldPickup>();
-        pickup.Initialize(weapon, instanceId);
+        pickup.Initialize(weapon, instanceId, upgradeLevel);
 
         // Trigger interazione separato, così il player la può raccogliere mentre mantiene fisica reale.
         var triggerGo = new GameObject("InteractTrigger");

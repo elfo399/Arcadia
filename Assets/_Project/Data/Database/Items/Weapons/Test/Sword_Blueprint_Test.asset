@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a544078287434a34b9eda1b7e6dec126, type: 3}
+  m_Name: Sword_Blueprint_Test
+  m_EditorClassIdentifier:
+  definitionId: 77c9b9d3072f4ed1ae7329f094676a77
+  weaponName: Sword Blueprint Test
+  baseValue: 1
+  rarity: 0
+  canUpgrade: 0
+  canCraft: 1
+  upgradeCoinCost: 0
+  upgradeMaterialRequirements: []
+  upgradeCostStages: []
+  icon: {fileID: 21300000, guid: fc3a7ced92e4f9242b44c592418cae09, type: 3}
+  modelPrefab: {fileID: 3213851043470871558, guid: 30b6b019014098045849a8e6e4ca0ac2, type: 3}
+  description: Arma test dedicata ai Blueprint fragments del Fabbro.
+  category: 1
+  rangeType: 0
+  damageType: 0
+  physicalDamage: 25
+  magicDamage: 0
+  criticalHit: 1.1
+  criticalChance: 0
+  lightDamageMultiplier: 1
+  heavyDamageMultiplier: 1.25
+  weight: 3
+  scaling: STR C / DEX D
+  strengthScalingRank: 0
+  dexterityScalingRank: 0
+  intelligenceScalingRank: 0
+  faithScalingRank: 0
+  strengthRequirement: 0
+  dexterityRequirement: 0
+  intelligenceRequirement: 0
+  faithRequirement: 0
+  requirements: STR 10 / DEX 8

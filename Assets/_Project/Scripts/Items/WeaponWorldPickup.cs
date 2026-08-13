@@ -5,12 +5,14 @@ public class WeaponWorldPickup : MonoBehaviour, IInteractable
 {
     [SerializeField] private WeaponItem weapon;
     [SerializeField] private string instanceId;
+    [SerializeField, Min(0)] private int upgradeLevel;
     [SerializeField] private string prompt = "Raccogli arma";
 
-    public void Initialize(WeaponItem item, string id)
+    public void Initialize(WeaponItem item, string id, int level = 0)
     {
         weapon = item;
         instanceId = id;
+        upgradeLevel = Mathf.Max(0, level);
     }
 
     public void Interact(GameObject player)
@@ -32,8 +34,8 @@ public class WeaponWorldPickup : MonoBehaviour, IInteractable
             return;
         }
 
-        inventory.AddWeaponInstance(weapon, instanceId);
-        Destroy(gameObject);
+        if (inventory.TryAddWeaponInstance(weapon, instanceId, upgradeLevel, save: true))
+            Destroy(gameObject);
     }
 
     public string GetPrompt()

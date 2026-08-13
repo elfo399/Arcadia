@@ -18,6 +18,7 @@ public class SavedQuestRewardData
     public string type;
     public int amount;
     public string itemName;
+    public string magicBlueprintRecipeId;
 }
 
 [System.Serializable]
@@ -42,7 +43,8 @@ public class SavedInventoryItemData
 {
     // weapon | magic | armor | usable | item
     public string itemType;
-    // Nome asset ScriptableObject (es. Sword)
+    // Stable definition identity. assetName remains a legacy migration fallback.
+    public string definitionId;
     public string assetName;
     // Nome display (fallback)
     public string itemName;
@@ -56,7 +58,19 @@ public class SavedInventoryItemData
 [System.Serializable]
 public class SavedLoadoutSlotData
 {
+    public string definitionId;
+    // Only prepared magic loadout entries use recipeId. They never have instanceId.
+    public string recipeId;
+    // Legacy definition fallback.
     public string assetName;
+    public string instanceId;
+}
+
+[System.Serializable]
+public class SavedMagicInventorySlotData
+{
+    public MagicInventorySlotSource source;
+    public string recipeId;
     public string instanceId;
 }
 
@@ -69,6 +83,7 @@ public class SavedPlayerInventoryData
     public SavedLoadoutSlotData[] magicLoadout;
     public SavedLoadoutSlotData[] usableLoadout;
     public SavedLoadoutSlotData[] armorLoadout;
+    public SavedMagicInventorySlotData[] magicInventory;
     public int currentRightIndex;
     public int currentLeftIndex;
     public int currentMagicIndex;
@@ -87,6 +102,44 @@ public class SavedMerchantStockData
 public class SavedBlacksmithData
 {
     public string[] knownRecipeIds;
+    public SavedBlueprintFragmentData[] blueprintFragments;
+}
+
+[System.Serializable]
+public class SavedMagicProgressionData
+{
+    public string[] unlockedRecipeIds;
+    public string[] learnedRecipeIds;
+    public SavedBlueprintFragmentData[] blueprintFragments;
+}
+
+[System.Serializable]
+public class SavedBlueprintFragmentData
+{
+    public string recipeId;
+    public int fragments;
+}
+
+[System.Serializable]
+public class SavedMaterialStackData
+{
+    public string definitionId;
+    // Legacy definition fallback.
+    public string assetName;
+    public int amount;
+}
+
+[System.Serializable]
+public class SavedMaterialStorageData
+{
+    public SavedMaterialStackData[] materials;
+}
+
+[System.Serializable]
+public class SavedStorageData
+{
+    public SavedInventoryItemData[] items;
+    public SavedInventoryItemData[] magicItems;
 }
 
 [System.Serializable]
@@ -152,6 +205,10 @@ public class GameData
     public SavedPlayerInventoryData playerInventory;
     public SavedMerchantStockData[] merchantStocks;
     public SavedBlacksmithData blacksmith;
+    public SavedMagicProgressionData magicProgression;
+    public SavedMaterialStorageData materialStorage;
+    // Legacy field: read only for migration from the old physical storage.
+    public SavedStorageData storage;
 
     // Narrative state. Arrays remain JsonUtility-compatible; runtime systems
     // may use sets and explicitly import/export them.

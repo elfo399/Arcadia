@@ -649,7 +649,7 @@ public class PlayerCombat : MonoBehaviour
                            + transform.up * throwSpawnHeightOffset;
         float speed = thrownWeapon.throwSpeed > 0f ? thrownWeapon.throwSpeed : fallbackProjectileSpeed;
         float life = thrownWeapon.throwLifetime > 0f ? thrownWeapon.throwLifetime : fallbackProjectileLifetime;
-        SpawnThrownWeaponProjectile(thrownWeapon, thrownInstanceId, spawnPos, fireDir, computed.damage, speed, life, throwHitMask);
+        SpawnThrownWeaponProjectile(thrownWeapon, thrownInstanceId, thrownInstance.upgradeLevel, spawnPos, fireDir, computed.damage, speed, life, throwHitMask);
 
         controller?.menuManager?.RefreshEquipmentUI();
 
@@ -911,7 +911,7 @@ public class PlayerCombat : MonoBehaviour
         projectile.Initialize(transform, fireDir, Mathf.Max(1, damage), finalSpeed, finalLifetime, hitMask, sourceLabel, isCritical);
     }
 
-    private void SpawnThrownWeaponProjectile(WeaponItem weapon, string instanceId, Vector3 spawnPos, Vector3 fireDir, int damage, float speed, float lifetime, LayerMask hitMask)
+    private void SpawnThrownWeaponProjectile(WeaponItem weapon, string instanceId, int upgradeLevel, Vector3 spawnPos, Vector3 fireDir, int damage, float speed, float lifetime, LayerMask hitMask)
     {
         if (weapon == null || string.IsNullOrWhiteSpace(instanceId)) return;
 
@@ -939,7 +939,7 @@ public class PlayerCombat : MonoBehaviour
             return;
         }
 
-        throwProj.Initialize(transform, weapon, instanceId, fireDir, Mathf.Max(1, damage), speed, lifetime, hitMask);
+        throwProj.Initialize(transform, weapon, instanceId, upgradeLevel, fireDir, Mathf.Max(1, damage), speed, lifetime, hitMask);
     }
 
     private Vector3 GetMagicFireDirection()

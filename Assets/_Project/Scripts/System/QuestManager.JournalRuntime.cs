@@ -4,7 +4,7 @@ using UnityEngine;
 public partial class QuestManager
 {
     public enum JournalPadSection { List, Detail }
-    private enum QuestRewardKind { Item, Weapon, Usable, Magic, Armor, Experience }
+    private enum QuestRewardKind { Item, Weapon, Usable, Magic, MagicBlueprint, Armor, Experience }
 
     private JournalPadSection currentJournalPadSection = JournalPadSection.List;
     private int journalPadListIndex;
@@ -304,7 +304,8 @@ public partial class QuestManager
             return false;
         }
 
-        CountInventoryUsage(inventory.Items, out int normalUsed, out int magicUsed);
+        int normalUsed = inventory.NormalUsedSlots;
+        int magicUsed = inventory.MagicUsedSlots;
 
         int normalAdditional = 0;
         int magicAdditional = 0;
@@ -382,20 +383,28 @@ public partial class QuestManager
                     if (!WouldStackMagic(inventory, magic, magicStacks))
                         magicAdditional += 1;
                     break;
+                case QuestRewardKind.MagicBlueprint:
+                    if (stats == null || reward.magicBlueprintAsset == null || reward.magicBlueprintAsset.recipe == null
+                        || string.IsNullOrWhiteSpace(reward.magicBlueprintAsset.recipe.recipeId))
+                    {
+                        failureReason = DescribeQuestReward(reward, i) + ": blueprint asset non risolto.";
+                        return false;
+                    }
+                    break;
             }
         }
 
-        bool normalOk = normalCapacity <= 0 || (normalUsed + normalAdditional) <= normalCapacity;
-        bool magicOk = magicCapacity <= 0 || (magicUsed + magicAdditional) <= magicCapacity;
+        bool normalOk = inventory.HasFreeNormalInventorySlots(normalAdditional);
+        bool magicOk = inventory.HasFreeMagicInventorySlots(magicAdditional);
         if (!normalOk)
         {
-            failureReason = $"Inventario pieno: {normalUsed} usati + {normalAdditional} reward > {normalCapacity}.";
+            failureReason = $"Inventario pieno: {normalUsed} usati + {normalAdditional} reward > {inventory.NormalInventoryCapacity}.";
             return false;
         }
 
         if (!magicOk)
         {
-            failureReason = $"Inventario magie pieno: {magicUsed} usati + {magicAdditional} reward > {magicCapacity}.";
+            failureReason = $"Inventario magie pieno: {magicUsed} usati + {magicAdditional} reward > {inventory.MagicInventoryCapacity}.";
             return false;
         }
 
@@ -459,24 +468,29 @@ public partial class QuestManager
                 case QuestRewardKind.Weapon:
                     if (!TryResolveWeaponReward(reward, out var weapon)) return false;
                     for (int n = 0; n < amount; n++)
-                        inventory.AddItem(new InventoryItem(weapon, 1));
+                        if (!inventory.TryAddItem(weapon, 1, save: false)) return false;
                     break;
                 case QuestRewardKind.Armor:
                     if (!TryResolveArmorReward(reward, out var armor)) return false;
                     for (int n = 0; n < amount; n++)
-                        inventory.AddItem(new InventoryItem(armor, 1));
+                        if (!inventory.TryAddItem(armor, 1, save: false)) return false;
                     break;
                 case QuestRewardKind.Usable:
                     if (!TryResolveUsableReward(reward, out var usable)) return false;
-                    AddOrStackUsableReward(inventory, usable, amount);
+                    if (!inventory.TryAddItem(usable, amount, save: false)) return false;
                     break;
                 case QuestRewardKind.Item:
                     if (!TryResolveItemReward(reward, out var item)) return false;
-                    AddOrStackItemReward(inventory, item, amount);
+                    if (!inventory.TryAddItem(item, amount, save: false)) return false;
                     break;
                 case QuestRewardKind.Magic:
                     if (!TryResolveMagicReward(reward, out var magic)) return false;
-                    AddOrStackMagicReward(inventory, magic, amount);
+                    if (!inventory.TryAddItem(magic, amount, save: false)) return false;
+                    break;
+                case QuestRewardKind.MagicBlueprint:
+                    if (stats == null || reward.magicBlueprintAsset == null || reward.magicBlueprintAsset.recipe == null)
+                        return false;
+                    reward.magicBlueprintAsset.Unlock(stats, save: false);
                     break;
             }
         }
@@ -510,6 +524,7 @@ public partial class QuestManager
 
         ClampJournalPadIndices();
         NotifyChanged();
+        PlayerStats.instance?.SaveStats();
     }
 
     private static bool IsMagicInventoryItem(InventoryItem item)
@@ -676,6 +691,7 @@ public partial class QuestManager
             case QuestRewardType.Weapon: kind = QuestRewardKind.Weapon; return true;
             case QuestRewardType.Usable: kind = QuestRewardKind.Usable; return true;
             case QuestRewardType.Magic: kind = QuestRewardKind.Magic; return true;
+            case QuestRewardType.MagicBlueprint: kind = QuestRewardKind.MagicBlueprint; return true;
             case QuestRewardType.Armor: kind = QuestRewardKind.Armor; return true;
             case QuestRewardType.Experience: kind = QuestRewardKind.Experience; return true;
             case QuestRewardType.Item: kind = QuestRewardKind.Item; break;
@@ -683,6 +699,7 @@ public partial class QuestManager
 
         string raw = string.IsNullOrWhiteSpace(reward.type) ? string.Empty : reward.type.Trim().ToLowerInvariant();
         if (raw.Contains("weapon")) { kind = QuestRewardKind.Weapon; return true; }
+        if (raw.Contains("blueprint")) { kind = QuestRewardKind.MagicBlueprint; return true; }
         if (raw.Contains("usable") || raw.Contains("consumable") || raw.Contains("potion")) { kind = QuestRewardKind.Usable; return true; }
         if (raw.Contains("magic") || raw.Contains("spell") || raw.Contains("magia")) { kind = QuestRewardKind.Magic; return true; }
         if (raw.Contains("armor") || raw.Contains("helmet") || raw.Contains("chestplate") || raw.Contains("leggings") || raw.Contains("boots")) { kind = QuestRewardKind.Armor; return true; }

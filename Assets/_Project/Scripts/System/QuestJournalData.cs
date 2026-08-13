@@ -30,6 +30,8 @@ public class QuestRewardEntryData
     public UsableItemData usableAsset;
     public ItemData itemAsset;
     public MagicItemData magicAsset;
+    public MagicBlueprintData magicBlueprintAsset;
+    public string magicBlueprintRecipeId;
     public ArmorItemData armorAsset;
 }
 

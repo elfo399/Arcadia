@@ -238,8 +238,11 @@ public class CoreGenerator : MonoBehaviour
             CachePlayerStats();
             if (playerStats != null)
             {
-                playerStats.ClearDungeonCheckpoint();
-                playerStats.SaveStatsImmediate();
+                if (!playerStats.TryCompleteRun())
+                {
+                    Debug.LogError("[CoreGenerator] Completamento run fallito: loot non depositato.");
+                    return;
+                }
             }
 
             SceneManager.LoadScene(hubSceneName);

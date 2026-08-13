@@ -26,8 +26,14 @@ public class InventoryItem
     // Per magie/spell
     public MagicItemData magicData;
 
+    public static string CreateInstanceId()
+    {
+        return System.Guid.NewGuid().ToString("N");
+    }
+
     public InventoryItem(Sprite itemIcon, int quantity)
     {
+        instanceId = CreateInstanceId();
         icon = itemIcon;
         amount = quantity;
         upgradeLevel = 0;
@@ -44,8 +50,8 @@ public class InventoryItem
     {
         weaponData = weapon;
         icon = weapon != null ? weapon.icon : null;
-        // le armi non sono stackabili visivamente: amount viene usato solo per duplicare in griglia
-        amount = Mathf.Max(1, quantity);
+        // Weapons own individual runtime state and are never stored as a stack.
+        amount = 1;
         upgradeLevel = 0;
         title = overrideTitle ?? (weapon != null ? weapon.weaponName : string.Empty);
         description = overrideDescription ?? (weapon != null ? weapon.description : string.Empty);
@@ -53,7 +59,7 @@ public class InventoryItem
         usableData = null;
         armorData = null;
         magicData = null;
-        instanceId = System.Guid.NewGuid().ToString();
+        instanceId = CreateInstanceId();
     }
 
     public InventoryItem(ItemData item, int quantity = 1, string overrideTitle = null, string overrideDescription = null)
@@ -68,7 +74,7 @@ public class InventoryItem
         usableData = null;
         armorData = null;
         magicData = null;
-        instanceId = System.Guid.NewGuid().ToString();
+        instanceId = CreateInstanceId();
     }
 
     public InventoryItem(UsableItemData usable, int quantity = 1, string overrideTitle = null, string overrideDescription = null)
@@ -83,14 +89,15 @@ public class InventoryItem
         itemData = null;
         armorData = null;
         magicData = null;
-        instanceId = System.Guid.NewGuid().ToString();
+        instanceId = CreateInstanceId();
     }
 
     public InventoryItem(ArmorItemData armor, int quantity = 1, string overrideTitle = null, string overrideDescription = null)
     {
         armorData = armor;
         icon = armor != null ? armor.icon : null;
-        amount = quantity;
+        // Armor owns individual runtime state and is never stored as a stack.
+        amount = 1;
         upgradeLevel = 0;
         title = overrideTitle ?? (armor != null ? armor.itemName : string.Empty);
         description = overrideDescription ?? (armor != null ? armor.description : string.Empty);
@@ -98,7 +105,7 @@ public class InventoryItem
         itemData = null;
         usableData = null;
         magicData = null;
-        instanceId = System.Guid.NewGuid().ToString();
+        instanceId = CreateInstanceId();
     }
 
     public InventoryItem(MagicItemData magic, int quantity = 1, string overrideTitle = null, string overrideDescription = null)
@@ -113,6 +120,6 @@ public class InventoryItem
         itemData = null;
         usableData = null;
         armorData = null;
-        instanceId = System.Guid.NewGuid().ToString();
+        instanceId = CreateInstanceId();
     }
 }

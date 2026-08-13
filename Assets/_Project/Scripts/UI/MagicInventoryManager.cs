@@ -10,7 +10,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     [Header("Magic UI")]
     [SerializeField] private InventorySlot slotPrefab;
     [SerializeField] private Transform magicSlotParent;
-    [SerializeField] private int magicInitialSlotCount = 12;
+    [SerializeField] private int magicInitialSlotCount = PlayerInventory.DefaultMagicInventoryCapacity;
 
     [Header("Magic Empty State")]
     [Tooltip("Object shown when the player does not own any magic.")]
@@ -31,24 +31,26 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private GameObject attackStatsRoot;
     [SerializeField] private TextMeshProUGUI attackDamageText;
     [SerializeField] private TextMeshProUGUI attackCriticalText;
+    [SerializeField] private TextMeshProUGUI attackManaCostText;
     [SerializeField] private GameObject boostStatsRoot;
     [SerializeField] private TextMeshProUGUI boostAttributeText;
     [SerializeField] private TextMeshProUGUI boostAmountText;
     [SerializeField] private TextMeshProUGUI boostDurationText;
+    [SerializeField] private TextMeshProUGUI boostManaCostText;
     [SerializeField] private GameObject healingStatsRoot;
     [SerializeField] private TextMeshProUGUI healingTypeText;
     [SerializeField] private TextMeshProUGUI healingAmountText;
+    [SerializeField] private TextMeshProUGUI healingManaCostText;
     [FormerlySerializedAs("equipMagicButton")]
     [SerializeField] private Button equipButton;
 
     private readonly List<InventorySlot> slots = new();
-    private readonly List<InventoryItem> currentItems = new();
+    private readonly List<MagicItemData> currentMagic = new();
     private PlayerInventory playerInventory;
     private EquipmentManager equipmentManager;
     [SerializeField] private Canvas dragCanvas;
     [SerializeField] private RectTransform dragPreviewRoot;
     private Image activeDragPreview;
-    private int dragOriginIndex = -1;
     private bool slotInputEnabled = true;
     private bool showPadFocus;
     private int currentSelectedIndex = -1;
@@ -70,8 +72,8 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
                 slots[i].Init(i, this);
         }
 
-        if (slotPrefab != null && magicInitialSlotCount > 0 && slots.Count == 0)
-            EnsureSlots(magicInitialSlotCount);
+        if (slotPrefab != null && GetCapacity() > 0 && slots.Count == 0)
+            EnsureSlots(GetCapacity());
 
         if (isInitialized)
         {
@@ -102,7 +104,9 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         CancelActiveDrag();
     }
 
-    public int GetCapacity() => magicInitialSlotCount;
+    public int GetCapacity() => playerInventory != null
+        ? playerInventory.MagicInventoryCapacity
+        : magicInitialSlotCount;
 
     public void SetPlayerInventory(PlayerInventory inventory)
     {
@@ -117,14 +121,14 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     public void ShowMagicTab()
     {
-        RefreshFromPlayer();
+        RefreshMagicInventory();
         SetEquipButtonState(false, false);
     }
 
     public void PrepareMagicEquipSelectionView()
     {
         equipmentManager?.ShowMagicPanel();
-        RefreshFromPlayer();
+        RefreshMagicInventory();
         UpdateEquipButtonState();
     }
 
@@ -133,7 +137,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         if (!slotInputEnabled) return;
 
         ApplyPadFocusVisual(index);
-        if (HasItem(index))
+        if (HasMagic(index))
             ShowItemDetailsByIndex(index);
         else
             ClearDetail();
@@ -143,14 +147,9 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     public void HandleSlotBeginDrag(int index, PointerEventData eventData)
     {
         if (!slotInputEnabled) return;
-        if (!HasItem(index)) return;
-
-        dragOriginIndex = index;
-        Vector2 iconSize = Vector2.zero;
-        if (IsValidSlotIndex(index) && slots[index] != null)
-            iconSize = slots[index].GetIconSize();
-
-        CreateDragPreview(GetItemIcon(currentItems[index]), eventData, iconSize);
+        // The unified layout has a domain-defined order. Dragging cannot mutate
+        // this visual projection independently from the player inventory.
+        return;
     }
 
     public void HandleSlotDrag(PointerEventData eventData)
@@ -173,13 +172,9 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
             return;
         }
 
-        if (dragOriginIndex >= 0)
-            SwapItems(dragOriginIndex, targetIndex);
-
         ClearDragPreview();
-        dragOriginIndex = -1;
 
-        if (HasItem(targetIndex))
+        if (HasMagic(targetIndex))
             ShowItemDetailsByIndex(targetIndex);
         else
             ClearDetail();
@@ -190,7 +185,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     public void CancelActiveDrag()
     {
         ClearDragPreview();
-        dragOriginIndex = -1;
     }
 
     public void SetSlotInputEnabled(bool enabled)
@@ -210,7 +204,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     {
         if (!slotInputEnabled) return;
 
-        if (!HasItem(index))
+        if (!HasMagic(index))
             return;
 
         ShowItemDetailsByIndex(index);
@@ -223,7 +217,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         int fallback = 0;
         for (int i = 0; i < slots.Count; i++)
         {
-            if (HasItem(i))
+            if (HasMagic(i))
             {
                 fallback = i;
                 break;
@@ -261,7 +255,7 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
             return;
         }
 
-        if (padFocusIndex < 0 || !HasItem(padFocusIndex))
+        if (padFocusIndex < 0 || !HasMagic(padFocusIndex))
         {
             FocusDefaultPadSlot(false);
             return;
@@ -273,23 +267,19 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     public void OnEquipMagicButtonClick()
     {
         int targetIndex = currentSelectedIndex;
-        if (!HasItem(targetIndex) && HasItem(padFocusIndex))
+        if (!HasMagic(targetIndex) && HasMagic(padFocusIndex))
             targetIndex = padFocusIndex;
 
-        if (!HasItem(targetIndex)) return;
+        if (!HasMagic(targetIndex)) return;
         if (playerInventory == null || equipmentManager == null) return;
         if (equipmentManager.CurrentEquipTarget != EquipmentManager.EquipTarget.Top) return;
 
         currentSelectedIndex = targetIndex;
-        var item = currentItems[targetIndex];
-        var magic = item != null ? item.magicData : null;
-        if (magic == null) return;
-
         int slotIndex = equipmentManager.CurrentTopIndex;
-        playerInventory.SetMagicAtSlot(slotIndex, magic, item.instanceId);
-        if (playerInventory.GetCurrentMagic() != magic)
-            playerInventory.ForceSetMagicAtSlot(slotIndex, magic, item.instanceId);
+        if (!playerInventory.TryEquipMagicInventorySlot(slotIndex, targetIndex))
+            return;
 
+        RefreshMagicInventory();
         equipmentManager?.RefreshEquipmentCross();
         equipmentManager.CloseEquipGrid();
     }
@@ -303,18 +293,19 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         UpdateEquipButtonState();
     }
 
-    private void RefreshFromPlayer()
+    public void RefreshMagicInventory()
     {
-        currentItems.Clear();
-        if (playerInventory != null)
-        {
-            currentItems.AddRange(playerInventory.GetMagicInventorySlotLayout(magicInitialSlotCount));
-        }
+        if (playerInventory == null || !playerInventory.TryGetMagicInventoryLayout(out MagicInventorySlotView[] layout))
+            return; // Fail-safe: unresolved prepared recipes must not clear UI/equipped magic.
+
+        currentMagic.Clear();
+        for (int i = 0; i < layout.Length; i++)
+            currentMagic.Add(layout[i].Magic);
 
         // Attiva prima la griglia: al primo ingresso questo permette ad Awake degli
         // InventorySlot di terminare prima che Setup assegni le icone.
         UpdateMagicEmptyState(HasAnyMagic());
-        RefreshSlotsFromCurrentItems();
+        RefreshSlotsFromMagicInventory();
 
         currentSelectedIndex = -1;
         ClearPadFocus();
@@ -322,16 +313,16 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         UpdateEquipButtonState();
     }
 
-    private void RefreshSlotsFromCurrentItems()
+    private void RefreshSlotsFromMagicInventory()
     {
-        int activeSlotCount = Mathf.Max(magicInitialSlotCount, currentItems.Count, 1);
+        int activeSlotCount = Mathf.Max(1, currentMagic.Count);
         EnsureSlots(activeSlotCount);
         ClearSlots();
 
         for (int i = 0; i < slots.Count; i++)
         {
-            if (i < currentItems.Count && currentItems[i] != null)
-                slots[i].Setup(GetItemIcon(currentItems[i]), currentItems[i].amount, IsItemEquipped(currentItems[i]));
+            if (i < currentMagic.Count && currentMagic[i] != null)
+                slots[i].Setup(currentMagic[i].icon, 1, playerInventory != null && playerInventory.IsMagicInventorySlotEquipped(i));
             else
                 slots[i].Clear();
 
@@ -378,13 +369,13 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
     }
 
     private bool IsValidSlotIndex(int index) => index >= 0 && index < slots.Count;
-    private bool HasItem(int index) => index >= 0 && index < currentItems.Count && currentItems[index] != null;
+    private bool HasMagic(int index) => index >= 0 && index < currentMagic.Count && currentMagic[index] != null;
 
     private bool HasAnyMagic()
     {
-        for (int i = 0; i < currentItems.Count; i++)
+        for (int i = 0; i < currentMagic.Count; i++)
         {
-            if (currentItems[i]?.magicData != null)
+            if (currentMagic[i] != null)
                 return true;
         }
 
@@ -401,31 +392,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
             gridRoot.SetActive(hasMagic);
         if (noMagicBanner != null && noMagicBanner.activeSelf == hasMagic)
             noMagicBanner.SetActive(!hasMagic);
-    }
-
-    private void SwapItems(int a, int b)
-    {
-        if (!IsValidSlotIndex(a) || !IsValidSlotIndex(b) || a == b) return;
-
-        int maxIndex = Mathf.Max(a, b);
-        while (currentItems.Count <= maxIndex)
-            currentItems.Add(null);
-
-        var temp = currentItems[a];
-        currentItems[a] = currentItems[b];
-        currentItems[b] = temp;
-
-        PersistMagicSlotLayout();
-        RefreshSlotsFromCurrentItems();
-        ApplyPadFocusVisual(showPadFocus ? b : -1);
-    }
-
-    private void PersistMagicSlotLayout()
-    {
-        if (playerInventory == null)
-            return;
-
-        playerInventory.SetMagicInventorySlotLayout(currentItems, magicInitialSlotCount);
     }
 
     private void SetPadFocus(int index, bool selectItem = true)
@@ -473,14 +439,14 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
 
     private void ShowItemDetailsByIndex(int index)
     {
-        if (!HasItem(index))
+        if (!HasMagic(index))
         {
             ClearDetail();
             return;
         }
 
         currentSelectedIndex = index;
-        var magic = currentItems[index].magicData;
+        var magic = currentMagic[index];
         if (magic == null)
         {
             ClearDetail();
@@ -494,13 +460,16 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         UpdateMagicTypeSections(magic);
         SetText(ResolveText(attackDamageText, magicDamageText), magic.magicDamage.ToString());
         SetText(ResolveText(attackCriticalText, magicCriticalText), magic.criticalHit.ToString("0.##"));
+        SetText(attackManaCostText, MagicItemData.FormatCompact(magic.manaCost));
         if (magicScalingText != null) magicScalingText.text = magic.scaling ?? string.Empty;
-        if (magicRequirementsText != null) magicRequirementsText.text = magic.requirements ?? string.Empty;
-        SetText(boostAttributeText, FormatBoostAttribute(magic.boostAttribute));
-        SetText(boostAmountText, FormatSignedAmount(magic.boostAmount));
-        SetText(boostDurationText, FormatDuration(magic.boostDurationSeconds));
-        SetText(healingTypeText, FormatHealingType(magic.effectType));
+        if (magicRequirementsText != null) magicRequirementsText.text = magic.GetRequirementsLabel();
+        SetText(boostAttributeText, MagicItemData.FormatBoostAttribute(magic.boostAttribute));
+        SetText(boostAmountText, MagicItemData.FormatSignedAmount(magic.boostAmount));
+        SetText(boostDurationText, MagicItemData.FormatDuration(magic.boostDurationSeconds));
+        SetText(boostManaCostText, MagicItemData.FormatCompact(magic.manaCost));
+        SetText(healingTypeText, MagicItemData.FormatHealingType(magic.effectType));
         SetText(healingAmountText, magic.healAmount.ToString());
+        SetText(healingManaCostText, MagicItemData.FormatCompact(magic.manaCost));
         UpdateEquipButtonState();
     }
 
@@ -518,20 +487,21 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         if (magicRequirementsText != null) magicRequirementsText.text = string.Empty;
         SetText(attackDamageText, string.Empty);
         SetText(attackCriticalText, string.Empty);
+        SetText(attackManaCostText, string.Empty);
         SetText(boostAttributeText, string.Empty);
         SetText(boostAmountText, string.Empty);
         SetText(boostDurationText, string.Empty);
+        SetText(boostManaCostText, string.Empty);
         SetText(healingTypeText, string.Empty);
         SetText(healingAmountText, string.Empty);
+        SetText(healingManaCostText, string.Empty);
     }
 
     private void UpdateMagicTypeSections(MagicItemData magic)
     {
-        bool attack = magic != null && magic.effectType == MagicItemData.MagicEffectType.Damage;
-        bool boost = magic != null && magic.effectType == MagicItemData.MagicEffectType.BoostAttribute;
-        bool healing = magic != null
-                       && (magic.effectType == MagicItemData.MagicEffectType.HealHealth
-                           || magic.effectType == MagicItemData.MagicEffectType.RestoreMana);
+        bool attack = magic != null && magic.IsVisualCategory(MagicItemData.MagicCategory.Attack);
+        bool boost = magic != null && magic.IsVisualCategory(MagicItemData.MagicCategory.Boost);
+        bool healing = magic != null && magic.IsVisualCategory(MagicItemData.MagicCategory.Healing);
 
         SetMagicStatsRoots(attack, boost, healing);
     }
@@ -554,48 +524,13 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
             target.text = value ?? string.Empty;
     }
 
-    private static string FormatBoostAttribute(MagicItemData.BoostAttribute attribute)
-    {
-        switch (attribute)
-        {
-            case MagicItemData.BoostAttribute.Vigor: return "Vigor";
-            case MagicItemData.BoostAttribute.Mind: return "Mind";
-            case MagicItemData.BoostAttribute.Endurance: return "Endurance";
-            case MagicItemData.BoostAttribute.Strength: return "Strength";
-            case MagicItemData.BoostAttribute.Dexterity: return "Dexterity";
-            case MagicItemData.BoostAttribute.Intelligence: return "Intelligence";
-            case MagicItemData.BoostAttribute.Faith: return "Faith";
-            default: return string.Empty;
-        }
-    }
-
-    private static string FormatSignedAmount(int amount)
-    {
-        return amount > 0 ? $"+{amount}" : amount.ToString();
-    }
-
-    private static string FormatDuration(float seconds)
-    {
-        return seconds > 0f ? $"{seconds:0.##}s" : string.Empty;
-    }
-
-    private static string FormatHealingType(MagicItemData.MagicEffectType effectType)
-    {
-        switch (effectType)
-        {
-            case MagicItemData.MagicEffectType.HealHealth: return "Health";
-            case MagicItemData.MagicEffectType.RestoreMana: return "Mana";
-            default: return string.Empty;
-        }
-    }
-
     private void UpdateEquipButtonState()
     {
         bool canEquip = equipmentManager != null
                         && equipmentManager.CurrentEquipTarget == EquipmentManager.EquipTarget.Top
                         && currentSelectedIndex >= 0
-                        && HasItem(currentSelectedIndex)
-                        && currentItems[currentSelectedIndex]?.magicData != null;
+                        && HasMagic(currentSelectedIndex)
+                        && currentMagic[currentSelectedIndex] != null;
         SetEquipButtonState(canEquip, canEquip);
     }
 
@@ -611,18 +546,6 @@ public class MagicInventoryManager : MonoBehaviour, IInventorySlotHandler
         return equipButton != null
                && equipButton.gameObject.activeInHierarchy
                && equipButton.interactable;
-    }
-
-    private bool IsItemEquipped(InventoryItem item)
-    {
-        if (item == null || string.IsNullOrEmpty(item.instanceId)) return false;
-        return playerInventory != null && playerInventory.IsInstanceEquipped(item.instanceId);
-    }
-
-    private Sprite GetItemIcon(InventoryItem item)
-    {
-        if (item == null) return null;
-        return item.magicData != null ? item.magicData.icon : item.icon;
     }
 
     private void CreateDragPreview(Sprite icon, PointerEventData eventData, Vector2 iconSize)
