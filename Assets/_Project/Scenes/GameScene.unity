@@ -4433,6 +4433,7 @@ GameObject:
   - component: {fileID: 220392755}
   - component: {fileID: 220392756}
   - component: {fileID: 220392757}
+  - component: {fileID: 220392758}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -4879,6 +4880,34 @@ MonoBehaviour:
     usable: {fileID: 0}
     quantity: 1
   itemDatabase: {fileID: 11400000, guid: aab1021923c31834980b3a15af913b5a, type: 2}
+--- !u!114 &220392758
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 220392744}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3733a22a35fd4a82a257f4d77d316f21, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  enableTestPlayerSetup: 0
+  resetInventoryBeforeSetup: 1
+  giveTestInventory: 1
+  giveTestMaterials: 1
+  giveTestCoins: 1
+  giveTestStats: 1
+  giveTestMagics: 1
+  equipTestLoadout: 1
+  persistTestSetup: 0
+  testCoins: 99999
+  materialAmount: 999
+  minimumTestStat: 50
+  statRequirementMargin: 5
+  learnedMagicCount: 3
+  preparedMagicCount: 3
+  foundMagicCount: 2
 --- !u!114 &220392755
 MonoBehaviour:
   m_ObjectHideFlags: 0

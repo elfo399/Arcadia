@@ -83,6 +83,7 @@ public class PlayerInventory : MonoBehaviour
     public int MagicInventoryCapacity => Mathf.Max(1, magicInventoryCapacity);
     public int NormalUsedSlots => CountUsedSlots(magic: false);
     public int MagicUsedSlots => CountOccupiedMagicInventorySlots();
+    public ItemDatabase ItemDatabase => itemDatabase;
     public IReadOnlyList<MagicRecipeData> MagicRecipes => itemDatabase != null
         ? itemDatabase.MagicRecipes
         : System.Array.Empty<MagicRecipeData>();

@@ -4877,8 +4877,8 @@ MonoBehaviour:
   m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8a8695521f0d02e499659fee002a26c2, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Padding:
     m_Left: 0
     m_Right: 0
@@ -5179,8 +5179,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
@@ -8831,8 +8831,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 59f8146938fff824cb5fd77236b75775, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Padding:
     m_Left: 10
     m_Right: 0
@@ -46643,6 +46643,34 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1145156847}
   m_CullTransparentMesh: 1
+--- !u!114 &1149146400
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1149146430}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3733a22a35fd4a82a257f4d77d316f21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enableTestPlayerSetup: 0
+  resetInventoryBeforeSetup: 1
+  giveTestInventory: 1
+  giveTestMaterials: 1
+  giveTestCoins: 1
+  giveTestStats: 1
+  giveTestMagics: 1
+  equipTestLoadout: 1
+  persistTestSetup: 0
+  testCoins: 99999
+  materialAmount: 999
+  minimumTestStat: 50
+  statRequirementMargin: 5
+  learnedMagicCount: 3
+  preparedMagicCount: 3
+  foundMagicCount: 2
 --- !u!1 &1149146430
 GameObject:
   m_ObjectHideFlags: 0
@@ -46664,6 +46692,7 @@ GameObject:
   - component: {fileID: 1149146434}
   - component: {fileID: 1149146433}
   - component: {fileID: 1149146432}
+  - component: {fileID: 1149146400}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -55679,7 +55708,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1388262342
 RectTransform:
   m_ObjectHideFlags: 0

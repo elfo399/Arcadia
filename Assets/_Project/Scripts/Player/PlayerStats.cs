@@ -123,6 +123,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     [SerializeField, Min(0f)] private float minSaveIntervalSeconds = 0.75f;
     private float lastSaveRealtime = -999f;
     private bool saveQueued = false;
+    [NonSerialized] private bool runtimeSaveSuppressedForTesting;
     private Coroutine delayedUiRefreshRoutine;
     private bool inspectorStartingClassAppliedThisSession;
     private bool deathInProgress;
@@ -175,6 +176,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public int EffectiveDexterity => Mathf.Max(1, dexterity + temporaryDexterityBonus);
     public int EffectiveIntelligence => Mathf.Max(1, intelligence + temporaryIntelligenceBonus);
     public int EffectiveFaith => Mathf.Max(1, faith + temporaryFaithBonus);
+
+    /// <summary>Debug-only session guard. It is never serialized and does not alter save data.</summary>
+    public void SetRuntimeSaveSuppressedForTesting(bool suppressed)
+    {
+        runtimeSaveSuppressedForTesting = suppressed;
+        if (suppressed)
+            saveQueued = false;
+    }
 
     void Awake()
     {
@@ -892,6 +901,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     private void RequestSave(bool immediate)
     {
+        if (runtimeSaveSuppressedForTesting)
+        {
+            saveQueued = false;
+            return;
+        }
+
         if (immediate)
         {
             saveQueued = false;
