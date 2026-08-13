@@ -1025,7 +1025,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         }
 
         if (loadedStorageStateApplied)
-            data.materialStorage = materialStorageState.Export(item => item != null ? item.name : string.Empty);
+            data.materialStorage = materialStorageState.Export();
         else if (loadedDataCache != null && loadedDataCache.materialStorage != null)
             data.materialStorage = loadedDataCache.materialStorage;
 
@@ -1824,7 +1824,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             {
                 materialStorageState.Import(
                     loadedDataCache.materialStorage,
-                    playerInventory.ResolveItemDataByAssetName);
+                    playerInventory.ResolveItemData);
             }
             else
             {

@@ -3,7 +3,7 @@ using System.IO;
 
 public static class SaveSystem
 {
-    public const int CurrentSaveVersion = 5;
+    public const int CurrentSaveVersion = 6;
     public const string SinglePlayerId = "player";
     public const string DefaultPlayerName = "Player";
 
@@ -366,6 +366,13 @@ public static class SaveSystem
                     // PlayerStats migrates old physical storage once the
                     // ItemDatabase lookup is available.
                     data.saveVersion = 5;
+                    break;
+
+                case 5:
+                    // Definition IDs and the complete magic inventory layout are
+                    // resolved by PlayerInventory once ItemDatabase is available.
+                    // assetName remains populated as a legacy fallback.
+                    data.saveVersion = 6;
                     break;
 
                 default:

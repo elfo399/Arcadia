@@ -3,6 +3,10 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "RogueLike/Usable Item")]
 public class UsableItemData : ScriptableObject
 {
+    [Header("Persistence")]
+    [Tooltip("Stable save identifier. Do not change after this definition ships.")]
+    public string definitionId;
+
     [Header("Info")]
     public string itemName;
     [Min(0)] public int baseValue = 1;

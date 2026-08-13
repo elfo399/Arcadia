@@ -43,7 +43,8 @@ public class SavedInventoryItemData
 {
     // weapon | magic | armor | usable | item
     public string itemType;
-    // Nome asset ScriptableObject (es. Sword)
+    // Stable definition identity. assetName remains a legacy migration fallback.
+    public string definitionId;
     public string assetName;
     // Nome display (fallback)
     public string itemName;
@@ -57,7 +58,19 @@ public class SavedInventoryItemData
 [System.Serializable]
 public class SavedLoadoutSlotData
 {
+    public string definitionId;
+    // Only prepared magic loadout entries use recipeId. They never have instanceId.
+    public string recipeId;
+    // Legacy definition fallback.
     public string assetName;
+    public string instanceId;
+}
+
+[System.Serializable]
+public class SavedMagicInventorySlotData
+{
+    public MagicInventorySlotSource source;
+    public string recipeId;
     public string instanceId;
 }
 
@@ -70,6 +83,7 @@ public class SavedPlayerInventoryData
     public SavedLoadoutSlotData[] magicLoadout;
     public SavedLoadoutSlotData[] usableLoadout;
     public SavedLoadoutSlotData[] armorLoadout;
+    public SavedMagicInventorySlotData[] magicInventory;
     public int currentRightIndex;
     public int currentLeftIndex;
     public int currentMagicIndex;
@@ -109,6 +123,8 @@ public class SavedBlueprintFragmentData
 [System.Serializable]
 public class SavedMaterialStackData
 {
+    public string definitionId;
+    // Legacy definition fallback.
     public string assetName;
     public int amount;
 }

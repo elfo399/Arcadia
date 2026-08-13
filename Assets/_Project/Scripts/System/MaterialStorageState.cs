@@ -54,7 +54,7 @@ public sealed class MaterialStorageState
         return true;
     }
 
-    public SavedMaterialStorageData Export(Func<ItemData, string> assetNameResolver)
+    public SavedMaterialStorageData Export()
     {
         var result = new List<SavedMaterialStackData>();
         foreach (KeyValuePair<ItemData, int> entry in Quantities)
@@ -62,18 +62,23 @@ public sealed class MaterialStorageState
             if (entry.Key == null || entry.Key.category != ItemCategory.Material || entry.Value <= 0)
                 continue;
 
-            string assetName = assetNameResolver != null ? assetNameResolver(entry.Key) : entry.Key.name;
-            if (string.IsNullOrWhiteSpace(assetName))
+            string definitionId = ItemDatabase.GetDefinitionId(entry.Key);
+            if (string.IsNullOrWhiteSpace(definitionId))
                 continue;
 
-            result.Add(new SavedMaterialStackData { assetName = assetName, amount = entry.Value });
+            result.Add(new SavedMaterialStackData
+            {
+                definitionId = definitionId,
+                assetName = entry.Key.name,
+                amount = entry.Value
+            });
         }
 
-        result.Sort((a, b) => string.Compare(a.assetName, b.assetName, StringComparison.OrdinalIgnoreCase));
+        result.Sort((a, b) => string.Compare(a.definitionId, b.definitionId, StringComparison.OrdinalIgnoreCase));
         return new SavedMaterialStorageData { materials = result.ToArray() };
     }
 
-    public void Import(SavedMaterialStorageData saved, Func<string, ItemData> resolver)
+    public void Import(SavedMaterialStorageData saved, Func<string, string, ItemData> resolver)
     {
         Quantities.Clear();
         if (saved == null || saved.materials == null || resolver == null)
@@ -85,7 +90,7 @@ public sealed class MaterialStorageState
             if (entry == null || entry.amount <= 0)
                 continue;
 
-            ItemData item = resolver(entry.assetName);
+            ItemData item = resolver(entry.definitionId, entry.assetName);
             if (item == null || item.category != ItemCategory.Material || !CanAdd(item, entry.amount))
                 continue;
 

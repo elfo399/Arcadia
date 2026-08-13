@@ -4,6 +4,10 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "RogueLike/Magic Item")]
 public class MagicItemData : ScriptableObject
 {
+    [Header("Persistence")]
+    [Tooltip("Stable save identifier. Do not change after this definition ships.")]
+    public string definitionId;
+
     public enum MagicCategory
     {
         Attack,
