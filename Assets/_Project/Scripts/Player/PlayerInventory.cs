@@ -1200,16 +1200,9 @@ public class PlayerInventory : MonoBehaviour
 
         MagicInventorySlotState target = magicInventoryLayout[slotIndex];
         if (target.Source == MagicInventorySlotSource.Found)
-        {
-            int relocationSlot = duplicatePreparedSlot >= 0
-                ? duplicatePreparedSlot
-                : GetFirstEmptyMagicInventorySlot();
-            if (relocationSlot < 0)
-                return false;
+            return false;
 
-            magicInventoryLayout[relocationSlot].SetFound(target.InstanceId);
-        }
-        else if (duplicatePreparedSlot >= 0)
+        if (duplicatePreparedSlot >= 0)
         {
             // Selecting the same learned magic in another cell moves it instead
             // of silently rejecting the confirm command.

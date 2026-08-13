@@ -100,6 +100,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     private int openingFrame = -1;
     private int lastActionActivationFrame = -1;
     private int lastPreparedSlotActivationFrame = -1;
+    private int preparedSlotFocusEnteredFrame = -1;
     private int actionFocusEnteredFrame = -1;
     private float lastNavigationTime = -999f;
     private Coroutine contentAppearRoutine;
@@ -217,10 +218,12 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         if (playerController != null) playerController.ReleaseGameplayInputLock(gameplayLockOwner);
         controls = null;
         openingFrame = -1;
+        preparedSlotFocusEnteredFrame = -1;
         IsOpen = false;
         isInteractive = false;
         isClosing = false;
         ActiveContext = null;
+        armedPreparedRecipeIndex = -1;
         ClearRows();
         ClearPreparedRows();
         if (magicHud != null) magicHud.SetActive(false);
@@ -252,8 +255,12 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         isClosing = false;
         isInteractive = false;
         MagicView openingView = mode == MagicServiceMode.Equip ? MagicView.Prepare : MagicView.Learn;
+        // Opening PREPARA always starts in list mode. A placement choice must
+        // be confirmed during this opening, never carried over from a prior UI.
+        armedPreparedRecipeIndex = -1;
         focusArea = openingView == MagicView.Prepare ? FocusArea.PrepareList : FocusArea.LearnList;
         openingFrame = Time.frameCount;
+        preparedSlotFocusEnteredFrame = -1;
         playerController.AcquireGameplayInputLock(gameplayLockOwner);
         SubscribeInput();
         HideAllContentGroups();
@@ -272,6 +279,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         IsOpen = false;
         isInteractive = false;
         isClosing = true;
+        armedPreparedRecipeIndex = -1;
         UnsubscribeInput();
         StopContentAppearRoutineOnly();
         if (EventSystem.current != null)
@@ -415,12 +423,9 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     public bool SetRunMagicAtSlot(int slot, MagicRecipeData recipe)
     {
         PlayerStats stats = ResolvePlayerStats();
-        bool changed = recipe != null && stats != null && recipe.resultMagic != null
+        return recipe != null && stats != null && recipe.resultMagic != null
             && stats.KnowsMagicRecipe(recipe.recipeId)
             && stats.SetRunMagicAtSlot(slot, recipe.recipeId);
-        if (changed)
-            RefreshPreparedMagicState();
-        return changed;
     }
 
     public bool RemoveRunMagicAtSlot(int slot)
@@ -622,13 +627,16 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         }
 
         ClearRows();
+        // Entering PREPARA is never itself a placement confirmation.
+        armedPreparedRecipeIndex = -1;
         if (refresh) RefreshPrepareView();
-        if (focus) SetPreparedRecipeFocus(selectedPreparedRecipeIndex < 0 ? 0 : selectedPreparedRecipeIndex, toggleArmed: false);
+        if (focus) SetPreparedRecipeFocus(selectedPreparedRecipeIndex < 0 ? 0 : selectedPreparedRecipeIndex);
     }
 
     private void HandleHorizontalNavigation(int direction)
     {
-        if (direction > 0)
+        // Right may only enter slot focus after an explicit list confirmation.
+        if (direction > 0 && ArmedPreparedRecipe != null)
             FocusPreparedSlots();
     }
 
@@ -758,7 +766,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         }
     }
 
-    private void SetPreparedRecipeFocus(int index, bool toggleArmed)
+    private void SetPreparedRecipeFocus(int index)
     {
         if (preparedRecipeRows.Count == 0)
         {
@@ -768,9 +776,6 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         }
 
         index = (index % preparedRecipeRows.Count + preparedRecipeRows.Count) % preparedRecipeRows.Count;
-        if (toggleArmed)
-            armedPreparedRecipeIndex = armedPreparedRecipeIndex == index ? -1 : index;
-
         selectedPreparedRecipeIndex = index;
         focusArea = FocusArea.PrepareList;
         if (index < preparedRows.Count)
@@ -785,7 +790,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         if (!IsOpen || !isInteractive || index < 0 || index >= preparedRecipeRows.Count)
             return;
 
-        SetPreparedRecipeFocus(index, toggleArmed: false);
+        SetPreparedRecipeFocus(index);
         armedPreparedRecipeIndex = index;
         RefreshPreparedSlots();
         FocusPreparedSlots();
@@ -794,19 +799,24 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     private void MovePreparedRecipeFocus(int direction)
     {
         if (preparedRecipeRows.Count > 0)
-            SetPreparedRecipeFocus(selectedPreparedRecipeIndex + direction, toggleArmed: false);
+            SetPreparedRecipeFocus(selectedPreparedRecipeIndex + direction);
     }
 
     private void FocusPreparedList()
     {
+        // Returning to the list exits placement mode, so no previous choice
+        // can be applied after further navigation.
+        armedPreparedRecipeIndex = -1;
+        preparedSlotFocusEnteredFrame = -1;
         focusArea = FocusArea.PrepareList;
-        SetPreparedRecipeFocus(selectedPreparedRecipeIndex < 0 ? 0 : selectedPreparedRecipeIndex, toggleArmed: false);
+        SetPreparedRecipeFocus(selectedPreparedRecipeIndex < 0 ? 0 : selectedPreparedRecipeIndex);
     }
 
     private void FocusPreparedSlots()
     {
-        if (equipSlots.Count == 0)
+        if (ArmedPreparedRecipe == null || equipSlots.Count == 0)
             return;
+        preparedSlotFocusEnteredFrame = Time.frameCount;
         focusArea = FocusArea.PrepareSlots;
         SetPreparedSlotFocus(selectedPreparedSlotIndex < 0 ? 0 : selectedPreparedSlotIndex);
     }
@@ -947,7 +957,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
 
         if (focusArea == FocusArea.PrepareList)
         {
-            if (selectedPreparedRecipeIndex < 0)
+            if (selectedPreparedRecipeIndex < 0 || selectedPreparedRecipeIndex >= preparedRecipeRows.Count)
                 return;
 
             armedPreparedRecipeIndex = selectedPreparedRecipeIndex;
@@ -981,6 +991,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
 
         if (focusArea == FocusArea.PrepareSlots)
         {
+            armedPreparedRecipeIndex = -1;
             FocusPreparedList();
             return;
         }
@@ -1091,6 +1102,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     {
         ClearRows();
         ClearPreparedRows();
+        armedPreparedRecipeIndex = -1;
         if (magicHud != null)
             magicHud.SetActive(false);
         isClosing = false;
@@ -1101,6 +1113,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
             playerController.ReleaseGameplayInputLock(gameplayLockOwner);
         controls = null;
         openingFrame = -1;
+        preparedSlotFocusEnteredFrame = -1;
     }
 
     private void StopContentAppearRoutineOnly()
@@ -1195,20 +1208,29 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
 
     private void ApplyPreparedSlotSelection(int slotIndex)
     {
-        if (lastPreparedSlotActivationFrame == Time.frameCount)
+        // The input that confirms/clicks a recipe may also be delivered by the
+        // EventSystem to the slot selected during that same frame. Entering the
+        // grid must only move focus; placement requires a subsequent input.
+        if (preparedSlotFocusEnteredFrame == Time.frameCount
+            || lastPreparedSlotActivationFrame == Time.frameCount)
             return;
 
         int capacity = GetRunMagicCapacity();
         if (slotIndex < 0 || slotIndex >= capacity)
             return;
 
+        MagicRecipeData recipe = ArmedPreparedRecipe;
+        if (recipe == null)
+            return;
+
         lastPreparedSlotActivationFrame = Time.frameCount;
         SetPreparedSlotFocus(slotIndex);
-        MagicRecipeData recipe = ArmedPreparedRecipe;
-        if (recipe != null)
-            SetRunMagicAtSlot(slotIndex, recipe);
-        else
-            RemoveRunMagicAtSlot(slotIndex);
+        if (!SetRunMagicAtSlot(slotIndex, recipe))
+            return;
+
+        armedPreparedRecipeIndex = -1;
+        RefreshPreparedMagicState();
+        FocusPreparedList();
     }
 
     private void SubscribeInput()
