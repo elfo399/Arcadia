@@ -1185,17 +1185,35 @@ public class PlayerInventory : MonoBehaviour
             || recipe == null || recipe.resultMagic == null)
             return false;
 
-        MagicInventorySlotState target = magicInventoryLayout[slotIndex];
-        if (target.Source == MagicInventorySlotSource.Found)
-            return false;
-
         string normalized = recipeId.Trim();
+        int duplicatePreparedSlot = -1;
         for (int i = 0; i < magicInventoryLayout.Count; i++)
         {
             if (i == slotIndex || magicInventoryLayout[i].Source != MagicInventorySlotSource.Prepared)
                 continue;
             if (string.Equals(magicInventoryLayout[i].RecipeId, normalized, System.StringComparison.OrdinalIgnoreCase))
+            {
+                duplicatePreparedSlot = i;
+                break;
+            }
+        }
+
+        MagicInventorySlotState target = magicInventoryLayout[slotIndex];
+        if (target.Source == MagicInventorySlotSource.Found)
+        {
+            int relocationSlot = duplicatePreparedSlot >= 0
+                ? duplicatePreparedSlot
+                : GetFirstEmptyMagicInventorySlot();
+            if (relocationSlot < 0)
                 return false;
+
+            magicInventoryLayout[relocationSlot].SetFound(target.InstanceId);
+        }
+        else if (duplicatePreparedSlot >= 0)
+        {
+            // Selecting the same learned magic in another cell moves it instead
+            // of silently rejecting the confirm command.
+            magicInventoryLayout[duplicatePreparedSlot].Clear();
         }
 
         target.SetPrepared(normalized);

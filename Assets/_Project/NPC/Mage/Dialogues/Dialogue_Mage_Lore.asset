@@ -30,9 +30,9 @@ MonoBehaviour:
     actionsOnExit: []
     nextNodeId: 
     choices:
-    - choiceId: mage_service
+    - choiceId: mage_learn
       text: Impara magie
-      playerSpokenText: 
+      playerSpokenText:
       conditions:
         logic: 0
         negate: 0
@@ -42,7 +42,7 @@ MonoBehaviour:
       - type: 17
         amount: 1
         stopOnFailure: 1
-        id: 
+        id:
         item:
           itemType: 0
           item: {fileID: 0}
@@ -51,12 +51,42 @@ MonoBehaviour:
           magic: {fileID: 0}
           usable: {fileID: 0}
         questDefinition: {fileID: 0}
-        serviceId: magic
-        teleportTargetId: 
-        teleportSceneName: 
+        serviceId: magic_learn
+        teleportTargetId:
+        teleportSceneName:
         useTeleportTargetRotation: 1
-      nextNodeId: 
-      returnNodeId: 
+      nextNodeId:
+      returnNodeId:
+      playerSpeaksChoice: 0
+      unavailableDisplay: 0
+      showReadIndicator: 0
+    - choiceId: mage_equip
+      text: Equipaggia magie
+      playerSpokenText:
+      conditions:
+        logic: 0
+        negate: 0
+        conditions: []
+        groups: []
+      actions:
+      - type: 17
+        amount: 1
+        stopOnFailure: 1
+        id:
+        item:
+          itemType: 0
+          item: {fileID: 0}
+          weapon: {fileID: 0}
+          armor: {fileID: 0}
+          magic: {fileID: 0}
+          usable: {fileID: 0}
+        questDefinition: {fileID: 0}
+        serviceId: magic_equip
+        teleportTargetId:
+        teleportSceneName:
+        useTeleportTargetRotation: 1
+      nextNodeId:
+      returnNodeId:
       playerSpeaksChoice: 0
       unavailableDisplay: 0
       showReadIndicator: 0

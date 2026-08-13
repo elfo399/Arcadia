@@ -24,9 +24,9 @@ public static class InitialHubNpcDialogueBuilder
             conversationPrefix: "mage",
             introGreeting: "Le correnti arcane ti hanno condotto fino a me.",
             introFarewell: "Quando sarai pronto, parleremo di magia.",
-            serviceChoiceId: "mage_service",
+            serviceChoiceId: "mage_learn",
             serviceLabel: "Impara magie",
-            serviceId: "magic",
+            serviceId: "magic_learn",
             loreChoiceId: "mage_lore",
             loreLabel: "Parlami delle rune.",
             loreText: "Ogni runa è una promessa: pronunciarla significa accettarne il prezzo.");
@@ -228,6 +228,8 @@ public static class InitialHubNpcDialogueBuilder
 
         if (prefix == "merchant")
             choices.Add(ServiceChoice("merchant_service_Sell", "Vendi", "merchant_sell"));
+        else if (prefix == "mage")
+            choices.Add(ServiceChoice("mage_equip", "Equipaggia magie", "magic_equip"));
 
         choices.Add(new DialogueChoice
         {

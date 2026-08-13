@@ -16,13 +16,20 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private PlayerController playerController;
     [SerializeField] private PlayerInventory playerInventory;
     [SerializeField] private PlayerStats playerStats;
+    [SerializeField] private Animator bookAnimator;
+    [SerializeField] private Animator contentAppearAnimator;
+    [SerializeField] private CanvasGroup learnContentGroup;
+    [SerializeField] private CanvasGroup equipContentGroup;
 
     [Header("Recipe List")]
     [SerializeField] private Transform recipeListRoot;
     [SerializeField] private DialogueChoiceUI recipeRowPrefab;
+    [SerializeField] private ScrollableVerticalListUI recipeListScroll;
 
     [Header("Detail")]
     [SerializeField] private GameObject detailRoot;
+    [SerializeField] private Image detailImage;
+    [SerializeField] private TextMeshProUGUI detailTitle;
     [SerializeField] private TextMeshProUGUI scalingText;
     [SerializeField] private TextMeshProUGUI requirementsText;
 
@@ -60,11 +67,21 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private GameObject equipRoot;
     [SerializeField] private Transform equipMagicListRoot;
     [SerializeField] private DialogueChoiceUI equipMagicRowPrefab;
+    [SerializeField] private ScrollableVerticalListUI preparedMagicListScroll;
     [SerializeField] private Transform equipSlotRoot;
+    [SerializeField] private GridLayoutGroup equipSlotGrid;
     [SerializeField] private InventorySlot equipSlotPrefab;
     // Editor/bootstrap fallback only; once PlayerStats is available the domain
     // RunMagicCapacity is the sole gameplay capacity source.
     [SerializeField, Min(0)] private int equipSlotCount = 6;
+
+    [Header("Initial State")]
+    [SerializeField] private string bookOpenStateName = "BookOpen";
+    [SerializeField] private string contentAppearStateName = "Transition";
+    [SerializeField, Min(0f)] private float contentAppearDelay = 0.5833333f;
+    [SerializeField, Min(0f)] private float contentAppearDuration = 1.8f;
+    [SerializeField] private string bookCloseStateName = "CloseBook";
+    [SerializeField, Min(0f)] private float bookCloseDuration = 0.6666666f;
 
     private readonly List<MagicRecipeData> visibleRecipes = new List<MagicRecipeData>();
     private readonly List<DialogueChoiceUI> recipeRows = new List<DialogueChoiceUI>();
@@ -82,8 +99,11 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     private int selectedPreparedSlotIndex;
     private int openingFrame = -1;
     private int lastActionActivationFrame = -1;
+    private int lastPreparedSlotActivationFrame = -1;
     private int actionFocusEnteredFrame = -1;
     private float lastNavigationTime = -999f;
+    private Coroutine contentAppearRoutine;
+    private Coroutine closeRoutine;
     private MagicView currentView = MagicView.Learn;
     private FocusArea focusArea = FocusArea.LearnList;
     private bool isInteractive;
@@ -115,6 +135,33 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         if (magicHud != null) magicHud.SetActive(false);
         if (actionButton != null) actionButton.onClick.AddListener(OnActionButtonClicked);
         EnsureEquipSlots();
+        ResolveDetailReferences();
+        HideContentAppearAnimation();
+        HideAllContentGroups();
+    }
+
+    private void OnValidate()
+    {
+        ResolveDetailReferences();
+    }
+
+    private void ResolveDetailReferences()
+    {
+        if (detailRoot == null || (detailImage != null && detailTitle != null))
+            return;
+
+        Transform root = detailRoot.transform;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (child == null)
+                continue;
+
+            if (detailImage == null && string.Equals(child.name, "Image", StringComparison.OrdinalIgnoreCase))
+                detailImage = child.GetComponent<Image>();
+            else if (detailTitle == null && string.Equals(child.name, "Title", StringComparison.OrdinalIgnoreCase))
+                detailTitle = child.GetComponent<TextMeshProUGUI>();
+        }
     }
 
     private void EnsureEquipSlots()
@@ -163,7 +210,13 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     private void OnDisable()
     {
         UnsubscribeInput();
+        StopContentAppearRoutineOnly();
+        if (closeRoutine != null)
+            StopCoroutine(closeRoutine);
+        closeRoutine = null;
         if (playerController != null) playerController.ReleaseGameplayInputLock(gameplayLockOwner);
+        controls = null;
+        openingFrame = -1;
         IsOpen = false;
         isInteractive = false;
         isClosing = false;
@@ -174,6 +227,11 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     }
 
     public bool OpenMagic(NpcServiceContext context)
+    {
+        return OpenMagic(MagicServiceMode.Learn, context);
+    }
+
+    public bool OpenMagic(MagicServiceMode mode, NpcServiceContext context)
     {
         if (context == null || context.Player == null || context.PlayerStats == null || context.PlayerInventory == null || isClosing)
             return false;
@@ -193,13 +251,18 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         IsOpen = true;
         isClosing = false;
         isInteractive = false;
-        focusArea = FocusArea.LearnList;
+        MagicView openingView = mode == MagicServiceMode.Equip ? MagicView.Prepare : MagicView.Learn;
+        focusArea = openingView == MagicView.Prepare ? FocusArea.PrepareList : FocusArea.LearnList;
         openingFrame = Time.frameCount;
         playerController.AcquireGameplayInputLock(gameplayLockOwner);
         SubscribeInput();
+        HideAllContentGroups();
         if (magicHud != null) magicHud.SetActive(true);
-        SetMagicView(MagicView.Learn, refresh: true, focus: true);
-        isInteractive = true;
+        SetMagicView(openingView, refresh: true, focus: true);
+        DeactivateContentRoots();
+        RestartBookOpenAnimation();
+        Canvas.ForceUpdateCanvases();
+        contentAppearRoutine = StartCoroutine(PlayContentAppearAnimation());
         return true;
     }
 
@@ -210,24 +273,31 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         isInteractive = false;
         isClosing = true;
         UnsubscribeInput();
-        if (EventSystem.current != null && IsOwnedSelection(EventSystem.current.currentSelectedGameObject))
+        StopContentAppearRoutineOnly();
+        if (EventSystem.current != null)
             EventSystem.current.SetSelectedGameObject(null);
-        ClearRows();
-        ClearPreparedRows();
-        if (magicHud != null) magicHud.SetActive(false);
-        if (playerController != null) playerController.ReleaseGameplayInputLock(gameplayLockOwner);
         ActiveContext = null;
-        isClosing = false;
-        Closed?.Invoke();
+
+        if (!isActiveAndEnabled)
+        {
+            FinishClose();
+            return;
+        }
+
+        closeRoutine = StartCoroutine(RunCloseAnimations());
     }
 
     private void Update()
     {
         if (!IsOpen || !isInteractive || controls == null || Time.unscaledTime < lastNavigationTime + 0.20f) return;
         Vector2 move = controls.Player.Move.ReadValue<Vector2>();
-        if (Mathf.Abs(move.x) > 0.5f)
+        if (Mathf.Abs(move.x) > 0.5f && currentView == MagicView.Prepare)
         {
-            HandleHorizontalNavigation(move.x > 0.5f ? 1 : -1);
+            int direction = move.x > 0.5f ? 1 : -1;
+            if (focusArea == FocusArea.PrepareSlots)
+                MovePreparedSlotHorizontal(direction);
+            else
+                HandleHorizontalNavigation(direction);
             lastNavigationTime = Time.unscaledTime;
             return;
         }
@@ -236,7 +306,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         if (focusArea == FocusArea.PrepareList)
             MovePreparedRecipeFocus(move.y > 0.5f ? -1 : 1);
         else if (focusArea == FocusArea.PrepareSlots)
-            SetPreparedSlotFocus(selectedPreparedSlotIndex + (move.y > 0.5f ? -1 : 1));
+            MovePreparedSlotVertical(move.y > 0.5f ? -1 : 1);
         else
             MoveRecipeFocus(move.y > 0.5f ? -1 : 1);
         lastNavigationTime = Time.unscaledTime;
@@ -520,24 +590,13 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         }
 
         selectedRecipeIndex = visibleRecipes.Count == 0 ? -1 : Mathf.Clamp(previous < 0 ? 0 : previous, 0, visibleRecipes.Count - 1);
+        recipeListScroll?.Refresh(previous < 0);
         RefreshSelectedRecipe();
     }
 
     private bool IsRecipeVisible(MagicRecipeData recipe)
     {
         return recipe != null && recipe.resultMagic != null && !string.IsNullOrWhiteSpace(recipe.recipeId) && IsRecipeAvailable(recipe);
-    }
-
-    public void ShowLearnView()
-    {
-        if (IsOpen)
-            SetMagicView(MagicView.Learn, refresh: true, focus: true);
-    }
-
-    public void ShowPrepareView()
-    {
-        if (IsOpen)
-            SetMagicView(MagicView.Prepare, refresh: true, focus: true);
     }
 
     private void SetMagicView(MagicView view, bool refresh, bool focus)
@@ -548,6 +607,8 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         currentView = view;
         if (learnRoot != null) learnRoot.SetActive(view == MagicView.Learn);
         if (equipRoot != null) equipRoot.SetActive(view == MagicView.Prepare);
+        if (isInteractive)
+            SetContentGroupState(GetActiveContentGroup(), 1f, true);
 
         if (view == MagicView.Learn)
         {
@@ -567,24 +628,54 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
 
     private void HandleHorizontalNavigation(int direction)
     {
-        if (currentView == MagicView.Learn)
-        {
-            if (direction > 0)
-                SetMagicView(MagicView.Prepare, refresh: true, focus: true);
-            return;
-        }
-
-        if (focusArea == FocusArea.PrepareSlots)
-        {
-            if (direction < 0)
-                FocusPreparedList();
-            return;
-        }
-
-        if (direction < 0)
-            SetMagicView(MagicView.Learn, refresh: true, focus: true);
-        else
+        if (direction > 0)
             FocusPreparedSlots();
+    }
+
+    private void MovePreparedSlotHorizontal(int direction)
+    {
+        int capacity = GetRunMagicCapacity();
+        int columns = GetPreparedSlotColumnCount(capacity);
+        if (capacity <= 0 || columns <= 0)
+            return;
+
+        int rowStart = selectedPreparedSlotIndex / columns * columns;
+        int rowEnd = Mathf.Min(rowStart + columns - 1, capacity - 1);
+        if (direction < 0 && selectedPreparedSlotIndex <= rowStart)
+        {
+            FocusPreparedList();
+            return;
+        }
+
+        int nextIndex = Mathf.Clamp(selectedPreparedSlotIndex + direction, rowStart, rowEnd);
+        if (nextIndex != selectedPreparedSlotIndex)
+            SetPreparedSlotFocus(nextIndex);
+    }
+
+    private void MovePreparedSlotVertical(int direction)
+    {
+        int capacity = GetRunMagicCapacity();
+        int columns = GetPreparedSlotColumnCount(capacity);
+        if (capacity <= 0 || columns <= 0)
+            return;
+
+        int nextIndex = selectedPreparedSlotIndex + direction * columns;
+        if (nextIndex >= 0 && nextIndex < capacity)
+            SetPreparedSlotFocus(nextIndex);
+    }
+
+    private int GetPreparedSlotColumnCount(int capacity)
+    {
+        if (equipSlotGrid == null)
+            return 1;
+
+        if (equipSlotGrid.constraint == GridLayoutGroup.Constraint.FixedColumnCount)
+            return Mathf.Max(1, equipSlotGrid.constraintCount);
+
+        if (equipSlotGrid.constraint == GridLayoutGroup.Constraint.FixedRowCount)
+            return Mathf.Max(1, Mathf.CeilToInt(capacity / (float)Mathf.Max(1, equipSlotGrid.constraintCount)));
+
+        return 1;
     }
 
     private void RefreshPrepareView()
@@ -630,7 +721,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
             Navigation navigation = row.Button.navigation;
             navigation.mode = Navigation.Mode.None;
             row.Button.navigation = navigation;
-            row.Button.onClick.AddListener(() => SetPreparedRecipeFocus(index, toggleArmed: true));
+            row.Button.onClick.AddListener(() => HandlePreparedRecipeClicked(index));
             preparedRows.Add(row);
         }
 
@@ -639,6 +730,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
             : Mathf.Clamp(previousFocus < 0 ? 0 : previousFocus, 0, preparedRecipeRows.Count - 1);
         if (armedPreparedRecipeIndex >= preparedRecipeRows.Count)
             armedPreparedRecipeIndex = -1;
+        preparedMagicListScroll?.Refresh(previousFocus < 0);
     }
 
     private void RefreshPreparedSlots()
@@ -681,9 +773,22 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
 
         selectedPreparedRecipeIndex = index;
         focusArea = FocusArea.PrepareList;
-        if (EventSystem.current != null && index < preparedRows.Count)
-            EventSystem.current.SetSelectedGameObject(preparedRows[index].gameObject);
+        if (index < preparedRows.Count)
+            SelectInEventSystem(preparedRows[index].gameObject);
+        if (index < preparedRows.Count)
+            preparedMagicListScroll?.EnsureVisible(preparedRows[index].transform as RectTransform);
         RefreshPreparedSlots();
+    }
+
+    private void HandlePreparedRecipeClicked(int index)
+    {
+        if (!IsOpen || !isInteractive || index < 0 || index >= preparedRecipeRows.Count)
+            return;
+
+        SetPreparedRecipeFocus(index, toggleArmed: false);
+        armedPreparedRecipeIndex = index;
+        RefreshPreparedSlots();
+        FocusPreparedSlots();
     }
 
     private void MovePreparedRecipeFocus(int direction)
@@ -706,7 +811,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         SetPreparedSlotFocus(selectedPreparedSlotIndex < 0 ? 0 : selectedPreparedSlotIndex);
     }
 
-    private void SetPreparedSlotFocus(int index)
+    private void SetPreparedSlotFocus(int index, bool updateEventSelection = true)
     {
         int capacity = GetRunMagicCapacity();
         if (capacity <= 0)
@@ -717,8 +822,18 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         for (int i = 0; i < equipSlots.Count; i++)
             if (equipSlots[i] != null)
                 equipSlots[i].SetFocused(i == selectedPreparedSlotIndex);
-        if (EventSystem.current != null && selectedPreparedSlotIndex < equipSlots.Count && equipSlots[selectedPreparedSlotIndex] != null)
-            EventSystem.current.SetSelectedGameObject(equipSlots[selectedPreparedSlotIndex].gameObject);
+        if (updateEventSelection && selectedPreparedSlotIndex < equipSlots.Count && equipSlots[selectedPreparedSlotIndex] != null)
+            SelectInEventSystem(equipSlots[selectedPreparedSlotIndex].gameObject);
+    }
+
+    private static void SelectInEventSystem(GameObject target)
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null || target == null || eventSystem.alreadySelecting
+            || eventSystem.currentSelectedGameObject == target)
+            return;
+
+        eventSystem.SetSelectedGameObject(target);
     }
 
     private void SetRecipeFocus(int index)
@@ -730,6 +845,8 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         RefreshSelectedRecipe();
         if (EventSystem.current != null && selectedRecipeIndex < recipeRows.Count)
             EventSystem.current.SetSelectedGameObject(recipeRows[selectedRecipeIndex].gameObject);
+        if (selectedRecipeIndex < recipeRows.Count)
+            recipeListScroll?.EnsureVisible(recipeRows[selectedRecipeIndex].transform as RectTransform);
     }
 
     private void MoveRecipeFocus(int direction)
@@ -743,6 +860,14 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         MagicRecipeData recipe = SelectedRecipe;
         MagicItemData magic = recipe != null ? recipe.resultMagic : null;
         if (detailRoot != null) detailRoot.SetActive(magic != null);
+        if (detailImage != null)
+        {
+            detailImage.sprite = magic != null ? magic.icon : null;
+            detailImage.enabled = magic != null && magic.icon != null;
+            detailImage.preserveAspect = true;
+        }
+        if (detailTitle != null)
+            detailTitle.text = magic != null ? GetRecipeName(recipe) : string.Empty;
         if (scalingText != null) scalingText.text = magic != null ? magic.scaling : string.Empty;
         if (requirementsText != null) requirementsText.text = magic != null ? magic.GetRequirementsLabel() : string.Empty;
         bool attack = magic != null && magic.IsVisualCategory(MagicItemData.MagicCategory.Attack);
@@ -801,7 +926,7 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
 
     private void OnActionButtonClicked()
     {
-        if (!IsOpen || Time.frameCount == openingFrame || Time.frameCount == lastActionActivationFrame) return;
+        if (!IsOpen || !isInteractive || Time.frameCount == openingFrame || Time.frameCount == lastActionActivationFrame) return;
         lastActionActivationFrame = Time.frameCount;
         MagicRecipeData recipe = SelectedRecipe;
         if (recipe == null) return;
@@ -825,14 +950,8 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
             if (selectedPreparedRecipeIndex < 0)
                 return;
 
-            if (armedPreparedRecipeIndex == selectedPreparedRecipeIndex)
-            {
-                armedPreparedRecipeIndex = -1;
-                RefreshPreparedSlots();
-                return;
-            }
-
             armedPreparedRecipeIndex = selectedPreparedRecipeIndex;
+            RefreshPreparedSlots();
             FocusPreparedSlots();
             return;
         }
@@ -866,18 +985,12 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
             return;
         }
 
-        if (focusArea == FocusArea.PrepareList)
-        {
-            SetMagicView(MagicView.Learn, refresh: true, focus: true);
-            return;
-        }
-
         CloseMagic();
     }
 
     public void HandleSlotPointerDown(int index)
     {
-        if (IsOpen && currentView == MagicView.Prepare)
+        if (IsOpen && isInteractive && currentView == MagicView.Prepare)
             ApplyPreparedSlotSelection(index);
     }
 
@@ -888,22 +1001,208 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
 
     public void HandleSlotSelected(int index)
     {
-        if (IsOpen && currentView == MagicView.Prepare)
-            SetPreparedSlotFocus(index);
+        if (IsOpen && isInteractive && currentView == MagicView.Prepare)
+            SetPreparedSlotFocus(index, updateEventSelection: false);
     }
 
     public void HandleSlotSubmit(int index)
     {
-        if (IsOpen && currentView == MagicView.Prepare)
+        if (IsOpen && isInteractive && currentView == MagicView.Prepare)
             ApplyPreparedSlotSelection(index);
+    }
+
+    private System.Collections.IEnumerator PlayContentAppearAnimation()
+    {
+        if (contentAppearDelay > 0f)
+            yield return new WaitForSecondsRealtime(contentAppearDelay);
+        if (!IsOpen || isClosing)
+            yield break;
+
+        if (contentAppearAnimator != null && !string.IsNullOrWhiteSpace(contentAppearStateName))
+        {
+            GameObject animationObject = contentAppearAnimator.gameObject;
+            animationObject.SetActive(true);
+            contentAppearAnimator.enabled = true;
+            contentAppearAnimator.updateMode = AnimatorUpdateMode.UnscaledTime;
+            contentAppearAnimator.Play(contentAppearStateName, 0, 0f);
+            contentAppearAnimator.Update(0f);
+        }
+
+        // The transition is sampled before activating the actual UI content,
+        // preventing a one-frame flash of the final layout.
+        ShowContentGroup();
+
+        if (contentAppearAnimator != null && !string.IsNullOrWhiteSpace(contentAppearStateName))
+        {
+            if (contentAppearDuration > 0f)
+                yield return new WaitForSecondsRealtime(contentAppearDuration);
+
+            HideContentAppearAnimation();
+        }
+
+        contentAppearRoutine = null;
+        if (IsOpen && !isClosing)
+        {
+            isInteractive = true;
+            SetContentInteraction(true);
+            lastNavigationTime = Time.unscaledTime;
+            FocusCurrentView();
+        }
+    }
+
+    private System.Collections.IEnumerator RunCloseAnimations()
+    {
+        if (contentAppearAnimator != null && contentAppearDuration > 0f)
+        {
+            contentAppearAnimator.gameObject.SetActive(true);
+            contentAppearAnimator.enabled = true;
+            contentAppearAnimator.updateMode = AnimatorUpdateMode.UnscaledTime;
+
+            float elapsed = 0f;
+            while (elapsed < contentAppearDuration)
+            {
+                float normalizedTime = 1f - Mathf.Clamp01(elapsed / contentAppearDuration);
+                contentAppearAnimator.Play(contentAppearStateName, 0, normalizedTime);
+                contentAppearAnimator.Update(0f);
+                elapsed += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            contentAppearAnimator.Play(contentAppearStateName, 0, 0f);
+            contentAppearAnimator.Update(0f);
+        }
+
+        HideContentGroup();
+        DeactivateContentRoots();
+        HideContentAppearAnimation();
+        if (bookAnimator != null && bookCloseDuration > 0f)
+        {
+            bookAnimator.enabled = true;
+            bookAnimator.updateMode = AnimatorUpdateMode.UnscaledTime;
+            bookAnimator.Play(bookCloseStateName, 0, 0f);
+            bookAnimator.Update(0f);
+            yield return new WaitForSecondsRealtime(bookCloseDuration);
+        }
+
+        FinishClose();
+    }
+
+    private void FinishClose()
+    {
+        ClearRows();
+        ClearPreparedRows();
+        if (magicHud != null)
+            magicHud.SetActive(false);
+        isClosing = false;
+        isInteractive = false;
+        closeRoutine = null;
+        Closed?.Invoke();
+        if (playerController != null)
+            playerController.ReleaseGameplayInputLock(gameplayLockOwner);
+        controls = null;
+        openingFrame = -1;
+    }
+
+    private void StopContentAppearRoutineOnly()
+    {
+        if (contentAppearRoutine != null)
+            StopCoroutine(contentAppearRoutine);
+        contentAppearRoutine = null;
+    }
+
+    private void HideContentAppearAnimation()
+    {
+        if (contentAppearAnimator == null)
+            return;
+        contentAppearAnimator.enabled = false;
+        contentAppearAnimator.gameObject.SetActive(false);
+    }
+
+    private void HideContentGroup()
+    {
+        SetContentGroupState(GetActiveContentGroup(), 0f, false);
+    }
+
+    private void HideAllContentGroups()
+    {
+        SetContentGroupState(learnContentGroup, 0f, false);
+        SetContentGroupState(equipContentGroup, 0f, false);
+    }
+
+    private void DeactivateContentRoots()
+    {
+        if (EventSystem.current != null && IsOwnedSelection(EventSystem.current.currentSelectedGameObject))
+            EventSystem.current.SetSelectedGameObject(null);
+        if (learnRoot != null)
+            learnRoot.SetActive(false);
+        if (equipRoot != null)
+            equipRoot.SetActive(false);
+    }
+
+    private void RestartBookOpenAnimation()
+    {
+        if (bookAnimator == null || string.IsNullOrWhiteSpace(bookOpenStateName))
+            return;
+        bookAnimator.enabled = true;
+        bookAnimator.updateMode = AnimatorUpdateMode.UnscaledTime;
+        bookAnimator.Play(bookOpenStateName, 0, 0f);
+        bookAnimator.Update(0f);
+    }
+
+    private void ShowContentGroup()
+    {
+        GameObject activeRoot = GetActiveContentRoot();
+        if (activeRoot != null)
+            activeRoot.SetActive(true);
+        SetContentGroupState(GetActiveContentGroup(), 1f, false);
+    }
+
+    private void SetContentInteraction(bool enabled)
+    {
+        CanvasGroup activeGroup = GetActiveContentGroup();
+        if (activeGroup == null)
+            return;
+        activeGroup.interactable = enabled;
+        activeGroup.blocksRaycasts = enabled;
+    }
+
+    private CanvasGroup GetActiveContentGroup()
+    {
+        return currentView == MagicView.Prepare ? equipContentGroup : learnContentGroup;
+    }
+
+    private GameObject GetActiveContentRoot()
+    {
+        return currentView == MagicView.Prepare ? equipRoot : learnRoot;
+    }
+
+    private static void SetContentGroupState(CanvasGroup group, float alpha, bool interactive)
+    {
+        if (group == null)
+            return;
+        group.alpha = alpha;
+        group.interactable = interactive;
+        group.blocksRaycasts = interactive;
+    }
+
+    private void FocusCurrentView()
+    {
+        if (currentView == MagicView.Prepare)
+            FocusPreparedList();
+        else if (visibleRecipes.Count > 0)
+            SetRecipeFocus(Mathf.Clamp(selectedRecipeIndex, 0, visibleRecipes.Count - 1));
     }
 
     private void ApplyPreparedSlotSelection(int slotIndex)
     {
+        if (lastPreparedSlotActivationFrame == Time.frameCount)
+            return;
+
         int capacity = GetRunMagicCapacity();
         if (slotIndex < 0 || slotIndex >= capacity)
             return;
 
+        lastPreparedSlotActivationFrame = Time.frameCount;
         SetPreparedSlotFocus(slotIndex);
         MagicRecipeData recipe = ArmedPreparedRecipe;
         if (recipe != null)
@@ -931,8 +1230,13 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
     {
         ClearMaterialRows();
         for (int i = 0; i < recipeRows.Count; i++)
-            if (recipeRows[i] != null) Destroy(recipeRows[i].gameObject);
+            if (recipeRows[i] != null)
+            {
+                recipeRows[i].gameObject.SetActive(false);
+                Destroy(recipeRows[i].gameObject);
+            }
         recipeRows.Clear();
+        recipeListScroll?.Refresh(false);
     }
 
     private void ClearPreparedRows()
@@ -951,8 +1255,13 @@ public sealed class MagicManager : MonoBehaviour, IInventorySlotHandler
         }
 
         for (int i = 0; i < preparedRows.Count; i++)
-            if (preparedRows[i] != null) Destroy(preparedRows[i].gameObject);
+            if (preparedRows[i] != null)
+            {
+                preparedRows[i].gameObject.SetActive(false);
+                Destroy(preparedRows[i].gameObject);
+            }
         preparedRows.Clear();
+        preparedMagicListScroll?.Refresh(false);
     }
 
     private void ClearMaterialRows()

@@ -1,8 +1,15 @@
 using UnityEngine;
 
+public enum MagicServiceMode
+{
+    Learn,
+    Equip
+}
+
 public sealed class MagicService : NpcServiceBehaviour
 {
     [SerializeField] private MagicManager magicManager;
+    [SerializeField] private MagicServiceMode openMode = MagicServiceMode.Learn;
     private NpcServiceContext activeContext;
 
     public override bool Open(NpcServiceContext context)
@@ -13,7 +20,7 @@ public sealed class MagicService : NpcServiceBehaviour
         activeContext = context;
         magicManager.Closed -= OnMagicClosed;
         magicManager.Closed += OnMagicClosed;
-        if (magicManager.OpenMagic(context)) return true;
+        if (magicManager.OpenMagic(openMode, context)) return true;
 
         magicManager.Closed -= OnMagicClosed;
         activeContext = null;
