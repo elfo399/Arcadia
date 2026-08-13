@@ -907,8 +907,10 @@ public class PlayerInventory : MonoBehaviour
         }
         else
         {
-            int copies = item.weaponData != null || item.armorData != null ? item.amount : 1;
-            item.amount = 1;
+            bool nonStackable = item.weaponData != null || item.armorData != null;
+            int copies = nonStackable ? item.amount : 1;
+            if (nonStackable)
+                item.amount = 1;
             EnsureNewInstanceId(item);
             items.Add(item);
             for (int i = 1; i < copies; i++)
