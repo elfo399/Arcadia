@@ -23,11 +23,21 @@ public sealed class ChallengeRoomRule : RoomRule, IInteractable, ITriggeredRoomE
     public string GetPrompt() => !floorAllowsChallenge||active||IsCompleted||IsFailed ? string.Empty : prompt;
     private bool StartChallenge()
     {
-        if(!floorAllowsChallenge||active||IsResolved)return false;
-        if(waves.Count==0){Debug.LogError($"[ChallengeRoomRule] {name} requires at least one wave.",this);return false;} active=true; remaining=timeLimitSeconds; StartRunning(); Context.Room.BeginCombat(this); StartNextWave();return true;
+        if(!CanStartFromTrigger())return false;
+        active=true; remaining=timeLimitSeconds; StartRunning(); Context.Room.BeginCombat(this); StartNextWave();return true;
     }
     public bool TryStartFromTrigger()=>StartChallenge();
-    public bool CanStartFromTrigger()=>floorAllowsChallenge&&!active&&!IsResolved&&waves.Count>0;
+    public bool CanStartFromTrigger()
+    {
+        if(!floorAllowsChallenge||active||IsResolved||waves.Count==0||GetComponentsInChildren<DungeonWaveSpawnPoint>(true).Length==0)return false;
+        foreach(DungeonWaveDefinition wave in waves)
+        {
+            List<SpawnTable> pools=wave!=null?wave.enemyPools:null;
+            if(pools==null||pools.Count==0)pools=CoreGenerator.Instance!=null&&CoreGenerator.Instance.ActiveFloorDefinition!=null?CoreGenerator.Instance.ActiveFloorDefinition.enemyPools:null;
+            if(pools==null||pools.Find(pool=>pool!=null)==null)return false;
+        }
+        return true;
+    }
     private void StartNextWave()
     {
         waveIndex++; if(waveIndex>=waves.Count){ active=false; Complete(); return; }
