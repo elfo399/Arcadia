@@ -5,7 +5,9 @@ using UnityEngine;
 [Serializable] public sealed class SavedDungeonRuleState { public string ruleId; public bool completed; public bool failed; public string payload; }
 [Serializable] public sealed class SavedDungeonRoomState { public string roomId; public bool visited; public bool completed; public bool revealed; public bool rewardClaimed; public bool encounterInProgress; public SavedDungeonRuleState[] rules; }
 [Serializable] public sealed class SavedDungeonFloorState { public int floorNumber; public SavedDungeonRoomState[] rooms; }
-[Serializable] public sealed class SavedRunModifierState { public string modifierId; public int stacks; public RunModifierEffect effect; public float multiplierPerStack=1f; }
+[Serializable] public sealed class SavedRunModifierEffect { public RunModifierEffect effect; public float multiplierPerStack=1f; }
+/// <summary>The scalar fields are retained to load v8 saves; effects is the lossless v9 representation.</summary>
+[Serializable] public sealed class SavedRunModifierState { public string modifierId; public int stacks; public RunModifierEffect effect; public float multiplierPerStack=1f; public SavedRunModifierEffect[] effects; }
 [Serializable] public sealed class SavedDungeonRunState
 {
     public string runSeed; public int currentFloor; public SavedRunModifierState[] modifiers; public string[] oncePerRunEvents; public SavedDungeonFloorState currentFloorState;

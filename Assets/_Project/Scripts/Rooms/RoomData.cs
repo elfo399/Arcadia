@@ -27,6 +27,8 @@ public class RoomData : ScriptableObject
     public string stableId;
     public string roomName;
     public GameObject roomPrefab; 
+    [Min(1)] [Tooltip("Relative deterministic selection weight inside a matching room pool.")]
+    public int generationWeight = 1;
 
     [Header("Dimensioni Griglia")]
     public Vector2Int size = new Vector2Int(1, 1); 

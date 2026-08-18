@@ -18,8 +18,11 @@ public sealed class WaveRoomRule : RoomRule
     {
         currentWave++; if(currentWave>=waves.Count){ Complete(); return; }
         var points=GetComponentsInChildren<DungeonWaveSpawnPoint>(true); if(points.Length==0){ Debug.LogError($"[WaveRoomRule] {name} requires DungeonWaveSpawnPoint components.",this); Fail(); return; }
-        var wave=waves[currentWave]; if(wave==null || wave.enemyPools==null || wave.enemyPools.Count==0){ Debug.LogError($"[WaveRoomRule] {name} wave {currentWave} has no pools.",this); Fail(); return; }
-        var random=Context.CreateRandom(RuleId+":wave:"+currentWave); for(int i=0;i<points.Length;i++) points[i].Spawn(wave.enemyPools[random.Next(wave.enemyPools.Count)],random,Context.Room,RuleId); Context.Room.WakeUpEnemies(RuleId);
+        var wave=waves[currentWave]; List<SpawnTable> pools=wave!=null?wave.enemyPools:null;
+        if(pools==null||pools.Count==0)pools=CoreGenerator.Instance!=null&&CoreGenerator.Instance.ActiveFloorDefinition!=null?CoreGenerator.Instance.ActiveFloorDefinition.enemyPools:null;
+        var validPools=new List<SpawnTable>();if(pools!=null)foreach(var pool in pools)if(pool!=null)validPools.Add(pool);
+        if(validPools.Count==0){ Debug.LogError($"[WaveRoomRule] {name} wave {currentWave} has no pools.",this); Fail(); return; }
+        var random=Context.CreateRandom(RuleId+":wave:"+currentWave); for(int i=0;i<points.Length;i++) points[i].Spawn(validPools[random.Next(validPools.Count)],random,Context.Room,RuleId); Context.Room.WakeUpEnemies(RuleId);
         if(Context.Room.GetEncounterEnemyCount(RuleId)==0) StartNextWave();
     }
     public override void OnEnemyDied(GameObject enemy,string ownerId) { if(running&&ownerId==RuleId&&Context.Room.GetEncounterEnemyCount(RuleId)==0) StartNextWave(); }

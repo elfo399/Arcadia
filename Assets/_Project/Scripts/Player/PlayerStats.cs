@@ -475,6 +475,17 @@ public class PlayerStats : MonoBehaviour, IDamageable
         UpdateFlaskUI();
     }
 
+    public bool HasFlasks(int amount) => amount <= 0 || currentFlasks >= amount;
+
+    public bool TryConsumeFlasks(int amount, bool save = true)
+    {
+        if (amount <= 0 || currentFlasks < amount) return false;
+        currentFlasks -= amount;
+        UpdateFlaskUI();
+        if (save) SaveStats();
+        return true;
+    }
+
     public void SpendStamina(float amount)
     {
         // Se siamo nell'Hub, non consumare stamina (Opzionale)

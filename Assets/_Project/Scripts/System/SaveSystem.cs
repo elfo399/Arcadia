@@ -3,7 +3,7 @@ using System.IO;
 
 public static class SaveSystem
 {
-    public const int CurrentSaveVersion = 8;
+    public const int CurrentSaveVersion = 9;
     public const string SinglePlayerId = "player";
     public const string DefaultPlayerName = "Player";
 
@@ -397,6 +397,18 @@ public static class SaveSystem
                         data.dungeonRun.rooms = null;
                     }
                     data.saveVersion = 8;
+                    break;
+
+                case 8:
+                    // v8 stored one effect per modifier. v9 stores an effect list
+                    // so a pact restores every effect without relying on assets.
+                    if (data.dungeonRun != null && data.dungeonRun.modifiers != null)
+                    {
+                        foreach (SavedRunModifierState modifier in data.dungeonRun.modifiers)
+                            if (modifier != null && (modifier.effects == null || modifier.effects.Length == 0))
+                                modifier.effects = new[] { new SavedRunModifierEffect { effect = modifier.effect, multiplierPerStack = Mathf.Max(.01f, modifier.multiplierPerStack) } };
+                    }
+                    data.saveVersion = 9;
                     break;
 
                 default:

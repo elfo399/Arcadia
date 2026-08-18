@@ -85,6 +85,7 @@ public class CoreGenerator : MonoBehaviour
     private bool savedCheckpointApplied;
     private DungeonThemeDefinition activeThemeDefinition;
     private DungeonRoomSet activeRoomSet;
+    private DungeonFloorDefinition activeFloorDefinition;
     private DungeonRunStateController runStateController;
     private int activeNormalRoomCount;
 
@@ -92,6 +93,7 @@ public class CoreGenerator : MonoBehaviour
     public event Action<int> FloorGenerated;
     public int CurrentFloor => currentFloor;
     public DungeonThemeDefinition ActiveThemeDefinition => activeThemeDefinition;
+    public DungeonFloorDefinition ActiveFloorDefinition => activeFloorDefinition;
     public string ActiveThemeDisplayName => GetThemeDisplayName(activeThemeDefinition);
     public IReadOnlyList<Room> ActiveRooms => activeRoomObjects;
 
@@ -331,17 +333,21 @@ public class CoreGenerator : MonoBehaviour
         freeSockets = freeSockets.OrderBy(x => prng.Next()).ToList();
         
         // 5. Tenta di piazzare le stanze speciali, passando la mappa spaziale per ottimizzare i controlli.
-        if (!PlaceSpecialRoom("Shop", layout, occupiedCells, deadEndNormalRooms, freeSockets, -1, shopBigRoomChance, cellToRoomMap)) return null;
-        if (!PlaceSpecialRoom("Treasure", layout, occupiedCells, deadEndNormalRooms, freeSockets, -1, treasureBigRoomChance, cellToRoomMap)) return null;
-        if (!PlaceSpecialRoom("Boss", layout, occupiedCells, deadEndNormalRooms, freeSockets, minBossDistance, bossBigRoomChance, cellToRoomMap)) return null;
+        if (!PlaceSpecialRooms("Shop", ResolveSpecialRoomCount("Shop"), layout, occupiedCells, deadEndNormalRooms, freeSockets, -1, shopBigRoomChance, cellToRoomMap)) return null;
+        if (!PlaceSpecialRooms("Treasure", ResolveSpecialRoomCount("Treasure"), layout, occupiedCells, deadEndNormalRooms, freeSockets, -1, treasureBigRoomChance, cellToRoomMap)) return null;
+        if (!PlaceSpecialRooms("Boss", ResolveSpecialRoomCount("Boss"), layout, occupiedCells, deadEndNormalRooms, freeSockets, minBossDistance, bossBigRoomChance, cellToRoomMap)) return null;
 
-        // 5.1 CURCH / EVIL CURCH (opzionale)
-        if (playerStats != null && prng.Next(0, 100) <= curchsRoomsChance)
+        // Floor definitions explicitly control shrine categories. Legacy floors retain their morality-gated chance.
+        if (activeFloorDefinition != null)
+        {
+            if (!PlaceSpecialRooms("Curch", ResolveSpecialRoomCount("Curch"), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, curchBigRoomChance, cellToRoomMap)) return null;
+            if (!PlaceSpecialRooms("EvilCurch", ResolveSpecialRoomCount("EvilCurch"), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, evilCurchBigRoomChance, cellToRoomMap)) return null;
+        }
+        else if (playerStats != null && playerStats.benedetto != playerStats.malefico && prng.Next(0, 100) <= curchsRoomsChance)
         {
             string curchType = playerStats.benedetto > playerStats.malefico ? "Curch" : "EvilCurch";
             int curchChance = playerStats.benedetto > playerStats.malefico ? curchBigRoomChance : evilCurchBigRoomChance;
-            if(playerStats.benedetto != playerStats.malefico)
-                PlaceSpecialRoom(curchType, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, curchChance, cellToRoomMap);
+            PlaceSpecialRoom(curchType, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, curchChance, cellToRoomMap);
         }
 
         return layout;
@@ -471,7 +477,18 @@ public class CoreGenerator : MonoBehaviour
             }
         }
         
-        return type == "Curch" || type == "EvilCurch";
+        // Callers that intentionally treat a shrine as optional simply ignore this
+        // result. A floor definition with a positive minimum must instead fail the
+        // attempt so it can never silently generate fewer requested rooms.
+        return false;
+    }
+
+    private bool PlaceSpecialRooms(string type, int count, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, List<VirtualRoom> replacementCandidates, List<Vector2Int> freeSockets, int minDistance, int bigRoomChance, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    {
+        for (int i = 0; i < count; i++)
+            if (!PlaceSpecialRoom(type, layout, occupied, replacementCandidates, freeSockets, minDistance, bigRoomChance, cellToRoomMap))
+                return false;
+        return true;
     }
 
     bool IsTouchingAnySpecialRoom(Vector2Int anchor, Vector2Int size, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap, VirtualRoom roomToIgnore)
@@ -609,7 +626,18 @@ public class CoreGenerator : MonoBehaviour
         {
             if (variants != null && variants.Length > 0)
             {
-                return variants[prng.Next(variants.Length)];
+                int totalWeight = 0;
+                for (int i = 0; i < variants.Length; i++)
+                    if (variants[i] != null) totalWeight += Mathf.Max(1, variants[i].roomData != null ? variants[i].roomData.generationWeight : 1);
+                if (totalWeight <= 0) return null;
+                int roll = prng.Next(totalWeight);
+                for (int i = 0; i < variants.Length; i++)
+                {
+                    Room candidate = variants[i];
+                    if (candidate == null) continue;
+                    roll -= Mathf.Max(1, candidate.roomData != null ? candidate.roomData.generationWeight : 1);
+                    if (roll < 0) return candidate;
+                }
             }
         }
         return null;
@@ -623,6 +651,10 @@ public class CoreGenerator : MonoBehaviour
     {
         activeThemeDefinition = SelectThemeForFloor(currentFloor, currentMasterSeed);
         activeRoomSet = activeThemeDefinition != null ? activeThemeDefinition.roomSet : null;
+        DungeonFloorThemeTable.FloorThemeEntry entry = floorThemeTable != null ? floorThemeTable.GetEntryForFloor(currentFloor) : null;
+        activeFloorDefinition = entry != null ? entry.floorDefinition : null;
+        DungeonRoomSet overrideSet = PickFloorRoomSet(activeFloorDefinition);
+        if (overrideSet != null) activeRoomSet = overrideSet;
         string themeLabel = ActiveThemeDisplayName;
 
         if (activeThemeDefinition != null && activeRoomSet != null)
@@ -679,19 +711,19 @@ public class CoreGenerator : MonoBehaviour
             return false;
         }
 
-        if (!HasAnyVariant(activeRoomSet.boss1x1Variants, activeRoomSet.boss2x1Variants, activeRoomSet.boss1x2Variants, activeRoomSet.boss2x2Variants))
+        if (ResolveSpecialRoomCount("Boss") > 0 && !HasAnyVariant(activeRoomSet.boss1x1Variants, activeRoomSet.boss2x1Variants, activeRoomSet.boss1x2Variants, activeRoomSet.boss2x2Variants))
         {
             error = $"il room set '{activeRoomSet.name}' non ha varianti Boss.";
             return false;
         }
 
-        if (!HasAnyVariant(activeRoomSet.shop1x1Variants, activeRoomSet.shop2x1Variants, activeRoomSet.shop1x2Variants, activeRoomSet.shop2x2Variants))
+        if (ResolveSpecialRoomCount("Shop") > 0 && !HasAnyVariant(activeRoomSet.shop1x1Variants, activeRoomSet.shop2x1Variants, activeRoomSet.shop1x2Variants, activeRoomSet.shop2x2Variants))
         {
             error = $"il room set '{activeRoomSet.name}' non ha varianti Shop.";
             return false;
         }
 
-        if (!HasAnyVariant(activeRoomSet.treasure1x1Variants, activeRoomSet.treasure2x1Variants, activeRoomSet.treasure1x2Variants, activeRoomSet.treasure2x2Variants))
+        if (ResolveSpecialRoomCount("Treasure") > 0 && !HasAnyVariant(activeRoomSet.treasure1x1Variants, activeRoomSet.treasure2x1Variants, activeRoomSet.treasure1x2Variants, activeRoomSet.treasure2x2Variants))
         {
             error = $"il room set '{activeRoomSet.name}' non ha varianti Treasure.";
             return false;
@@ -747,6 +779,32 @@ public class CoreGenerator : MonoBehaviour
         if (definition == null || definition.normalRooms == null)
             return Mathf.Max(0, totalNormalRooms);
         return definition.normalRooms.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "normal-count"));
+    }
+
+    private int ResolveSpecialRoomCount(string type)
+    {
+        if (activeFloorDefinition == null)
+            return type == "Curch" || type == "EvilCurch" ? 0 : 1;
+        DungeonFloorDefinition.RoomCount count = activeFloorDefinition.GetCount(type);
+        return count == null ? 0 : count.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", type + "-count"));
+    }
+
+    private DungeonRoomSet PickFloorRoomSet(DungeonFloorDefinition definition)
+    {
+        if (definition == null || definition.allowedRoomSets == null) return null;
+        int total = 0;
+        foreach (DungeonFloorDefinition.RoomSetChoice choice in definition.allowedRoomSets)
+            if (choice != null && choice.roomSet != null) total += Mathf.Max(1, choice.weight);
+        if (total <= 0) return null;
+        System.Random random = DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "room-set");
+        int roll = random.Next(total);
+        foreach (DungeonFloorDefinition.RoomSetChoice choice in definition.allowedRoomSets)
+        {
+            if (choice == null || choice.roomSet == null) continue;
+            roll -= Mathf.Max(1, choice.weight);
+            if (roll < 0) return choice.roomSet;
+        }
+        return null;
     }
 
     private Room GetStartRoomPrefab()

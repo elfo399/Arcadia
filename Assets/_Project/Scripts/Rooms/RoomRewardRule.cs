@@ -15,7 +15,19 @@ public sealed class RoomRewardRule : RoomRule
     [SerializeField] private string requiredRuleId;
     [SerializeField] private bool requiresRuleSuccess;
     private LootPoolDefinition.Entry[] offers; private readonly HashSet<int> claimed=new HashSet<int>(); private DungeonRewardOfferAnchor[] anchors;
-    protected override void OnRoomInitialized(){BuildOffers();anchors=GetComponentsInChildren<DungeonRewardOfferAnchor>(true);BindAnchors();}
+    protected override void OnRoomInitialized()
+    {
+        if(lootPool==null&&CoreGenerator.Instance!=null&&CoreGenerator.Instance.ActiveFloorDefinition!=null)
+        {
+            var pools=CoreGenerator.Instance.ActiveFloorDefinition.lootPools;
+            if(pools!=null&&pools.Count>0)
+            {
+                var valid=new List<LootPoolDefinition>();foreach(var pool in pools)if(pool!=null)valid.Add(pool);
+                if(valid.Count>0)lootPool=valid[Context.CreateRandom(RuleId+":floor-loot-pool").Next(valid.Count)];
+            }
+        }
+        BuildOffers();anchors=GetComponentsInChildren<DungeonRewardOfferAnchor>(true);BindAnchors();
+    }
     protected override void OnStateRestored(string payload){if(!string.IsNullOrWhiteSpace(payload))foreach(string token in payload.Split(','))if(int.TryParse(token,out int index))claimed.Add(index);BindAnchors();if((completeAfterClaims||blocksUntilClaimed)&&claimed.Count>=maxClaims)Complete();}
     protected override string CaptureState(){var indices=new List<int>(claimed);indices.Sort();return string.Join(",",indices);}
     private void BuildOffers(){if(lootPool==null)return;offers=new LootPoolDefinition.Entry[Mathf.Max(1,generatedChoices)];var random=Context.CreateRandom(RuleId+":offers");for(int i=0;i<offers.Length;i++)offers[i]=lootPool.Pick(random);}

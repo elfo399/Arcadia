@@ -12,12 +12,31 @@ public enum DungeonRequirementKind { None, Coins, Strength, Dexterity, Intellige
 }
 
 /// <summary>Author a secret or internal area inside a physical room; it never creates a dungeon graph cell.</summary>
+public enum DungeonSecretKind { Secret, SuperSecret }
 public sealed class DungeonSecretAccess : MonoBehaviour, IInteractable
 {
-    [SerializeField] private string interactionId; [SerializeField] private GameObject openedArea; [SerializeField] private DungeonRequirement requirement; [SerializeField] private bool oneShot=true; [SerializeField] private string prompt="Open secret";
+    [SerializeField] private DungeonSecretKind secretKind;
+    [SerializeField] private string interactionId; [SerializeField] private GameObject openedArea;
+    [Tooltip("Legacy single requirement retained for existing prefabs.")] [SerializeField] private DungeonRequirement requirement;
+    [SerializeField] private DungeonRequirement[] requirements=Array.Empty<DungeonRequirement>();
+    [SerializeField] private bool oneShot=true; [SerializeField] private string prompt="Open secret";
     private Room room; private SavedDungeonRuleState state;
     private void Start(){room=GetComponentInParent<Room>(); if(room==null)return; state=room.GetExternalState("interaction:"+interactionId); if(state.completed&&openedArea)openedArea.SetActive(true);}
-    public void Interact(GameObject player){if(room==null)return; var stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance; if(oneShot&&state.completed || requirement!=null&&!requirement.TryConsume(stats))return; if(openedArea)openedArea.SetActive(true); state.completed=true; room.SaveExternalState(state);}
+    public void Interact(GameObject player)
+    {
+        if(room==null)return; var stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance;
+        if(oneShot&&state.completed||!RequirementsMet(stats))return;
+        // Consumption happens only after every requirement has been validated.
+        if(requirement!=null&&!requirement.TryConsume(stats))return;
+        foreach(DungeonRequirement entry in requirements)if(entry!=null&&!entry.TryConsume(stats))return;
+        if(openedArea)openedArea.SetActive(true); state.completed=true; room.SaveExternalState(state);
+    }
+    private bool RequirementsMet(PlayerStats stats)
+    {
+        if(requirement!=null&&!requirement.IsMet(stats))return false;
+        foreach(DungeonRequirement entry in requirements)if(entry!=null&&!entry.IsMet(stats))return false;
+        return true;
+    }
     public string GetPrompt()=>state!=null&&state.completed&&oneShot?string.Empty:prompt;
 #if UNITY_EDITOR
     private void OnValidate(){if(string.IsNullOrWhiteSpace(interactionId)){interactionId="secret-"+Guid.NewGuid().ToString("N");UnityEditor.EditorUtility.SetDirty(this);}}

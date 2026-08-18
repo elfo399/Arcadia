@@ -26,8 +26,11 @@ public sealed class ChallengeRoomRule : RoomRule, IInteractable
     {
         waveIndex++; if(waveIndex>=waves.Count){ active=false; Complete(); return; }
         DungeonWaveSpawnPoint[] points=GetComponentsInChildren<DungeonWaveSpawnPoint>(true); DungeonWaveDefinition wave=waves[waveIndex];
-        if(points.Length==0||wave==null||wave.enemyPools==null||wave.enemyPools.Count==0){ EndFailure(); return; }
-        var random=Context.CreateRandom(RuleId+":challenge:"+waveIndex); foreach(var point in points) point.Spawn(wave.enemyPools[random.Next(wave.enemyPools.Count)],random,Context.Room,RuleId); Context.Room.WakeUpEnemies(RuleId);
+        List<SpawnTable> pools=wave!=null?wave.enemyPools:null;
+        if(pools==null||pools.Count==0)pools=CoreGenerator.Instance!=null&&CoreGenerator.Instance.ActiveFloorDefinition!=null?CoreGenerator.Instance.ActiveFloorDefinition.enemyPools:null;
+        var validPools=new List<SpawnTable>();if(pools!=null)foreach(var pool in pools)if(pool!=null)validPools.Add(pool);
+        if(points.Length==0||validPools.Count==0){ EndFailure(); return; }
+        var random=Context.CreateRandom(RuleId+":challenge:"+waveIndex); foreach(var point in points) point.Spawn(validPools[random.Next(validPools.Count)],random,Context.Room,RuleId); Context.Room.WakeUpEnemies(RuleId);
     }
     private void Update() { if(active && mode==DungeonChallengeMode.TimedKill && (remaining-=Time.deltaTime)<=0f) EndFailure(); }
     public override void OnEnemyDied(GameObject enemy,string ownerId) { if(active&&ownerId==RuleId&&Context.Room.GetEncounterEnemyCount(RuleId)==0) StartNextWave(); }
