@@ -439,7 +439,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
         switch (usable.effectType)
         {
             case UsableItemData.UsableEffectType.Heal:
-                RestoreHealth(usable.healAmount > 0 ? usable.healAmount : flaskHealAmount);
+                float heal = usable.healAmount > 0 ? usable.healAmount : flaskHealAmount;
+                if (RunModifierController.Active != null) heal *= RunModifierController.Active.GetMultiplier(RunModifierEffect.FlaskHealingMultiplier);
+                RestoreHealth(heal);
                 break;
             case UsableItemData.UsableEffectType.Mana:
                 RestoreMana(usable.manaRestore > 0 ? usable.manaRestore : 0f);
@@ -502,7 +504,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         if (currentStamina < maxStamina)
         {
-            currentStamina += staminaRegenRate * Time.deltaTime;
+            float regen = staminaRegenRate * (RunModifierController.Active != null ? RunModifierController.Active.GetMultiplier(RunModifierEffect.StaminaRegenMultiplier) : 1f);
+            currentStamina += regen * Time.deltaTime;
             if (currentStamina > maxStamina) currentStamina = maxStamina;
         }
     }
@@ -1705,9 +1708,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
         float manaRatio = keepCurrentRatio ? Mathf.Clamp01(currentMana / oldMaxMana) : 1f;
         float staminaRatio = keepCurrentRatio ? Mathf.Clamp01(currentStamina / oldMaxStamina) : 1f;
 
-        maxHealth = GetMaxHealth(EffectiveVigor);
-        maxMana = GetMaxMana(EffectiveMind);
-        maxStamina = GetMaxStamina(EffectiveEndurance);
+        float healthMultiplier = RunModifierController.Active != null ? RunModifierController.Active.GetMultiplier(RunModifierEffect.MaxHealthMultiplier) : 1f;
+        float manaMultiplier = RunModifierController.Active != null ? RunModifierController.Active.GetMultiplier(RunModifierEffect.MaxManaMultiplier) : 1f;
+        float staminaMultiplier = RunModifierController.Active != null ? RunModifierController.Active.GetMultiplier(RunModifierEffect.MaxStaminaMultiplier) : 1f;
+        maxHealth = GetMaxHealth(EffectiveVigor) * healthMultiplier;
+        maxMana = GetMaxMana(EffectiveMind) * manaMultiplier;
+        maxStamina = GetMaxStamina(EffectiveEndurance) * staminaMultiplier;
 
         currentHealth = Mathf.Clamp(maxHealth * healthRatio, 0f, maxHealth);
         currentMana = Mathf.Clamp(maxMana * manaRatio, 0f, maxMana);

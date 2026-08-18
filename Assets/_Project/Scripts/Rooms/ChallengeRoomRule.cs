@@ -11,9 +11,10 @@ public sealed class ChallengeRoomRule : RoomRule, IInteractable
     [SerializeField] private List<DungeonWaveDefinition> waves = new List<DungeonWaveDefinition>();
     [SerializeField, Min(1f)] private float timeLimitSeconds = 30f;
     [SerializeField] private bool failureCompletesRoom = true;
+    [SerializeField] private bool allowRetry = true;
     [SerializeField] private string prompt = "Accept challenge";
     private bool active; private int waveIndex=-1; private float remaining;
-    public override bool BlocksRoomCompletion => base.BlocksRoomCompletion && !(IsFailed && failureCompletesRoom);
+    public override bool IsSatisfiedForRoomCompletion => IsCompleted || (IsFailed && failureCompletesRoom);
     protected override void OnRoomInitialized() { remaining=timeLimitSeconds; }
     private void OnEnable() { PlayerStats.DamageTaken += HandlePlayerDamage; }
     private void OnDisable() { PlayerStats.DamageTaken -= HandlePlayerDamage; }
@@ -30,7 +31,7 @@ public sealed class ChallengeRoomRule : RoomRule, IInteractable
     private void Update() { if(active && mode==DungeonChallengeMode.TimedKill && (remaining-=Time.deltaTime)<=0f) EndFailure(); }
     public override void OnEnemyDied(GameObject enemy,string ownerId) { if(active&&ownerId==RuleId&&Context.Room.GetEncounterEnemyCount(RuleId)==0) StartNextWave(); }
     private void HandlePlayerDamage(float amount) { if(active && mode==DungeonChallengeMode.PerfectCombat && amount>0f) EndFailure(); }
-    private void EndFailure() { if(!active)return; active=false; Context.Room.ClearEncounter(RuleId); Fail(); }
+    private void EndFailure() { if(!active)return; active=false; Context.Room.ClearEncounter(RuleId); if(allowRetry)ResetFailedAttempt(); else Fail(); }
     protected override void OnStateRestored(string payload) { active=false; waveIndex=-1; remaining=timeLimitSeconds; }
     protected override string CaptureState() => IsCompleted ? "success" : IsFailed ? "failed" : string.Empty;
 }

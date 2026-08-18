@@ -5,11 +5,11 @@ public class InteractableDoor : MonoBehaviour,IInteractable
 {
     [SerializeField] private string doorId="internal-door";
     [SerializeField] private DungeonRequirement requirement;
-    [SerializeField] private bool legacyUnlockWholeRoom;
+    [SerializeField] private bool legacyUnlockWholeRoom=true;
     [SerializeField] private GameObject openedVisual;
     [SerializeField] private string prompt="Open";
     private Room parentRoom; private SavedDungeonRuleState state;
-    private void Start(){parentRoom=GetComponentInParent<Room>();if(parentRoom!=null){state=parentRoom.GetExternalState("door:"+doorId);if(state.completed)OpenVisual();}}
+    private void Start(){parentRoom=GetComponentInParent<Room>();if(parentRoom!=null){state=parentRoom.GetExternalState("door:"+doorId);if(state.completed){OpenVisual();if(legacyUnlockWholeRoom)parentRoom.UnlockSpecialRoom();}}}
     public void Interact(GameObject player)
     {
         if(state!=null&&state.completed)return;PlayerStats stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance;

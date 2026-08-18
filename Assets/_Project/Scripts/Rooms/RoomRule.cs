@@ -26,6 +26,7 @@ public abstract class RoomRule : MonoBehaviour
     public bool IsCompleted=>Outcome==RoomRuleOutcome.Succeeded;
     public bool IsFailed=>Outcome==RoomRuleOutcome.Failed;
     public bool IsResolved=>IsCompleted||IsFailed;
+    public virtual bool IsSatisfiedForRoomCompletion => IsCompleted;
     internal void InitializeRule(RoomRuleContext context,SavedDungeonRuleState saved)
     {
         Context=context; Outcome=saved!=null?(saved.completed?RoomRuleOutcome.Succeeded:saved.failed?RoomRuleOutcome.Failed:RoomRuleOutcome.Pending):RoomRuleOutcome.Pending;
@@ -35,6 +36,8 @@ public abstract class RoomRule : MonoBehaviour
     protected void StartRunning(){if(IsResolved)return;Outcome=RoomRuleOutcome.Running;Context.Room.NotifyRuleChanged(this);}
     protected void Complete(){if(IsResolved)return;Outcome=RoomRuleOutcome.Succeeded;Context.Room.ReleaseDoorLock(RuleId);Context.Room.NotifyRuleChanged(this);}
     protected void Fail(){if(IsResolved)return;Outcome=RoomRuleOutcome.Failed;Context.Room.ReleaseDoorLock(RuleId);Context.Room.NotifyRuleChanged(this);}
+    protected void ResetForRetry(){if(!IsFailed)return;Outcome=RoomRuleOutcome.Pending;Context.Room.NotifyRuleChanged(this);}
+    protected void ResetFailedAttempt(){Outcome=RoomRuleOutcome.Pending;Context.Room.ReleaseDoorLock(RuleId);Context.Room.NotifyRuleChanged(this);}
     protected void AcquireDoorLock(){if(LocksConnectedDoors)Context.Room.AcquireDoorLock(RuleId);}
     protected virtual void OnRoomInitialized(){}
     protected virtual void OnStateRestored(string payload){}

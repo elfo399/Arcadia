@@ -4,6 +4,8 @@
 
 `Room` is the generated prefab context. Its stable runtime ID is the full deterministic composite of run seed, floor, anchor, placement role, and `RoomData.stableId`. It owns room/floor persistence, aggregate diagnostics, encounter ownership, and door-lock reasons. A rule owns its own encounter; Room does not treat every enemy in a prefab as one encounter.
 
+Legacy authored `EnemySpawner` registrations are routed to the compatibility `CombatRoomRule` even when spawning happens after Room initialization. Existing Shop/Treasure/Curch/EvilCurch prefabs retain their legacy entry lock through the explicit compatibility flag; disable that flag for newly authored unlocked special rooms. Internal `InteractableDoor` components remain local unless their legacy whole-room mode is enabled.
+
 ## State and saving
 
 Save version 8 separates run state (`runSeed`, modifiers, OncePerRun IDs) from the current-floor state (floor number and room/rule/minimap records). `DungeonRunStateController` is authoritative during a live run; `GameData` is only imported at run start and exported on save. Changing floor discards only floor records. Significant room, interaction, event, modifier, and minimap changes request the existing throttled player save.
@@ -27,3 +29,5 @@ Old rooms with `EnemySpawner` automatically receive a runtime `CombatRoomRule`, 
 - Events: `DungeonNarrativeEvent` uses existing PlayerStats flags/Karma/Benedetto/Malefico and supports Repeatable, OncePerRun, and OncePerSave. Existing NPC/dialogue components remain the dialogue authority.
 
 `DungeonFloorThemeTable` remains the theme source. Its optional `DungeonFloorDefinition` provides deterministic normal room min/max counts (`min == max` is fixed). Legacy CoreGenerator values remain the fallback.
+
+Run modifiers also support maximum Health/Stamina/Mana, stamina regeneration, and flask healing multipliers. They are recalculated from base-derived stats, preserve current resource ratios, and never mutate permanent attributes.
