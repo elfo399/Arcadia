@@ -12,8 +12,8 @@ public sealed class ShrineEncounter : MonoBehaviour
     {
         if(!available||room==null||choice==null||selected.Count>=maxSelections||selected.Contains(choice.ChoiceId))return false;PlayerStats stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance;
         if(stats==null||!choice.AreRequirementsMet(stats)||!DungeonCostTransaction.CanPay(choice.Costs,stats)||!choice.TryResolveOutcomes(stats,room,out var resolved))return false;
-        if(!DungeonCostTransaction.TryPay(choice.Costs,stats))return false;
-        if(!DungeonOutcomeResolution.ApplyAll(resolved,stats))return false;selected.Add(choice.ChoiceId);state.payload=string.Join(",",selected);state.completed=selected.Count>=maxSelections;room.SaveExternalState(state);Refresh();return true;
+        if(!DungeonCostTransaction.TryPay(choice.Costs,stats,out bool lethalPayment)||lethalPayment)return false;
+        if(!DungeonOutcomeResolution.ApplyAll(resolved,stats)){Debug.LogError($"[ShrineEncounter] Resolved outcome batch unexpectedly failed after payment on '{name}'.",this);return false;}selected.Add(choice.ChoiceId);state.payload=string.Join(",",selected);state.completed=selected.Count>=maxSelections;room.SaveExternalState(state);Refresh();return true;
     }
     private void Refresh(){foreach(var choice in GetComponentsInChildren<ShrineChoice>(true))choice.SetAvailable(available&&selected.Count<maxSelections&&!selected.Contains(choice.ChoiceId));}
 #if UNITY_EDITOR
@@ -43,8 +43,8 @@ public sealed class RiskRewardInteraction:MonoBehaviour,IInteractable
     {
         PlayerStats stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance;if(room==null||stats==null||(oneShot&&state.completed))return;
         if(requirements!=null)foreach(var r in requirements)if(r!=null&&!r.IsMet(stats))return;
-        if(!DungeonCostTransaction.CanPay(costs,stats)||!TryResolveOutcomes(stats,out var resolved))return;if(!DungeonCostTransaction.TryPay(costs,stats))return;
-        if(!DungeonOutcomeResolution.ApplyAll(resolved,stats))return;state.completed=true;room.SaveExternalState(state);
+        if(!DungeonCostTransaction.CanPay(costs,stats)||!TryResolveOutcomes(stats,out var resolved))return;if(!DungeonCostTransaction.TryPay(costs,stats,out bool lethalPayment)||lethalPayment)return;
+        if(!DungeonOutcomeResolution.ApplyAll(resolved,stats)){Debug.LogError($"[RiskRewardInteraction] Resolved outcome batch unexpectedly failed after payment on '{name}'.",this);return;}state.completed=true;room.SaveExternalState(state);
     }
     private bool TryResolveOutcomes(PlayerStats stats,out List<DungeonResolvedOutcome> resolved)
     =>DungeonOutcomeResolution.TryResolveAll(outcomes,stats,index=>DungeonDeterminism.Create(DungeonRunStateController.Active?.RunSeed??string.Empty,room.Floor,room.RuntimeId,interactionId+":"+index),out resolved);

@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [DisallowMultipleComponent]
-public sealed class CombatRoomRule : RoomRule
+public sealed class CombatRoomRule : RoomRule, ITriggeredRoomEncounter
 {
     public override bool BlocksRoomCompletion => true;
     [SerializeField] private bool startOnPlayerEntry = true;
@@ -13,10 +13,17 @@ public sealed class CombatRoomRule : RoomRule
     }
     public override void OnPlayerEntered(bool firstVisit)
     {
-        if (IsCompleted || !startOnPlayerEntry) return;
+        if (!startOnPlayerEntry) return;
+        TryStartFromTrigger();
+    }
+    public bool TryStartFromTrigger()
+    {
+        if (IsResolved || started) return false;
         started = true; StartRunning(); Context.Room.BeginCombat(this); Context.Room.WakeUpEnemies(RuleId);
         if (Context.Room.GetEncounterEnemyCount(RuleId) == 0) Complete();
+        return true;
     }
+    public bool CanStartFromTrigger()=>!IsResolved&&!started;
     public override void OnEnemyDied(GameObject enemy, string ownerId)
     {
         if (started && !IsResolved && ownerId == RuleId && Context.Room.GetEncounterEnemyCount(RuleId) == 0) Complete();

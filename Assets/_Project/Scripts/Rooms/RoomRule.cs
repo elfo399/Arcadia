@@ -49,3 +49,6 @@ public abstract class RoomRule : MonoBehaviour
     public virtual void OnRuleChanged(RoomRule rule){}
     public virtual void OnRoomCompleted(){}
 }
+
+/// <summary>Implemented by authored rules that can be started by a separate prop interaction.</summary>
+public interface ITriggeredRoomEncounter { bool CanStartFromTrigger(); bool TryStartFromTrigger(); }

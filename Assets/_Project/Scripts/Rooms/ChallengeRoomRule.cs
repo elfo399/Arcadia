@@ -5,27 +5,29 @@ using UnityEngine;
 public enum DungeonChallengeMode { Gauntlet, TimedKill, PerfectCombat }
 
 /// <summary>Voluntary encounter rule. Failure ends the encounter without corrupting persistent room state.</summary>
-public sealed class ChallengeRoomRule : RoomRule, IInteractable
+public sealed class ChallengeRoomRule : RoomRule, IInteractable, ITriggeredRoomEncounter
 {
-    public override bool BlocksRoomCompletion => true;
+    public override bool BlocksRoomCompletion => floorAllowsChallenge;
     [SerializeField] private DungeonChallengeMode mode;
     [SerializeField] private List<DungeonWaveDefinition> waves = new List<DungeonWaveDefinition>();
     [SerializeField, Min(1f)] private float timeLimitSeconds = 30f;
     [SerializeField] private bool failureCompletesRoom = true;
     [SerializeField] private bool allowRetry = true;
     [SerializeField] private string prompt = "Accept challenge";
-    private bool active; private int waveIndex=-1; private float remaining;
+    private bool active; private int waveIndex=-1; private float remaining; private bool floorAllowsChallenge=true;
     public override bool IsSatisfiedForRoomCompletion => IsCompleted || (IsFailed && failureCompletesRoom);
-    protected override void OnRoomInitialized() { remaining=timeLimitSeconds; }
+    protected override void OnRoomInitialized() { remaining=timeLimitSeconds;floorAllowsChallenge=CoreGenerator.Instance==null||CoreGenerator.Instance.ActiveFloorDefinition==null||CoreGenerator.Instance.ActiveFloorDefinition.challengesAvailable; }
     private void OnEnable() { PlayerStats.DamageTaken += HandlePlayerDamage; }
     private void OnDisable() { PlayerStats.DamageTaken -= HandlePlayerDamage; }
-    public void Interact(GameObject player) { if(!active&&!IsResolved) StartChallenge(); }
-    public string GetPrompt() => active||IsCompleted||IsFailed ? string.Empty : prompt;
-    private void StartChallenge()
+    public void Interact(GameObject player) { if(floorAllowsChallenge&&!active&&!IsResolved) StartChallenge(); }
+    public string GetPrompt() => !floorAllowsChallenge||active||IsCompleted||IsFailed ? string.Empty : prompt;
+    private bool StartChallenge()
     {
-        if(CoreGenerator.Instance!=null&&CoreGenerator.Instance.ActiveFloorDefinition!=null&&!CoreGenerator.Instance.ActiveFloorDefinition.challengesAvailable)return;
-        if(waves.Count==0){Debug.LogError($"[ChallengeRoomRule] {name} requires at least one wave.",this);return;} active=true; remaining=timeLimitSeconds; StartRunning(); Context.Room.BeginCombat(this); StartNextWave();
+        if(!floorAllowsChallenge||active||IsResolved)return false;
+        if(waves.Count==0){Debug.LogError($"[ChallengeRoomRule] {name} requires at least one wave.",this);return false;} active=true; remaining=timeLimitSeconds; StartRunning(); Context.Room.BeginCombat(this); StartNextWave();return true;
     }
+    public bool TryStartFromTrigger()=>StartChallenge();
+    public bool CanStartFromTrigger()=>floorAllowsChallenge&&!active&&!IsResolved&&waves.Count>0;
     private void StartNextWave()
     {
         waveIndex++; if(waveIndex>=waves.Count){ active=false; Complete(); return; }

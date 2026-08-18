@@ -42,7 +42,7 @@ public sealed class DungeonNarrativeEvent : MonoBehaviour, IInteractable
         if(choices!=null&&choices.Length>0)return;
         PlayerStats stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance; if(room==null||stats==null||string.IsNullOrWhiteSpace(eventId)||(requirement!=null&&!requirement.IsMet(stats))||!CanOccur(stats))return;
         var costs=new System.Collections.Generic.List<DungeonCost>();if(coinCost>0)costs.Add(new DungeonCost{kind=DungeonCostKind.Coins,amount=coinCost});if(healthSacrifice>0)costs.Add(new DungeonCost{kind=DungeonCostKind.Health,amount=healthSacrifice});
-        if(!DungeonCostTransaction.CanPay(costs,stats)||(grantModifier!=null&&(RunModifierController.Active==null||!RunModifierController.Active.CanAdd(grantModifier)))||!DungeonCostTransaction.TryPay(costs,stats))return;
+        if(!DungeonCostTransaction.CanPay(costs,stats)||(grantModifier!=null&&(RunModifierController.Active==null||!RunModifierController.Active.CanAdd(grantModifier)))||!DungeonCostTransaction.TryPay(costs,stats,out bool lethalPayment)||lethalPayment)return;
         if(karmaDelta!=0)stats.ModifyKarma(karmaDelta,false); if(benedettoDelta!=0)stats.ModifyBenedetto(benedettoDelta,false); if(maleficoDelta!=0)stats.ModifyMalefico(maleficoDelta,false); if(!string.IsNullOrWhiteSpace(setStoryFlag))stats.SetStoryFlag(setStoryFlag,false); if(grantModifier!=null)RunModifierController.Active.Add(grantModifier);
         if(occurrence==DungeonOccurrencePolicy.OncePerRun) DungeonRunStateController.Active?.ConsumeOncePerRun(eventId); if(occurrence==DungeonOccurrencePolicy.OncePerSave)stats.SetStoryFlag(SaveFlag,false); state.completed=true;room.SaveExternalState(state);
     }
@@ -51,7 +51,8 @@ public sealed class DungeonNarrativeEvent : MonoBehaviour, IInteractable
         if(room==null||string.IsNullOrWhiteSpace(choiceId))return false;Choice choice=null;
         foreach(Choice candidate in choices)if(candidate!=null&&string.Equals(candidate.choiceId,choiceId,StringComparison.Ordinal)){choice=candidate;break;}
         PlayerStats stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance;if(choice==null||stats==null||!CanOccur(stats)||!RequirementsMet(choice.requirements,stats)||!DungeonCostTransaction.CanPay(choice.costs,stats)||!TryResolve(choice,stats,out var resolved))return false;
-        if(!DungeonCostTransaction.TryPay(choice.costs,stats)||!DungeonOutcomeResolution.ApplyAll(resolved,stats))return false;
+        if(!DungeonCostTransaction.TryPay(choice.costs,stats,out bool lethalPayment)||lethalPayment)return false;
+        if(!DungeonOutcomeResolution.ApplyAll(resolved,stats)){Debug.LogError($"[DungeonNarrativeEvent] Resolved outcome batch unexpectedly failed after payment on '{name}'.",this);return false;}
         if(choice.consumesEvent){if(occurrence==DungeonOccurrencePolicy.OncePerRun)DungeonRunStateController.Active?.ConsumeOncePerRun(eventId);if(occurrence==DungeonOccurrencePolicy.OncePerSave)stats.SetStoryFlag(SaveFlag,false);state.completed=true;}
         room.SaveExternalState(state);RefreshChoices();
         choice.dialogueHook?.Interact(player??stats.gameObject);return true;

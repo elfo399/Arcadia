@@ -17,12 +17,13 @@ public static class DungeonCostTransaction
 {
     private sealed class Totals { public int coins; public int flasks; public float health; public bool healthMustRemainNonLethal; public readonly Dictionary<ItemData,int> items=new Dictionary<ItemData,int>(); }
     public static bool CanPay(IReadOnlyList<DungeonCost> costs,PlayerStats stats)=>BuildTotals(costs,stats,out _);
-    public static bool TryPay(IReadOnlyList<DungeonCost> costs,PlayerStats stats)
+    public static bool TryPay(IReadOnlyList<DungeonCost> costs,PlayerStats stats)=>TryPay(costs,stats,out _);
+    /// <summary>When lethalPayment is true, death/run failure owns the result and normal rewards must not be applied.</summary>
+    public static bool TryPay(IReadOnlyList<DungeonCost> costs,PlayerStats stats,out bool lethalPayment)
     {
-        if(!BuildTotals(costs,stats,out Totals totals))return false;PlayerInventory inventory=stats.GetComponent<PlayerInventory>();bool coinsPaid=false,flasksPaid=false,healthPaid=false;var removed=new List<KeyValuePair<ItemData,int>>();
+        lethalPayment=false;if(!BuildTotals(costs,stats,out Totals totals))return false;PlayerInventory inventory=stats.GetComponent<PlayerInventory>();bool coinsPaid=false,flasksPaid=false;var removed=new List<KeyValuePair<ItemData,int>>();
         if(totals.coins>0&&!stats.TryRemoveCoins(totals.coins,false))return false;coinsPaid=totals.coins>0;
         if(totals.flasks>0&&!stats.TryConsumeFlasks(totals.flasks,false)){Rollback(stats,inventory,totals,coinsPaid,false,false,removed);return false;}flasksPaid=totals.flasks>0;
-        if(totals.health>0f&&!stats.TrySacrificeHealth(totals.health,!totals.healthMustRemainNonLethal,false)){Rollback(stats,inventory,totals,coinsPaid,flasksPaid,false,removed);return false;}healthPaid=totals.health>0f;
         foreach(var pair in totals.items)
         {
             int before=inventory.GetTotalItemAmount(pair.Key);
@@ -30,10 +31,14 @@ public static class DungeonCostTransaction
             {
                 int actuallyRemoved=Mathf.Max(0,before-inventory.GetTotalItemAmount(pair.Key));
                 if(actuallyRemoved>0)removed.Add(new KeyValuePair<ItemData,int>(pair.Key,actuallyRemoved));
-                Rollback(stats,inventory,totals,coinsPaid,flasksPaid,healthPaid,removed);return false;
+                Rollback(stats,inventory,totals,coinsPaid,flasksPaid,false,removed);return false;
             }
             removed.Add(pair);
         }
+        // Exact sacrifice is deliberately last: a lethal payment may immediately
+        // enter run-failure flow, so no further resource mutation can follow it.
+        if(totals.health>0f&&!stats.TrySacrificeHealth(totals.health,!totals.healthMustRemainNonLethal,false)){Rollback(stats,inventory,totals,coinsPaid,flasksPaid,false,removed);return false;}
+        lethalPayment=totals.health>0f&&stats.currentHealth<=0f;
         return true;
     }
     /// <summary>Compatibility path for consuming legacy requirements.</summary>
@@ -67,10 +72,10 @@ public enum DungeonOutcomeKind { RunModifier, Item, LootPool, Karma, Benedetto, 
             case DungeonOutcomeKind.Karma:return stats.ModifyKarma(source.amount,false);
             case DungeonOutcomeKind.Benedetto:return stats.ModifyBenedetto(source.amount,false);
             case DungeonOutcomeKind.Malefico:return stats.ModifyMalefico(source.amount,false);
-            case DungeonOutcomeKind.StoryFlag:return stats.SetStoryFlag(source.id,false);
+            case DungeonOutcomeKind.StoryFlag:return stats.HasStoryFlag(source.id)||stats.SetStoryFlag(source.id,false);
             case DungeonOutcomeKind.Heal:stats.RestoreHealth(source.amount);return true;
             case DungeonOutcomeKind.RestoreFlasks:stats.RestoreFlasks(source.amount);return true;
-            case DungeonOutcomeKind.MagicRecipe:return stats.UnlockMagicRecipe(source.id,false);
+            case DungeonOutcomeKind.MagicRecipe:return stats.IsMagicRecipeUnlocked(source.id)||stats.UnlockMagicRecipe(source.id,false);
             default:return false;
         }
     }
@@ -87,7 +92,7 @@ public enum DungeonOutcomeKind { RunModifier, Item, LootPool, Karma, Benedetto, 
             case DungeonOutcomeKind.Item:if(item==null||inventory==null||!inventory.CanAddItem(item,Mathf.Max(1,amount)))return false;break;
             case DungeonOutcomeKind.LootPool:candidate.resolvedLoot=lootPool!=null?lootPool.Pick(random,stats):null;if(candidate.resolvedLoot==null||inventory==null||!inventory.CanAddItem(candidate.resolvedLoot.item,candidate.resolvedLoot.amount))return false;break;
             case DungeonOutcomeKind.StoryFlag:if(string.IsNullOrWhiteSpace(id))return false;break;
-            case DungeonOutcomeKind.MagicRecipe:if(string.IsNullOrWhiteSpace(id)||stats.IsMagicRecipeUnlocked(id))return false;break;
+            case DungeonOutcomeKind.MagicRecipe:if(string.IsNullOrWhiteSpace(id))return false;break;
         }
         resolved=candidate;return true;
     }
@@ -103,8 +108,22 @@ public static class DungeonOutcomeResolution
     public static bool TryResolveAll(IReadOnlyList<DungeonOutcome> outcomes,PlayerStats stats,Func<int,System.Random> randomForIndex,out List<DungeonResolvedOutcome> resolved)
     {
         resolved=new List<DungeonResolvedOutcome>();if(outcomes==null)return true;
-        for(int i=0;i<outcomes.Count;i++)if(outcomes[i]!=null){if(!outcomes[i].TryResolve(stats,randomForIndex(i),out DungeonResolvedOutcome entry))return false;resolved.Add(entry);}return true;
+        var inventoryAdds=new Dictionary<ScriptableObject,int>();var uniqueModifiers=new HashSet<string>(StringComparer.Ordinal);
+        for(int i=0;i<outcomes.Count;i++)if(outcomes[i]!=null)
+        {
+            if(!outcomes[i].TryResolve(stats,randomForIndex(i),out DungeonResolvedOutcome entry))return false;
+            DungeonOutcome outcome=entry.source;
+            if(outcome.kind==DungeonOutcomeKind.RunModifier&&outcome.modifier!=null&&outcome.modifier.stacking==RunModifierStacking.Unique&&!uniqueModifiers.Add(outcome.modifier.stableId.Trim()))return false;
+            ScriptableObject inventoryItem=null;int amount=0;
+            if(outcome.kind==DungeonOutcomeKind.Item){inventoryItem=outcome.item;amount=Mathf.Max(1,outcome.amount);}
+            else if(outcome.kind==DungeonOutcomeKind.LootPool&&entry.resolvedLoot!=null){inventoryItem=entry.resolvedLoot.item;amount=entry.resolvedLoot.amount;}
+            if(inventoryItem!=null)inventoryAdds[inventoryItem]=inventoryAdds.TryGetValue(inventoryItem,out int current)?SaturatingAdd(current,amount):amount;
+            resolved.Add(entry);
+        }
+        PlayerInventory inventory=stats!=null?stats.GetComponent<PlayerInventory>():null;
+        return inventoryAdds.Count==0||(inventory!=null&&inventory.CanAddItemsBatch(inventoryAdds));
     }
     public static bool ApplyAll(IReadOnlyList<DungeonResolvedOutcome> resolved,PlayerStats stats)
     {if(resolved==null)return true;foreach(DungeonResolvedOutcome entry in resolved)if(entry==null||!entry.Apply(stats))return false;return true;}
+    private static int SaturatingAdd(int left,int right)=>left>int.MaxValue-right?int.MaxValue:left+right;
 }

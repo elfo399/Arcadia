@@ -36,9 +36,10 @@ public sealed class DungeonNpcEncounter : MonoBehaviour, IInteractable
     private bool Activate(GameObject player)
     {
         PlayerStats stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance;if(!CanActivate(stats))return false;
+        if(!HasNpcSource()){Debug.LogError($"[DungeonNpcEncounter] '{name}' needs either an existing NPC or an NPC prefab.",this);return false;}
         if(!DungeonOutcomeResolution.TryResolveAll(activationOutcomes,stats,index=>ContextRandom("outcome:"+index),out List<DungeonResolvedOutcome> resolved))return false;
-        if(!DungeonOutcomeResolution.ApplyAll(resolved,stats))return false;
         GameObject npc=EnsureNpc();if(npc==null)return false;
+        if(!DungeonOutcomeResolution.ApplyAll(resolved,stats)){Debug.LogError($"[DungeonNpcEncounter] Activation outcomes unexpectedly failed after NPC activation for '{name}'.",this);return false;}
         if(!string.IsNullOrWhiteSpace(discoveredFlag))stats.SetStoryFlag(discoveredFlag,false);if(!string.IsNullOrWhiteSpace(hubUnlockFlag))stats.SetStoryFlag(hubUnlockFlag,false);
         if(occurrence==DungeonOccurrencePolicy.OncePerRun)DungeonRunStateController.Active?.ConsumeOncePerRun(encounterId);if(occurrence==DungeonOccurrencePolicy.OncePerSave)stats.SetStoryFlag(SaveFlag,false);
         state.completed=true;room.SaveExternalState(state);
@@ -56,8 +57,9 @@ public sealed class DungeonNpcEncounter : MonoBehaviour, IInteractable
     private GameObject EnsureNpc()
     {
         if(existingNpc!=null){existingNpc.SetActive(true);return existingNpc;}if(spawnedNpc!=null)return spawnedNpc;if(npcPrefab==null)return null;
-        Transform point=spawnPoint!=null?spawnPoint:transform;spawnedNpc=Instantiate(npcPrefab,point.position,point.rotation,transform);return spawnedNpc;
+        Transform point=spawnPoint!=null?spawnPoint:transform;spawnedNpc=Instantiate(npcPrefab,point.position,point.rotation,transform);if(spawnedNpc==null)Debug.LogError($"[DungeonNpcEncounter] Failed to instantiate NPC prefab on '{name}'.",this);return spawnedNpc;
     }
+    private bool HasNpcSource()=>existingNpc!=null||spawnedNpc!=null||npcPrefab!=null;
     private System.Random ContextRandom(string stream)=>DungeonDeterminism.Create(DungeonRunStateController.Active?.RunSeed??string.Empty,room!=null?room.Floor:0,room!=null?room.RuntimeId:string.Empty,"npc:"+encounterId+":"+stream);
 #if UNITY_EDITOR
     private void OnValidate(){if(string.IsNullOrWhiteSpace(encounterId)){encounterId="npc-"+Guid.NewGuid().ToString("N");UnityEditor.EditorUtility.SetDirty(this);}}
