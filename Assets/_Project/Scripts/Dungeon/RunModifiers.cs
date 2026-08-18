@@ -40,6 +40,11 @@ public sealed class RunModifierController:MonoBehaviour
         else states[id]=new SavedRunModifierState{modifierId=id,stacks=1,effect=definition.effect,multiplierPerStack=Mathf.Max(.01f,definition.multiplierPerStack),effects=definition.BuildEffects()};
         Sync();return true;
     }
+    public bool CanAdd(RunModifierDefinition definition)
+    {
+        if(definition==null||string.IsNullOrWhiteSpace(definition.stableId))return false;
+        return definition.stacking!=RunModifierStacking.Unique||!states.ContainsKey(definition.stableId.Trim());
+    }
     public bool Remove(string id){if(string.IsNullOrWhiteSpace(id)||!states.Remove(id))return false;Sync();return true;}
     public int GetStacks(string id)=>!string.IsNullOrWhiteSpace(id)&&states.TryGetValue(id,out var record)?record.stacks:0;
     public float GetMultiplier(RunModifierEffect effect)

@@ -7,7 +7,7 @@ public enum DungeonRequirementKind { None, Coins, Strength, Dexterity, Intellige
     public DungeonRequirementKind kind; public int amount; public string id; public ItemData item; public bool consumeItem;
     public bool IsMet(PlayerStats stats)
     { if(kind==DungeonRequirementKind.None)return true; if(stats==null)return false; switch(kind) { case DungeonRequirementKind.Coins:return stats.HasCoins(amount); case DungeonRequirementKind.Strength:return stats.EffectiveStrength>=amount; case DungeonRequirementKind.Dexterity:return stats.EffectiveDexterity>=amount; case DungeonRequirementKind.Intelligence:return stats.EffectiveIntelligence>=amount; case DungeonRequirementKind.Faith:return stats.EffectiveFaith>=amount; case DungeonRequirementKind.Karma:return stats.karma>=amount; case DungeonRequirementKind.Benedetto:return stats.benedetto>=amount; case DungeonRequirementKind.Malefico:return stats.malefico>=amount; case DungeonRequirementKind.StoryFlag:return stats.HasStoryFlag(id); case DungeonRequirementKind.InventoryItem:return item!=null&&PlayerInventoryHas(stats,item,amount); default:return false; } }
-    public bool TryConsume(PlayerStats stats){if(!IsMet(stats))return false;if(kind==DungeonRequirementKind.InventoryItem&&consumeItem){PlayerInventory inventory=stats.GetComponent<PlayerInventory>();return inventory!=null&&inventory.TryRemoveItem(item,Mathf.Max(1,amount),out _,false);}return true;}
+    public bool TryConsume(PlayerStats stats){return DungeonCostTransaction.TryConsumeRequirements(new[]{this},stats);}
     private static bool PlayerInventoryHas(PlayerStats stats,ItemData item,int amount){PlayerInventory inventory=stats.GetComponent<PlayerInventory>();return inventory!=null&&inventory.GetTotalItemAmount(item)>=Mathf.Max(1,amount);}
 }
 
@@ -26,9 +26,8 @@ public sealed class DungeonSecretAccess : MonoBehaviour, IInteractable
     {
         if(room==null)return; var stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance;
         if(oneShot&&state.completed||!RequirementsMet(stats))return;
-        // Consumption happens only after every requirement has been validated.
-        if(requirement!=null&&!requirement.TryConsume(stats))return;
-        foreach(DungeonRequirement entry in requirements)if(entry!=null&&!entry.TryConsume(stats))return;
+        var allRequirements=new System.Collections.Generic.List<DungeonRequirement>();if(requirement!=null)allRequirements.Add(requirement);if(requirements!=null)allRequirements.AddRange(requirements);
+        if(!DungeonCostTransaction.TryConsumeRequirements(allRequirements,stats))return;
         if(openedArea)openedArea.SetActive(true); state.completed=true; room.SaveExternalState(state);
     }
     private bool RequirementsMet(PlayerStats stats)

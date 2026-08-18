@@ -419,6 +419,26 @@ public class PlayerStats : MonoBehaviour, IDamageable
         currentHealth = Mathf.Min(currentHealth, maxHealth);
     }
 
+    /// <summary>
+    /// Pays an authored dungeon sacrifice exactly. This deliberately bypasses the
+    /// combat damage pipeline (armour, block, invulnerability and run modifiers).
+    /// </summary>
+    public bool CanSacrificeHealth(float amount, bool allowLethal = false)
+    {
+        if (amount <= 0f) return true;
+        if (currentHealth <= 0f) return false;
+        return allowLethal ? currentHealth >= amount : currentHealth > amount;
+    }
+
+    public bool TrySacrificeHealth(float amount, bool allowLethal = false, bool save = true)
+    {
+        if (!CanSacrificeHealth(amount, allowLethal)) return false;
+        if (amount <= 0f) return true;
+        currentHealth = Mathf.Clamp(currentHealth - amount, 0f, maxHealth);
+        if (save) SaveStats();
+        return true;
+    }
+
     public void SetInvulnerable(bool value)
     {
         invulnerable = value;
