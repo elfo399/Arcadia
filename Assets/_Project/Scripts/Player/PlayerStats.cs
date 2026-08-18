@@ -396,6 +396,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (amount <= 0f) return;
 
         float preArmorAmount = amount;
+        if (RunModifierController.Active != null)
+            amount *= RunModifierController.Active.GetMultiplier(RunModifierEffect.DamageTakenMultiplier);
         RefreshArmorTotals();
         int effectiveDefense = GetDefenseForDamageType(damageType);
         amount = ApplyArmorMitigation(amount, damageType);

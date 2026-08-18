@@ -41,4 +41,15 @@ public class RoomData : ScriptableObject
     
     [Header("Rewards / Loot Table")]
     public List<LootItem> rewards = new List<LootItem>();
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (string.IsNullOrWhiteSpace(stableId))
+        {
+            stableId = "roomdef-" + System.Guid.NewGuid().ToString("N");
+            UnityEditor.EditorUtility.SetDirty(this);
+        }
+    }
+#endif
 }

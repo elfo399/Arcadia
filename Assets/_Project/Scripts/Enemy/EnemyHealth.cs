@@ -21,8 +21,7 @@ public class EnemyHealth : MonoBehaviour, IDamageable
         if (currentHealth <= 0) currentHealth = maxHealth;
         if (healthBar != null) healthBar.SetMaxHealth(maxHealth);
 
-        Room room = GetComponentInParent<Room>();
-        if (room != null) room.RegisterEnemy(gameObject);
+        // Spawners register encounter ownership before activating the enemy.
     }
 
     public void TakeDamage(int damage)

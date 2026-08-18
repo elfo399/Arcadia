@@ -26,6 +26,6 @@ public sealed class DungeonNarrativeEvent : MonoBehaviour, IInteractable
         if(occurrence==DungeonOccurrencePolicy.OncePerRun) DungeonRunStateController.Active?.ConsumeOncePerRun(eventId); if(occurrence==DungeonOccurrencePolicy.OncePerSave)stats.SetStoryFlag(SaveFlag,false); state.completed=true;room.SaveExternalState(state);
     }
     private bool CanOccur(PlayerStats stats)
-    { if(occurrence==DungeonOccurrencePolicy.Repeatable)return true; if(occurrence==DungeonOccurrencePolicy.OncePerSave)return !stats.HasStoryFlag(SaveFlag); return state==null||!state.completed; }
-    public string GetPrompt()=>state!=null&&state.completed&&occurrence!=DungeonOccurrencePolicy.Repeatable?string.Empty:prompt;
+    { if(occurrence==DungeonOccurrencePolicy.Repeatable)return true; if(occurrence==DungeonOccurrencePolicy.OncePerSave)return !stats.HasStoryFlag(SaveFlag); return DungeonRunStateController.Active==null ? state==null||!state.completed : !DungeonRunStateController.Active.HasConsumedOncePerRun(eventId); }
+    public string GetPrompt(){if(occurrence==DungeonOccurrencePolicy.OncePerRun&&DungeonRunStateController.Active!=null&&DungeonRunStateController.Active.HasConsumedOncePerRun(eventId))return string.Empty;return state!=null&&state.completed&&occurrence!=DungeonOccurrencePolicy.Repeatable?string.Empty:prompt;}
 }

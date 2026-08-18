@@ -1,12 +1,14 @@
 using System;
 using UnityEngine;
 
-public enum DungeonRequirementKind { None, Coins, Karma, Benedetto, Malefico, StoryFlag }
+public enum DungeonRequirementKind { None, Coins, Strength, Dexterity, Intelligence, Faith, Karma, Benedetto, Malefico, StoryFlag, InventoryItem }
 [Serializable] public sealed class DungeonRequirement
 {
-    public DungeonRequirementKind kind; public int amount; public string id;
+    public DungeonRequirementKind kind; public int amount; public string id; public ItemData item; public bool consumeItem;
     public bool IsMet(PlayerStats stats)
-    { if(kind==DungeonRequirementKind.None)return true; if(stats==null)return false; switch(kind) { case DungeonRequirementKind.Coins:return stats.HasCoins(amount); case DungeonRequirementKind.Karma:return stats.karma>=amount; case DungeonRequirementKind.Benedetto:return stats.benedetto>=amount; case DungeonRequirementKind.Malefico:return stats.malefico>=amount; case DungeonRequirementKind.StoryFlag:return stats.HasStoryFlag(id); default:return false; } }
+    { if(kind==DungeonRequirementKind.None)return true; if(stats==null)return false; switch(kind) { case DungeonRequirementKind.Coins:return stats.HasCoins(amount); case DungeonRequirementKind.Strength:return stats.strength>=amount; case DungeonRequirementKind.Dexterity:return stats.dexterity>=amount; case DungeonRequirementKind.Intelligence:return stats.intelligence>=amount; case DungeonRequirementKind.Faith:return stats.faith>=amount; case DungeonRequirementKind.Karma:return stats.karma>=amount; case DungeonRequirementKind.Benedetto:return stats.benedetto>=amount; case DungeonRequirementKind.Malefico:return stats.malefico>=amount; case DungeonRequirementKind.StoryFlag:return stats.HasStoryFlag(id); case DungeonRequirementKind.InventoryItem:return item!=null&&PlayerInventoryHas(stats,item,amount); default:return false; } }
+    public bool TryConsume(PlayerStats stats){if(!IsMet(stats))return false;if(kind==DungeonRequirementKind.InventoryItem&&consumeItem){PlayerInventory inventory=stats.GetComponent<PlayerInventory>();return inventory!=null&&inventory.TryRemoveItem(item,Mathf.Max(1,amount),out _,false);}return true;}
+    private static bool PlayerInventoryHas(PlayerStats stats,ItemData item,int amount){PlayerInventory inventory=stats.GetComponent<PlayerInventory>();return inventory!=null&&inventory.GetTotalItemAmount(item)>=Mathf.Max(1,amount);}
 }
 
 /// <summary>Author a secret or internal area inside a physical room; it never creates a dungeon graph cell.</summary>
@@ -15,7 +17,7 @@ public sealed class DungeonSecretAccess : MonoBehaviour, IInteractable
     [SerializeField] private string interactionId="secret"; [SerializeField] private GameObject openedArea; [SerializeField] private DungeonRequirement requirement; [SerializeField] private bool oneShot=true; [SerializeField] private string prompt="Open secret";
     private Room room; private SavedDungeonRuleState state;
     private void Start(){room=GetComponentInParent<Room>(); if(room==null)return; state=room.GetExternalState("interaction:"+interactionId); if(state.completed&&openedArea)openedArea.SetActive(true);}
-    public void Interact(GameObject player){if(room==null)return; var stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance; if(oneShot&&state.completed || requirement!=null&&!requirement.IsMet(stats))return; if(openedArea)openedArea.SetActive(true); state.completed=true; room.SaveExternalState(state);}
+    public void Interact(GameObject player){if(room==null)return; var stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance; if(oneShot&&state.completed || requirement!=null&&!requirement.TryConsume(stats))return; if(openedArea)openedArea.SetActive(true); state.completed=true; room.SaveExternalState(state);}
     public string GetPrompt()=>state!=null&&state.completed&&oneShot?string.Empty:prompt;
 }
 

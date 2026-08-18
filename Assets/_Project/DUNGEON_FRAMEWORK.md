@@ -1,25 +1,29 @@
-# Arcadia dungeon framework
+# Dungeon framework
 
-`CoreGenerator` still owns deterministic graph topology, special-room placement, theme selection, prefab instantiation, door connection, NavMesh build, player spawn and minimap registration. It does not decorate rooms procedurally. Every physical room remains an authored prefab.
+`CoreGenerator` retains graph topology, room placement, themes, prefab instantiation, connected doors, NavMesh, player spawn, minimap registration, and boss floor progression. It does not decorate authored rooms.
 
-`Room` is the runtime context for a prefab. On generation it receives a stable ID derived from run seed, floor, grid anchor, placement role and `RoomData.stableId`. It owns connected doors, entry/completion state and dispatches lifecycle events to `RoomRule` components. A room is complete only after every blocking rule is complete. Legacy prefabs containing `EnemySpawner` but no rule get a runtime `CombatRoomRule` compatibility component.
+`Room` is the generated prefab context. Its stable runtime ID is the full deterministic composite of run seed, floor, anchor, placement role, and `RoomData.stableId`. It owns room/floor persistence, aggregate diagnostics, encounter ownership, and door-lock reasons. A rule owns its own encounter; Room does not treat every enemy in a prefab as one encounter.
+
+## State and saving
+
+Save version 8 separates run state (`runSeed`, modifiers, OncePerRun IDs) from the current-floor state (floor number and room/rule/minimap records). `DungeonRunStateController` is authoritative during a live run; `GameData` is only imported at run start and exported on save. Changing floor discards only floor records. Significant room, interaction, event, modifier, and minimap changes request the existing throttled player save.
+
+Completed encounters remain completed. Interrupted combat, waves and challenges intentionally restart at their deterministic initial state: no enemy transforms, HP, projectiles, or timers are saved. v6 saves migrate through v7; v7 records are converted into v8 floor state while preserving modifiers and OncePerRun IDs.
+
+## Legacy migration
+
+Run **Arcadia > Dungeon > Generate and validate stable IDs** before authoring new dungeon content. It assigns missing `RoomData.stableId` values and unique prefab `RoomRule` IDs, while reporting duplicate RoomData IDs. It is editor-only and never mutates shared assets at runtime.
+
+Old rooms with `EnemySpawner` automatically receive a runtime `CombatRoomRule`, including rooms that now also have rewards/events. Old `RoomData.rewards` remain active through `LegacyRoomRewardRule` unless a modern `RoomRewardRule` is present; never put both reward systems on a prefab deliberately.
 
 ## Authoring
 
-Give every `RoomData` a stable ID once. Add one or more `RoomRule`s to the room root and give each a unique rule ID.
+- Normal combat: authored `EnemySpawner`s work unchanged; add `CombatRoomRule` only to explicitly configure combat.
+- Waves: add `WaveRoomRule`, `DungeonWaveSpawnPoint`s, and ordered `SpawnTable` lists. Wave points use the same enemy construction as `EnemySpawner`.
+- Challenges: add `ChallengeRoomRule`; it is voluntarily interacted with. Gauntlet, Timed Kill, and Perfect Combat are supported. Challenge failure resolves as failed, removes only challenge-owned enemies, and cannot grant success-gated rewards.
+- Treasure/rewards: create a `LootPoolDefinition`, add `RoomRewardRule`, and add one `DungeonRewardOfferAnchor` with collider per physical pedestal. Offers are deterministic. The player selects a pedestal; no first-offer auto-claim exists. Configure `requiredRuleId` to gate a reward on a successful challenge/combat rule.
+- Shrine: add `ShrineInteraction` to each authored choice object. Choose a thematic family, modifier, costs, and requirements. Modifiers use concrete outgoing/incoming damage multipliers and persist across floors.
+- Secrets/internal areas: `DungeonSecretAccess` opens authored geometry only—never a graph cell/minimap icon. `InteractableDoor` is internal by default; configure a `DungeonRequirement` (including consumable inventory `ItemData`) and it will not unlock graph doors.
+- Events: `DungeonNarrativeEvent` uses existing PlayerStats flags/Karma/Benedetto/Malefico and supports Repeatable, OncePerRun, and OncePerSave. Existing NPC/dialogue components remain the dialogue authority.
 
-- Normal combat: add `CombatRoomRule` and authored `EnemySpawner`s.
-- Treasure: create a `LootPoolDefinition`, add `RoomRewardRule`, assign the pool, and put a collider on its reward pedestal (or room) so it can be interacted with. Set its completion blocking setting only when a claim must gate the room.
-- Waves: add `WaveRoomRule`, one or more `DungeonWaveSpawnPoint`s, and ordered wave `SpawnTable` lists.
-- Challenges: add `ChallengeRoomRule`; it starts only on interaction. Select Gauntlet, Timed Kill, or Perfect Combat and configure its waves. Failed, unfinished challenges restart rather than restoring individual enemies.
-- Shrine: add a `ShrineInteraction` to each authored choice object. Use a family label, requirement/cost, and a `RunModifierDefinition` (Blessing, Curse, or Pact). The generated controller is the only run-modifier authority.
-- Secret/internal area: add `DungeonSecretAccess` to an authored lever/door and reference the object to open. It does not make a grid cell or minimap icon.
-- NPC/narrative, risk/reward, sacrifice and stat checks: add `DungeonNarrativeEvent`, configure its occurrence policy, requirements, cost/sacrifice and karma/story consequences. Existing dialogue/NPC components remain the dialogue authority.
-
-`DungeonFloorThemeTable` remains the theme source of truth. Its optional `DungeonFloorDefinition` sets deterministic normal-room ranges (`min == max` is exact) and exposes floor pool hooks.
-
-## Save/load and determinism
-
-Save version 7 adds JsonUtility-safe `SavedDungeonRunState`, keyed by room/rule IDs. Layout is regenerated from its original seed; visited/revealed/completed state, reward claims, interactions, modifier state and rule payloads are restored. Completed combat does not respawn. Incomplete combat, waves and challenges intentionally restart from their initial deterministic state. `System.Random` streams are derived through `DungeonDeterminism`; no generated content should use Unity global random.
-
-Run-only modifiers and active dungeon state are cleared when `PlayerStats.TryCompleteRun` succeeds. Permanent consequences use existing `PlayerStats` story flags and Karma/Benedetto/Malefico persistence.
+`DungeonFloorThemeTable` remains the theme source. Its optional `DungeonFloorDefinition` provides deterministic normal room min/max counts (`min == max` is fixed). Legacy CoreGenerator values remain the fallback.

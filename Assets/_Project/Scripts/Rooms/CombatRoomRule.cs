@@ -6,15 +6,19 @@ public sealed class CombatRoomRule : RoomRule
     [SerializeField] private bool startOnPlayerEntry = true;
     private bool started;
     protected override void OnStateRestored(string payload) { started = false; } // unfinished encounters deliberately restart
-    public override void OnPlayerEntered()
+    protected override void OnRoomInitialized()
+    {
+        Context.Room.AdoptEncounter("legacy", RuleId);
+    }
+    public override void OnPlayerEntered(bool firstVisit)
     {
         if (IsCompleted || !startOnPlayerEntry) return;
-        started = true; Context.Room.BeginCombat(this); Context.Room.WakeUpEnemies();
-        if (Context.Room.ActiveEnemyCount == 0) Complete();
+        started = true; StartRunning(); Context.Room.BeginCombat(this); Context.Room.WakeUpEnemies(RuleId);
+        if (Context.Room.GetEncounterEnemyCount(RuleId) == 0) Complete();
     }
-    public override void OnEnemyDied(GameObject enemy)
+    public override void OnEnemyDied(GameObject enemy, string ownerId)
     {
-        if (started && !IsCompleted && Context.Room.ActiveEnemyCount == 0) Complete();
+        if (started && !IsResolved && ownerId == RuleId && Context.Room.GetEncounterEnemyCount(RuleId) == 0) Complete();
     }
     protected override string CaptureState() => started ? "started" : string.Empty;
 }

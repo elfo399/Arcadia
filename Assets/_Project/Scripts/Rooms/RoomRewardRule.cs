@@ -2,28 +2,59 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>Configurable deterministic reward offers. Put a collider on the authored room/pedestal.</summary>
-public sealed class RoomRewardRule : RoomRule, IInteractable
+/// <summary>Deterministic, authored-pedestal reward choices. It never auto-selects an offer.</summary>
+public sealed class RoomRewardRule : RoomRule
 {
     [SerializeField] private LootPoolDefinition lootPool;
-    [SerializeField, Min(1)] private int generatedChoices = 1;
-    [SerializeField, Min(1)] private int maxClaims = 1;
+    [SerializeField,Min(1)] private int generatedChoices=1;
+    [SerializeField,Min(1)] private int maxClaims=1;
     [SerializeField] private bool completeAfterClaims;
-    [SerializeField] private string prompt = "Claim reward";
-    private LootPoolDefinition.Entry[] offers;
-    private readonly HashSet<int> claimed = new HashSet<int>();
-    protected override void OnRoomInitialized() { BuildOffers(); if(completeAfterClaims && claimed.Count >= maxClaims) Complete(); }
-    protected override void OnStateRestored(string payload)
-    { if(!string.IsNullOrEmpty(payload)) foreach(string token in payload.Split(',')) if(int.TryParse(token,out int index)) claimed.Add(index); if(completeAfterClaims && claimed.Count>=maxClaims) Complete(); }
-    protected override string CaptureState() { var values=new List<int>(claimed); values.Sort(); return string.Join(",",values); }
-    private void BuildOffers()
-    { if(lootPool==null) return; offers=new LootPoolDefinition.Entry[Mathf.Max(1,generatedChoices)]; var random=Context.CreateRandom(RuleId+":offers"); for(int i=0;i<offers.Length;i++) offers[i]=lootPool.Pick(random); }
-    public void Interact(GameObject player)
+    [SerializeField] private string requiredRuleId;
+    [SerializeField] private bool requiresRuleSuccess;
+    private LootPoolDefinition.Entry[] offers; private readonly HashSet<int> claimed=new HashSet<int>(); private DungeonRewardOfferAnchor[] anchors;
+    protected override void OnRoomInitialized(){BuildOffers();anchors=GetComponentsInChildren<DungeonRewardOfferAnchor>(true);BindAnchors();}
+    protected override void OnStateRestored(string payload){if(!string.IsNullOrWhiteSpace(payload))foreach(string token in payload.Split(','))if(int.TryParse(token,out int index))claimed.Add(index);BindAnchors();if(completeAfterClaims&&claimed.Count>=maxClaims)Complete();}
+    protected override string CaptureState(){var indices=new List<int>(claimed);indices.Sort();return string.Join(",",indices);}
+    private void BuildOffers(){if(lootPool==null)return;offers=new LootPoolDefinition.Entry[Mathf.Max(1,generatedChoices)];var random=Context.CreateRandom(RuleId+":offers");for(int i=0;i<offers.Length;i++)offers[i]=lootPool.Pick(random);}
+    private bool IsAvailable(){if(!requiresRuleSuccess)return true;RoomRule source=Context.Room.GetRule(requiredRuleId);return source!=null&&source.Outcome==RoomRuleOutcome.Succeeded;}
+    private void BindAnchors()
     {
-        if(offers==null || claimed.Count>=maxClaims) return; PlayerInventory inventory=player!=null?player.GetComponentInParent<PlayerInventory>():null; if(inventory==null)return;
-        for(int i=0;i<offers.Length && claimed.Count<maxClaims;i++) { var offer=offers[i]; if(offer==null||offer.item==null||claimed.Contains(i)||!inventory.TryAddItem(offer.item,offer.amount)) continue; claimed.Add(i); Context.State.rewardClaimed=true; break; }
-        if(completeAfterClaims && claimed.Count>=maxClaims) Complete(); Context.Room.NotifyRuleChanged(this);
+        if(anchors==null||offers==null)return;bool exhausted=claimed.Count>=maxClaims;for(int i=0;i<anchors.Length;i++){var anchor=anchors[i];if(anchor==null)continue;bool offered=i<offers.Length&&offers[i]!=null&&offers[i].item!=null&&!claimed.Contains(i)&&!exhausted&&IsAvailable();anchor.Configure(this,i,offered?offers[i]:null,offered);}
     }
-    public string GetPrompt() => claimed.Count >= maxClaims ? string.Empty : prompt;
-    private void OnValidate() { if(maxClaims>generatedChoices) maxClaims=generatedChoices; if(lootPool==null) Debug.LogWarning($"[RoomRewardRule] {name} has no LootPool.",this); }
+    internal void TryClaim(int index,GameObject player)
+    {
+        if(!IsAvailable()||offers==null||index<0||index>=offers.Length||claimed.Contains(index)||claimed.Count>=maxClaims)return;var offer=offers[index];PlayerInventory inventory=player!=null?player.GetComponentInParent<PlayerInventory>():null;if(offer==null||offer.item==null||inventory==null||!inventory.TryAddItem(offer.item,offer.amount))return;
+        claimed.Add(index);Context.State.rewardClaimed=true;if(completeAfterClaims&&claimed.Count>=maxClaims)Complete();BindAnchors();Context.Room.NotifyRuleChanged(this);
+    }
+    public override void OnRuleChanged(RoomRule rule){if(requiresRuleSuccess&&rule!=null&&rule.RuleId==requiredRuleId)BindAnchors();}
+#if UNITY_EDITOR
+    protected override void OnValidate(){base.OnValidate();if(maxClaims>generatedChoices)maxClaims=generatedChoices;if(lootPool==null)Debug.LogWarning($"[RoomRewardRule] '{name}' has no LootPool.",this);}
+#endif
+}
+
+/// <summary>Put one on every authored pedestal. The component is both its physical presentation and interaction target.</summary>
+public sealed class DungeonRewardOfferAnchor : MonoBehaviour,IInteractable
+{
+    [SerializeField] private GameObject availableVisual; [SerializeField] private GameObject claimedVisual; [SerializeField] private string prompt="Take reward";
+    private RoomRewardRule owner; private int index; private bool available;
+    internal void Configure(RoomRewardRule rule,int offerIndex,LootPoolDefinition.Entry entry,bool canClaim){owner=rule;index=offerIndex;available=canClaim;if(availableVisual)availableVisual.SetActive(canClaim);if(claimedVisual)claimedVisual.SetActive(!canClaim);}
+    public void Interact(GameObject player){if(available&&owner!=null)owner.TryClaim(index,player);}
+    public string GetPrompt()=>available?prompt:string.Empty;
+}
+
+/// <summary>Temporary migration for existing RoomData.rewards. Modern RoomRewardRule takes precedence.</summary>
+public sealed class LegacyRoomRewardRule : RoomRule
+{
+    public override bool BlocksRoomCompletion => false;
+    public override void OnRoomCompleted()
+    {
+        if(Context.State.rewardClaimed||Context.Room.roomData==null)return;var random=Context.CreateRandom("legacy-rewards");
+        foreach(var loot in Context.Room.roomData.rewards)
+        {
+            if(loot==null||loot.itemPrefab==null||random.Next(0,101)>loot.dropChance)continue;int amount=1;
+            if(loot.quantityWeights!=null&&loot.quantityWeights.Count>0){float total=0;foreach(var weight in loot.quantityWeights)if(weight!=null)total+=Mathf.Max(0,weight.chance);double roll=random.NextDouble()*total;float cursor=0;foreach(var weight in loot.quantityWeights)if(weight!=null){cursor+=Mathf.Max(0,weight.chance);if(roll<=cursor){amount=Mathf.Max(0,weight.amount);break;}}}
+            for(int i=0;i<amount;i++){Vector3 offset=new Vector3((float)(random.NextDouble()*4-2),.2f,(float)(random.NextDouble()*4-2));Instantiate(loot.itemPrefab,Context.Room.transform.position+offset,Quaternion.identity,Context.Room.transform);}
+        }
+        Context.State.rewardClaimed=true;Context.Room.NotifyRuleChanged(this);
+    }
 }

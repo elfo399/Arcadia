@@ -3,7 +3,7 @@ using System.IO;
 
 public static class SaveSystem
 {
-    public const int CurrentSaveVersion = 7;
+    public const int CurrentSaveVersion = 8;
     public const string SinglePlayerId = "player";
     public const string DefaultPlayerName = "Player";
 
@@ -380,6 +380,23 @@ public static class SaveSystem
                     // receive deterministic per-room/rule state on their next save.
                     data.dungeonRun = null;
                     data.saveVersion = 7;
+                    break;
+
+                case 7:
+                    // v7 coupled a floor snapshot to global run data. Preserve
+                    // modifiers/events and move room records into floor state.
+                    if (data.dungeonRun != null && data.dungeonRun.currentFloorState == null)
+                    {
+                        data.dungeonRun.currentFloor = Mathf.Max(1, data.dungeonRun.floor);
+                        data.dungeonRun.currentFloorState = new SavedDungeonFloorState
+                        {
+                            floorNumber = data.dungeonRun.currentFloor,
+                            rooms = data.dungeonRun.rooms
+                        };
+                        data.dungeonRun.floor = 0;
+                        data.dungeonRun.rooms = null;
+                    }
+                    data.saveVersion = 8;
                     break;
 
                 default:

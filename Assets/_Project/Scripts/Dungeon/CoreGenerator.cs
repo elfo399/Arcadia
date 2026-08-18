@@ -187,9 +187,9 @@ public class CoreGenerator : MonoBehaviour
         if (showRngLogs) Debug.Log($"[CoreGenerator] Seed per piano {currentFloor}: '{floorSeedString}' -> Hash: {currentMasterSeed}");
 
         if (runStateController == null) runStateController = GetComponent<DungeonRunStateController>();
-        SavedDungeonRunState savedRun = playerStats != null && playerStats.LoadedDataSnapshot != null
+        SavedDungeonRunState savedRun = !runStateController.IsInitialized && playerStats != null && playerStats.LoadedDataSnapshot != null
             ? playerStats.LoadedDataSnapshot.dungeonRun : null;
-        runStateController.BeginOrRestore(gameSeedString, currentFloor, savedRun);
+        runStateController.InitializeFromSave(gameSeedString, currentFloor, savedRun);
         RunModifierController.Active?.RestoreFromRunState();
 
         ResolveActiveThemeForCurrentFloor();
@@ -836,6 +836,7 @@ public class CoreGenerator : MonoBehaviour
             instance.ConfigureGeneratedInstance(
                 DungeonDeterminism.RoomId(gameSeedString, currentFloor, vr.anchorPos, vr.type, definitionId),
                 vr.anchorPos, vr.size, currentFloor, vr.type);
+            instance.InitializeGeneratedRuntime();
             if (vr.type == "Start") startRoomInstance = instance;
 
             activeRoomObjects.Add(instance);
