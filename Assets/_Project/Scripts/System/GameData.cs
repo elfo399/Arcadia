@@ -190,6 +190,8 @@ public class GameData
     public bool dungeonCheckpointActive;
     public int dungeonFloor;
     public string dungeonSeed;
+    // Active run state is intentionally separate from permanent progression.
+    public SavedDungeonRunState dungeonRun;
 
     // Legacy currency fields, kept only in memory to migrate older saves.
     [System.NonSerialized]

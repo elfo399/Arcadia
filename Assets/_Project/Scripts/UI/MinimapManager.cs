@@ -425,6 +425,25 @@ public class MinimapManager : MonoBehaviour
         MapStateChanged?.Invoke();
     }
 
+    /// <summary>Restores only generated-room fog state; authored secret sub-areas never register here.</summary>
+    public void RestoreRoomVisibility(Vector2Int gridPos, bool visited, bool revealed)
+    {
+        if (visited) _visitedRoomAnchors.Add(gridPos);
+        if (revealed) _revealedRoomAnchors.Add(gridPos);
+        if (_roomIconObjects.TryGetValue(gridPos, out GameObject icon) && icon != null)
+        {
+            icon.SetActive(revealed);
+            if (revealed) ApplyIconVisibilityState(icon, gridPos, _lastPlayerRoomAnchor);
+        }
+    }
+
+    public bool TryGetRoomVisibility(Vector2Int gridPos, out bool visited, out bool revealed)
+    {
+        visited = _visitedRoomAnchors.Contains(gridPos);
+        revealed = _revealedRoomAnchors.Contains(gridPos);
+        return _roomData.ContainsKey(gridPos);
+    }
+
     private void SetupIconVisuals(GameObject iconObj, Vector2Int gridPos, RoomData data)
     {
         RectTransform rt = iconObj.GetComponent<RectTransform>();

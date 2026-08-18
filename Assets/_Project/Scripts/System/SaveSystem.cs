@@ -3,7 +3,7 @@ using System.IO;
 
 public static class SaveSystem
 {
-    public const int CurrentSaveVersion = 6;
+    public const int CurrentSaveVersion = 7;
     public const string SinglePlayerId = "player";
     public const string DefaultPlayerName = "Player";
 
@@ -373,6 +373,13 @@ public static class SaveSystem
                     // resolved by PlayerInventory once ItemDatabase is available.
                     // assetName remains populated as a legacy fallback.
                     data.saveVersion = 6;
+                    break;
+
+                case 6:
+                    // Older checkpoints restart the current floor once. New saves
+                    // receive deterministic per-room/rule state on their next save.
+                    data.dungeonRun = null;
+                    data.saveVersion = 7;
                     break;
 
                 default:

@@ -17,6 +17,8 @@ public class DungeonFloorThemeTable : ScriptableObject
     {
         [Min(1)] public int floorNumber = 1;
         public List<ThemeChoice> themes = new List<ThemeChoice>();
+        [Tooltip("Optional generation/content overrides; theme selection remains in this table.")]
+        public DungeonFloorDefinition floorDefinition;
     }
 
     public List<FloorThemeEntry> floors = new List<FloorThemeEntry>();

@@ -23,6 +23,8 @@ public class LootItem
 public class RoomData : ScriptableObject
 {
     [Header("Identità")]
+    [Tooltip("Immutable authoring ID used by deterministic generated-room identities.")]
+    public string stableId;
     public string roomName;
     public GameObject roomPrefab; 
 

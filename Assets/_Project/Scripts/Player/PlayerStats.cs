@@ -7,6 +7,7 @@ using System.Collections.Generic;
 
 public class PlayerStats : MonoBehaviour, IDamageable
 {
+    public static event System.Action<float> DamageTaken;
     public const int BronzeCoinValue = 1;
     public const int SilverCoinValue = 5;
     public const int GoldCoinValue = 10;
@@ -403,6 +404,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         Debug.Log($"[PlayerStats] Damage taken -> incoming:{incomingAmount:0.##}, afterBlockParry:{preArmorAmount:0.##}, type:{damageType}, defense:{effectiveDefense}, armorPhy:{totalArmorPhysicalDefense}, armorMag:{totalArmorMagicDefense}, final:{amount:0.##}");
 
         currentHealth -= amount;
+        DamageTaken?.Invoke(amount);
         if (currentHealth < 0) currentHealth = 0;
 
         if (currentHealth <= 0) Die();
@@ -707,6 +709,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
         }
 
         ClearDungeonCheckpoint();
+        if (DungeonRunStateController.Active != null)
+            DungeonRunStateController.Active.ClearRun();
+        if (RunModifierController.Active != null)
+            RunModifierController.Active.ClearForRunEnd();
         SaveStatsImmediate();
         return true;
     }
@@ -977,6 +983,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             dungeonCheckpointActive = this.dungeonCheckpointActive,
             dungeonFloor = this.dungeonCheckpointFloor,
             dungeonSeed = this.dungeonCheckpointSeed,
+            dungeonRun = DungeonRunStateController.Active != null ? DungeonRunStateController.Active.Export() : loadedDataCache != null ? loadedDataCache.dungeonRun : null,
             bankGold = this.bankGold,
             bankSilver = this.bankSilver,
             bankCopper = this.bankCopper,
@@ -1742,6 +1749,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
             inventory.ClearRunInventory(save: false);
         ResetRunWallet();
         ClearDungeonCheckpoint();
+        if (DungeonRunStateController.Active != null)
+            DungeonRunStateController.Active.ClearRun();
+        if (RunModifierController.Active != null)
+            RunModifierController.Active.ClearForRunEnd();
         SaveStatsImmediate();
         Debug.Log("SEI MORTO! Ritorno all'Hub...");
         SceneManager.LoadScene("HubScene");

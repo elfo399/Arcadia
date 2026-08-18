@@ -85,12 +85,15 @@ public class CoreGenerator : MonoBehaviour
     private bool savedCheckpointApplied;
     private DungeonThemeDefinition activeThemeDefinition;
     private DungeonRoomSet activeRoomSet;
+    private DungeonRunStateController runStateController;
+    private int activeNormalRoomCount;
 
     public event Action<int, string> FloorThemeChanged;
     public event Action<int> FloorGenerated;
     public int CurrentFloor => currentFloor;
     public DungeonThemeDefinition ActiveThemeDefinition => activeThemeDefinition;
     public string ActiveThemeDisplayName => GetThemeDisplayName(activeThemeDefinition);
+    public IReadOnlyList<Room> ActiveRooms => activeRoomObjects;
 
     // Lookup ricostruito in base al tema attivo del piano.
     private Dictionary<string, Dictionary<Vector2Int, Room[]>> _prefabLookup;
@@ -110,6 +113,9 @@ public class CoreGenerator : MonoBehaviour
     void Awake() 
     { 
         Instance = this;
+        runStateController = GetComponent<DungeonRunStateController>();
+        if (runStateController == null) runStateController = gameObject.AddComponent<DungeonRunStateController>();
+        if (GetComponent<RunModifierController>() == null) gameObject.AddComponent<RunModifierController>();
         ResolvePlayerTransform();
         CachePlayerStats();
         ApplySavedCheckpointIfAvailable();
@@ -180,6 +186,12 @@ public class CoreGenerator : MonoBehaviour
         currentMasterSeed = ComputeSeedHash(floorSeedString);
         if (showRngLogs) Debug.Log($"[CoreGenerator] Seed per piano {currentFloor}: '{floorSeedString}' -> Hash: {currentMasterSeed}");
 
+        if (runStateController == null) runStateController = GetComponent<DungeonRunStateController>();
+        SavedDungeonRunState savedRun = playerStats != null && playerStats.LoadedDataSnapshot != null
+            ? playerStats.LoadedDataSnapshot.dungeonRun : null;
+        runStateController.BeginOrRestore(gameSeedString, currentFloor, savedRun);
+        RunModifierController.Active?.RestoreFromRunState();
+
         ResolveActiveThemeForCurrentFloor();
         if (!ValidateActiveThemeConfiguration(out string configError))
         {
@@ -188,6 +200,7 @@ public class CoreGenerator : MonoBehaviour
         }
 
         InitializePrefabLookup();
+        activeNormalRoomCount = ResolveNormalRoomCount();
 
         Room effectiveStartRoomPrefab = GetStartRoomPrefab();
         if (effectiveStartRoomPrefab == null || effectiveStartRoomPrefab.roomData == null)
@@ -266,8 +279,8 @@ public class CoreGenerator : MonoBehaviour
         List<VirtualRoom> expandableRooms = new List<VirtualRoom> { layout[0] };
         int normalCount = 0;
         int consecutiveFailedNormalPlacements = 0;
-        int maxNormalPlacementFailures = Mathf.Max(50, totalNormalRooms * 8);
-        while (normalCount < totalNormalRooms && expandableRooms.Count > 0)
+        int maxNormalPlacementFailures = Mathf.Max(50, activeNormalRoomCount * 8);
+        while (normalCount < activeNormalRoomCount && expandableRooms.Count > 0)
         {
             VirtualRoom origin = expandableRooms[prng.Next(expandableRooms.Count)];
             Vector2Int dir = directions[prng.Next(directions.Length)];
@@ -302,7 +315,7 @@ public class CoreGenerator : MonoBehaviour
             }
         }
 
-        if (normalCount < totalNormalRooms)
+        if (normalCount < activeNormalRoomCount)
             return null;
 
         // --- FASE DI PIAZZAMENTO STANZE SPECIALI ---
@@ -727,6 +740,15 @@ public class CoreGenerator : MonoBehaviour
         return null;
     }
 
+    private int ResolveNormalRoomCount()
+    {
+        DungeonFloorThemeTable.FloorThemeEntry entry = floorThemeTable != null ? floorThemeTable.GetEntryForFloor(currentFloor) : null;
+        DungeonFloorDefinition definition = entry != null ? entry.floorDefinition : null;
+        if (definition == null || definition.normalRooms == null)
+            return Mathf.Max(0, totalNormalRooms);
+        return definition.normalRooms.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "normal-count"));
+    }
+
     private Room GetStartRoomPrefab()
     {
         return activeRoomSet != null ? activeRoomSet.startRoomPrefab : null;
@@ -809,8 +831,11 @@ public class CoreGenerator : MonoBehaviour
             Room instance = Instantiate(vr.prefabReference, worldPos, Quaternion.identity);
             instance.transform.parent = transform;
             instance.name = $"{vr.type}_{vr.anchorPos}";
-
-            instance.roomData.size = vr.size;
+            string definitionId = instance.roomData != null && !string.IsNullOrWhiteSpace(instance.roomData.stableId)
+                ? instance.roomData.stableId : vr.prefabReference.name;
+            instance.ConfigureGeneratedInstance(
+                DungeonDeterminism.RoomId(gameSeedString, currentFloor, vr.anchorPos, vr.type, definitionId),
+                vr.anchorPos, vr.size, currentFloor, vr.type);
             if (vr.type == "Start") startRoomInstance = instance;
 
             activeRoomObjects.Add(instance);
@@ -822,8 +847,8 @@ public class CoreGenerator : MonoBehaviour
         var gridLookup = new Dictionary<Vector2Int, Room>();
         foreach (Room r in activeRoomObjects)
         {
-            Vector2Int anchor = GetGridPos(r.transform.position);
-            Vector2Int size = (r.roomData.size == Vector2Int.zero) ? Vector2Int.one : r.roomData.size;
+            Vector2Int anchor = r.GridAnchor;
+            Vector2Int size = r.GridSize;
             for (int x = 0; x < size.x; x++)
                 for (int y = 0; y < size.y; y++)
                     gridLookup[anchor + new Vector2Int(x, y)] = r;
@@ -831,8 +856,8 @@ public class CoreGenerator : MonoBehaviour
 
         foreach (Room r in activeRoomObjects)
         {
-            Vector2Int anchor = GetGridPos(r.transform.position);
-            Vector2Int size = (r.roomData.size == Vector2Int.zero) ? Vector2Int.one : r.roomData.size;
+            Vector2Int anchor = r.GridAnchor;
+            Vector2Int size = r.GridSize;
             for (int x = 0; x < size.x; x++)
             {
                 for (int y = 0; y < size.y; y++)
@@ -862,7 +887,12 @@ public class CoreGenerator : MonoBehaviour
     void InitializeMinimap()
     {
         if (!MinimapManager.instance) return;
-        foreach (Room r in activeRoomObjects) MinimapManager.instance.RegisterRoom(GetGridPos(r.transform.position), r.roomData);
+        foreach (Room r in activeRoomObjects)
+        {
+            MinimapManager.instance.RegisterRoom(r.GridAnchor, r.roomData);
+            if (runStateController != null && runStateController.TryGetRoom(r.RuntimeId, out SavedDungeonRoomState state) && state != null)
+                MinimapManager.instance.RestoreRoomVisibility(r.GridAnchor, state.visited, state.revealed);
+        }
     }
 
     int GetManhattanDist(Vector2Int a, Vector2Int b) => Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
