@@ -33,13 +33,8 @@ public class RoomData : ScriptableObject
     [Header("Dimensioni Griglia")]
     public Vector2Int size = new Vector2Int(1, 1); 
 
-    [Header("Tipo")]
-    public bool isBossRoom;
-    public bool isTreasureRoom;
-    public bool isStartRoom;
-    public bool isShopRoom;
-    public bool isBlessedRoom;
-    public bool isEvilRoom;
+    [Header("Structural type")]
+    public RoomType roomType = RoomType.Normal;
     
     [Header("Rewards / Loot Table")]
     public List<LootItem> rewards = new List<LootItem>();

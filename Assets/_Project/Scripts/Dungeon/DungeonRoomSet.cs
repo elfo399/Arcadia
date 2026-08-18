@@ -49,4 +49,40 @@ public class DungeonRoomSet : ScriptableObject
     public Room[] secretAccessSuperSecret2x1Variants;
     public Room[] secretAccessSuperSecret1x2Variants;
     public Room[] secretAccessSuperSecret2x2Variants;
+
+    [Header("Wave")]
+    public Room[] wave1x1Variants;
+    public Room[] wave2x1Variants;
+    public Room[] wave1x2Variants;
+    public Room[] wave2x2Variants;
+
+    [Header("Challenge")]
+    public Room[] challenge1x1Variants;
+    public Room[] challenge2x1Variants;
+    public Room[] challenge1x2Variants;
+    public Room[] challenge2x2Variants;
+
+    [Header("Miniboss")]
+    public Room[] miniboss1x1Variants;
+    public Room[] miniboss2x1Variants;
+    public Room[] miniboss1x2Variants;
+    public Room[] miniboss2x2Variants;
+
+    [Header("Parkour")]
+    public Room[] parkour1x1Variants;
+    public Room[] parkour2x1Variants;
+    public Room[] parkour1x2Variants;
+    public Room[] parkour2x2Variants;
+
+    [Header("Narrative")]
+    public Room[] narrative1x1Variants;
+    public Room[] narrative2x1Variants;
+    public Room[] narrative1x2Variants;
+    public Room[] narrative2x2Variants;
+
+    [Header("NPC Encounter")]
+    public Room[] npcEncounter1x1Variants;
+    public Room[] npcEncounter2x1Variants;
+    public Room[] npcEncounter1x2Variants;
+    public Room[] npcEncounter2x2Variants;
 }

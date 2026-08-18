@@ -30,6 +30,12 @@ public sealed class DungeonFloorDefinition : ScriptableObject
     public RoomCount shopRooms = new RoomCount { min = 1, max = 1 };
     public RoomCount treasureRooms = new RoomCount { min = 1, max = 1 };
     public RoomCount bossRooms = new RoomCount { min = 1, max = 1 };
+    public RoomCount waveRooms = new RoomCount { enabled = false, min = 0, max = 0 };
+    public RoomCount challengeRooms = new RoomCount { enabled = false, min = 0, max = 0 };
+    public RoomCount minibossRooms = new RoomCount { enabled = false, min = 0, max = 0 };
+    public RoomCount parkourRooms = new RoomCount { enabled = false, min = 0, max = 0 };
+    public RoomCount narrativeRooms = new RoomCount { enabled = false, min = 0, max = 0 };
+    public RoomCount npcEncounterRooms = new RoomCount { enabled = false, min = 0, max = 0 };
     public RoomCount curchRooms = new RoomCount { enabled = false };
     public RoomCount evilCurchRooms = new RoomCount { enabled = false };
     [Tooltip("Generated SecretAccess rooms whose authored prefab contains a normal-secret discovery mechanism.")]
@@ -49,24 +55,33 @@ public sealed class DungeonFloorDefinition : ScriptableObject
     public bool shrinesAvailable = true;
     public bool minibossesAvailable = true;
 
-    public RoomCount GetCount(string category)
+    public RoomCount GetCount(RoomType roomType)
     {
-        switch (category)
+        switch (roomType)
         {
-            case "Normal": return normalRooms;
-            case "Shop": return shopRooms;
-            case "Treasure": return treasureRooms;
-            case "Boss": return bossRooms;
-            case "Curch": return curchRooms;
-            case "EvilCurch": return evilCurchRooms;
-            case "SecretAccess/Secret": return secretAccessSecretRooms;
-            case "SecretAccess/SuperSecret": return secretAccessSuperSecretRooms;
+            case RoomType.Normal: return normalRooms;
+            case RoomType.Shop: return shopRooms;
+            case RoomType.Treasure: return treasureRooms;
+            case RoomType.Boss: return bossRooms;
+            case RoomType.Wave: return waveRooms;
+            case RoomType.Challenge: return challengeRooms;
+            case RoomType.Miniboss: return minibossRooms;
+            case RoomType.Parkour: return parkourRooms;
+            case RoomType.Narrative: return narrativeRooms;
+            case RoomType.NpcEncounter: return npcEncounterRooms;
+            case RoomType.Curch: return curchRooms;
+            case RoomType.EvilCurch: return evilCurchRooms;
             default: return null;
         }
     }
 
+    public RoomCount GetSecretAccessCount(bool superSecret)
+    {
+        return superSecret ? secretAccessSuperSecretRooms : secretAccessSecretRooms;
+    }
+
     private void OnValidate()
     {
-        normalRooms?.Normalize(); shopRooms?.Normalize(); treasureRooms?.Normalize(); bossRooms?.Normalize(); curchRooms?.Normalize(); evilCurchRooms?.Normalize(); secretAccessSecretRooms?.Normalize(); secretAccessSuperSecretRooms?.Normalize();
+        normalRooms?.Normalize(); shopRooms?.Normalize(); treasureRooms?.Normalize(); bossRooms?.Normalize(); waveRooms?.Normalize(); challengeRooms?.Normalize(); minibossRooms?.Normalize(); parkourRooms?.Normalize(); narrativeRooms?.Normalize(); npcEncounterRooms?.Normalize(); curchRooms?.Normalize(); evilCurchRooms?.Normalize(); secretAccessSecretRooms?.Normalize(); secretAccessSuperSecretRooms?.Normalize();
     }
 }
