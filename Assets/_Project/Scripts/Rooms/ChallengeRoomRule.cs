@@ -21,7 +21,11 @@ public sealed class ChallengeRoomRule : RoomRule, IInteractable
     private void OnDisable() { PlayerStats.DamageTaken -= HandlePlayerDamage; }
     public void Interact(GameObject player) { if(!active&&!IsResolved) StartChallenge(); }
     public string GetPrompt() => active||IsCompleted||IsFailed ? string.Empty : prompt;
-    private void StartChallenge() { if(waves.Count==0){Debug.LogError($"[ChallengeRoomRule] {name} requires at least one wave.",this);return;} active=true; remaining=timeLimitSeconds; StartRunning(); Context.Room.BeginCombat(this); StartNextWave(); }
+    private void StartChallenge()
+    {
+        if(CoreGenerator.Instance!=null&&CoreGenerator.Instance.ActiveFloorDefinition!=null&&!CoreGenerator.Instance.ActiveFloorDefinition.challengesAvailable)return;
+        if(waves.Count==0){Debug.LogError($"[ChallengeRoomRule] {name} requires at least one wave.",this);return;} active=true; remaining=timeLimitSeconds; StartRunning(); Context.Room.BeginCombat(this); StartNextWave();
+    }
     private void StartNextWave()
     {
         waveIndex++; if(waveIndex>=waves.Count){ active=false; Complete(); return; }

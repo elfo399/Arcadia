@@ -5,6 +5,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName="DungeonFloor", menuName="Dungeon/Floor Definition")]
 public sealed class DungeonFloorDefinition : ScriptableObject
 {
+    public enum DungeonMoralRoomPolicy { Independent, AlignmentExclusive }
     [Serializable]
     public sealed class RoomCount
     {
@@ -31,6 +32,8 @@ public sealed class DungeonFloorDefinition : ScriptableObject
     public RoomCount bossRooms = new RoomCount { min = 1, max = 1 };
     public RoomCount curchRooms = new RoomCount { enabled = false };
     public RoomCount evilCurchRooms = new RoomCount { enabled = false };
+    [Tooltip("Independent allows both authored moral room categories. AlignmentExclusive selects only the stronger alignment; ties spawn neither.")]
+    public DungeonMoralRoomPolicy moralRoomPolicy = DungeonMoralRoomPolicy.Independent;
 
     [Header("Content pools")]
     [Tooltip("Optional weighted room-set override. Empty means the selected theme room set remains authoritative.")]

@@ -435,6 +435,14 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (!CanSacrificeHealth(amount, allowLethal)) return false;
         if (amount <= 0f) return true;
         currentHealth = Mathf.Clamp(currentHealth - amount, 0f, maxHealth);
+        // Sacrifice bypasses combat mitigation, but death ownership remains the
+        // same as ordinary damage so a lethal authored cost cannot leave a
+        // living player at zero health.
+        if (currentHealth <= 0f)
+        {
+            Die();
+            return true;
+        }
         if (save) SaveStats();
         return true;
     }

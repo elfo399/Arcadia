@@ -30,7 +30,7 @@ public sealed class RoomRewardRule : RoomRule
     }
     protected override void OnStateRestored(string payload){if(!string.IsNullOrWhiteSpace(payload))foreach(string token in payload.Split(','))if(int.TryParse(token,out int index))claimed.Add(index);BindAnchors();if((completeAfterClaims||blocksUntilClaimed)&&claimed.Count>=maxClaims)Complete();}
     protected override string CaptureState(){var indices=new List<int>(claimed);indices.Sort();return string.Join(",",indices);}
-    private void BuildOffers(){if(lootPool==null)return;offers=new LootPoolDefinition.Entry[Mathf.Max(1,generatedChoices)];var random=Context.CreateRandom(RuleId+":offers");for(int i=0;i<offers.Length;i++)offers[i]=lootPool.Pick(random);}
+    private void BuildOffers(){if(lootPool==null)return;offers=new LootPoolDefinition.Entry[Mathf.Max(1,generatedChoices)];var random=Context.CreateRandom(RuleId+":offers");for(int i=0;i<offers.Length;i++)offers[i]=lootPool.Pick(random,PlayerStats.instance);}
     private bool IsAvailable(){if(!requiresRuleSuccess)return true;RoomRule source=Context.Room.GetRule(requiredRuleId);return source!=null&&source.Outcome==RoomRuleOutcome.Succeeded;}
     private void BindAnchors()
     {

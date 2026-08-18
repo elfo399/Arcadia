@@ -88,6 +88,7 @@ public class CoreGenerator : MonoBehaviour
     private DungeonFloorDefinition activeFloorDefinition;
     private DungeonRunStateController runStateController;
     private int activeNormalRoomCount;
+    private string pendingThemeOverrideId;
 
     public event Action<int, string> FloorThemeChanged;
     public event Action<int> FloorGenerated;
@@ -246,9 +247,10 @@ public class CoreGenerator : MonoBehaviour
         }
     }
 
-    public void NextFloor()
+    public void NextFloor(int targetFloorNumber = 0, string targetThemeId = null)
     {
-        if (currentFloor >= maxFloors)
+        int destination = targetFloorNumber > 0 ? Mathf.Clamp(targetFloorNumber, 1, Mathf.Max(1, maxFloors)) : currentFloor + 1;
+        if (destination > maxFloors || (targetFloorNumber <= 0 && currentFloor >= maxFloors))
         {
             CachePlayerStats();
             if (playerStats != null)
@@ -264,7 +266,8 @@ public class CoreGenerator : MonoBehaviour
         }
         else
         {
-            currentFloor++;
+            currentFloor = destination;
+            pendingThemeOverrideId = string.IsNullOrWhiteSpace(targetThemeId) ? null : targetThemeId.Trim();
             Generate();
         }
     }
@@ -340,8 +343,18 @@ public class CoreGenerator : MonoBehaviour
         // Floor definitions explicitly control shrine categories. Legacy floors retain their morality-gated chance.
         if (activeFloorDefinition != null)
         {
-            if (!PlaceSpecialRooms("Curch", ResolveSpecialRoomCount("Curch"), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, curchBigRoomChance, cellToRoomMap)) return null;
-            if (!PlaceSpecialRooms("EvilCurch", ResolveSpecialRoomCount("EvilCurch"), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, evilCurchBigRoomChance, cellToRoomMap)) return null;
+            int curchCount = ResolveSpecialRoomCount("Curch");
+            int evilCurchCount = ResolveSpecialRoomCount("EvilCurch");
+            if (activeFloorDefinition.moralRoomPolicy == DungeonFloorDefinition.DungeonMoralRoomPolicy.AlignmentExclusive)
+            {
+                int blessed = playerStats != null ? playerStats.benedetto : 0;
+                int evil = playerStats != null ? playerStats.malefico : 0;
+                if (blessed > evil) evilCurchCount = 0;
+                else if (evil > blessed) curchCount = 0;
+                else { curchCount = 0; evilCurchCount = 0; }
+            }
+            if (!PlaceSpecialRooms("Curch", curchCount, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, curchBigRoomChance, cellToRoomMap)) return null;
+            if (!PlaceSpecialRooms("EvilCurch", evilCurchCount, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, evilCurchBigRoomChance, cellToRoomMap)) return null;
         }
         else if (playerStats != null && playerStats.benedetto != playerStats.malefico && prng.Next(0, 100) <= curchsRoomsChance)
         {
@@ -741,6 +754,16 @@ public class CoreGenerator : MonoBehaviour
         DungeonFloorThemeTable.FloorThemeEntry entry = floorThemeTable.GetEntryForFloor(floor);
         if (entry == null || entry.themes == null || entry.themes.Count == 0)
             return null;
+
+        if (!string.IsNullOrWhiteSpace(pendingThemeOverrideId))
+        {
+            string requested = pendingThemeOverrideId;
+            pendingThemeOverrideId = null; // explicitly one-floor only
+            foreach (DungeonFloorThemeTable.ThemeChoice choice in entry.themes)
+                if (choice != null && choice.theme != null && choice.theme.roomSet != null && string.Equals(choice.theme.themeId, requested, StringComparison.Ordinal))
+                    return choice.theme;
+            Debug.LogWarning($"[CoreGenerator] Theme override '{requested}' is not valid for floor {floor}; using weighted floor selection.");
+        }
 
         int totalWeight = 0;
         for (int i = 0; i < entry.themes.Count; i++)

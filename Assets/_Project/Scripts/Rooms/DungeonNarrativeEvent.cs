@@ -50,18 +50,18 @@ public sealed class DungeonNarrativeEvent : MonoBehaviour, IInteractable
     {
         if(room==null||string.IsNullOrWhiteSpace(choiceId))return false;Choice choice=null;
         foreach(Choice candidate in choices)if(candidate!=null&&string.Equals(candidate.choiceId,choiceId,StringComparison.Ordinal)){choice=candidate;break;}
-        PlayerStats stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance;if(choice==null||stats==null||!CanOccur(stats)||!RequirementsMet(choice.requirements,stats)||!DungeonCostTransaction.CanPay(choice.costs,stats)||!CanApply(choice,stats))return false;
-        if(!DungeonCostTransaction.TryPay(choice.costs,stats))return false;Apply(choice,stats);
+        PlayerStats stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance;if(choice==null||stats==null||!CanOccur(stats)||!RequirementsMet(choice.requirements,stats)||!DungeonCostTransaction.CanPay(choice.costs,stats)||!TryResolve(choice,stats,out var resolved))return false;
+        if(!DungeonCostTransaction.TryPay(choice.costs,stats)||!DungeonOutcomeResolution.ApplyAll(resolved,stats))return false;
         if(choice.consumesEvent){if(occurrence==DungeonOccurrencePolicy.OncePerRun)DungeonRunStateController.Active?.ConsumeOncePerRun(eventId);if(occurrence==DungeonOccurrencePolicy.OncePerSave)stats.SetStoryFlag(SaveFlag,false);state.completed=true;}
         room.SaveExternalState(state);RefreshChoices();
         choice.dialogueHook?.Interact(player??stats.gameObject);return true;
     }
     internal bool IsChoiceAvailable(string choiceId,PlayerStats stats)
     {
-        if(!CanOccur(stats)||choices==null)return false;foreach(Choice choice in choices)if(choice!=null&&choice.choiceId==choiceId)return RequirementsMet(choice.requirements,stats)&&DungeonCostTransaction.CanPay(choice.costs,stats)&&CanApply(choice,stats);return false;
+        if(!CanOccur(stats)||choices==null)return false;foreach(Choice choice in choices)if(choice!=null&&choice.choiceId==choiceId)return RequirementsMet(choice.requirements,stats)&&DungeonCostTransaction.CanPay(choice.costs,stats)&&TryResolve(choice,stats,out _);return false;
     }
-    private bool CanApply(Choice choice,PlayerStats stats){if(choice.outcomes==null)return true;for(int i=0;i<choice.outcomes.Length;i++)if(choice.outcomes[i]!=null&&!choice.outcomes[i].CanApply(stats,DungeonDeterminism.Create(DungeonRunStateController.Active?.RunSeed??string.Empty,room.Floor,room.RuntimeId,eventId+":"+choice.choiceId+":"+i)))return false;return true;}
-    private void Apply(Choice choice,PlayerStats stats){if(choice.outcomes==null)return;for(int i=0;i<choice.outcomes.Length;i++)if(choice.outcomes[i]!=null)choice.outcomes[i].Apply(stats,DungeonDeterminism.Create(DungeonRunStateController.Active?.RunSeed??string.Empty,room.Floor,room.RuntimeId,eventId+":"+choice.choiceId+":"+i));}
+    private bool TryResolve(Choice choice,PlayerStats stats,out List<DungeonResolvedOutcome> resolved)
+    =>DungeonOutcomeResolution.TryResolveAll(choice.outcomes,stats,index=>DungeonDeterminism.Create(DungeonRunStateController.Active?.RunSeed??string.Empty,room.Floor,room.RuntimeId,eventId+":"+choice.choiceId+":"+index),out resolved);
     private static bool RequirementsMet(IEnumerable<DungeonRequirement> requirements,PlayerStats stats){if(requirements==null)return true;foreach(DungeonRequirement requirement in requirements)if(requirement!=null&&!requirement.IsMet(stats))return false;return true;}
     private void RefreshChoices(){foreach(DungeonNarrativeChoiceAnchor anchor in GetComponentsInChildren<DungeonNarrativeChoiceAnchor>(true))anchor.Refresh();}
     private bool CanOccur(PlayerStats stats)

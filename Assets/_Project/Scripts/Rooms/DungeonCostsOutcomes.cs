@@ -52,15 +52,59 @@ public static class DungeonCostTransaction
 }
 
 public enum DungeonOutcomeKind { RunModifier, Item, LootPool, Karma, Benedetto, Malefico, StoryFlag, Heal, RestoreFlasks, MagicRecipe }
+[Serializable] public sealed class DungeonResolvedOutcome
+{
+    [NonSerialized] internal DungeonOutcome source;
+    [NonSerialized] internal LootPoolDefinition.Entry resolvedLoot;
+    public bool Apply(PlayerStats stats)
+    {
+        if(stats==null||source==null)return false;PlayerInventory inventory=stats.GetComponent<PlayerInventory>();
+        switch(source.kind)
+        {
+            case DungeonOutcomeKind.RunModifier:return RunModifierController.Active!=null&&RunModifierController.Active.Add(source.modifier);
+            case DungeonOutcomeKind.Item:return inventory!=null&&inventory.TryAddItem(source.item,Mathf.Max(1,source.amount));
+            case DungeonOutcomeKind.LootPool:return resolvedLoot!=null&&inventory!=null&&inventory.TryAddItem(resolvedLoot.item,resolvedLoot.amount);
+            case DungeonOutcomeKind.Karma:return stats.ModifyKarma(source.amount,false);
+            case DungeonOutcomeKind.Benedetto:return stats.ModifyBenedetto(source.amount,false);
+            case DungeonOutcomeKind.Malefico:return stats.ModifyMalefico(source.amount,false);
+            case DungeonOutcomeKind.StoryFlag:return stats.SetStoryFlag(source.id,false);
+            case DungeonOutcomeKind.Heal:stats.RestoreHealth(source.amount);return true;
+            case DungeonOutcomeKind.RestoreFlasks:stats.RestoreFlasks(source.amount);return true;
+            case DungeonOutcomeKind.MagicRecipe:return stats.UnlockMagicRecipe(source.id,false);
+            default:return false;
+        }
+    }
+}
 [Serializable] public sealed class DungeonOutcome
 {
     public DungeonOutcomeKind kind; public RunModifierDefinition modifier; public ItemData item; public LootPoolDefinition lootPool; public string id; public int amount=1;
-    public bool CanApply(PlayerStats stats,System.Random random)
+    public bool TryResolve(PlayerStats stats,System.Random random,out DungeonResolvedOutcome resolved)
     {
-        if(stats==null)return false;PlayerInventory inventory=stats.GetComponent<PlayerInventory>();switch(kind){case DungeonOutcomeKind.RunModifier:return RunModifierController.Active!=null&&RunModifierController.Active.CanAdd(modifier);case DungeonOutcomeKind.Item:return item!=null&&inventory!=null&&inventory.CanAddItem(item,Mathf.Max(1,amount));case DungeonOutcomeKind.LootPool:LootPoolDefinition.Entry entry=lootPool!=null?lootPool.Pick(random):null;return entry!=null&&entry.item!=null&&inventory!=null&&inventory.CanAddItem(entry.item,entry.amount);case DungeonOutcomeKind.StoryFlag:return !string.IsNullOrWhiteSpace(id);case DungeonOutcomeKind.MagicRecipe:return !string.IsNullOrWhiteSpace(id)&&!stats.IsMagicRecipeUnlocked(id);default:return true;}
+        resolved=null;if(stats==null)return false;PlayerInventory inventory=stats.GetComponent<PlayerInventory>();var candidate=new DungeonResolvedOutcome{source=this};
+        switch(kind)
+        {
+            case DungeonOutcomeKind.RunModifier:if(RunModifierController.Active==null||!RunModifierController.Active.CanAdd(modifier))return false;break;
+            case DungeonOutcomeKind.Item:if(item==null||inventory==null||!inventory.CanAddItem(item,Mathf.Max(1,amount)))return false;break;
+            case DungeonOutcomeKind.LootPool:candidate.resolvedLoot=lootPool!=null?lootPool.Pick(random,stats):null;if(candidate.resolvedLoot==null||inventory==null||!inventory.CanAddItem(candidate.resolvedLoot.item,candidate.resolvedLoot.amount))return false;break;
+            case DungeonOutcomeKind.StoryFlag:if(string.IsNullOrWhiteSpace(id))return false;break;
+            case DungeonOutcomeKind.MagicRecipe:if(string.IsNullOrWhiteSpace(id)||stats.IsMagicRecipeUnlocked(id))return false;break;
+        }
+        resolved=candidate;return true;
     }
+    public bool CanApply(PlayerStats stats,System.Random random)=>TryResolve(stats,random,out _);
     public void Apply(PlayerStats stats,System.Random random)
     {
-        if(stats==null)return;switch(kind){case DungeonOutcomeKind.RunModifier:RunModifierController.Active?.Add(modifier);break;case DungeonOutcomeKind.Item:stats.GetComponent<PlayerInventory>()?.TryAddItem(item,Mathf.Max(1,amount));break;case DungeonOutcomeKind.LootPool:LootPoolDefinition.Entry entry=lootPool!=null?lootPool.Pick(random):null;if(entry!=null)stats.GetComponent<PlayerInventory>()?.TryAddItem(entry.item,entry.amount);break;case DungeonOutcomeKind.Karma:stats.ModifyKarma(amount,false);break;case DungeonOutcomeKind.Benedetto:stats.ModifyBenedetto(amount,false);break;case DungeonOutcomeKind.Malefico:stats.ModifyMalefico(amount,false);break;case DungeonOutcomeKind.StoryFlag:stats.SetStoryFlag(id,false);break;case DungeonOutcomeKind.Heal:stats.RestoreHealth(amount);break;case DungeonOutcomeKind.RestoreFlasks:stats.RestoreFlasks(amount);break;case DungeonOutcomeKind.MagicRecipe:stats.UnlockMagicRecipe(id,false);break;}
+        if(TryResolve(stats,random,out DungeonResolvedOutcome resolved))resolved.Apply(stats);
     }
+}
+
+public static class DungeonOutcomeResolution
+{
+    public static bool TryResolveAll(IReadOnlyList<DungeonOutcome> outcomes,PlayerStats stats,Func<int,System.Random> randomForIndex,out List<DungeonResolvedOutcome> resolved)
+    {
+        resolved=new List<DungeonResolvedOutcome>();if(outcomes==null)return true;
+        for(int i=0;i<outcomes.Count;i++)if(outcomes[i]!=null){if(!outcomes[i].TryResolve(stats,randomForIndex(i),out DungeonResolvedOutcome entry))return false;resolved.Add(entry);}return true;
+    }
+    public static bool ApplyAll(IReadOnlyList<DungeonResolvedOutcome> resolved,PlayerStats stats)
+    {if(resolved==null)return true;foreach(DungeonResolvedOutcome entry in resolved)if(entry==null||!entry.Apply(stats))return false;return true;}
 }
