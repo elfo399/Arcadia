@@ -14,19 +14,24 @@ public enum DungeonRequirementKind { None, Coins, Strength, Dexterity, Intellige
 /// <summary>Author a secret or internal area inside a physical room; it never creates a dungeon graph cell.</summary>
 public sealed class DungeonSecretAccess : MonoBehaviour, IInteractable
 {
-    [SerializeField] private string interactionId="secret"; [SerializeField] private GameObject openedArea; [SerializeField] private DungeonRequirement requirement; [SerializeField] private bool oneShot=true; [SerializeField] private string prompt="Open secret";
+    [SerializeField] private string interactionId; [SerializeField] private GameObject openedArea; [SerializeField] private DungeonRequirement requirement; [SerializeField] private bool oneShot=true; [SerializeField] private string prompt="Open secret";
     private Room room; private SavedDungeonRuleState state;
     private void Start(){room=GetComponentInParent<Room>(); if(room==null)return; state=room.GetExternalState("interaction:"+interactionId); if(state.completed&&openedArea)openedArea.SetActive(true);}
     public void Interact(GameObject player){if(room==null)return; var stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance; if(oneShot&&state.completed || requirement!=null&&!requirement.TryConsume(stats))return; if(openedArea)openedArea.SetActive(true); state.completed=true; room.SaveExternalState(state);}
     public string GetPrompt()=>state!=null&&state.completed&&oneShot?string.Empty:prompt;
+#if UNITY_EDITOR
+    private void OnValidate(){if(string.IsNullOrWhiteSpace(interactionId)){interactionId="secret-"+Guid.NewGuid().ToString("N");UnityEditor.EditorUtility.SetDirty(this);}}
+#endif
 }
 
 public sealed class ShrineInteraction : MonoBehaviour, IInteractable
 {
-    [SerializeField] private string shrineId="shrine"; [SerializeField] private string family="Faith"; [SerializeField] private RunModifierDefinition modifier; [SerializeField] private DungeonRequirement requirement; [SerializeField] private int coinCost; [SerializeField] private bool oneShot=true; [SerializeField] private string prompt="Pray";
+    [SerializeField] private string shrineId; [SerializeField] private string family="Faith"; [SerializeField] private RunModifierDefinition modifier; [SerializeField] private DungeonRequirement requirement; [SerializeField] private int coinCost; [SerializeField] private bool oneShot=true; [SerializeField] private string prompt="Pray";
     private Room room; private SavedDungeonRuleState state;
     private void Start(){room=GetComponentInParent<Room>();if(room!=null)state=room.GetExternalState("shrine:"+shrineId);}
     public void Interact(GameObject player){var stats=player!=null?player.GetComponentInParent<PlayerStats>():PlayerStats.instance;if(room==null||stats==null||(oneShot&&state.completed)||(requirement!=null&&!requirement.IsMet(stats))||(coinCost>0&&!stats.HasCoins(coinCost))||RunModifierController.Active==null||!RunModifierController.Active.Add(modifier))return;if(coinCost>0)stats.TryRemoveCoins(coinCost,false);state.completed=true;room.SaveExternalState(state);}
     public string GetPrompt()=>state!=null&&state.completed&&oneShot?string.Empty:prompt;
-    private void OnValidate(){if(string.IsNullOrWhiteSpace(family))Debug.LogWarning("[Shrine] A family is required.",this);}
+#if UNITY_EDITOR
+    private void OnValidate(){if(string.IsNullOrWhiteSpace(shrineId)){shrineId="shrine-"+Guid.NewGuid().ToString("N");UnityEditor.EditorUtility.SetDirty(this);}if(string.IsNullOrWhiteSpace(family))Debug.LogWarning("[Shrine] A family is required.",this);}
+#endif
 }

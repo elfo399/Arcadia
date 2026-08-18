@@ -5,6 +5,9 @@ using UnityEngine;
 /// <summary>Deterministic, authored-pedestal reward choices. It never auto-selects an offer.</summary>
 public sealed class RoomRewardRule : RoomRule
 {
+    [Tooltip("Only enable when taking the configured number of rewards must complete the room.")]
+    [SerializeField] private bool blocksUntilClaimed;
+    public override bool BlocksRoomCompletion => blocksUntilClaimed;
     [SerializeField] private LootPoolDefinition lootPool;
     [SerializeField,Min(1)] private int generatedChoices=1;
     [SerializeField,Min(1)] private int maxClaims=1;
@@ -13,7 +16,7 @@ public sealed class RoomRewardRule : RoomRule
     [SerializeField] private bool requiresRuleSuccess;
     private LootPoolDefinition.Entry[] offers; private readonly HashSet<int> claimed=new HashSet<int>(); private DungeonRewardOfferAnchor[] anchors;
     protected override void OnRoomInitialized(){BuildOffers();anchors=GetComponentsInChildren<DungeonRewardOfferAnchor>(true);BindAnchors();}
-    protected override void OnStateRestored(string payload){if(!string.IsNullOrWhiteSpace(payload))foreach(string token in payload.Split(','))if(int.TryParse(token,out int index))claimed.Add(index);BindAnchors();if(completeAfterClaims&&claimed.Count>=maxClaims)Complete();}
+    protected override void OnStateRestored(string payload){if(!string.IsNullOrWhiteSpace(payload))foreach(string token in payload.Split(','))if(int.TryParse(token,out int index))claimed.Add(index);BindAnchors();if((completeAfterClaims||blocksUntilClaimed)&&claimed.Count>=maxClaims)Complete();}
     protected override string CaptureState(){var indices=new List<int>(claimed);indices.Sort();return string.Join(",",indices);}
     private void BuildOffers(){if(lootPool==null)return;offers=new LootPoolDefinition.Entry[Mathf.Max(1,generatedChoices)];var random=Context.CreateRandom(RuleId+":offers");for(int i=0;i<offers.Length;i++)offers[i]=lootPool.Pick(random);}
     private bool IsAvailable(){if(!requiresRuleSuccess)return true;RoomRule source=Context.Room.GetRule(requiredRuleId);return source!=null&&source.Outcome==RoomRuleOutcome.Succeeded;}
@@ -24,11 +27,11 @@ public sealed class RoomRewardRule : RoomRule
     internal void TryClaim(int index,GameObject player)
     {
         if(!IsAvailable()||offers==null||index<0||index>=offers.Length||claimed.Contains(index)||claimed.Count>=maxClaims)return;var offer=offers[index];PlayerInventory inventory=player!=null?player.GetComponentInParent<PlayerInventory>():null;if(offer==null||offer.item==null||inventory==null||!inventory.TryAddItem(offer.item,offer.amount))return;
-        claimed.Add(index);Context.State.rewardClaimed=true;if(completeAfterClaims&&claimed.Count>=maxClaims)Complete();BindAnchors();Context.Room.NotifyRuleChanged(this);
+        claimed.Add(index);Context.State.rewardClaimed=true;if((completeAfterClaims||blocksUntilClaimed)&&claimed.Count>=maxClaims)Complete();BindAnchors();Context.Room.NotifyRuleChanged(this);
     }
     public override void OnRuleChanged(RoomRule rule){if(requiresRuleSuccess&&rule!=null&&rule.RuleId==requiredRuleId)BindAnchors();}
 #if UNITY_EDITOR
-    protected override void OnValidate(){base.OnValidate();if(maxClaims>generatedChoices)maxClaims=generatedChoices;if(lootPool==null)Debug.LogWarning($"[RoomRewardRule] '{name}' has no LootPool.",this);}
+    protected override void OnValidate(){base.OnValidate();if(maxClaims>generatedChoices)maxClaims=generatedChoices;if(blocksUntilClaimed)completeAfterClaims=true;if(lootPool==null)Debug.LogWarning($"[RoomRewardRule] '{name}' has no LootPool.",this);}
 #endif
 }
 

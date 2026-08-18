@@ -7,6 +7,7 @@ public enum DungeonChallengeMode { Gauntlet, TimedKill, PerfectCombat }
 /// <summary>Voluntary encounter rule. Failure ends the encounter without corrupting persistent room state.</summary>
 public sealed class ChallengeRoomRule : RoomRule, IInteractable
 {
+    public override bool BlocksRoomCompletion => true;
     [SerializeField] private DungeonChallengeMode mode;
     [SerializeField] private List<DungeonWaveDefinition> waves = new List<DungeonWaveDefinition>();
     [SerializeField, Min(1f)] private float timeLimitSeconds = 30f;
@@ -31,7 +32,8 @@ public sealed class ChallengeRoomRule : RoomRule, IInteractable
     private void Update() { if(active && mode==DungeonChallengeMode.TimedKill && (remaining-=Time.deltaTime)<=0f) EndFailure(); }
     public override void OnEnemyDied(GameObject enemy,string ownerId) { if(active&&ownerId==RuleId&&Context.Room.GetEncounterEnemyCount(RuleId)==0) StartNextWave(); }
     private void HandlePlayerDamage(float amount) { if(active && mode==DungeonChallengeMode.PerfectCombat && amount>0f) EndFailure(); }
-    private void EndFailure() { if(!active)return; active=false; Context.Room.ClearEncounter(RuleId); if(allowRetry)ResetFailedAttempt(); else Fail(); }
-    protected override void OnStateRestored(string payload) { active=false; waveIndex=-1; remaining=timeLimitSeconds; }
+    private void EndFailure() { if(!active)return; if(allowRetry){ResetAttempt();ResetFailedAttempt();}else{active=false;Context.Room.ClearEncounter(RuleId);Fail();} }
+    protected override void OnStateRestored(string payload) { ResetAttempt(); }
     protected override string CaptureState() => IsCompleted ? "success" : IsFailed ? "failed" : string.Empty;
+    private void ResetAttempt(){active=false;waveIndex=-1;remaining=timeLimitSeconds;Context?.Room.ClearEncounter(RuleId);Context?.Room.ReleaseDoorLock(RuleId);}
 }

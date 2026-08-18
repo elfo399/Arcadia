@@ -19,7 +19,9 @@ public static class DungeonIdentityTools
         foreach(string guid in AssetDatabase.FindAssets("t:Prefab"))
         {
             string path=AssetDatabase.GUIDToAssetPath(guid);GameObject root=PrefabUtility.LoadPrefabContents(path);Room room=root.GetComponent<Room>();if(room==null){PrefabUtility.UnloadPrefabContents(root);continue;}
-            var seen=new HashSet<string>(StringComparer.Ordinal);bool dirty=false;foreach(RoomRule rule in root.GetComponents<RoomRule>()){if(string.IsNullOrWhiteSpace(rule.RuleId)||!seen.Add(rule.RuleId)){rule.SetEditorRuleId("rule-"+Guid.NewGuid().ToString("N"));seen.Add(rule.RuleId);dirty=true;changed++;}}
+            var seen=new HashSet<string>(StringComparer.Ordinal);bool dirty=false;foreach(RoomRule rule in root.GetComponentsInChildren<RoomRule>(true)){if(string.IsNullOrWhiteSpace(rule.RuleId)||!seen.Add(rule.RuleId)){rule.SetEditorRuleId("rule-"+Guid.NewGuid().ToString("N"));seen.Add(rule.RuleId);dirty=true;changed++;}}
+            bool legacySpecial=room.roomData!=null&&!room.roomData.isStartRoom&&(room.roomData.isShopRoom||room.roomData.isTreasureRoom||room.roomData.isBlessedRoom||room.roomData.isEvilRoom);
+            if(legacySpecial)foreach(InteractableDoor door in root.GetComponentsInChildren<InteractableDoor>(true)){door.SetLegacyWholeRoomUnlockForMigration(true);dirty=true;}
             if(dirty)PrefabUtility.SaveAsPrefabAsset(root,path);PrefabUtility.UnloadPrefabContents(root);
         }
         if(changed>0)AssetDatabase.SaveAssets();Debug.Log($"[Dungeon IDs] complete; generated/repaired {changed} IDs.");

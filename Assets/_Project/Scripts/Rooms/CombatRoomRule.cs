@@ -3,6 +3,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class CombatRoomRule : RoomRule
 {
+    public override bool BlocksRoomCompletion => true;
     [SerializeField] private bool startOnPlayerEntry = true;
     private bool started;
     protected override void OnStateRestored(string payload) { started = false; } // unfinished encounters deliberately restart

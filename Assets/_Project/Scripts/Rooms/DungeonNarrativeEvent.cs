@@ -5,7 +5,7 @@ public enum DungeonOccurrencePolicy { Repeatable, OncePerRun, OncePerSave }
 /// <summary>Small reusable event hook for authored NPCs, props, risk/reward and sacrifice interactions.</summary>
 public sealed class DungeonNarrativeEvent : MonoBehaviour, IInteractable
 {
-    [SerializeField] private string eventId="event";
+    [SerializeField] private string eventId;
     [SerializeField] private DungeonOccurrencePolicy occurrence= DungeonOccurrencePolicy.OncePerRun;
     [SerializeField] private DungeonRequirement requirement;
     [SerializeField] private int coinCost;
@@ -28,4 +28,7 @@ public sealed class DungeonNarrativeEvent : MonoBehaviour, IInteractable
     private bool CanOccur(PlayerStats stats)
     { if(occurrence==DungeonOccurrencePolicy.Repeatable)return true; if(occurrence==DungeonOccurrencePolicy.OncePerSave)return !stats.HasStoryFlag(SaveFlag); return DungeonRunStateController.Active==null ? state==null||!state.completed : !DungeonRunStateController.Active.HasConsumedOncePerRun(eventId); }
     public string GetPrompt(){if(occurrence==DungeonOccurrencePolicy.OncePerRun&&DungeonRunStateController.Active!=null&&DungeonRunStateController.Active.HasConsumedOncePerRun(eventId))return string.Empty;return state!=null&&state.completed&&occurrence!=DungeonOccurrencePolicy.Repeatable?string.Empty:prompt;}
+#if UNITY_EDITOR
+    private void OnValidate(){if(string.IsNullOrWhiteSpace(eventId)){eventId="event-"+System.Guid.NewGuid().ToString("N");UnityEditor.EditorUtility.SetDirty(this);}}
+#endif
 }

@@ -7,6 +7,7 @@ using UnityEngine;
 /// <summary>Ordered authored-spawn-point encounter. Each interrupted wave restarts from wave zero after loading.</summary>
 public sealed class WaveRoomRule : RoomRule
 {
+    public override bool BlocksRoomCompletion => true;
     [SerializeField] private List<DungeonWaveDefinition> waves = new List<DungeonWaveDefinition>();
     [SerializeField] private bool startOnPlayerEntry = true;
     private int currentWave = -1;

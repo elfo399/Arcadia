@@ -12,7 +12,7 @@ public sealed class RoomRuleContext
 public abstract class RoomRule : MonoBehaviour
 {
     [SerializeField] private string ruleId;
-    [SerializeField] private bool blocksRoomCompletion=true;
+    [SerializeField] private bool blocksRoomCompletion;
     [SerializeField] private bool locksConnectedDoors;
     protected RoomRuleContext Context { get; private set; }
     public string RuleId=>string.IsNullOrWhiteSpace(ruleId)?GetType().Name:ruleId.Trim();

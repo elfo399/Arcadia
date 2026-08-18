@@ -3,9 +3,10 @@ using UnityEngine;
 /// <summary>Authored internal door. It never changes graph-door locks unless legacy mode is explicitly enabled.</summary>
 public class InteractableDoor : MonoBehaviour,IInteractable
 {
-    [SerializeField] private string doorId="internal-door";
+    [SerializeField] private string doorId;
     [SerializeField] private DungeonRequirement requirement;
-    [SerializeField] private bool legacyUnlockWholeRoom=true;
+    [Tooltip("Legacy entry-door compatibility only. New internal doors must leave this disabled.")]
+    [SerializeField] private bool legacyUnlockWholeRoom;
     [SerializeField] private GameObject openedVisual;
     [SerializeField] private string prompt="Open";
     private Room parentRoom; private SavedDungeonRuleState state;
@@ -18,4 +19,8 @@ public class InteractableDoor : MonoBehaviour,IInteractable
     }
     private void OpenVisual(){if(openedVisual)openedVisual.SetActive(true);gameObject.SetActive(false);}
     public string GetPrompt()=>state!=null&&state.completed?string.Empty:prompt;
+    public void SetLegacyWholeRoomUnlockForMigration(bool value){legacyUnlockWholeRoom=value;}
+#if UNITY_EDITOR
+    private void OnValidate(){if(string.IsNullOrWhiteSpace(doorId)){doorId="door-"+System.Guid.NewGuid().ToString("N");UnityEditor.EditorUtility.SetDirty(this);}}
+#endif
 }
