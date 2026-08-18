@@ -10,8 +10,6 @@ public class Room : MonoBehaviour
     [SerializeField] private string questTargetId; [SerializeField] private string questTargetTag;
     [Serializable] public struct DoorEntry{public string label;public Vector2Int gridOffset;public Vector2Int direction;public GameObject doorObject;public GameObject wallObject;public GameObject lockObject;[HideInInspector]public bool isConnected;}
     public List<DoorEntry> doors=new List<DoorEntry>();
-    [Tooltip("Legacy authored entry lock. It is not inferred from room category.")] public bool isLocked;
-    [Tooltip("Compatibility only: preserves old special-room key locks. Disable on newly authored unlocked special rooms.")] [SerializeField] private bool legacySpecialEntryLock=true;
     [HideInInspector] public bool roomCleared; [HideInInspector] public List<GameObject> activeEnemies=new List<GameObject>();
     public GameObject floorPortalPrefab; public GameObject preplacedFloorPortal; public Vector3 portalSpawnOffset; public float portalDistanceFromCenter=10f; public Transform playerSpawnPoint;
     public string RuntimeId{get;private set;} public Vector2Int GridAnchor{get;private set;} public Vector2Int GridSize{get;private set;}=Vector2Int.one; public int Floor{get;private set;} public string PlacementRole{get;private set;}
@@ -24,7 +22,7 @@ public class Room : MonoBehaviour
     private void InitializeRuntime()
     {
         if(initialized)return;initialized=true;if(string.IsNullOrWhiteSpace(RuntimeId))ConfigureGeneratedInstance(gameObject.name,Vector2Int.zero,roomData!=null?roomData.size:Vector2Int.one,0,internalRoomType);
-        state=DungeonRunStateController.Active!=null?DungeonRunStateController.Active.GetRoom(RuntimeId):new SavedDungeonRoomState{roomId=RuntimeId,rules=Array.Empty<SavedDungeonRuleState>()};context=new RoomRuleContext(this,state);if(legacySpecialEntryLock&&roomData!=null&&!roomData.isStartRoom&&(roomData.isShopRoom||roomData.isTreasureRoom||roomData.isBlessedRoom||roomData.isEvilRoom))isLocked=true;if(isLocked)doorLocks.Add("legacy-entry");
+        state=DungeonRunStateController.Active!=null?DungeonRunStateController.Active.GetRoom(RuntimeId):new SavedDungeonRoomState{roomId=RuntimeId,rules=Array.Empty<SavedDungeonRuleState>()};context=new RoomRuleContext(this,state);
         rules.AddRange(GetComponents<RoomRule>());
         bool hasEncounter=false;foreach(var rule in rules)if(rule is CombatRoomRule||rule is WaveRoomRule)hasEncounter=true;
         // Legacy spawners still get combat even when a reward/event rule is added.
@@ -36,9 +34,8 @@ public class Room : MonoBehaviour
         roomCleared=state.completed;if(roomCleared){RefreshDoors();TrySpawnFloorPortal();}else RefreshDoors();
     }
     public RoomRule GetRule(string id){foreach(var rule in rules)if(rule!=null&&string.Equals(rule.RuleId,id,StringComparison.Ordinal))return rule;return null;}
-    public bool CanOpenMenuHere()=>!isLocked&&!BattleActive&&AreConnectedDoorsOpen();
+    public bool CanOpenMenuHere()=>!BattleActive&&AreConnectedDoorsOpen();
     public void OpenDoor(Vector2Int relativePos,Vector2Int direction){for(int i=0;i<doors.Count;i++)if(doors[i].gridOffset==relativePos&&doors[i].direction==direction){var d=doors[i];d.isConnected=true;doors[i]=d;RefreshDoors();return;}}
-    public void UnlockSpecialRoom(){isLocked=false;ReleaseDoorLock("legacy-entry");}
     public void AcquireDoorLock(string reason){if(!string.IsNullOrWhiteSpace(reason)&&doorLocks.Add(reason))RefreshDoors();}
     public void ReleaseDoorLock(string reason){if(!string.IsNullOrWhiteSpace(reason)&&doorLocks.Remove(reason))RefreshDoors();}
     private void RefreshDoors(){bool locked=doorLocks.Count>0;foreach(var d in doors)if(d.isConnected){if(d.lockObject)d.lockObject.SetActive(locked);else if(d.wallObject)d.wallObject.SetActive(locked);if(d.doorObject)d.doorObject.SetActive(!locked);}}
@@ -56,7 +53,7 @@ public class Room : MonoBehaviour
     public void SaveExternalState(SavedDungeonRuleState external){Persist();}
     private void Persist(){if(state==null)return;state.visited|=PlayerHasEntered;state.completed=roomCleared;state.rules=ExportRules();DungeonRunStateController.Active?.MarkDirty();}
     private SavedDungeonRuleState[] ExportRules(){var data=new List<SavedDungeonRuleState>();var ids=new HashSet<string>();foreach(var r in rules)if(r!=null){data.Add(r.ExportState());ids.Add(r.RuleId);}if(state.rules!=null)foreach(var saved in state.rules)if(saved!=null&&!ids.Contains(saved.ruleId))data.Add(saved);return data.ToArray();}
-    private void OnTriggerEnter(Collider other){if(!other.CompareTag("Player"))return;CurrentPlayerRoom=this;if(PlayerHasEntered||isLocked)return;bool first=!state.visited;PlayerHasEntered=true;state.visited=true;state.revealed=true;QuestEvents.Raise(QuestObjectiveEventType.EnterRoom,ResolveQuestTargetId(),ResolveQuestTargetTag());foreach(var rule in rules)if(rule!=null)rule.OnPlayerEntered(first);EvaluateCompletion();Persist();}
+    private void OnTriggerEnter(Collider other){if(!other.CompareTag("Player"))return;CurrentPlayerRoom=this;if(PlayerHasEntered)return;bool first=!state.visited;PlayerHasEntered=true;state.visited=true;state.revealed=true;QuestEvents.Raise(QuestObjectiveEventType.EnterRoom,ResolveQuestTargetId(),ResolveQuestTargetTag());foreach(var rule in rules)if(rule!=null)rule.OnPlayerEntered(first);EvaluateCompletion();Persist();}
     private void OnTriggerStay(Collider other){if(other.CompareTag("Player"))CurrentPlayerRoom=this;}
     private void OnTriggerExit(Collider other){if(!other.CompareTag("Player"))return;if(CurrentPlayerRoom==this)CurrentPlayerRoom=null;foreach(var rule in rules)if(rule!=null)rule.OnPlayerExited();Persist();}
     private bool AreConnectedDoorsOpen(){foreach(var d in doors)if(d.isConnected&&((d.lockObject&&d.lockObject.activeInHierarchy)||(d.wallObject&&d.wallObject.activeInHierarchy)))return false;return true;}
