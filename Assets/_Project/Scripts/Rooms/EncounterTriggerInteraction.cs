@@ -29,8 +29,14 @@ public sealed class EncounterTriggerInteraction : MonoBehaviour, IInteractable
         if(requirements!=null)foreach(DungeonRequirement requirement in requirements)if(requirement!=null&&!requirement.IsMet(stats))return;
         ITriggeredRoomEncounter encounter=ResolveTarget();
         if(encounter==null||!encounter.CanStartFromTrigger()){Debug.LogError($"[EncounterTriggerInteraction] '{name}' target '{targetRuleId}' is missing, unavailable, or is not triggerable.",this);return;}
-        if(!DungeonCostTransaction.CanPay(costs,stats)||!DungeonCostTransaction.TryPay(costs,stats,out bool lethalPayment)||lethalPayment)return;
-        if(!encounter.TryStartFromTrigger())return;
+        if(!DungeonCostTransaction.CanPay(costs,stats)||!DungeonCostTransaction.TryPay(costs,stats,out DungeonCostTransaction.DungeonCostPayment payment,out bool lethalPayment)||lethalPayment)return;
+        if(!encounter.TryStartFromTrigger())
+        {
+            payment.Rollback();
+            Debug.LogError($"[EncounterTriggerInteraction] '{name}' target '{targetRuleId}' failed after payment; payment was rolled back.",this);
+            return;
+        }
+        payment.Commit();
         state.completed=true;room.SaveExternalState(state);Refresh();
     }
     public string GetPrompt()
@@ -49,7 +55,11 @@ public sealed class EncounterTriggerInteraction : MonoBehaviour, IInteractable
     private void OnValidate()
     {
         if(string.IsNullOrWhiteSpace(interactionId)){interactionId="encounter-trigger-"+Guid.NewGuid().ToString("N");UnityEditor.EditorUtility.SetDirty(this);}
-        if(string.IsNullOrWhiteSpace(targetRuleId))Debug.LogWarning($"[EncounterTriggerInteraction] '{name}' needs a target RoomRule ID.",this);
+        if(string.IsNullOrWhiteSpace(targetRuleId)){Debug.LogWarning($"[EncounterTriggerInteraction] '{name}' needs a target RoomRule ID.",this);return;}
+        Room prefabRoom=GetComponentInParent<Room>();if(prefabRoom==null)return;
+        RoomRule targetRule=null;foreach(RoomRule rule in prefabRoom.GetComponents<RoomRule>())if(rule!=null&&string.Equals(rule.RuleId,targetRuleId,StringComparison.Ordinal)){targetRule=rule;break;}
+        if(targetRule==null)Debug.LogWarning($"[EncounterTriggerInteraction] '{name}' targets rule '{targetRuleId}', but no RoomRule with that ID exists on '{prefabRoom.name}'.",this);
+        else if(!(targetRule is ITriggeredRoomEncounter))Debug.LogWarning($"[EncounterTriggerInteraction] '{name}' target '{targetRuleId}' is not an ITriggeredRoomEncounter.",this);
     }
 #endif
 }

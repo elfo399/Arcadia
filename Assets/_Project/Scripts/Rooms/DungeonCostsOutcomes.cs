@@ -16,14 +16,34 @@ public enum DungeonCostKind { Coins, Health, Flasks, InventoryItem }
 public static class DungeonCostTransaction
 {
     private sealed class Totals { public int coins; public int flasks; public float health; public bool healthMustRemainNonLethal; public readonly Dictionary<ItemData,int> items=new Dictionary<ItemData,int>(); }
+    /// <summary>Immediate-use receipt. It is intentionally not serializable or global.</summary>
+    public sealed class DungeonCostPayment
+    {
+        private readonly PlayerStats stats; private readonly PlayerInventory inventory; private int coins; private int flasks; private float health; private readonly List<KeyValuePair<ItemData,int>> items;
+        private bool committed; private bool rolledBack;
+        internal DungeonCostPayment(PlayerStats stats,PlayerInventory inventory,List<KeyValuePair<ItemData,int>> items){this.stats=stats;this.inventory=inventory;this.items=items;}
+        internal bool IsLethal { get; set; }
+        internal void MarkCoins(int amount){coins=amount;} internal void MarkFlasks(int amount){flasks=amount;} internal void MarkHealth(float amount){health=amount;}
+        public void Commit(){committed=true;}
+        public bool Rollback()
+        {
+            if(committed||rolledBack||IsLethal)return false;rolledBack=true;bool success=true;
+            for(int i=items.Count-1;i>=0;i--)if(inventory==null||!inventory.TryAddItem(items[i].Key,items[i].Value,false)){Debug.LogError("[DungeonCostPayment] Critical inventory rollback failure.");success=false;}
+            if(health>0f)stats.RestoreHealth(health);if(flasks>0)stats.RestoreFlasks(flasks);if(coins>0)stats.AddCoins(coins,false);return success;
+        }
+    }
     public static bool CanPay(IReadOnlyList<DungeonCost> costs,PlayerStats stats)=>BuildTotals(costs,stats,out _);
     public static bool TryPay(IReadOnlyList<DungeonCost> costs,PlayerStats stats)=>TryPay(costs,stats,out _);
     /// <summary>When lethalPayment is true, death/run failure owns the result and normal rewards must not be applied.</summary>
     public static bool TryPay(IReadOnlyList<DungeonCost> costs,PlayerStats stats,out bool lethalPayment)
     {
-        lethalPayment=false;if(!BuildTotals(costs,stats,out Totals totals))return false;PlayerInventory inventory=stats.GetComponent<PlayerInventory>();bool coinsPaid=false,flasksPaid=false;var removed=new List<KeyValuePair<ItemData,int>>();
-        if(totals.coins>0&&!stats.TryRemoveCoins(totals.coins,false))return false;coinsPaid=totals.coins>0;
-        if(totals.flasks>0&&!stats.TryConsumeFlasks(totals.flasks,false)){Rollback(stats,inventory,totals,coinsPaid,false,false,removed);return false;}flasksPaid=totals.flasks>0;
+        bool paid=TryPay(costs,stats,out DungeonCostPayment payment,out lethalPayment);if(paid&&!lethalPayment)payment?.Commit();return paid;
+    }
+    public static bool TryPay(IReadOnlyList<DungeonCost> costs,PlayerStats stats,out DungeonCostPayment payment,out bool lethalPayment)
+    {
+        payment=null;lethalPayment=false;if(!BuildTotals(costs,stats,out Totals totals))return false;PlayerInventory inventory=stats.GetComponent<PlayerInventory>();var removed=new List<KeyValuePair<ItemData,int>>();payment=new DungeonCostPayment(stats,inventory,removed);
+        if(totals.coins>0&&!stats.TryRemoveCoins(totals.coins,false)){payment=null;return false;}payment.MarkCoins(totals.coins);
+        if(totals.flasks>0&&!stats.TryConsumeFlasks(totals.flasks,false)){payment.Rollback();payment=null;return false;}payment.MarkFlasks(totals.flasks);
         foreach(var pair in totals.items)
         {
             int before=inventory.GetTotalItemAmount(pair.Key);
@@ -31,14 +51,14 @@ public static class DungeonCostTransaction
             {
                 int actuallyRemoved=Mathf.Max(0,before-inventory.GetTotalItemAmount(pair.Key));
                 if(actuallyRemoved>0)removed.Add(new KeyValuePair<ItemData,int>(pair.Key,actuallyRemoved));
-                Rollback(stats,inventory,totals,coinsPaid,flasksPaid,false,removed);return false;
+                payment.Rollback();payment=null;return false;
             }
             removed.Add(pair);
         }
         // Exact sacrifice is deliberately last: a lethal payment may immediately
         // enter run-failure flow, so no further resource mutation can follow it.
-        if(totals.health>0f&&!stats.TrySacrificeHealth(totals.health,!totals.healthMustRemainNonLethal,false)){Rollback(stats,inventory,totals,coinsPaid,flasksPaid,false,removed);return false;}
-        lethalPayment=totals.health>0f&&stats.currentHealth<=0f;
+        if(totals.health>0f&&!stats.TrySacrificeHealth(totals.health,!totals.healthMustRemainNonLethal,false)){payment.Rollback();payment=null;return false;}payment.MarkHealth(totals.health);
+        lethalPayment=totals.health>0f&&stats.currentHealth<=0f;payment.IsLethal=lethalPayment;
         return true;
     }
     /// <summary>Compatibility path for consuming legacy requirements.</summary>
