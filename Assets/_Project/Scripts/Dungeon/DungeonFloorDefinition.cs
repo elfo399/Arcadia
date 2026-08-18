@@ -32,6 +32,10 @@ public sealed class DungeonFloorDefinition : ScriptableObject
     public RoomCount bossRooms = new RoomCount { min = 1, max = 1 };
     public RoomCount curchRooms = new RoomCount { enabled = false };
     public RoomCount evilCurchRooms = new RoomCount { enabled = false };
+    [Tooltip("Generated SecretAccess rooms whose authored prefab contains a normal-secret discovery mechanism.")]
+    public RoomCount secretAccessSecretRooms = new RoomCount { enabled = false, min = 0, max = 0 };
+    [Tooltip("Generated SecretAccess rooms whose authored prefab contains a super-secret discovery mechanism.")]
+    public RoomCount secretAccessSuperSecretRooms = new RoomCount { enabled = false, min = 0, max = 0 };
     [Tooltip("Independent allows both authored moral room categories. AlignmentExclusive selects only the stronger alignment; ties spawn neither.")]
     public DungeonMoralRoomPolicy moralRoomPolicy = DungeonMoralRoomPolicy.Independent;
 
@@ -55,12 +59,14 @@ public sealed class DungeonFloorDefinition : ScriptableObject
             case "Boss": return bossRooms;
             case "Curch": return curchRooms;
             case "EvilCurch": return evilCurchRooms;
+            case "SecretAccess/Secret": return secretAccessSecretRooms;
+            case "SecretAccess/SuperSecret": return secretAccessSuperSecretRooms;
             default: return null;
         }
     }
 
     private void OnValidate()
     {
-        normalRooms?.Normalize(); shopRooms?.Normalize(); treasureRooms?.Normalize(); bossRooms?.Normalize(); curchRooms?.Normalize(); evilCurchRooms?.Normalize();
+        normalRooms?.Normalize(); shopRooms?.Normalize(); treasureRooms?.Normalize(); bossRooms?.Normalize(); curchRooms?.Normalize(); evilCurchRooms?.Normalize(); secretAccessSecretRooms?.Normalize(); secretAccessSuperSecretRooms?.Normalize();
     }
 }

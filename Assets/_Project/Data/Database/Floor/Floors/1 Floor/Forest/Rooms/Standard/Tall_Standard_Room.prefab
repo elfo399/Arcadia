@@ -604,7 +604,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   spawnTable: {fileID: 11400000, guid: 64d5bdd16cdc6e544bf31cbaf590adc9, type: 2}
-  spawnChance: 99
 --- !u!1 &1953106945190598228
 GameObject:
   m_ObjectHideFlags: 0
@@ -1576,6 +1575,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   roomData: {fileID: 11400000, guid: 92e7638eb8dd6cc49864466001b71cdf, type: 2}
   internalRoomType: Normal
+  questTargetId: 
+  questTargetTag: 
   doors:
   - label: North DX
     gridOffset: {x: 0, y: 1}
@@ -1583,6 +1584,7 @@ MonoBehaviour:
     doorObject: {fileID: 4468019011060315025}
     wallObject: {fileID: 4907858621689939227}
     lockObject: {fileID: 0}
+    authoredGate: {fileID: 0}
     isConnected: 0
   - label: South DX
     gridOffset: {x: 0, y: 0}
@@ -1590,6 +1592,7 @@ MonoBehaviour:
     doorObject: {fileID: 992268561662703808}
     wallObject: {fileID: 3060343329876996752}
     lockObject: {fileID: 0}
+    authoredGate: {fileID: 0}
     isConnected: 0
   - label: West_SX
     gridOffset: {x: 0, y: 0}
@@ -1597,6 +1600,7 @@ MonoBehaviour:
     doorObject: {fileID: 5692850843076534909}
     wallObject: {fileID: 4384561209117864248}
     lockObject: {fileID: 0}
+    authoredGate: {fileID: 0}
     isConnected: 0
   - label: West_DX
     gridOffset: {x: 0, y: 1}
@@ -1604,6 +1608,7 @@ MonoBehaviour:
     doorObject: {fileID: 6607862612952269542}
     wallObject: {fileID: 3458865883069993561}
     lockObject: {fileID: 0}
+    authoredGate: {fileID: 0}
     isConnected: 0
   - label: East_SX
     gridOffset: {x: 0, y: 0}
@@ -1611,6 +1616,7 @@ MonoBehaviour:
     doorObject: {fileID: 5254987993790537219}
     wallObject: {fileID: 3596602838662624233}
     lockObject: {fileID: 0}
+    authoredGate: {fileID: 0}
     isConnected: 0
   - label: East_DX
     gridOffset: {x: 0, y: 1}
@@ -1618,13 +1624,15 @@ MonoBehaviour:
     doorObject: {fileID: 1953106945190598228}
     wallObject: {fileID: 7517478782434005477}
     lockObject: {fileID: 0}
+    authoredGate: {fileID: 0}
     isConnected: 0
-  isLocked: 0
   roomCleared: 0
   activeEnemies: []
-  coinPrefab: {fileID: 0}
-  minCoins: 2
-  maxCoins: 5
+  floorPortalPrefab: {fileID: 0}
+  preplacedFloorPortal: {fileID: 0}
+  portalSpawnOffset: {x: 0, y: 0, z: 0}
+  portalDistanceFromCenter: 10
+  playerSpawnPoint: {fileID: 0}
 --- !u!65 &-8682136029178512985
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -2740,7 +2748,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   spawnTable: {fileID: 11400000, guid: 64d5bdd16cdc6e544bf31cbaf590adc9, type: 2}
-  spawnChance: 99
 --- !u!1 &7517478782434005477
 GameObject:
   m_ObjectHideFlags: 0

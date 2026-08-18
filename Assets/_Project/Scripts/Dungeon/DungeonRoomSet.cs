@@ -37,4 +37,16 @@ public class DungeonRoomSet : ScriptableObject
     [Header("Evil Curch")]
     public Room[] evilCurch1x1Variants;
     public Room[] evilCurch2x2Variants;
+
+    [Header("Secret Access / Secret")]
+    public Room[] secretAccessSecret1x1Variants;
+    public Room[] secretAccessSecret2x1Variants;
+    public Room[] secretAccessSecret1x2Variants;
+    public Room[] secretAccessSecret2x2Variants;
+
+    [Header("Secret Access / Super Secret")]
+    public Room[] secretAccessSuperSecret1x1Variants;
+    public Room[] secretAccessSuperSecret2x1Variants;
+    public Room[] secretAccessSuperSecret1x2Variants;
+    public Room[] secretAccessSuperSecret2x2Variants;
 }
