@@ -18,6 +18,8 @@ public class SceneLoader : MonoBehaviour
             }
             else
             {
+                if (string.Equals(sceneToLoad, "HubScene", System.StringComparison.OrdinalIgnoreCase))
+                    PlayerStats.instance?.EndDungeonRun(DungeonRunEndReason.VoluntaryExit);
                 // Carica la scena del gioco. 
                 // "Single" significa che chiude questa e apre l'altra.
                 SceneManager.LoadScene(sceneToLoad, LoadSceneMode.Single);

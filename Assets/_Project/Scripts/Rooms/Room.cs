@@ -8,7 +8,7 @@ public class Room : MonoBehaviour
     public static Room CurrentPlayerRoom { get; private set; }
     [Header("Definition")] public RoomData roomData; [HideInInspector] public string internalRoomType="Normal";
     [SerializeField] private string questTargetId; [SerializeField] private string questTargetTag;
-    [Serializable] public struct DoorEntry{public string label;public Vector2Int gridOffset;public Vector2Int direction;public GameObject doorObject;public GameObject wallObject;public GameObject lockObject;[HideInInspector]public bool isConnected;}
+    [Serializable] public struct DoorEntry{public string label;public Vector2Int gridOffset;public Vector2Int direction;public GameObject doorObject;public GameObject wallObject;public GameObject lockObject;[Tooltip("Optional authored gameplay gate for this graph socket. It is independent from encounter locks.")]public InteractableDoor authoredGate;[HideInInspector]public bool isConnected;}
     public List<DoorEntry> doors=new List<DoorEntry>();
     [HideInInspector] public bool roomCleared; [HideInInspector] public List<GameObject> activeEnemies=new List<GameObject>();
     public GameObject floorPortalPrefab; public GameObject preplacedFloorPortal; public Vector3 portalSpawnOffset; public float portalDistanceFromCenter=10f; public Transform playerSpawnPoint;
@@ -38,7 +38,36 @@ public class Room : MonoBehaviour
     public void OpenDoor(Vector2Int relativePos,Vector2Int direction){for(int i=0;i<doors.Count;i++)if(doors[i].gridOffset==relativePos&&doors[i].direction==direction){var d=doors[i];d.isConnected=true;doors[i]=d;RefreshDoors();return;}}
     public void AcquireDoorLock(string reason){if(!string.IsNullOrWhiteSpace(reason)&&doorLocks.Add(reason))RefreshDoors();}
     public void ReleaseDoorLock(string reason){if(!string.IsNullOrWhiteSpace(reason)&&doorLocks.Remove(reason))RefreshDoors();}
-    private void RefreshDoors(){bool locked=doorLocks.Count>0;foreach(var d in doors)if(d.isConnected){if(d.lockObject)d.lockObject.SetActive(locked);else if(d.wallObject)d.wallObject.SetActive(locked);if(d.doorObject)d.doorObject.SetActive(!locked);}}
+    private void RefreshDoors()
+    {
+        bool encounterLocked=doorLocks.Count>0;
+        foreach(var d in doors)
+        {
+            if(!d.isConnected)
+            {
+                if(d.wallObject)d.wallObject.SetActive(true);
+                if(d.doorObject)d.doorObject.SetActive(false);
+                if(d.lockObject)d.lockObject.SetActive(false);
+                ResolveAuthoredGate(d)?.SetSocketConnection(GetSocketGateId(d),false);
+                continue;
+            }
+
+            if(d.wallObject)d.wallObject.SetActive(false);
+            if(d.doorObject)d.doorObject.SetActive(!encounterLocked);
+            InteractableDoor gate=ResolveAuthoredGate(d);
+            if(gate!=null)
+            {
+                // The gate owns its visual/collider state. Never use the graph lockObject
+                // to erase it simply because combat is not active.
+                gate.SetSocketConnection(GetSocketGateId(d),true);
+                gate.SetEncounterBlocked(encounterLocked);
+            }
+            else if(d.lockObject)d.lockObject.SetActive(encounterLocked);
+            else if(d.wallObject)d.wallObject.SetActive(encounterLocked);
+        }
+    }
+    private static InteractableDoor ResolveAuthoredGate(DoorEntry entry)=>entry.authoredGate!=null?entry.authoredGate:entry.lockObject!=null?entry.lockObject.GetComponent<InteractableDoor>():null;
+    private static string GetSocketGateId(DoorEntry entry)=>$"entry-{entry.label}-{entry.gridOffset.x}-{entry.gridOffset.y}-{entry.direction.x}-{entry.direction.y}";
     public void RegisterEnemy(GameObject enemy,string ownerId="legacy")
     {if(enemy==null)return;ownerId=ownerId=="legacy"?legacyEncounterOwner:ownerId;if(!activeEnemies.Contains(enemy))activeEnemies.Add(enemy);if(!encounterEnemies.TryGetValue(ownerId??"legacy",out var list)){list=new List<GameObject>();encounterEnemies[ownerId??"legacy"]=list;}if(!list.Contains(enemy))list.Add(enemy);enemy.SetActive(false);}
     public void AdoptEncounter(string oldOwner,string newOwner){if(oldOwner=="legacy")legacyEncounterOwner=newOwner;if(encounterEnemies.TryGetValue(oldOwner,out var list)){encounterEnemies.Remove(oldOwner);if(!encounterEnemies.TryGetValue(newOwner,out var target)){target=new List<GameObject>();encounterEnemies[newOwner]=target;}target.AddRange(list);}}

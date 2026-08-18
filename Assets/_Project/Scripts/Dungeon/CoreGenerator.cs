@@ -83,6 +83,8 @@ public class CoreGenerator : MonoBehaviour
     private System.Random prng;
     private PlayerStats playerStats;
     private bool savedCheckpointApplied;
+    private bool resumingSavedRun;
+    private SavedDungeonRunState resumeRunState;
     private DungeonThemeDefinition activeThemeDefinition;
     private DungeonRoomSet activeRoomSet;
     private DungeonFloorDefinition activeFloorDefinition;
@@ -130,6 +132,14 @@ public class CoreGenerator : MonoBehaviour
     {
         CachePlayerStats();
         ApplySavedCheckpointIfAvailable();
+        if (!resumingSavedRun)
+        {
+            currentFloor = 1;
+            gameSeedString = string.Empty;
+            useRandomSeed = true;
+            pendingThemeOverrideId = null;
+            playerStats?.BeginNewDungeonRun();
+        }
         Generate();
     }
     
@@ -160,10 +170,19 @@ public class CoreGenerator : MonoBehaviour
         if (savedCheckpointApplied)
             return;
 
-        if (playerStats == null || !playerStats.TryGetDungeonCheckpoint(out int savedFloor, out string savedSeed))
+        if (playerStats == null || !playerStats.HasActiveDungeonCheckpoint)
             return;
 
+        if (!playerStats.TryGetDungeonResumeCheckpoint(out int savedFloor, out string savedSeed, out SavedDungeonRunState savedRun))
+        {
+            Debug.LogWarning("[DungeonLifecycle] Discarded invalid dungeon resume checkpoint; starting a new run.");
+            playerStats.ClearDungeonResumeState(save: true);
+            return;
+        }
+
         savedCheckpointApplied = true;
+        resumingSavedRun = true;
+        resumeRunState = savedRun;
         currentFloor = Mathf.Clamp(savedFloor, 1, Mathf.Max(1, maxFloors));
         if (!string.IsNullOrWhiteSpace(savedSeed))
         {
@@ -171,7 +190,7 @@ public class CoreGenerator : MonoBehaviour
             useRandomSeed = false;
         }
 
-        Debug.Log($"[CoreGenerator] Ripristino checkpoint: piano {currentFloor}, seed '{gameSeedString}'.");
+        Debug.Log($"[DungeonLifecycle] Resume run seed '{gameSeedString}' floor {currentFloor}.");
     }
 
     public void Generate()
@@ -190,8 +209,7 @@ public class CoreGenerator : MonoBehaviour
         if (showRngLogs) Debug.Log($"[CoreGenerator] Seed per piano {currentFloor}: '{floorSeedString}' -> Hash: {currentMasterSeed}");
 
         if (runStateController == null) runStateController = GetComponent<DungeonRunStateController>();
-        SavedDungeonRunState savedRun = !runStateController.IsInitialized && playerStats != null && playerStats.LoadedDataSnapshot != null
-            ? playerStats.LoadedDataSnapshot.dungeonRun : null;
+        SavedDungeonRunState savedRun = !runStateController.IsInitialized && resumingSavedRun ? resumeRunState : null;
         runStateController.InitializeFromSave(gameSeedString, currentFloor, savedRun);
         RunModifierController.Active?.RestoreFromRunState();
 
@@ -239,6 +257,8 @@ public class CoreGenerator : MonoBehaviour
             if (navMeshSurface != null) navMeshSurface.BuildNavMesh();
             InitializeMinimap();
             RespawnPlayerAtStart();
+            playerStats?.SaveDungeonResumeCheckpoint(currentFloor, gameSeedString);
+            playerStats?.SaveStatsImmediate();
             FloorGenerated?.Invoke(currentFloor);
         }
         else

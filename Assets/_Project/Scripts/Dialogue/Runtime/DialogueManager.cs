@@ -240,6 +240,9 @@ public sealed class DialogueManager : MonoBehaviour
             return false;
         }
 
+        if (string.Equals(requestedScene, "HubScene", StringComparison.OrdinalIgnoreCase))
+            PlayerStats.instance?.EndDungeonRun(DungeonRunEndReason.VoluntaryExit);
+
         StartCoroutine(LoadSceneAndTeleport(playerTransform, requestedScene, targetId, useTargetRotation));
         CloseDialogue(runCurrentExitActions: false);
         return true;

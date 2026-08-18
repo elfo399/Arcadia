@@ -22,6 +22,10 @@ public class PlayerClassSelectionButton : MonoBehaviour
             PlayerClassBootstrapper.ApplyToCurrentPlayer();
 
         if (!string.IsNullOrWhiteSpace(sceneToLoadAfterSelect))
+        {
+            if (string.Equals(sceneToLoadAfterSelect, "HubScene", System.StringComparison.OrdinalIgnoreCase))
+                PlayerStats.instance?.EndDungeonRun(DungeonRunEndReason.VoluntaryExit);
             SceneManager.LoadScene(sceneToLoadAfterSelect);
+        }
     }
 }

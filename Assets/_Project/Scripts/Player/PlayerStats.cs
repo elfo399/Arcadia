@@ -5,6 +5,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
+public enum DungeonRunEndReason { Completed, Death, VoluntaryExit }
+
 public class PlayerStats : MonoBehaviour, IDamageable
 {
     public static event System.Action<float> DamageTaken;
@@ -671,9 +673,36 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public void SetDungeonCheckpoint(int floor, string seed)
     {
+        SaveDungeonResumeCheckpoint(floor, seed);
+    }
+
+    /// <summary>Marks the currently active dungeon as resumable after an application quit.</summary>
+    public void SaveDungeonResumeCheckpoint(int floor, string seed)
+    {
+        if (string.IsNullOrWhiteSpace(seed))
+        {
+            Debug.LogWarning("[DungeonLifecycle] Refused resume checkpoint with an empty seed.");
+            ClearDungeonResumeState(save: false);
+            return;
+        }
         dungeonCheckpointActive = true;
         dungeonCheckpointFloor = Mathf.Max(1, floor);
-        dungeonCheckpointSeed = seed ?? string.Empty;
+        dungeonCheckpointSeed = seed.Trim();
+    }
+
+    /// <summary>Starts a fresh dungeon session. It never changes inventory or permanent progression.</summary>
+    public void BeginNewDungeonRun()
+    {
+        ClearDungeonResumeState(save: false);
+        Debug.Log("[DungeonLifecycle] Begin NEW run.");
+    }
+
+    public bool TryGetDungeonResumeCheckpoint(out int floor, out string seed, out SavedDungeonRunState run)
+    {
+        floor = Mathf.Max(1, dungeonCheckpointFloor);
+        seed = dungeonCheckpointSeed ?? string.Empty;
+        run = loadedDataCache != null ? loadedDataCache.dungeonRun : null;
+        return dungeonCheckpointActive && IsValidDungeonResumeData(floor, seed, run);
     }
 
     public bool TryGetDungeonCheckpoint(out int floor, out string seed)
@@ -688,6 +717,30 @@ public class PlayerStats : MonoBehaviour, IDamageable
         dungeonCheckpointActive = false;
         dungeonCheckpointFloor = 1;
         dungeonCheckpointSeed = string.Empty;
+    }
+
+    /// <summary>Ends a dungeon session and removes every resumable/run-only record before saving.</summary>
+    public void EndDungeonRun(DungeonRunEndReason reason, bool save = true)
+    {
+        ClearDungeonResumeState(save: false);
+        Debug.Log($"[DungeonLifecycle] End run: {reason}. Cleared resume state.");
+        if (save) SaveStatsImmediate();
+    }
+
+    /// <summary>Clears both runtime authorities and the loaded snapshot so a Hub save cannot resurrect a run.</summary>
+    public void ClearDungeonResumeState(bool save)
+    {
+        ClearDungeonCheckpoint();
+        DungeonRunStateController.Active?.ClearRun();
+        RunModifierController.Active?.ClearForRunEnd();
+        if (loadedDataCache != null)
+        {
+            loadedDataCache.dungeonCheckpointActive = false;
+            loadedDataCache.dungeonFloor = 1;
+            loadedDataCache.dungeonSeed = string.Empty;
+            loadedDataCache.dungeonRun = null;
+        }
+        if (save) SaveStatsImmediate();
     }
 
     /// <summary>
@@ -752,12 +805,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             return false;
         }
 
-        ClearDungeonCheckpoint();
-        if (DungeonRunStateController.Active != null)
-            DungeonRunStateController.Active.ClearRun();
-        if (RunModifierController.Active != null)
-            RunModifierController.Active.ClearForRunEnd();
-        SaveStatsImmediate();
+        EndDungeonRun(DungeonRunEndReason.Completed);
         return true;
     }
 
@@ -1024,10 +1072,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
             usesUnifiedCoins = true,
             bankCoins = this.bankCoins,
             runCoins = this.runCoins,
-            dungeonCheckpointActive = this.dungeonCheckpointActive,
-            dungeonFloor = this.dungeonCheckpointFloor,
-            dungeonSeed = this.dungeonCheckpointSeed,
-            dungeonRun = DungeonRunStateController.Active != null ? DungeonRunStateController.Active.Export() : loadedDataCache != null ? loadedDataCache.dungeonRun : null,
+            dungeonCheckpointActive = HasValidDungeonResumeSnapshot(out int resumeFloor, out string resumeSeed, out SavedDungeonRunState resumeRun),
+            dungeonFloor = resumeFloor,
+            dungeonSeed = resumeSeed,
+            dungeonRun = resumeRun,
             bankGold = this.bankGold,
             bankSilver = this.bankSilver,
             bankCopper = this.bankCopper,
@@ -1202,15 +1250,49 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     private void ApplyLoadedDungeonCheckpoint(GameData data)
     {
-        if (data == null || !data.dungeonCheckpointActive)
+        if (data == null || !data.dungeonCheckpointActive || !IsValidDungeonResumeData(data.dungeonFloor, data.dungeonSeed, data.dungeonRun))
         {
-            ClearDungeonCheckpoint();
+            ClearDungeonResumeState(save: false);
             return;
         }
 
         dungeonCheckpointActive = true;
         dungeonCheckpointFloor = Mathf.Max(1, data.dungeonFloor);
         dungeonCheckpointSeed = data.dungeonSeed ?? string.Empty;
+    }
+
+    private bool HasValidDungeonResumeSnapshot(out int floor, out string seed, out SavedDungeonRunState run)
+    {
+        floor = 1;
+        seed = string.Empty;
+        run = null;
+        if (!dungeonCheckpointActive)
+            return false;
+
+        floor = Mathf.Max(1, dungeonCheckpointFloor);
+        seed = dungeonCheckpointSeed ?? string.Empty;
+        DungeonRunStateController controller = DungeonRunStateController.Active;
+        if (controller != null && controller.IsInitialized && string.Equals(controller.RunSeed, seed, StringComparison.Ordinal))
+            run = controller.Export();
+        else if (loadedDataCache != null)
+            run = loadedDataCache.dungeonRun;
+
+        if (IsValidDungeonResumeData(floor, seed, run))
+            return true;
+
+        floor = 1;
+        seed = string.Empty;
+        run = null;
+        return false;
+    }
+
+    private static bool IsValidDungeonResumeData(int floor, string seed, SavedDungeonRunState run)
+    {
+        return floor >= 1
+            && !string.IsNullOrWhiteSpace(seed)
+            && run != null
+            && string.Equals(run.runSeed ?? string.Empty, seed.Trim(), StringComparison.Ordinal)
+            && run.currentFloor == floor;
     }
 
     public bool TryApplySelectedClassStart(PlayerClassDatabase database)
@@ -1795,12 +1877,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (inventory != null)
             inventory.ClearRunInventory(save: false);
         ResetRunWallet();
-        ClearDungeonCheckpoint();
-        if (DungeonRunStateController.Active != null)
-            DungeonRunStateController.Active.ClearRun();
-        if (RunModifierController.Active != null)
-            RunModifierController.Active.ClearForRunEnd();
-        SaveStatsImmediate();
+        EndDungeonRun(DungeonRunEndReason.Death);
         Debug.Log("SEI MORTO! Ritorno all'Hub...");
         SceneManager.LoadScene("HubScene");
     }

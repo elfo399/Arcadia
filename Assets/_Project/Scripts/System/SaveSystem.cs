@@ -3,7 +3,7 @@ using System.IO;
 
 public static class SaveSystem
 {
-    public const int CurrentSaveVersion = 9;
+    public const int CurrentSaveVersion = 10;
     public const string SinglePlayerId = "player";
     public const string DefaultPlayerName = "Player";
 
@@ -409,6 +409,17 @@ public static class SaveSystem
                                 modifier.effects = new[] { new SavedRunModifierEffect { effect = modifier.effect, multiplierPerStack = Mathf.Max(.01f, modifier.multiplierPerStack) } };
                     }
                     data.saveVersion = 9;
+                    break;
+
+                case 9:
+                    // v9 could retain a checkpoint after an intentional Hub return.
+                    // It cannot prove that the snapshot came from an interrupted run,
+                    // so discard only the old run-resume data and retain progression.
+                    data.dungeonCheckpointActive = false;
+                    data.dungeonFloor = 1;
+                    data.dungeonSeed = string.Empty;
+                    data.dungeonRun = null;
+                    data.saveVersion = 10;
                     break;
 
                 default:
