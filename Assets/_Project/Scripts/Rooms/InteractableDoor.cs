@@ -16,6 +16,7 @@ public class InteractableDoor : MonoBehaviour,IInteractable
     private Renderer[] fallbackClosedRenderers=Array.Empty<Renderer>();
     private bool socketControlled; private bool socketConnected=true; private bool encounterBlocked; private bool opened;
     private bool IsOpened=>opened||(state!=null&&state.completed);
+    public bool IsPassable => (!socketControlled || socketConnected) && IsOpened && !encounterBlocked;
 
     private void Awake()
     {

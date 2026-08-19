@@ -6,7 +6,7 @@ using UnityEngine;
 public class Room : MonoBehaviour
 {
     public static Room CurrentPlayerRoom { get; private set; }
-    [Header("Definition")] public RoomData roomData; [HideInInspector] public string internalRoomType="Normal";
+    [Header("Definition")] public RoomData roomData;
     [SerializeField] private string questTargetId; [SerializeField] private string questTargetTag;
     [Serializable] public struct DoorEntry{public string label;public Vector2Int gridOffset;public Vector2Int direction;public GameObject doorObject;public GameObject wallObject;public GameObject lockObject;[Tooltip("Optional authored gameplay gate for this graph socket. It is independent from encounter locks.")]public InteractableDoor authoredGate;[HideInInspector]public bool isConnected;}
     public List<DoorEntry> doors=new List<DoorEntry>();
@@ -16,12 +16,12 @@ public class Room : MonoBehaviour
     public int ActiveEnemyCount{get{PruneEnemies();return activeEnemies.Count;}} public bool PlayerHasEntered{get;private set;} public bool BattleActive=>doorLocks.Count>0;
     private readonly List<RoomRule> rules=new List<RoomRule>(); private readonly Dictionary<string,List<GameObject>> encounterEnemies=new Dictionary<string,List<GameObject>>(StringComparer.Ordinal); private readonly HashSet<string> doorLocks=new HashSet<string>(StringComparer.Ordinal);
     private SavedDungeonRoomState state; private RoomRuleContext context; private GameObject spawnedPortal; private bool initialized; private string legacyEncounterOwner="legacy";
-    public void ConfigureGeneratedInstance(string id,Vector2Int anchor,Vector2Int size,int floor,RoomType role){RuntimeId=id;GridAnchor=anchor;GridSize=size==Vector2Int.zero?Vector2Int.one:size;Floor=floor;PlacementRole=role;internalRoomType=role.ToString();}
+    public void ConfigureGeneratedInstance(string id,Vector2Int anchor,Vector2Int size,int floor,RoomType role){RuntimeId=id;GridAnchor=anchor;GridSize=size==Vector2Int.zero?Vector2Int.one:size;Floor=floor;PlacementRole=role;}
     public void InitializeGeneratedRuntime(){InitializeRuntime();}
     private void Start()=>InitializeRuntime();
     private void InitializeRuntime()
     {
-        if(initialized)return;initialized=true;if(string.IsNullOrWhiteSpace(RuntimeId)){if(!Enum.TryParse(internalRoomType,true,out RoomType role))role=RoomType.Normal;ConfigureGeneratedInstance(gameObject.name,Vector2Int.zero,roomData!=null?roomData.size:Vector2Int.one,0,role);}
+        if(initialized)return;initialized=true;if(string.IsNullOrWhiteSpace(RuntimeId))ConfigureGeneratedInstance(gameObject.name,Vector2Int.zero,roomData!=null?roomData.size:Vector2Int.one,0,roomData!=null?roomData.roomType:RoomType.Normal);
         state=DungeonRunStateController.Active!=null?DungeonRunStateController.Active.GetRoom(RuntimeId):new SavedDungeonRoomState{roomId=RuntimeId,rules=Array.Empty<SavedDungeonRuleState>()};context=new RoomRuleContext(this,state);
         rules.AddRange(GetComponents<RoomRule>());
         bool hasEncounter=false;foreach(var rule in rules)if(rule is CombatRoomRule||rule is WaveRoomRule)hasEncounter=true;
@@ -85,7 +85,7 @@ public class Room : MonoBehaviour
     private void OnTriggerEnter(Collider other){if(!other.CompareTag("Player"))return;CurrentPlayerRoom=this;if(PlayerHasEntered)return;bool first=!state.visited;PlayerHasEntered=true;state.visited=true;state.revealed=true;QuestEvents.Raise(QuestObjectiveEventType.EnterRoom,ResolveQuestTargetId(),ResolveQuestTargetTag());foreach(var rule in rules)if(rule!=null)rule.OnPlayerEntered(first);EvaluateCompletion();Persist();}
     private void OnTriggerStay(Collider other){if(other.CompareTag("Player"))CurrentPlayerRoom=this;}
     private void OnTriggerExit(Collider other){if(!other.CompareTag("Player"))return;if(CurrentPlayerRoom==this)CurrentPlayerRoom=null;foreach(var rule in rules)if(rule!=null)rule.OnPlayerExited();Persist();}
-    private bool AreConnectedDoorsOpen(){foreach(var d in doors)if(d.isConnected&&((d.lockObject&&d.lockObject.activeInHierarchy)||(d.wallObject&&d.wallObject.activeInHierarchy)))return false;return true;}
+    private bool AreConnectedDoorsOpen(){foreach(var d in doors)if(d.isConnected){InteractableDoor gate=d.lockObject?d.lockObject.GetComponentInChildren<InteractableDoor>(true):null;if(gate!=null){if(!gate.IsPassable)return false;}else if((d.lockObject&&d.lockObject.activeInHierarchy)||(d.wallObject&&d.wallObject.activeInHierarchy))return false;}return true;}
     private void PruneEnemies(){activeEnemies.RemoveAll(x=>x==null);}
     private string ResolveQuestTargetId()=>!string.IsNullOrWhiteSpace(questTargetId)?questTargetId.Trim():roomData!=null&&!string.IsNullOrWhiteSpace(roomData.stableId)?roomData.stableId:gameObject.name;
     private string ResolveQuestTargetTag()=>!string.IsNullOrWhiteSpace(questTargetTag)?questTargetTag.Trim():PlacementRole.ToString();
