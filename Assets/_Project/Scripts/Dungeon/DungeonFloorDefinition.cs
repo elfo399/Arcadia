@@ -30,7 +30,8 @@ public sealed class DungeonFloorDefinition : ScriptableObject
     public RoomCount shopRooms = new RoomCount { min = 1, max = 1 };
     public RoomCount treasureRooms = new RoomCount { min = 1, max = 1 };
     public RoomCount bossRooms = new RoomCount { min = 1, max = 1 };
-    public RoomCount waveRooms = new RoomCount { enabled = false, min = 0, max = 0 };
+    [Tooltip("Challenge Rooms is the total number of slots that become either Wave or Challenge rooms.")]
+    [FormerlySerializedAs("waveRooms")]
     public RoomCount challengeRooms = new RoomCount { enabled = false, min = 0, max = 0 };
     public RoomCount minibossRooms = new RoomCount { enabled = false, min = 0, max = 0 };
     public RoomCount parkourRooms = new RoomCount { enabled = false, min = 0, max = 0 };
@@ -60,7 +61,6 @@ public sealed class DungeonFloorDefinition : ScriptableObject
             case RoomType.Shop: return shopRooms;
             case RoomType.Treasure: return treasureRooms;
             case RoomType.Boss: return bossRooms;
-            case RoomType.Wave: return waveRooms;
             case RoomType.Challenge: return challengeRooms;
             case RoomType.Miniboss: return minibossRooms;
             case RoomType.Parkour: return parkourRooms;
@@ -79,6 +79,6 @@ public sealed class DungeonFloorDefinition : ScriptableObject
 
     private void OnValidate()
     {
-        normalRooms?.Normalize(); shopRooms?.Normalize(); treasureRooms?.Normalize(); bossRooms?.Normalize(); waveRooms?.Normalize(); challengeRooms?.Normalize(); minibossRooms?.Normalize(); parkourRooms?.Normalize(); npcEncounterRooms?.Normalize(); churchRooms?.Normalize(); secretAccessSecretRooms?.Normalize(); secretAccessSuperSecretRooms?.Normalize();
+        normalRooms?.Normalize(); shopRooms?.Normalize(); treasureRooms?.Normalize(); bossRooms?.Normalize(); challengeRooms?.Normalize(); minibossRooms?.Normalize(); parkourRooms?.Normalize(); npcEncounterRooms?.Normalize(); churchRooms?.Normalize(); secretAccessSecretRooms?.Normalize(); secretAccessSuperSecretRooms?.Normalize();
     }
 }
