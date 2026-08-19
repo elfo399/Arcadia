@@ -67,6 +67,10 @@ public class CoreGenerator : MonoBehaviour
     [Header("Debug")]
     public bool showRngLogs = true;
 
+    [Header("Debug / Testing")]
+    [Tooltip("TEST ONLY: when GameScene starts, ignore and clear any saved dungeon checkpoint, reset to floor 1, and generate a fresh random seed.")]
+    public bool forceNewRunOnStartForTesting = false;
+
     #endregion
 
     #region --- Strutture Dati Interne ---
@@ -139,7 +143,8 @@ public class CoreGenerator : MonoBehaviour
         if (GetComponent<RunModifierController>() == null) gameObject.AddComponent<RunModifierController>();
         ResolvePlayerTransform();
         CachePlayerStats();
-        ApplySavedCheckpointIfAvailable();
+        if (!forceNewRunOnStartForTesting)
+            ApplySavedCheckpointIfAvailable();
         if (playerStats == null) Debug.LogWarning("[CoreGenerator] PlayerStats non trovato! La generazione di stanze speciali (Curch/EvilCurch) non funzionerà.");
         
     }
@@ -147,14 +152,15 @@ public class CoreGenerator : MonoBehaviour
     void Start()
     {
         CachePlayerStats();
-        ApplySavedCheckpointIfAvailable();
-        if (!resumingSavedRun)
+        if (forceNewRunOnStartForTesting)
         {
-            currentFloor = 1;
-            gameSeedString = string.Empty;
-            useRandomSeed = true;
-            pendingThemeOverrideId = null;
-            playerStats?.BeginNewDungeonRun();
+            PrepareNewRunForGeneration(forcedForTesting: true);
+        }
+        else
+        {
+            ApplySavedCheckpointIfAvailable();
+            if (!resumingSavedRun)
+                PrepareNewRunForGeneration(forcedForTesting: false);
         }
         Generate();
     }
@@ -179,6 +185,22 @@ public class CoreGenerator : MonoBehaviour
     {
         if (playerStats == null)
             playerStats = PlayerStats.instance;
+    }
+
+    private void PrepareNewRunForGeneration(bool forcedForTesting)
+    {
+        resumingSavedRun = false;
+        resumeRunState = null;
+        currentFloor = 1;
+        gameSeedString = string.Empty;
+        useRandomSeed = true;
+        pendingThemeOverrideId = null;
+
+        runStateController?.ClearRun();
+        playerStats?.BeginNewDungeonRun();
+
+        if (forcedForTesting)
+            Debug.Log("[DungeonLifecycle] TEST override: ignored saved checkpoint and forced NEW run with a fresh seed.");
     }
 
     private void ApplySavedCheckpointIfAvailable()
