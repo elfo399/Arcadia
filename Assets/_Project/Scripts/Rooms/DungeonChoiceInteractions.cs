@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>Authored parent plus physical child choices; no separate UI system is introduced.</summary>
 public sealed class ShrineEncounter : MonoBehaviour
 {
-    [SerializeField] private string shrineId; [SerializeField] private string family="Faith"; [SerializeField,Min(1)] private int maxSelections=1;
+    [SerializeField] private string shrineId; [SerializeField,Min(1)] private int maxSelections=1;
     private Room room; private SavedDungeonRuleState state; private readonly HashSet<string> selected=new HashSet<string>();private bool available=true;
     private void Start(){room=GetComponentInParent<Room>();if(room==null)return;available=CoreGenerator.Instance==null||CoreGenerator.Instance.ActiveFloorDefinition==null||CoreGenerator.Instance.ActiveFloorDefinition.shrinesAvailable;state=room.GetExternalState("shrine:"+shrineId);if(!string.IsNullOrEmpty(state.payload))foreach(string id in state.payload.Split(','))selected.Add(id);Refresh();}
     internal bool Select(ShrineChoice choice,GameObject player)

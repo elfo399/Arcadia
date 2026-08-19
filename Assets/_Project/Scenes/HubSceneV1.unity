@@ -2646,7 +2646,8 @@ MonoBehaviour:
   craftModeRoot: {fileID: 1094994546}
   craftContentGroup: {fileID: 1094994548}
   slotParent: {fileID: 1250113944}
-  upgradeItemRowPrefab: {fileID: 1433739382364863992, guid: c765f5d7daba6754ebe7a98cc3638b31, type: 3}
+  upgradeItemSlotPrefab: {fileID: 3146139372920839725, guid: 8694c9e84f74c054fb9adb7618c38d3e, type: 3}
+  upgradeGridSlotCount: 30
   upgradeListScroll: {fileID: 3200000023}
   detailRoot: {fileID: 1721245104}
   detailImage: {fileID: 424139846}
@@ -50735,7 +50736,7 @@ GameObject:
   - component: {fileID: 1250113945}
   - component: {fileID: 3200000024}
   m_Layer: 0
-  m_Name: BlacksmithUpgradeListContent
+  m_Name: BlacksmithUpgradeGridContent
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -50780,10 +50781,10 @@ MonoBehaviour:
   m_ChildAlignment: 1
   m_StartCorner: 0
   m_StartAxis: 0
-  m_CellSize: {x: 245, y: 48}
-  m_Spacing: {x: 0, y: 6}
+  m_CellSize: {x: 42, y: 42}
+  m_Spacing: {x: 6, y: 6}
   m_Constraint: 1
-  m_ConstraintCount: 1
+  m_ConstraintCount: 5
 --- !u!1 &1251698897
 GameObject:
   m_ObjectHideFlags: 0

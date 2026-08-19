@@ -840,8 +840,8 @@ public class CoreGenerator : MonoBehaviour
         if (ResolveSpecialRoomCount(RoomType.NpcEncounter) > 0 && !HasAnyVariant(activeRoomSet.npcEncounter1x1Variants, activeRoomSet.npcEncounter2x1Variants, activeRoomSet.npcEncounter1x2Variants, activeRoomSet.npcEncounter2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti NpcEncounter."; return false; }
         if (ResolveChurchRoomCount() > 0)
         {
-            if (!HasAnyVariant(activeRoomSet.curch1x1Variants, activeRoomSet.curch2x1Variants, activeRoomSet.curch1x2Variants, activeRoomSet.curch2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Curch richieste da Church Rooms."; return false; }
-            if (!HasAnyVariant(activeRoomSet.evilCurch1x1Variants, activeRoomSet.evilCurch2x1Variants, activeRoomSet.evilCurch1x2Variants, activeRoomSet.evilCurch2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti EvilCurch richieste da Church Rooms."; return false; }
+            if (!HasAnyVariant(activeRoomSet.curch1x1Variants, activeRoomSet.curch2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Curch richieste da Church Rooms."; return false; }
+            if (!HasAnyVariant(activeRoomSet.evilCurch1x1Variants, activeRoomSet.evilCurch2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti EvilCurch richieste da Church Rooms."; return false; }
         }
 
         error = null;

@@ -115,7 +115,6 @@ public sealed class ShopManager : MonoBehaviour, IInventorySlotHandler
     public bool IsOpen { get; private set; }
     public ShopMode CurrentMode { get; private set; }
 
-    public event Action<ShopMode> ConfirmRequested;
     public event Action Closed;
 
     private void Awake()
