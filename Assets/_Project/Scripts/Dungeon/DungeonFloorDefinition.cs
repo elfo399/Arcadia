@@ -34,7 +34,6 @@ public sealed class DungeonFloorDefinition : ScriptableObject
     public RoomCount challengeRooms = new RoomCount { enabled = false, min = 0, max = 0 };
     public RoomCount minibossRooms = new RoomCount { enabled = false, min = 0, max = 0 };
     public RoomCount parkourRooms = new RoomCount { enabled = false, min = 0, max = 0 };
-    public RoomCount narrativeRooms = new RoomCount { enabled = false, min = 0, max = 0 };
     public RoomCount npcEncounterRooms = new RoomCount { enabled = false, min = 0, max = 0 };
     public RoomCount curchRooms = new RoomCount { enabled = false };
     public RoomCount evilCurchRooms = new RoomCount { enabled = false };
@@ -67,7 +66,6 @@ public sealed class DungeonFloorDefinition : ScriptableObject
             case RoomType.Challenge: return challengeRooms;
             case RoomType.Miniboss: return minibossRooms;
             case RoomType.Parkour: return parkourRooms;
-            case RoomType.Narrative: return narrativeRooms;
             case RoomType.NpcEncounter: return npcEncounterRooms;
             case RoomType.Curch: return curchRooms;
             case RoomType.EvilCurch: return evilCurchRooms;
@@ -82,6 +80,6 @@ public sealed class DungeonFloorDefinition : ScriptableObject
 
     private void OnValidate()
     {
-        normalRooms?.Normalize(); shopRooms?.Normalize(); treasureRooms?.Normalize(); bossRooms?.Normalize(); waveRooms?.Normalize(); challengeRooms?.Normalize(); minibossRooms?.Normalize(); parkourRooms?.Normalize(); narrativeRooms?.Normalize(); npcEncounterRooms?.Normalize(); curchRooms?.Normalize(); evilCurchRooms?.Normalize(); secretAccessSecretRooms?.Normalize(); secretAccessSuperSecretRooms?.Normalize();
+        normalRooms?.Normalize(); shopRooms?.Normalize(); treasureRooms?.Normalize(); bossRooms?.Normalize(); waveRooms?.Normalize(); challengeRooms?.Normalize(); minibossRooms?.Normalize(); parkourRooms?.Normalize(); npcEncounterRooms?.Normalize(); curchRooms?.Normalize(); evilCurchRooms?.Normalize(); secretAccessSecretRooms?.Normalize(); secretAccessSuperSecretRooms?.Normalize();
     }
 }

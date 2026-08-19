@@ -52,7 +52,6 @@ public class CoreGenerator : MonoBehaviour
     [Range(0, 100)] public int challengeBigRoomChance = 0;
     [Range(0, 100)] public int minibossBigRoomChance = 0;
     [Range(0, 100)] public int parkourBigRoomChance = 0;
-    [Range(0, 100)] public int narrativeBigRoomChance = 0;
     [Range(0, 100)] public int npcEncounterBigRoomChance = 0;
     [Range(0, 100)] public int secretAccessBigRoomChance = 0;
 
@@ -94,7 +93,7 @@ public class CoreGenerator : MonoBehaviour
     private enum RoomPoolKey
     {
         Normal, Shop, Treasure, Wave, Challenge, Miniboss, Parkour,
-        Narrative, NpcEncounter, SecretAccessSecret, SecretAccessSuperSecret,
+        NpcEncounter, SecretAccessSecret, SecretAccessSuperSecret,
         Curch, EvilCurch, Boss
     }
 
@@ -402,7 +401,6 @@ public class CoreGenerator : MonoBehaviour
         if (!PlaceSpecialRooms(RoomType.Wave, RoomPoolKey.Wave, ResolveSpecialRoomCount(RoomType.Wave), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, waveBigRoomChance, cellToRoomMap)) return null;
         if (!PlaceSpecialRooms(RoomType.Challenge, RoomPoolKey.Challenge, ResolveSpecialRoomCount(RoomType.Challenge), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, challengeBigRoomChance, cellToRoomMap)) return null;
         if (!PlaceSpecialRooms(RoomType.Parkour, RoomPoolKey.Parkour, ResolveSpecialRoomCount(RoomType.Parkour), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, parkourBigRoomChance, cellToRoomMap)) return null;
-        if (!PlaceSpecialRooms(RoomType.Narrative, RoomPoolKey.Narrative, ResolveSpecialRoomCount(RoomType.Narrative), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, narrativeBigRoomChance, cellToRoomMap)) return null;
         if (!PlaceSpecialRooms(RoomType.NpcEncounter, RoomPoolKey.NpcEncounter, ResolveSpecialRoomCount(RoomType.NpcEncounter), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, npcEncounterBigRoomChance, cellToRoomMap)) return null;
         if (!PlaceSpecialRooms(RoomType.SecretAccess, RoomPoolKey.SecretAccessSecret, ResolveSecretAccessRoomCount(false), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, secretAccessBigRoomChance, cellToRoomMap)) return null;
         if (!PlaceSpecialRooms(RoomType.SecretAccess, RoomPoolKey.SecretAccessSuperSecret, ResolveSecretAccessRoomCount(true), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, secretAccessBigRoomChance, cellToRoomMap)) return null;
@@ -843,7 +841,6 @@ public class CoreGenerator : MonoBehaviour
         if (ResolveSpecialRoomCount(RoomType.Challenge) > 0 && !HasAnyVariant(activeRoomSet.challenge1x1Variants, activeRoomSet.challenge2x1Variants, activeRoomSet.challenge1x2Variants, activeRoomSet.challenge2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Challenge."; return false; }
         if (ResolveSpecialRoomCount(RoomType.Miniboss) > 0 && !HasAnyVariant(activeRoomSet.miniboss1x1Variants, activeRoomSet.miniboss2x1Variants, activeRoomSet.miniboss1x2Variants, activeRoomSet.miniboss2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Miniboss."; return false; }
         if (ResolveSpecialRoomCount(RoomType.Parkour) > 0 && !HasAnyVariant(activeRoomSet.parkour1x1Variants, activeRoomSet.parkour2x1Variants, activeRoomSet.parkour1x2Variants, activeRoomSet.parkour2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Parkour."; return false; }
-        if (ResolveSpecialRoomCount(RoomType.Narrative) > 0 && !HasAnyVariant(activeRoomSet.narrative1x1Variants, activeRoomSet.narrative2x1Variants, activeRoomSet.narrative1x2Variants, activeRoomSet.narrative2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Narrative."; return false; }
         if (ResolveSpecialRoomCount(RoomType.NpcEncounter) > 0 && !HasAnyVariant(activeRoomSet.npcEncounter1x1Variants, activeRoomSet.npcEncounter2x1Variants, activeRoomSet.npcEncounter1x2Variants, activeRoomSet.npcEncounter2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti NpcEncounter."; return false; }
 
         error = null;
@@ -909,7 +906,7 @@ public class CoreGenerator : MonoBehaviour
     private int ResolveSpecialRoomCount(RoomType roomType)
     {
         if (activeFloorDefinition == null)
-            return roomType == RoomType.Curch || roomType == RoomType.EvilCurch || roomType == RoomType.Wave || roomType == RoomType.Challenge || roomType == RoomType.Miniboss || roomType == RoomType.Parkour || roomType == RoomType.Narrative || roomType == RoomType.NpcEncounter ? 0 : 1;
+            return roomType == RoomType.Curch || roomType == RoomType.EvilCurch || roomType == RoomType.Wave || roomType == RoomType.Challenge || roomType == RoomType.Miniboss || roomType == RoomType.Parkour || roomType == RoomType.NpcEncounter ? 0 : 1;
         DungeonFloorDefinition.RoomCount count = activeFloorDefinition.GetCount(roomType);
         return count == null ? 0 : count.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", roomType + "-count"));
     }
@@ -1027,7 +1024,6 @@ public class CoreGenerator : MonoBehaviour
             [RoomPoolKey.Challenge] = BuildSizeMap(activeRoomSet.challenge1x1Variants,activeRoomSet.challenge2x1Variants,activeRoomSet.challenge1x2Variants,activeRoomSet.challenge2x2Variants),
             [RoomPoolKey.Miniboss] = BuildSizeMap(activeRoomSet.miniboss1x1Variants,activeRoomSet.miniboss2x1Variants,activeRoomSet.miniboss1x2Variants,activeRoomSet.miniboss2x2Variants),
             [RoomPoolKey.Parkour] = BuildSizeMap(activeRoomSet.parkour1x1Variants,activeRoomSet.parkour2x1Variants,activeRoomSet.parkour1x2Variants,activeRoomSet.parkour2x2Variants),
-            [RoomPoolKey.Narrative] = BuildSizeMap(activeRoomSet.narrative1x1Variants,activeRoomSet.narrative2x1Variants,activeRoomSet.narrative1x2Variants,activeRoomSet.narrative2x2Variants),
             [RoomPoolKey.NpcEncounter] = BuildSizeMap(activeRoomSet.npcEncounter1x1Variants,activeRoomSet.npcEncounter2x1Variants,activeRoomSet.npcEncounter1x2Variants,activeRoomSet.npcEncounter2x2Variants)
         };
     }

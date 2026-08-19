@@ -74,12 +74,6 @@ public class DungeonRoomSet : ScriptableObject
     public Room[] parkour1x2Variants;
     public Room[] parkour2x2Variants;
 
-    [Header("Narrative")]
-    public Room[] narrative1x1Variants;
-    public Room[] narrative2x1Variants;
-    public Room[] narrative1x2Variants;
-    public Room[] narrative2x2Variants;
-
     [Header("NPC Encounter")]
     public Room[] npcEncounter1x1Variants;
     public Room[] npcEncounter2x1Variants;

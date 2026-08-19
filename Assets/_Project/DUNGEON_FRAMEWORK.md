@@ -26,7 +26,6 @@ Old rooms with `EnemySpawner` automatically receive a runtime `CombatRoomRule`, 
 - Treasure/rewards: create a `LootPoolDefinition`, add `RoomRewardRule`, and add one `DungeonRewardOfferAnchor` with collider per physical pedestal. Offers are deterministic. The player selects a pedestal; no first-offer auto-claim exists. Configure `requiredRuleId` to gate a reward on a successful challenge/combat rule.
 - Shrine: add `ShrineInteraction` to each authored choice object. Choose a thematic family, modifier, costs, and requirements. Modifiers use concrete outgoing/incoming damage multipliers and persist across floors.
 - Secrets/internal areas: `DungeonSecretAccess` opens authored geometry only—never a graph cell/minimap icon. `InteractableDoor` is internal by default; configure a `DungeonRequirement` (including consumable inventory `ItemData`) and it will not unlock graph doors.
-- Events: `DungeonNarrativeEvent` uses existing PlayerStats flags/Karma/Benedetto/Malefico and supports Repeatable, OncePerRun, and OncePerSave. Existing NPC/dialogue components remain the dialogue authority.
 
 `DungeonFloorThemeTable` remains the theme source. Its optional `DungeonFloorDefinition` provides deterministic normal room min/max counts (`min == max` is fixed). Legacy CoreGenerator values remain the fallback.
 
