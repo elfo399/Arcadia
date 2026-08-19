@@ -405,27 +405,23 @@ public class CoreGenerator : MonoBehaviour
         if (!PlaceSpecialRooms(RoomType.SecretAccess, RoomPoolKey.SecretAccessSecret, ResolveSecretAccessRoomCount(false), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, secretAccessBigRoomChance, cellToRoomMap)) return null;
         if (!PlaceSpecialRooms(RoomType.SecretAccess, RoomPoolKey.SecretAccessSuperSecret, ResolveSecretAccessRoomCount(true), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, secretAccessBigRoomChance, cellToRoomMap)) return null;
 
-        // Floor definitions explicitly control shrine categories. Legacy floors retain their morality-gated chance.
+        // Floor definitions configure one church count; alignment selects its authored variant.
         if (activeFloorDefinition != null)
         {
-            int curchCount = ResolveSpecialRoomCount(RoomType.Curch);
-            int evilCurchCount = ResolveSpecialRoomCount(RoomType.EvilCurch);
-            if (activeFloorDefinition.moralRoomPolicy == DungeonFloorDefinition.DungeonMoralRoomPolicy.AlignmentExclusive)
-            {
-                int blessed = playerStats != null ? playerStats.benedetto : 0;
-                int evil = playerStats != null ? playerStats.malefico : 0;
-                if (blessed > evil) evilCurchCount = 0;
-                else if (evil > blessed) curchCount = 0;
-                else { curchCount = 0; evilCurchCount = 0; }
-            }
-            if (!PlaceSpecialRooms(RoomType.Curch, RoomPoolKey.Curch, curchCount, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, curchBigRoomChance, cellToRoomMap)) return null;
-            if (!PlaceSpecialRooms(RoomType.EvilCurch, RoomPoolKey.EvilCurch, evilCurchCount, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, evilCurchBigRoomChance, cellToRoomMap)) return null;
+            int churchCount = ResolveChurchRoomCount();
+            bool useEvilChurch = playerStats != null && playerStats.malefico > playerStats.benedetto;
+            RoomType churchType = useEvilChurch ? RoomType.EvilCurch : RoomType.Curch;
+            RoomPoolKey churchPool = useEvilChurch ? RoomPoolKey.EvilCurch : RoomPoolKey.Curch;
+            int bigRoomChance = useEvilChurch ? evilCurchBigRoomChance : curchBigRoomChance;
+            if (!PlaceSpecialRooms(churchType, churchPool, churchCount, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, bigRoomChance, cellToRoomMap)) return null;
         }
         else if (playerStats != null && playerStats.benedetto != playerStats.malefico && prng.Next(0, 100) <= curchsRoomsChance)
         {
-            RoomType curchType = playerStats.benedetto > playerStats.malefico ? RoomType.Curch : RoomType.EvilCurch;
-            int curchChance = playerStats.benedetto > playerStats.malefico ? curchBigRoomChance : evilCurchBigRoomChance;
-            PlaceSpecialRoom(curchType, curchType == RoomType.Curch ? RoomPoolKey.Curch : RoomPoolKey.EvilCurch, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, curchChance, cellToRoomMap);
+            bool useEvilChurch = playerStats.malefico > playerStats.benedetto;
+            RoomType churchType = useEvilChurch ? RoomType.EvilCurch : RoomType.Curch;
+            RoomPoolKey churchPool = useEvilChurch ? RoomPoolKey.EvilCurch : RoomPoolKey.Curch;
+            int bigRoomChance = useEvilChurch ? evilCurchBigRoomChance : curchBigRoomChance;
+            PlaceSpecialRoom(churchType, churchPool, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, bigRoomChance, cellToRoomMap);
         }
 
         return layout;
@@ -842,6 +838,11 @@ public class CoreGenerator : MonoBehaviour
         if (ResolveSpecialRoomCount(RoomType.Miniboss) > 0 && !HasAnyVariant(activeRoomSet.miniboss1x1Variants, activeRoomSet.miniboss2x1Variants, activeRoomSet.miniboss1x2Variants, activeRoomSet.miniboss2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Miniboss."; return false; }
         if (ResolveSpecialRoomCount(RoomType.Parkour) > 0 && !HasAnyVariant(activeRoomSet.parkour1x1Variants, activeRoomSet.parkour2x1Variants, activeRoomSet.parkour1x2Variants, activeRoomSet.parkour2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Parkour."; return false; }
         if (ResolveSpecialRoomCount(RoomType.NpcEncounter) > 0 && !HasAnyVariant(activeRoomSet.npcEncounter1x1Variants, activeRoomSet.npcEncounter2x1Variants, activeRoomSet.npcEncounter1x2Variants, activeRoomSet.npcEncounter2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti NpcEncounter."; return false; }
+        if (ResolveChurchRoomCount() > 0)
+        {
+            if (!HasAnyVariant(activeRoomSet.curch1x1Variants, activeRoomSet.curch2x1Variants, activeRoomSet.curch1x2Variants, activeRoomSet.curch2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Curch richieste da Church Rooms."; return false; }
+            if (!HasAnyVariant(activeRoomSet.evilCurch1x1Variants, activeRoomSet.evilCurch2x1Variants, activeRoomSet.evilCurch1x2Variants, activeRoomSet.evilCurch2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti EvilCurch richieste da Church Rooms."; return false; }
+        }
 
         error = null;
         return true;
@@ -909,6 +910,15 @@ public class CoreGenerator : MonoBehaviour
             return roomType == RoomType.Curch || roomType == RoomType.EvilCurch || roomType == RoomType.Wave || roomType == RoomType.Challenge || roomType == RoomType.Miniboss || roomType == RoomType.Parkour || roomType == RoomType.NpcEncounter ? 0 : 1;
         DungeonFloorDefinition.RoomCount count = activeFloorDefinition.GetCount(roomType);
         return count == null ? 0 : count.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", roomType + "-count"));
+    }
+
+    private int ResolveChurchRoomCount()
+    {
+        if (activeFloorDefinition == null)
+            return 0;
+
+        DungeonFloorDefinition.RoomCount count = activeFloorDefinition.GetChurchCount();
+        return count == null ? 0 : count.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "church-count"));
     }
 
     private int ResolveSecretAccessRoomCount(bool superSecret)

@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 [CreateAssetMenu(fileName="DungeonFloor", menuName="Dungeon/Floor Definition")]
 public sealed class DungeonFloorDefinition : ScriptableObject
 {
-    public enum DungeonMoralRoomPolicy { Independent, AlignmentExclusive }
     [Serializable]
     public sealed class RoomCount
     {
@@ -35,14 +35,12 @@ public sealed class DungeonFloorDefinition : ScriptableObject
     public RoomCount minibossRooms = new RoomCount { enabled = false, min = 0, max = 0 };
     public RoomCount parkourRooms = new RoomCount { enabled = false, min = 0, max = 0 };
     public RoomCount npcEncounterRooms = new RoomCount { enabled = false, min = 0, max = 0 };
-    public RoomCount curchRooms = new RoomCount { enabled = false };
-    public RoomCount evilCurchRooms = new RoomCount { enabled = false };
+    [FormerlySerializedAs("curchRooms")]
+    public RoomCount churchRooms = new RoomCount { enabled = false };
     [Tooltip("Generated SecretAccess rooms whose authored prefab contains a normal-secret discovery mechanism.")]
     public RoomCount secretAccessSecretRooms = new RoomCount { enabled = false, min = 0, max = 0 };
     [Tooltip("Generated SecretAccess rooms whose authored prefab contains a super-secret discovery mechanism.")]
     public RoomCount secretAccessSuperSecretRooms = new RoomCount { enabled = false, min = 0, max = 0 };
-    [Tooltip("Independent allows both authored moral room categories. AlignmentExclusive selects only the stronger alignment; ties spawn neither.")]
-    public DungeonMoralRoomPolicy moralRoomPolicy = DungeonMoralRoomPolicy.Independent;
 
     [Header("Content pools")]
     [Tooltip("Optional weighted room-set override. Empty means the selected theme room set remains authoritative.")]
@@ -67,11 +65,12 @@ public sealed class DungeonFloorDefinition : ScriptableObject
             case RoomType.Miniboss: return minibossRooms;
             case RoomType.Parkour: return parkourRooms;
             case RoomType.NpcEncounter: return npcEncounterRooms;
-            case RoomType.Curch: return curchRooms;
-            case RoomType.EvilCurch: return evilCurchRooms;
+            case RoomType.Curch: return churchRooms;
             default: return null;
         }
     }
+
+    public RoomCount GetChurchCount() => churchRooms;
 
     public RoomCount GetSecretAccessCount(bool superSecret)
     {
@@ -80,6 +79,6 @@ public sealed class DungeonFloorDefinition : ScriptableObject
 
     private void OnValidate()
     {
-        normalRooms?.Normalize(); shopRooms?.Normalize(); treasureRooms?.Normalize(); bossRooms?.Normalize(); waveRooms?.Normalize(); challengeRooms?.Normalize(); minibossRooms?.Normalize(); parkourRooms?.Normalize(); npcEncounterRooms?.Normalize(); curchRooms?.Normalize(); evilCurchRooms?.Normalize(); secretAccessSecretRooms?.Normalize(); secretAccessSuperSecretRooms?.Normalize();
+        normalRooms?.Normalize(); shopRooms?.Normalize(); treasureRooms?.Normalize(); bossRooms?.Normalize(); waveRooms?.Normalize(); challengeRooms?.Normalize(); minibossRooms?.Normalize(); parkourRooms?.Normalize(); npcEncounterRooms?.Normalize(); churchRooms?.Normalize(); secretAccessSecretRooms?.Normalize(); secretAccessSuperSecretRooms?.Normalize();
     }
 }
