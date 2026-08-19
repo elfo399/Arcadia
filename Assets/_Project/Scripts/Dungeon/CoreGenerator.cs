@@ -725,14 +725,17 @@ public class CoreGenerator : MonoBehaviour
         activeThemeDefinition = SelectThemeForFloor(currentFloor, currentMasterSeed);
         activeRoomSet = activeThemeDefinition != null ? activeThemeDefinition.roomSet : null;
         DungeonFloorThemeTable.FloorThemeEntry entry = floorThemeTable != null ? floorThemeTable.GetEntryForFloor(currentFloor) : null;
-        activeFloorDefinition = entry != null ? entry.floorDefinition : null;
+        activeFloorDefinition = activeThemeDefinition != null && activeThemeDefinition.roomComposition != null
+            ? activeThemeDefinition.roomComposition
+            : entry != null ? entry.floorDefinition : null;
         DungeonRoomSet overrideSet = PickFloorRoomSet(activeFloorDefinition);
         if (overrideSet != null) activeRoomSet = overrideSet;
         string themeLabel = ActiveThemeDisplayName;
 
         if (activeThemeDefinition != null && activeRoomSet != null)
         {
-            Debug.Log($"[CoreGenerator] Piano {currentFloor}: tema selezionato '{themeLabel}' | RoomSet: '{activeRoomSet.name}'");
+            string compositionLabel = activeFloorDefinition != null ? activeFloorDefinition.name : "Legacy";
+            Debug.Log($"[CoreGenerator] Piano {currentFloor}: tema selezionato '{themeLabel}' | RoomSet: '{activeRoomSet.name}' | Composition: '{compositionLabel}'");
         }
         else
         {
@@ -876,11 +879,9 @@ public class CoreGenerator : MonoBehaviour
 
     private int ResolveNormalRoomCount()
     {
-        DungeonFloorThemeTable.FloorThemeEntry entry = floorThemeTable != null ? floorThemeTable.GetEntryForFloor(currentFloor) : null;
-        DungeonFloorDefinition definition = entry != null ? entry.floorDefinition : null;
-        if (definition == null || definition.normalRooms == null)
+        if (activeFloorDefinition == null || activeFloorDefinition.normalRooms == null)
             return Mathf.Max(0, totalNormalRooms);
-        return definition.normalRooms.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "normal-count"));
+        return activeFloorDefinition.normalRooms.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "normal-count"));
     }
 
     private int ResolveSpecialRoomCount(RoomType roomType)
