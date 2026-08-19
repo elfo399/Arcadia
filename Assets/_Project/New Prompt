@@ -1,0 +1,36 @@
+Prima di tutto sistema questi problemi 
+
+Assets\_Project\Scripts\Dungeon\CoreGenerator.cs(648,25): error CS0136: A local or parameter named 'current' cannot be declared in this scope because that name is used in an enclosing local scope to define a local or parameter
+
+Sub Graph at Assets/_ThirdParty/Texture/TerrainSampleAssets/ShaderGraphs/Subgraphs/URPSSS.shadersubgraph has 1 warning(s), the first is: There is a newer version of this node available. Inspect node for details.
+
+Sub Graph at Assets/_ThirdParty/Texture/TerrainSampleAssets/ShaderGraphs/Subgraphs/Wind.shadersubgraph has 1 warning(s), the first is: There is a newer version of this node available. Inspect node for details.
+
+Shader Graph at Assets/_ThirdParty/Texture/TerrainSampleAssets/ShaderGraphs/TerrainGrass.shadergraph has 1 warning(s), the first is: Validation: Property is of unknown type, a package may be missing.
+
+Blender could not be found.
+Make sure that Blender is installed and the .blend file has Blender as its 'Open with' application!
+
+File 'Gathering' has animation import warnings. See Import Messages in Animation Import Settings for more details.
+
+
+A polygon of Mesh 'bridge_rock_broken_01.001' in Assets/_ThirdParty/MaximeBrunoni/BridgesPack/Art/Meshes/BridgeRockBroken.fbx is self-intersecting and has been discarded.
+
+A polygon of Mesh 'bridge_rock_broken_01.001' in Assets/_ThirdParty/MaximeBrunoni/BridgesPack/Art/Meshes/BridgeRockBroken.fbx is self-intersecting and has been discarded.
+
+A polygon of Mesh 'EA03_Prop_Pier_01b_LOD2' in Assets/_ThirdParty/EmaceArt/Roadside Tales Bridges/Meshes/EA03_Prop_Pier_01b.fbx is self-intersecting and has been discarded.
+
+A polygon of Mesh 'EA03_Prop_Pier_01b_LOD1' in Assets/_ThirdParty/EmaceArt/Roadside Tales Bridges/Meshes/EA03_Prop_Pier_01b.fbx is self-intersecting and has been discarded.
+
+A polygon of Mesh 'EA03_Prop_Pier_01b_LOD1' in Assets/_ThirdParty/EmaceArt/Roadside Tales Bridges/Meshes/EA03_Prop_Pier_01b.fbx is self-intersecting and has been discarded.
+
+A polygon of Mesh 'EA03_Prop_Pier_01b_LOD0' in Assets/_ThirdParty/EmaceArt/Roadside Tales Bridges/Meshes/EA03_Prop_Pier_01b.fbx is self-intersecting and has been discarded.
+
+A polygon of Mesh 'EA03_Prop_Pier_01b_LOD0' in Assets/_ThirdParty/EmaceArt/Roadside Tales Bridges/Meshes/EA03_Prop_Pier_01b.fbx is self-intersecting and has been discarded.
+
+Main Object Name 'New Terrain' does not match filename 'HubTerrain'
+
+Lighting data asset ‘LightingData’ is incompatible with the current Unity version because the scene it was baked for was not serialized. Please use Generate Lighting to rebuild the lighting data, or assign the target scene to the Lighting Data Asset in the inspector.
+
+
+il funzionamento corretto dovrebbe essere che i tipi di stanza Challenge e Wave diventano un tipo solo chiamato Challenge, e entro potrebbero esserci o Wave o Sfida non ti puoi curare, o altre sfide in futuro invece la tipologia parkour non sarà un tipo di stanza apposta perchè spawnera come le normali non come le special iquindi semplciemtne qunado andremo a buildare una normal room faremo quelle con i mostrti e quelle con enigmi/percorsi
