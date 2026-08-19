@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 55728006089c16b46b93d0e1609ad7b5, type: 3}
+  m_Name: StandarRoom
+  m_EditorClassIdentifier: 
+  stableId: roomdef-b7802b70a1f9d2c44b32b6aa71c336a0
+  roomName: StandarRoom
+  roomPrefab: {fileID: 0}
+  size: {x: 1, y: 1}
+  roomType: 1
+  rewards:
+  - name: GoldCoin
+    itemPrefab: {fileID: 8995147148237869290, guid: 1d2576cf8ee2bd344a2d1a5e3f558e62, type: 3}
+    dropChance: 100
+    quantityWeights:
+    - amount: 1
+      chance: 50
+    - amount: 2
+      chance: 20
+    - amount: 3
+      chance: 15
+    - amount: 4
+      chance: 10
+    - amount: 5
+      chance: 5
+  - name: SilverCoin
+    itemPrefab: {fileID: 8995147148237869290, guid: 540ff07b32190ea4bba23d9fcfe81285, type: 3}
+    dropChance: 100
+    quantityWeights:
+    - amount: 1
+      chance: 80
+    - amount: 2
+      chance: 20
+  - name: CopperCoin
+    itemPrefab: {fileID: 8995147148237869290, guid: 320ad2e33947978439f296fe822ec81f, type: 3}
+    dropChance: 100
+    quantityWeights:
+    - amount: 1
+      chance: 80
+    - amount: 2
+      chance: 20
+  - name: Key
+    itemPrefab: {fileID: 5469647403989664328, guid: 7365aa4f4f5c7ba4fb21856c2d5bbdae, type: 3}
+    dropChance: 100
+    quantityWeights:
+    - amount: 1
+      chance: 80
+    - amount: 2
+      chance: 20

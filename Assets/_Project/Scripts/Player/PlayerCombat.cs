@@ -1139,6 +1139,8 @@ public class PlayerCombat : MonoBehaviour
         if (!HasWeaponRequirements(weapon))
             rawDamage *= 0.5f;
 
+        if (RunModifierController.Active != null)
+            rawDamage *= RunModifierController.Active.GetMultiplier(RunModifierEffect.DamageDealtMultiplier);
         int finalDamage = Mathf.Max(1, Mathf.RoundToInt(rawDamage));
         return (finalDamage, isCritical);
     }

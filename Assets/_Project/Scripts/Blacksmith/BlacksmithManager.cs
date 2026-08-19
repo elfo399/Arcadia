@@ -23,7 +23,8 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     [SerializeField] private GameObject craftModeRoot;
     [SerializeField] private CanvasGroup craftContentGroup;
     [SerializeField] private Transform slotParent;
-    [SerializeField] private DialogueChoiceUI upgradeItemRowPrefab;
+    [SerializeField] private InventorySlot upgradeItemSlotPrefab;
+    [SerializeField, Min(1)] private int upgradeGridSlotCount = 30;
     [SerializeField] private ScrollableVerticalListUI upgradeListScroll;
 
     [Header("Upgrade Detail")]
@@ -105,7 +106,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
     private PlayerControls controls;
     private Action<InputAction.CallbackContext> confirmCallback;
     private Action<InputAction.CallbackContext> cancelCallback;
-    private readonly List<DialogueChoiceUI> upgradeItemRows = new List<DialogueChoiceUI>();
+    private readonly List<InventorySlot> upgradeItemSlots = new List<InventorySlot>();
     private readonly List<InventoryItem> upgradeItems = new List<InventoryItem>();
     private readonly List<QuestRewardItemUI> materialRows = new List<QuestRewardItemUI>();
     private readonly List<CraftingRecipeData> visibleCraftRecipes = new List<CraftingRecipeData>();
@@ -265,10 +266,14 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             return;
         }
 
-        if (navigation.y > 0.5f)
-            MoveUpgradeFocus(-1);
+        if (navigation.x > 0.5f)
+            MoveUpgradeFocusHorizontal(1);
+        else if (navigation.x < -0.5f)
+            MoveUpgradeFocusHorizontal(-1);
+        else if (navigation.y > 0.5f)
+            MoveUpgradeFocusVertical(-1);
         else if (navigation.y < -0.5f)
-            MoveUpgradeFocus(1);
+            MoveUpgradeFocusVertical(1);
         else
             return;
 
@@ -403,6 +408,7 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         int previousIndex = selectedUpgradeIndex;
         ClearUpgradeItemRows();
         upgradeItems.Clear();
+        int slotCount = Mathf.Max(1, upgradeGridSlotCount);
         if (playerInventory != null)
         {
             IReadOnlyList<InventoryItem> inventoryItems = playerInventory.Items;
@@ -412,27 +418,30 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
                 if (item != null && item.weaponData != null
                     && item.weaponData.canUpgrade
                     && item.weaponData.category != WeaponCategory.Unarmed)
+                {
                     upgradeItems.Add(item);
+                    if (upgradeItems.Count >= slotCount)
+                        break;
+                }
             }
         }
 
-        DialogueChoiceUI rowPrefab = upgradeItemRowPrefab != null ? upgradeItemRowPrefab : craftRecipeRowPrefab;
-        for (int i = 0; i < upgradeItems.Count; i++)
+        for (int i = 0; i < slotCount; i++)
         {
-            if (slotParent == null || rowPrefab == null)
+            if (slotParent == null || upgradeItemSlotPrefab == null)
                 break;
 
-            int itemIndex = i;
-            InventoryItem item = upgradeItems[i];
-            DialogueChoiceUI row = Instantiate(rowPrefab, slotParent, false);
-            row.name = $"UpgradeWeapon_{i:00}";
-            row.gameObject.SetActive(true);
-            row.Bind(WeaponUpgradeCalculator.GetDisplayName(item), true, false);
-            Navigation navigation = row.Button.navigation;
-            navigation.mode = Navigation.Mode.None;
-            row.Button.navigation = navigation;
-            row.Button.onClick.AddListener(() => HandleUpgradeRowSubmit(itemIndex));
-            upgradeItemRows.Add(row);
+            InventorySlot slot = Instantiate(upgradeItemSlotPrefab, slotParent, false);
+            slot.name = $"UpgradeWeaponSlot_{i:00}";
+            slot.gameObject.SetActive(true);
+            bool hasWeapon = i < upgradeItems.Count;
+            slot.Init(i, hasWeapon ? this : null);
+            slot.SetDisplayOnly(!hasWeapon);
+            if (hasWeapon)
+                slot.Setup(GetItemIcon(upgradeItems[i]), 1, false);
+            else
+                slot.Clear();
+            upgradeItemSlots.Add(slot);
         }
 
         selectedUpgradeIndex = upgradeItems.Count > 0
@@ -444,25 +453,16 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
     private void ClearUpgradeItemRows()
     {
-        for (int i = 0; i < upgradeItemRows.Count; i++)
+        for (int i = 0; i < upgradeItemSlots.Count; i++)
         {
-            if (upgradeItemRows[i] == null)
+            if (upgradeItemSlots[i] == null)
                 continue;
-            upgradeItemRows[i].gameObject.SetActive(false);
-            Destroy(upgradeItemRows[i].gameObject);
+            upgradeItemSlots[i].gameObject.SetActive(false);
+            Destroy(upgradeItemSlots[i].gameObject);
         }
 
-        upgradeItemRows.Clear();
+        upgradeItemSlots.Clear();
         upgradeListScroll?.Refresh(false);
-    }
-
-    private void HandleUpgradeRowSubmit(int index)
-    {
-        if (!isInteractive || index < 0 || index >= upgradeItems.Count)
-            return;
-        if (selectedUpgradeIndex != index)
-            SetBlacksmithFocus(index);
-        TryFocusUpgradeButton();
     }
 
     public InventoryItem SelectedUpgradeItem => selectedUpgradeIndex >= 0 && selectedUpgradeIndex < upgradeItems.Count
@@ -505,17 +505,20 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
 
         RefreshUpgradeDetails();
 
+        for (int i = 0; i < upgradeItemSlots.Count; i++)
+            upgradeItemSlots[i]?.SetFocused(i == selectedUpgradeIndex);
+
         if (EventSystem.current != null && selectedUpgradeIndex >= 0
-            && selectedUpgradeIndex < upgradeItemRows.Count)
+            && selectedUpgradeIndex < upgradeItemSlots.Count)
         {
-            GameObject target = upgradeItemRows[selectedUpgradeIndex].gameObject;
+            GameObject target = upgradeItemSlots[selectedUpgradeIndex].gameObject;
             if (EventSystem.current.currentSelectedGameObject != target)
                 EventSystem.current.SetSelectedGameObject(target);
-            upgradeListScroll?.EnsureVisible(upgradeItemRows[selectedUpgradeIndex].transform as RectTransform);
+            upgradeListScroll?.EnsureVisible(upgradeItemSlots[selectedUpgradeIndex].transform as RectTransform);
         }
     }
 
-    private void MoveUpgradeFocus(int direction)
+    private void MoveUpgradeFocusHorizontal(int direction)
     {
         if (upgradeItems.Count == 0)
             return;
@@ -524,6 +527,27 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
         if (next >= upgradeItems.Count) next = 0;
         if (next < 0) next = upgradeItems.Count - 1;
         SetBlacksmithFocus(next);
+    }
+
+    private void MoveUpgradeFocusVertical(int direction)
+    {
+        if (upgradeItems.Count == 0)
+            return;
+
+        int columns = GetUpgradeGridColumnCount();
+        int start = selectedUpgradeIndex;
+        if (start < 0 || start >= upgradeItems.Count) start = 0;
+        int next = (start + (direction >= 0 ? columns : -columns)) % upgradeItems.Count;
+        if (next < 0) next += upgradeItems.Count;
+        SetBlacksmithFocus(next);
+    }
+
+    private int GetUpgradeGridColumnCount()
+    {
+        GridLayoutGroup grid = slotParent != null ? slotParent.GetComponent<GridLayoutGroup>() : null;
+        return grid != null && grid.constraint == GridLayoutGroup.Constraint.FixedColumnCount
+            ? Mathf.Max(1, grid.constraintCount)
+            : Mathf.Max(1, Mathf.CeilToInt(Mathf.Sqrt(upgradeItems.Count)));
     }
 
     private void RefreshUpgradeDetails()
@@ -1180,13 +1204,13 @@ public sealed class BlacksmithManager : MonoBehaviour, IInventorySlotHandler
             return;
         }
 
-        if (selectedUpgradeIndex < 0 || selectedUpgradeIndex >= upgradeItemRows.Count)
+        if (selectedUpgradeIndex < 0 || selectedUpgradeIndex >= upgradeItemSlots.Count)
             return;
 
-        GameObject target = upgradeItemRows[selectedUpgradeIndex].gameObject;
+        GameObject target = upgradeItemSlots[selectedUpgradeIndex].gameObject;
         if (EventSystem.current.currentSelectedGameObject != target)
             EventSystem.current.SetSelectedGameObject(target);
-        upgradeListScroll?.EnsureVisible(upgradeItemRows[selectedUpgradeIndex].transform as RectTransform);
+        upgradeListScroll?.EnsureVisible(upgradeItemSlots[selectedUpgradeIndex].transform as RectTransform);
     }
 
     private void OnCancelPerformed(InputAction.CallbackContext _)

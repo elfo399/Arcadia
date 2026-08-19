@@ -7,6 +7,11 @@ public class FloorPortal : MonoBehaviour
     public string playerTag = "Player";
     [Tooltip("Se true, il portale si disattiva dopo l'uso per evitare doppi trigger.")]
     public bool disableAfterUse = true;
+    [Header("Optional destination")]
+    [Tooltip("Zero keeps the normal next-floor behavior.")]
+    [Min(0)] public int targetFloorNumber;
+    [Tooltip("Optional one-floor DungeonThemeDefinition.themeId override.")]
+    public string targetThemeId;
     [Header("Quest Events")]
     [SerializeField] private string questTargetId = "next_floor";
     [SerializeField] private string questTargetTag = "floor";
@@ -34,7 +39,7 @@ public class FloorPortal : MonoBehaviour
         {
             used = true;
             QuestEvents.Raise(QuestObjectiveEventType.ReachFloor, ResolveQuestTargetId(), questTargetTag);
-            CoreGenerator.Instance.NextFloor();
+            CoreGenerator.Instance.NextFloor(targetFloorNumber, targetThemeId);
         }
 
         if (disableAfterUse) gameObject.SetActive(false);

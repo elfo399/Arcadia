@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c46b9ae52feb994e81af56842249bbc, type: 3}
+  m_Name: NecropolisRoomComposition
+  m_EditorClassIdentifier: 
+  normalRooms:
+    enabled: 1
+    min: 10
+    max: 10
+  shopRooms:
+    enabled: 1
+    min: 1
+    max: 1
+  treasureRooms:
+    enabled: 1
+    min: 1
+    max: 1
+  bossRooms:
+    enabled: 1
+    min: 1
+    max: 1
+  challengeRooms:
+    enabled: 0
+    min: 0
+    max: 0
+  minibossRooms:
+    enabled: 0
+    min: 0
+    max: 0
+  parkourRooms:
+    enabled: 0
+    min: 0
+    max: 0
+  npcEncounterRooms:
+    enabled: 0
+    min: 0
+    max: 0
+  churchRooms:
+    enabled: 1
+    min: 1
+    max: 1
+  secretAccessSecretRooms:
+    enabled: 0
+    min: 0
+    max: 0
+  secretAccessSuperSecretRooms:
+    enabled: 0
+    min: 0
+    max: 0
+  allowedRoomSets: []
+  lootPools: []
+  enemyPools: []
+  challengesAvailable: 1
+  shrinesAvailable: 1
+  minibossesAvailable: 1

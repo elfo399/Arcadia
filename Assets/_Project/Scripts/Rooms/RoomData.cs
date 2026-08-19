@@ -23,20 +23,30 @@ public class LootItem
 public class RoomData : ScriptableObject
 {
     [Header("Identità")]
+    [Tooltip("Immutable authoring ID used by deterministic generated-room identities.")]
+    public string stableId;
     public string roomName;
     public GameObject roomPrefab; 
+    [Min(1)] [Tooltip("Relative deterministic selection weight inside a matching room pool.")]
+    public int generationWeight = 1;
 
     [Header("Dimensioni Griglia")]
     public Vector2Int size = new Vector2Int(1, 1); 
 
-    [Header("Tipo")]
-    public bool isBossRoom;
-    public bool isTreasureRoom;
-    public bool isStartRoom;
-    public bool isShopRoom;
-    public bool isBlessedRoom;
-    public bool isEvilRoom;
+    [Header("Structural type")]
+    public RoomType roomType = RoomType.Normal;
     
     [Header("Rewards / Loot Table")]
     public List<LootItem> rewards = new List<LootItem>();
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (string.IsNullOrWhiteSpace(stableId))
+        {
+            stableId = "roomdef-" + System.Guid.NewGuid().ToString("N");
+            UnityEditor.EditorUtility.SetDirty(this);
+        }
+    }
+#endif
 }

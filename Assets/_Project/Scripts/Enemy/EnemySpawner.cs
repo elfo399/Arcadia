@@ -8,6 +8,9 @@ public class EnemySpawner : MonoBehaviour
 
     void Start()
     {
+        Room room = GetComponentInParent<Room>();
+        if (room != null && room.roomCleared)
+            return;
         int masterSeed = (CoreGenerator.Instance != null) ? CoreGenerator.Instance.currentMasterSeed : 0;
         int localSeed = masterSeed + (int)(transform.position.x * 1000) + (int)(transform.position.z * 1000);
         System.Random prng = new System.Random(localSeed);
@@ -21,7 +24,15 @@ public class EnemySpawner : MonoBehaviour
 
     void SpawnEnemy(EnemyData data)
     {
-        GameObject enemy = Instantiate(data.prefab, transform.position, transform.rotation, transform);
+        GameObject enemy = SpawnConfigured(data, transform.position, transform.rotation, transform);
+        Room room = GetComponentInParent<Room>();
+        if (room != null) room.RegisterEnemy(enemy, "legacy");
+    }
+
+    public static GameObject SpawnConfigured(EnemyData data, Vector3 position, Quaternion rotation, Transform parent)
+    {
+        if (data == null || data.prefab == null) return null;
+        GameObject enemy = Instantiate(data.prefab, position, rotation, parent);
         enemy.name = data.enemyName;
 
         EnemyHealth health = enemy.GetComponent<EnemyHealth>();
@@ -41,12 +52,7 @@ public class EnemySpawner : MonoBehaviour
             ai.SetPlayerTarget(ResolvePlayerTarget());
             ai.ConfigureFromData(data);
         }
-
-        if (enemy.CompareTag("Enemy"))
-        {
-            Room room = GetComponentInParent<Room>();
-            if (room != null) room.RegisterEnemy(enemy);
-        }
+        return enemy;
     }
 
     private static Transform ResolvePlayerTarget()

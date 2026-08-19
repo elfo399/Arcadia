@@ -472,6 +472,39 @@ public class PlayerInventory : MonoBehaviour
             : HasFreeNormalInventorySlots();
     }
 
+    /// <summary>Non-mutating aggregate capacity check used by dungeon outcome batches.</summary>
+    public bool CanAddItemsBatch(IReadOnlyDictionary<ScriptableObject, int> additions)
+    {
+        if (additions == null || additions.Count == 0) return true;
+        int normalSlotsNeeded = 0;
+        int magicSlotsNeeded = 0;
+        foreach (KeyValuePair<ScriptableObject, int> pair in additions)
+        {
+            int amount = Mathf.Max(1, pair.Value);
+            if (!CanAddItem(pair.Key, amount)) return false;
+            switch (pair.Key)
+            {
+                case WeaponItem:
+                case ArmorItemData:
+                    normalSlotsNeeded += amount;
+                    break;
+                case MagicItemData magic:
+                    if (FindStackableMagicItem(magic) == null) magicSlotsNeeded++;
+                    break;
+                case UsableItemData usable:
+                    if (FindStackableUsableItem(usable) == null) normalSlotsNeeded++;
+                    break;
+                case ItemData item:
+                    if (FindStackableGenericItem(item) == null) normalSlotsNeeded++;
+                    break;
+                default:
+                    return false;
+            }
+        }
+        return NormalUsedSlots <= NormalInventoryCapacity - normalSlotsNeeded
+               && MagicUsedSlots <= MagicInventoryCapacity - magicSlotsNeeded;
+    }
+
     public bool TryAddItem(ScriptableObject itemAsset, int amount = 1, bool save = true)
     {
         if (!CanAddItem(itemAsset, amount))

@@ -5,8 +5,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
+public enum DungeonRunEndReason { Completed, Death, VoluntaryExit }
+
 public class PlayerStats : MonoBehaviour, IDamageable
 {
+    public static event System.Action<float> DamageTaken;
     public const int BronzeCoinValue = 1;
     public const int SilverCoinValue = 5;
     public const int GoldCoinValue = 10;
@@ -395,6 +398,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (amount <= 0f) return;
 
         float preArmorAmount = amount;
+        if (RunModifierController.Active != null)
+            amount *= RunModifierController.Active.GetMultiplier(RunModifierEffect.DamageTakenMultiplier);
         RefreshArmorTotals();
         int effectiveDefense = GetDefenseForDamageType(damageType);
         amount = ApplyArmorMitigation(amount, damageType);
@@ -403,6 +408,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         Debug.Log($"[PlayerStats] Damage taken -> incoming:{incomingAmount:0.##}, afterBlockParry:{preArmorAmount:0.##}, type:{damageType}, defense:{effectiveDefense}, armorPhy:{totalArmorPhysicalDefense}, armorMag:{totalArmorMagicDefense}, final:{amount:0.##}");
 
         currentHealth -= amount;
+        DamageTaken?.Invoke(amount);
         if (currentHealth < 0) currentHealth = 0;
 
         if (currentHealth <= 0) Die();
@@ -413,6 +419,34 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (amount <= 0f) return;
         currentHealth += amount;
         currentHealth = Mathf.Min(currentHealth, maxHealth);
+    }
+
+    /// <summary>
+    /// Pays an authored dungeon sacrifice exactly. This deliberately bypasses the
+    /// combat damage pipeline (armour, block, invulnerability and run modifiers).
+    /// </summary>
+    public bool CanSacrificeHealth(float amount, bool allowLethal = false)
+    {
+        if (amount <= 0f) return true;
+        if (currentHealth <= 0f) return false;
+        return allowLethal ? currentHealth >= amount : currentHealth > amount;
+    }
+
+    public bool TrySacrificeHealth(float amount, bool allowLethal = false, bool save = true)
+    {
+        if (!CanSacrificeHealth(amount, allowLethal)) return false;
+        if (amount <= 0f) return true;
+        currentHealth = Mathf.Clamp(currentHealth - amount, 0f, maxHealth);
+        // Sacrifice bypasses combat mitigation, but death ownership remains the
+        // same as ordinary damage so a lethal authored cost cannot leave a
+        // living player at zero health.
+        if (currentHealth <= 0f)
+        {
+            Die();
+            return true;
+        }
+        if (save) SaveStats();
+        return true;
     }
 
     public void SetInvulnerable(bool value)
@@ -435,7 +469,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
         switch (usable.effectType)
         {
             case UsableItemData.UsableEffectType.Heal:
-                RestoreHealth(usable.healAmount > 0 ? usable.healAmount : flaskHealAmount);
+                float heal = usable.healAmount > 0 ? usable.healAmount : flaskHealAmount;
+                if (RunModifierController.Active != null) heal *= RunModifierController.Active.GetMultiplier(RunModifierEffect.FlaskHealingMultiplier);
+                RestoreHealth(heal);
                 break;
             case UsableItemData.UsableEffectType.Mana:
                 RestoreMana(usable.manaRestore > 0 ? usable.manaRestore : 0f);
@@ -469,6 +505,17 @@ public class PlayerStats : MonoBehaviour, IDamageable
         UpdateFlaskUI();
     }
 
+    public bool HasFlasks(int amount) => amount <= 0 || currentFlasks >= amount;
+
+    public bool TryConsumeFlasks(int amount, bool save = true)
+    {
+        if (amount <= 0 || currentFlasks < amount) return false;
+        currentFlasks -= amount;
+        UpdateFlaskUI();
+        if (save) SaveStats();
+        return true;
+    }
+
     public void SpendStamina(float amount)
     {
         // Se siamo nell'Hub, non consumare stamina (Opzionale)
@@ -498,7 +545,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
         if (currentStamina < maxStamina)
         {
-            currentStamina += staminaRegenRate * Time.deltaTime;
+            float regen = staminaRegenRate * (RunModifierController.Active != null ? RunModifierController.Active.GetMultiplier(RunModifierEffect.StaminaRegenMultiplier) : 1f);
+            currentStamina += regen * Time.deltaTime;
             if (currentStamina > maxStamina) currentStamina = maxStamina;
         }
     }
@@ -625,9 +673,36 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public void SetDungeonCheckpoint(int floor, string seed)
     {
+        SaveDungeonResumeCheckpoint(floor, seed);
+    }
+
+    /// <summary>Marks the currently active dungeon as resumable after an application quit.</summary>
+    public void SaveDungeonResumeCheckpoint(int floor, string seed)
+    {
+        if (string.IsNullOrWhiteSpace(seed))
+        {
+            Debug.LogWarning("[DungeonLifecycle] Refused resume checkpoint with an empty seed.");
+            ClearDungeonResumeState(save: false);
+            return;
+        }
         dungeonCheckpointActive = true;
         dungeonCheckpointFloor = Mathf.Max(1, floor);
-        dungeonCheckpointSeed = seed ?? string.Empty;
+        dungeonCheckpointSeed = seed.Trim();
+    }
+
+    /// <summary>Starts a fresh dungeon session. It never changes inventory or permanent progression.</summary>
+    public void BeginNewDungeonRun()
+    {
+        ClearDungeonResumeState(save: false);
+        Debug.Log("[DungeonLifecycle] Begin NEW run.");
+    }
+
+    public bool TryGetDungeonResumeCheckpoint(out int floor, out string seed, out SavedDungeonRunState run)
+    {
+        floor = Mathf.Max(1, dungeonCheckpointFloor);
+        seed = dungeonCheckpointSeed ?? string.Empty;
+        run = loadedDataCache != null ? loadedDataCache.dungeonRun : null;
+        return dungeonCheckpointActive && IsValidDungeonResumeData(floor, seed, run);
     }
 
     public bool TryGetDungeonCheckpoint(out int floor, out string seed)
@@ -642,6 +717,30 @@ public class PlayerStats : MonoBehaviour, IDamageable
         dungeonCheckpointActive = false;
         dungeonCheckpointFloor = 1;
         dungeonCheckpointSeed = string.Empty;
+    }
+
+    /// <summary>Ends a dungeon session and removes every resumable/run-only record before saving.</summary>
+    public void EndDungeonRun(DungeonRunEndReason reason, bool save = true)
+    {
+        ClearDungeonResumeState(save: false);
+        Debug.Log($"[DungeonLifecycle] End run: {reason}. Cleared resume state.");
+        if (save) SaveStatsImmediate();
+    }
+
+    /// <summary>Clears both runtime authorities and the loaded snapshot so a Hub save cannot resurrect a run.</summary>
+    public void ClearDungeonResumeState(bool save)
+    {
+        ClearDungeonCheckpoint();
+        DungeonRunStateController.Active?.ClearRun();
+        RunModifierController.Active?.ClearForRunEnd();
+        if (loadedDataCache != null)
+        {
+            loadedDataCache.dungeonCheckpointActive = false;
+            loadedDataCache.dungeonFloor = 1;
+            loadedDataCache.dungeonSeed = string.Empty;
+            loadedDataCache.dungeonRun = null;
+        }
+        if (save) SaveStatsImmediate();
     }
 
     /// <summary>
@@ -706,8 +805,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             return false;
         }
 
-        ClearDungeonCheckpoint();
-        SaveStatsImmediate();
+        EndDungeonRun(DungeonRunEndReason.Completed);
         return true;
     }
 
@@ -974,9 +1072,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
             usesUnifiedCoins = true,
             bankCoins = this.bankCoins,
             runCoins = this.runCoins,
-            dungeonCheckpointActive = this.dungeonCheckpointActive,
-            dungeonFloor = this.dungeonCheckpointFloor,
-            dungeonSeed = this.dungeonCheckpointSeed,
+            dungeonCheckpointActive = HasValidDungeonResumeSnapshot(out int resumeFloor, out string resumeSeed, out SavedDungeonRunState resumeRun),
+            dungeonFloor = resumeFloor,
+            dungeonSeed = resumeSeed,
+            dungeonRun = resumeRun,
             bankGold = this.bankGold,
             bankSilver = this.bankSilver,
             bankCopper = this.bankCopper,
@@ -1151,15 +1250,49 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     private void ApplyLoadedDungeonCheckpoint(GameData data)
     {
-        if (data == null || !data.dungeonCheckpointActive)
+        if (data == null || !data.dungeonCheckpointActive || !IsValidDungeonResumeData(data.dungeonFloor, data.dungeonSeed, data.dungeonRun))
         {
-            ClearDungeonCheckpoint();
+            ClearDungeonResumeState(save: false);
             return;
         }
 
         dungeonCheckpointActive = true;
         dungeonCheckpointFloor = Mathf.Max(1, data.dungeonFloor);
         dungeonCheckpointSeed = data.dungeonSeed ?? string.Empty;
+    }
+
+    private bool HasValidDungeonResumeSnapshot(out int floor, out string seed, out SavedDungeonRunState run)
+    {
+        floor = 1;
+        seed = string.Empty;
+        run = null;
+        if (!dungeonCheckpointActive)
+            return false;
+
+        floor = Mathf.Max(1, dungeonCheckpointFloor);
+        seed = dungeonCheckpointSeed ?? string.Empty;
+        DungeonRunStateController controller = DungeonRunStateController.Active;
+        if (controller != null && controller.IsInitialized && string.Equals(controller.RunSeed, seed, StringComparison.Ordinal))
+            run = controller.Export();
+        else if (loadedDataCache != null)
+            run = loadedDataCache.dungeonRun;
+
+        if (IsValidDungeonResumeData(floor, seed, run))
+            return true;
+
+        floor = 1;
+        seed = string.Empty;
+        run = null;
+        return false;
+    }
+
+    private static bool IsValidDungeonResumeData(int floor, string seed, SavedDungeonRunState run)
+    {
+        return floor >= 1
+            && !string.IsNullOrWhiteSpace(seed)
+            && run != null
+            && string.Equals(run.runSeed ?? string.Empty, seed.Trim(), StringComparison.Ordinal)
+            && run.currentFloor == floor;
     }
 
     public bool TryApplySelectedClassStart(PlayerClassDatabase database)
@@ -1696,9 +1829,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
         float manaRatio = keepCurrentRatio ? Mathf.Clamp01(currentMana / oldMaxMana) : 1f;
         float staminaRatio = keepCurrentRatio ? Mathf.Clamp01(currentStamina / oldMaxStamina) : 1f;
 
-        maxHealth = GetMaxHealth(EffectiveVigor);
-        maxMana = GetMaxMana(EffectiveMind);
-        maxStamina = GetMaxStamina(EffectiveEndurance);
+        float healthMultiplier = RunModifierController.Active != null ? RunModifierController.Active.GetMultiplier(RunModifierEffect.MaxHealthMultiplier) : 1f;
+        float manaMultiplier = RunModifierController.Active != null ? RunModifierController.Active.GetMultiplier(RunModifierEffect.MaxManaMultiplier) : 1f;
+        float staminaMultiplier = RunModifierController.Active != null ? RunModifierController.Active.GetMultiplier(RunModifierEffect.MaxStaminaMultiplier) : 1f;
+        maxHealth = GetMaxHealth(EffectiveVigor) * healthMultiplier;
+        maxMana = GetMaxMana(EffectiveMind) * manaMultiplier;
+        maxStamina = GetMaxStamina(EffectiveEndurance) * staminaMultiplier;
 
         currentHealth = Mathf.Clamp(maxHealth * healthRatio, 0f, maxHealth);
         currentMana = Mathf.Clamp(maxMana * manaRatio, 0f, maxMana);
@@ -1741,8 +1877,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (inventory != null)
             inventory.ClearRunInventory(save: false);
         ResetRunWallet();
-        ClearDungeonCheckpoint();
-        SaveStatsImmediate();
+        EndDungeonRun(DungeonRunEndReason.Death);
         Debug.Log("SEI MORTO! Ritorno all'Hub...");
         SceneManager.LoadScene("HubScene");
     }

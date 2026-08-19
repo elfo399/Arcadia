@@ -425,6 +425,25 @@ public class MinimapManager : MonoBehaviour
         MapStateChanged?.Invoke();
     }
 
+    /// <summary>Restores only generated-room fog state; authored secret sub-areas never register here.</summary>
+    public void RestoreRoomVisibility(Vector2Int gridPos, bool visited, bool revealed)
+    {
+        if (visited) _visitedRoomAnchors.Add(gridPos);
+        if (revealed) _revealedRoomAnchors.Add(gridPos);
+        if (_roomIconObjects.TryGetValue(gridPos, out GameObject icon) && icon != null)
+        {
+            icon.SetActive(revealed);
+            if (revealed) ApplyIconVisibilityState(icon, gridPos, _lastPlayerRoomAnchor);
+        }
+    }
+
+    public bool TryGetRoomVisibility(Vector2Int gridPos, out bool visited, out bool revealed)
+    {
+        visited = _visitedRoomAnchors.Contains(gridPos);
+        revealed = _revealedRoomAnchors.Contains(gridPos);
+        return _roomData.ContainsKey(gridPos);
+    }
+
     private void SetupIconVisuals(GameObject iconObj, Vector2Int gridPos, RoomData data)
     {
         RectTransform rt = iconObj.GetComponent<RectTransform>();
@@ -448,12 +467,12 @@ public class MinimapManager : MonoBehaviour
         if (overlayImg != null)
         {
             overlayImg.gameObject.SetActive(false);
-            if      (data.isBossRoom && skullIcon != null)   { overlayImg.sprite = skullIcon;   overlayImg.gameObject.SetActive(true); }
-            else if (data.isTreasureRoom && crownIcon != null) { overlayImg.sprite = crownIcon;   overlayImg.gameObject.SetActive(true); }
-            else if (data.isStartRoom && startIcon != null)  { overlayImg.sprite = startIcon;   overlayImg.gameObject.SetActive(true); }
-            else if (data.isShopRoom && shopIcon != null)    { overlayImg.sprite = shopIcon;    overlayImg.gameObject.SetActive(true); }
-            else if (data.isBlessedRoom && blessedIcon != null){ overlayImg.sprite = blessedIcon; overlayImg.gameObject.SetActive(true); }
-            else if (data.isEvilRoom && evilIcon != null)    { overlayImg.sprite = evilIcon;    overlayImg.gameObject.SetActive(true); }
+            if      (data.roomType == RoomType.Boss && skullIcon != null)   { overlayImg.sprite = skullIcon;   overlayImg.gameObject.SetActive(true); }
+            else if (data.roomType == RoomType.Treasure && crownIcon != null) { overlayImg.sprite = crownIcon;   overlayImg.gameObject.SetActive(true); }
+            else if (data.roomType == RoomType.Start && startIcon != null)  { overlayImg.sprite = startIcon;   overlayImg.gameObject.SetActive(true); }
+            else if (data.roomType == RoomType.Shop && shopIcon != null)    { overlayImg.sprite = shopIcon;    overlayImg.gameObject.SetActive(true); }
+            else if (data.roomType == RoomType.Curch && blessedIcon != null){ overlayImg.sprite = blessedIcon; overlayImg.gameObject.SetActive(true); }
+            else if (data.roomType == RoomType.EvilCurch && evilIcon != null)    { overlayImg.sprite = evilIcon;    overlayImg.gameObject.SetActive(true); }
         }
     }
     

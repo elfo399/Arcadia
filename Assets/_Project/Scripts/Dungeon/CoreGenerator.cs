@@ -48,6 +48,12 @@ public class CoreGenerator : MonoBehaviour
     [Range(0, 100)] public int treasureBigRoomChance = 50;
     [Range(0, 100)] public int curchBigRoomChance = 50;
     [Range(0, 100)] public int evilCurchBigRoomChance = 50;
+    [Range(0, 100)] public int waveBigRoomChance = 0;
+    [Range(0, 100)] public int challengeBigRoomChance = 0;
+    [Range(0, 100)] public int minibossBigRoomChance = 0;
+    [Range(0, 100)] public int parkourBigRoomChance = 0;
+    [Range(0, 100)] public int npcEncounterBigRoomChance = 0;
+    [Range(0, 100)] public int secretAccessBigRoomChance = 0;
 
     [Header("Regole Distanza & Adiacenza")]
     [Tooltip("Distanza minima (celle) dallo Start per il Boss.")]
@@ -60,6 +66,10 @@ public class CoreGenerator : MonoBehaviour
     [Header("Debug")]
     public bool showRngLogs = true;
 
+    [Header("Debug / Testing")]
+    [Tooltip("TEST ONLY: when GameScene starts, ignore and clear any saved dungeon checkpoint, reset to floor 1, and generate a fresh random seed.")]
+    public bool forceNewRunOnStartForTesting = false;
+
     #endregion
 
     #region --- Strutture Dati Interne ---
@@ -68,7 +78,7 @@ public class CoreGenerator : MonoBehaviour
     {
         public Vector2Int anchorPos;
         public Vector2Int size;
-        public string type;
+        public RoomType roomType;
         public Room prefabReference;
 
         public bool Contains(Vector2Int point)
@@ -78,22 +88,39 @@ public class CoreGenerator : MonoBehaviour
         }
     }
 
+    // A prefab pool is an authoring selector, not a graph role. The two
+    // SecretAccess pools deliberately share RoomType.SecretAccess.
+    private enum RoomPoolKey
+    {
+        Normal, Shop, Treasure, Wave, Challenge, Miniboss, Parkour,
+        NpcEncounter, SecretAccessSecret, SecretAccessSuperSecret,
+        Curch, EvilCurch, Boss
+    }
+
     private List<Room> activeRoomObjects = new List<Room>();
     private Room startRoomInstance;
     private System.Random prng;
     private PlayerStats playerStats;
     private bool savedCheckpointApplied;
+    private bool resumingSavedRun;
+    private SavedDungeonRunState resumeRunState;
     private DungeonThemeDefinition activeThemeDefinition;
     private DungeonRoomSet activeRoomSet;
+    private DungeonFloorDefinition activeFloorDefinition;
+    private DungeonRunStateController runStateController;
+    private int activeNormalRoomCount;
+    private string pendingThemeOverrideId;
 
     public event Action<int, string> FloorThemeChanged;
     public event Action<int> FloorGenerated;
     public int CurrentFloor => currentFloor;
     public DungeonThemeDefinition ActiveThemeDefinition => activeThemeDefinition;
+    public DungeonFloorDefinition ActiveFloorDefinition => activeFloorDefinition;
     public string ActiveThemeDisplayName => GetThemeDisplayName(activeThemeDefinition);
+    public IReadOnlyList<Room> ActiveRooms => activeRoomObjects;
 
     // Lookup ricostruito in base al tema attivo del piano.
-    private Dictionary<string, Dictionary<Vector2Int, Room[]>> _prefabLookup;
+    private Dictionary<RoomPoolKey, Dictionary<Vector2Int, Room[]>> _prefabLookup;
 
     private readonly Vector2Int[] directions = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
     
@@ -110,9 +137,13 @@ public class CoreGenerator : MonoBehaviour
     void Awake() 
     { 
         Instance = this;
+        runStateController = GetComponent<DungeonRunStateController>();
+        if (runStateController == null) runStateController = gameObject.AddComponent<DungeonRunStateController>();
+        if (GetComponent<RunModifierController>() == null) gameObject.AddComponent<RunModifierController>();
         ResolvePlayerTransform();
         CachePlayerStats();
-        ApplySavedCheckpointIfAvailable();
+        if (!forceNewRunOnStartForTesting)
+            ApplySavedCheckpointIfAvailable();
         if (playerStats == null) Debug.LogWarning("[CoreGenerator] PlayerStats non trovato! La generazione di stanze speciali (Curch/EvilCurch) non funzionerà.");
         
     }
@@ -120,7 +151,16 @@ public class CoreGenerator : MonoBehaviour
     void Start()
     {
         CachePlayerStats();
-        ApplySavedCheckpointIfAvailable();
+        if (forceNewRunOnStartForTesting)
+        {
+            PrepareNewRunForGeneration(forcedForTesting: true);
+        }
+        else
+        {
+            ApplySavedCheckpointIfAvailable();
+            if (!resumingSavedRun)
+                PrepareNewRunForGeneration(forcedForTesting: false);
+        }
         Generate();
     }
     
@@ -146,15 +186,40 @@ public class CoreGenerator : MonoBehaviour
             playerStats = PlayerStats.instance;
     }
 
+    private void PrepareNewRunForGeneration(bool forcedForTesting)
+    {
+        resumingSavedRun = false;
+        resumeRunState = null;
+        currentFloor = 1;
+        gameSeedString = string.Empty;
+        useRandomSeed = true;
+        pendingThemeOverrideId = null;
+
+        runStateController?.ClearRun();
+        playerStats?.BeginNewDungeonRun();
+
+        if (forcedForTesting)
+            Debug.Log("[DungeonLifecycle] TEST override: ignored saved checkpoint and forced NEW run with a fresh seed.");
+    }
+
     private void ApplySavedCheckpointIfAvailable()
     {
         if (savedCheckpointApplied)
             return;
 
-        if (playerStats == null || !playerStats.TryGetDungeonCheckpoint(out int savedFloor, out string savedSeed))
+        if (playerStats == null || !playerStats.HasActiveDungeonCheckpoint)
             return;
 
+        if (!playerStats.TryGetDungeonResumeCheckpoint(out int savedFloor, out string savedSeed, out SavedDungeonRunState savedRun))
+        {
+            Debug.LogWarning("[DungeonLifecycle] Discarded invalid dungeon resume checkpoint; starting a new run.");
+            playerStats.ClearDungeonResumeState(save: true);
+            return;
+        }
+
         savedCheckpointApplied = true;
+        resumingSavedRun = true;
+        resumeRunState = savedRun;
         currentFloor = Mathf.Clamp(savedFloor, 1, Mathf.Max(1, maxFloors));
         if (!string.IsNullOrWhiteSpace(savedSeed))
         {
@@ -162,7 +227,7 @@ public class CoreGenerator : MonoBehaviour
             useRandomSeed = false;
         }
 
-        Debug.Log($"[CoreGenerator] Ripristino checkpoint: piano {currentFloor}, seed '{gameSeedString}'.");
+        Debug.Log($"[DungeonLifecycle] Resume run seed '{gameSeedString}' floor {currentFloor}.");
     }
 
     public void Generate()
@@ -180,6 +245,11 @@ public class CoreGenerator : MonoBehaviour
         currentMasterSeed = ComputeSeedHash(floorSeedString);
         if (showRngLogs) Debug.Log($"[CoreGenerator] Seed per piano {currentFloor}: '{floorSeedString}' -> Hash: {currentMasterSeed}");
 
+        if (runStateController == null) runStateController = GetComponent<DungeonRunStateController>();
+        SavedDungeonRunState savedRun = !runStateController.IsInitialized && resumingSavedRun ? resumeRunState : null;
+        runStateController.InitializeFromSave(gameSeedString, currentFloor, savedRun);
+        RunModifierController.Active?.RestoreFromRunState();
+
         ResolveActiveThemeForCurrentFloor();
         if (!ValidateActiveThemeConfiguration(out string configError))
         {
@@ -188,6 +258,7 @@ public class CoreGenerator : MonoBehaviour
         }
 
         InitializePrefabLookup();
+        activeNormalRoomCount = ResolveNormalRoomCount();
 
         Room effectiveStartRoomPrefab = GetStartRoomPrefab();
         if (effectiveStartRoomPrefab == null || effectiveStartRoomPrefab.roomData == null)
@@ -223,6 +294,8 @@ public class CoreGenerator : MonoBehaviour
             if (navMeshSurface != null) navMeshSurface.BuildNavMesh();
             InitializeMinimap();
             RespawnPlayerAtStart();
+            playerStats?.SaveDungeonResumeCheckpoint(currentFloor, gameSeedString);
+            playerStats?.SaveStatsImmediate();
             FloorGenerated?.Invoke(currentFloor);
         }
         else
@@ -231,9 +304,10 @@ public class CoreGenerator : MonoBehaviour
         }
     }
 
-    public void NextFloor()
+    public void NextFloor(int targetFloorNumber = 0, string targetThemeId = null)
     {
-        if (currentFloor >= maxFloors)
+        int destination = targetFloorNumber > 0 ? Mathf.Clamp(targetFloorNumber, 1, Mathf.Max(1, maxFloors)) : currentFloor + 1;
+        if (destination > maxFloors || (targetFloorNumber <= 0 && currentFloor >= maxFloors))
         {
             CachePlayerStats();
             if (playerStats != null)
@@ -249,7 +323,8 @@ public class CoreGenerator : MonoBehaviour
         }
         else
         {
-            currentFloor++;
+            currentFloor = destination;
+            pendingThemeOverrideId = string.IsNullOrWhiteSpace(targetThemeId) ? null : targetThemeId.Trim();
             Generate();
         }
     }
@@ -260,31 +335,31 @@ public class CoreGenerator : MonoBehaviour
         List<VirtualRoom> layout = new List<VirtualRoom>();
 
         // 1. START
-        AddRoomToLayout(layout, occupiedCells, Vector2Int.zero, new Vector2Int(1, 1), "Start", GetStartRoomPrefab());
+        AddRoomToLayout(layout, occupiedCells, Vector2Int.zero, new Vector2Int(1, 1), RoomType.Start, GetStartRoomPrefab());
 
         // 2. CORPO CENTRALE
         List<VirtualRoom> expandableRooms = new List<VirtualRoom> { layout[0] };
         int normalCount = 0;
         int consecutiveFailedNormalPlacements = 0;
-        int maxNormalPlacementFailures = Mathf.Max(50, totalNormalRooms * 8);
-        while (normalCount < totalNormalRooms && expandableRooms.Count > 0)
+        int maxNormalPlacementFailures = Mathf.Max(50, activeNormalRoomCount * 8);
+        while (normalCount < activeNormalRoomCount && expandableRooms.Count > 0)
         {
             VirtualRoom origin = expandableRooms[prng.Next(expandableRooms.Count)];
             Vector2Int dir = directions[prng.Next(directions.Length)];
             Vector2Int potentialAnchor = origin.anchorPos + dir;
 
-            List<Vector2Int> sizesToTry = GetSizesToTry(normalBigRoomChance, "Normal");
+            List<Vector2Int> sizesToTry = GetSizesToTry(normalBigRoomChance, RoomPoolKey.Normal);
             bool placed = false;
 
             foreach (var size in sizesToTry)
             {
                 if (CanFit(potentialAnchor, size, occupiedCells, false))
                 {
-                    Room prefab = GetRandomPrefab("Normal", size);
+                    Room prefab = GetRandomPrefab(RoomPoolKey.Normal, size);
                     if (prefab != null)
                     {
-                        LogRoomPlacement("Normal", size, potentialAnchor);
-                        VirtualRoom newRoom = AddRoomToLayout(layout, occupiedCells, potentialAnchor, size, "Normal", prefab);
+                        LogRoomPlacement(RoomType.Normal, size, potentialAnchor);
+                        VirtualRoom newRoom = AddRoomToLayout(layout, occupiedCells, potentialAnchor, size, RoomType.Normal, prefab);
                         expandableRooms.Add(newRoom);
                         normalCount++;
                         consecutiveFailedNormalPlacements = 0;
@@ -302,7 +377,7 @@ public class CoreGenerator : MonoBehaviour
             }
         }
 
-        if (normalCount < totalNormalRooms)
+        if (normalCount < activeNormalRoomCount)
             return null;
 
         // --- FASE DI PIAZZAMENTO STANZE SPECIALI ---
@@ -318,18 +393,36 @@ public class CoreGenerator : MonoBehaviour
         freeSockets = freeSockets.OrderBy(x => prng.Next()).ToList();
         
         // 5. Tenta di piazzare le stanze speciali, passando la mappa spaziale per ottimizzare i controlli.
-        if (!PlaceSpecialRoom("Shop", layout, occupiedCells, deadEndNormalRooms, freeSockets, -1, shopBigRoomChance, cellToRoomMap)) return null;
-        if (!PlaceSpecialRoom("Treasure", layout, occupiedCells, deadEndNormalRooms, freeSockets, -1, treasureBigRoomChance, cellToRoomMap)) return null;
-        if (!PlaceSpecialRoom("Boss", layout, occupiedCells, deadEndNormalRooms, freeSockets, minBossDistance, bossBigRoomChance, cellToRoomMap)) return null;
+        // Keep this order deterministic; Boss retains priority over optional categories.
+        if (!PlaceSpecialRooms(RoomType.Shop, RoomPoolKey.Shop, ResolveSpecialRoomCount(RoomType.Shop), layout, occupiedCells, deadEndNormalRooms, freeSockets, -1, shopBigRoomChance, cellToRoomMap)) return null;
+        if (!PlaceSpecialRooms(RoomType.Treasure, RoomPoolKey.Treasure, ResolveSpecialRoomCount(RoomType.Treasure), layout, occupiedCells, deadEndNormalRooms, freeSockets, -1, treasureBigRoomChance, cellToRoomMap)) return null;
+        if (!PlaceSpecialRooms(RoomType.Boss, RoomPoolKey.Boss, ResolveSpecialRoomCount(RoomType.Boss), layout, occupiedCells, deadEndNormalRooms, freeSockets, minBossDistance, bossBigRoomChance, cellToRoomMap)) return null;
+        if (!PlaceSpecialRooms(RoomType.Miniboss, RoomPoolKey.Miniboss, ResolveSpecialRoomCount(RoomType.Miniboss), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, minibossBigRoomChance, cellToRoomMap)) return null;
+        if (!PlaceChallengeRooms(ResolveChallengeRoomCount(), layout, occupiedCells, deadEndNormalRooms, freeSockets, cellToRoomMap)) return null;
+        if (!PlaceSpecialRooms(RoomType.NpcEncounter, RoomPoolKey.NpcEncounter, ResolveSpecialRoomCount(RoomType.NpcEncounter), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, npcEncounterBigRoomChance, cellToRoomMap)) return null;
+        if (!PlaceSpecialRooms(RoomType.SecretAccess, RoomPoolKey.SecretAccessSecret, ResolveSecretAccessRoomCount(false), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, secretAccessBigRoomChance, cellToRoomMap)) return null;
+        if (!PlaceSpecialRooms(RoomType.SecretAccess, RoomPoolKey.SecretAccessSuperSecret, ResolveSecretAccessRoomCount(true), layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, secretAccessBigRoomChance, cellToRoomMap)) return null;
 
-        // 5.1 CURCH / EVIL CURCH (opzionale)
-        if (playerStats != null && prng.Next(0, 100) <= curchsRoomsChance)
+        // Floor definitions configure one church count; alignment selects its authored variant.
+        if (activeFloorDefinition != null)
         {
-            string curchType = playerStats.benedetto > playerStats.malefico ? "Curch" : "EvilCurch";
-            int curchChance = playerStats.benedetto > playerStats.malefico ? curchBigRoomChance : evilCurchBigRoomChance;
-            if(playerStats.benedetto != playerStats.malefico)
-                PlaceSpecialRoom(curchType, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, curchChance, cellToRoomMap);
+            int churchCount = ResolveChurchRoomCount();
+            bool useEvilChurch = playerStats != null && playerStats.malefico > playerStats.benedetto;
+            RoomType churchType = useEvilChurch ? RoomType.EvilCurch : RoomType.Curch;
+            RoomPoolKey churchPool = useEvilChurch ? RoomPoolKey.EvilCurch : RoomPoolKey.Curch;
+            int bigRoomChance = useEvilChurch ? evilCurchBigRoomChance : curchBigRoomChance;
+            if (!PlaceSpecialRooms(churchType, churchPool, churchCount, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, bigRoomChance, cellToRoomMap)) return null;
         }
+        else if (playerStats != null && playerStats.benedetto != playerStats.malefico && prng.Next(0, 100) <= curchsRoomsChance)
+        {
+            bool useEvilChurch = playerStats.malefico > playerStats.benedetto;
+            RoomType churchType = useEvilChurch ? RoomType.EvilCurch : RoomType.Curch;
+            RoomPoolKey churchPool = useEvilChurch ? RoomPoolKey.EvilCurch : RoomPoolKey.Curch;
+            int bigRoomChance = useEvilChurch ? evilCurchBigRoomChance : curchBigRoomChance;
+            PlaceSpecialRoom(churchType, churchPool, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, bigRoomChance, cellToRoomMap);
+        }
+
+        PlaceParkourRooms(ResolveSpecialRoomCount(RoomType.Parkour), layout, occupiedCells, cellToRoomMap);
 
         return layout;
     }
@@ -353,7 +446,7 @@ public class CoreGenerator : MonoBehaviour
     private List<VirtualRoom> FindDeadEndNormalRooms(List<VirtualRoom> layout, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
     {
         var candidates = new List<VirtualRoom>();
-        var normalRooms = layout.Where(r => r.type == "Normal").ToList();
+        var normalRooms = layout.Where(r => r.roomType == RoomType.Normal).ToList();
         
         if (normalRooms.Count == 0) return candidates;
 
@@ -410,31 +503,31 @@ public class CoreGenerator : MonoBehaviour
         }
     }
 
-    bool PlaceSpecialRoom(string type, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, List<VirtualRoom> replacementCandidates, List<Vector2Int> freeSockets, int minDistance, int bigRoomChance, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    bool PlaceSpecialRoom(RoomType roomType, RoomPoolKey poolKey, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, List<VirtualRoom> replacementCandidates, List<Vector2Int> freeSockets, int minDistance, int bigRoomChance, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
     {
-        var sizesToTry = GetSizesToTry(bigRoomChance, type);
+        var sizesToTry = GetSizesToTry(bigRoomChance, poolKey);
 
         // --- Strategia 1: Sostituzione di una stanza interna (vicolo cieco) ---
         foreach (var roomToReplace in replacementCandidates.ToList()) 
         {
             if (minDistance > 0 && GetManhattanDist(Vector2Int.zero, roomToReplace.anchorPos) < minDistance) continue;
-            if (avoidBossTouchingSpecials && type == "Boss" && IsTouchingRestrictedRoom(roomToReplace.anchorPos, roomToReplace.size, cellToRoomMap, roomToReplace)) continue;
+            if (avoidBossTouchingSpecials && roomType == RoomType.Boss && IsTouchingRestrictedRoom(roomToReplace.anchorPos, roomToReplace.size, cellToRoomMap, roomToReplace)) continue;
             if (IsTouchingAnySpecialRoom(roomToReplace.anchorPos, roomToReplace.size, cellToRoomMap, roomToReplace)) continue;
             if (!sizesToTry.Contains(roomToReplace.size)) continue;
             
-            Room prefab = GetRandomPrefab(type, roomToReplace.size);
+            Room prefab = GetRandomPrefab(poolKey, roomToReplace.size);
             if (prefab != null)
             {
                 TemporarilyRemoveRoom(roomToReplace, layout, occupied, cellToRoomMap);
-                LogRoomPlacement(type, roomToReplace.size, roomToReplace.anchorPos);
-                AddRoomToLayout(layout, occupied, roomToReplace.anchorPos, roomToReplace.size, type, prefab, cellToRoomMap);
+                LogRoomPlacement(roomType, roomToReplace.size, roomToReplace.anchorPos);
+                AddRoomToLayout(layout, occupied, roomToReplace.anchorPos, roomToReplace.size, roomType, prefab, cellToRoomMap);
                 replacementCandidates.Remove(roomToReplace);
                 return true; 
             }
         }
 
         // --- Strategia 2: Aggiunta su un bordo esterno (fallback) ---
-        bool isStrictDeadEnd = (type == "Boss" && bossMustBeDeadEnd);
+        bool isStrictDeadEnd = roomType == RoomType.Boss && bossMustBeDeadEnd;
         foreach (var spot in freeSockets.ToList())
         {
             if (minDistance > 0 && GetManhattanDist(Vector2Int.zero, spot) < minDistance) continue;
@@ -443,14 +536,14 @@ public class CoreGenerator : MonoBehaviour
             {
                 if (CanFit(spot, size, occupied, isStrictDeadEnd))
                 {
-                    if (avoidBossTouchingSpecials && type == "Boss" && IsTouchingRestrictedRoom(spot, size, cellToRoomMap, null)) continue;
+                    if (avoidBossTouchingSpecials && roomType == RoomType.Boss && IsTouchingRestrictedRoom(spot, size, cellToRoomMap, null)) continue;
                     if (IsTouchingAnySpecialRoom(spot, size, cellToRoomMap, null)) continue;
 
-                    Room prefab = GetRandomPrefab(type, size);
+                    Room prefab = GetRandomPrefab(poolKey, size);
                     if (prefab != null)
                     {
-                        LogRoomPlacement(type, size, spot);
-                        AddRoomToLayout(layout, occupied, spot, size, type, prefab, cellToRoomMap);
+                        LogRoomPlacement(roomType, size, spot);
+                        AddRoomToLayout(layout, occupied, spot, size, roomType, prefab, cellToRoomMap);
                         freeSockets.Remove(spot);
                         return true;
                     }
@@ -458,12 +551,156 @@ public class CoreGenerator : MonoBehaviour
             }
         }
         
-        return type == "Curch" || type == "EvilCurch";
+        // Callers that intentionally treat a shrine as optional simply ignore this
+        // result. A floor definition with a positive minimum must instead fail the
+        // attempt so it can never silently generate fewer requested rooms.
+        return false;
+    }
+
+    private bool PlaceSpecialRooms(RoomType roomType, RoomPoolKey poolKey, int count, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, List<VirtualRoom> replacementCandidates, List<Vector2Int> freeSockets, int minDistance, int bigRoomChance, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    {
+        for (int i = 0; i < count; i++)
+            if (!PlaceSpecialRoom(roomType, poolKey, layout, occupied, replacementCandidates, freeSockets, minDistance, bigRoomChance, cellToRoomMap))
+                return false;
+        return true;
+    }
+
+    private bool PlaceChallengeRooms(int count, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, List<VirtualRoom> replacementCandidates, List<Vector2Int> freeSockets, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    {
+        if (count <= 0)
+            return true;
+
+        bool hasWavePool = HasWaveRoomVariants();
+        bool hasChallengePool = HasChallengeRoomVariants();
+        if (!hasWavePool && !hasChallengePool)
+        {
+            Debug.LogWarning($"[CoreGenerator] Il room set '{activeRoomSet.name}' non ha varianti Wave o Challenge: Challenge Rooms viene saltato.");
+            return true;
+        }
+
+        System.Random choiceRandom = DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "challenge-room-types");
+        for (int i = 0; i < count; i++)
+        {
+            bool useWave = hasWavePool && (!hasChallengePool || choiceRandom.Next(0, 2) == 0);
+            RoomType roomType = useWave ? RoomType.Wave : RoomType.Challenge;
+            RoomPoolKey poolKey = useWave ? RoomPoolKey.Wave : RoomPoolKey.Challenge;
+            int bigRoomChance = useWave ? waveBigRoomChance : challengeBigRoomChance;
+            if (!PlaceSpecialRoom(roomType, poolKey, layout, occupied, replacementCandidates, freeSockets, 0, bigRoomChance, cellToRoomMap))
+                return false;
+        }
+
+        return true;
+    }
+
+    private void PlaceParkourRooms(int count, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            List<VirtualRoom> pathCandidates = FindMainPathNormalRooms(layout, cellToRoomMap);
+            if (pathCandidates.Count == 0)
+            {
+                Debug.LogWarning("[CoreGenerator] Nessuna Normal Room valida sul percorso Start-Boss: Parkour Room non piazzata.");
+                return;
+            }
+
+            bool replaced = false;
+            foreach (Vector2Int size in GetSizesToTry(parkourBigRoomChance, RoomPoolKey.Parkour))
+            {
+                foreach (VirtualRoom candidate in pathCandidates.Where(room => room.size == size).OrderBy(_ => prng.Next()).ToList())
+                {
+                    Room prefab = GetRandomPrefab(RoomPoolKey.Parkour, candidate.size);
+                    if (prefab == null)
+                        continue;
+
+                    TemporarilyRemoveRoom(candidate, layout, occupied, cellToRoomMap);
+                    LogRoomPlacement(RoomType.Parkour, candidate.size, candidate.anchorPos);
+                    AddRoomToLayout(layout, occupied, candidate.anchorPos, candidate.size, RoomType.Parkour, prefab, cellToRoomMap);
+                    replaced = true;
+                    break;
+                }
+
+                if (replaced)
+                    break;
+            }
+
+            if (!replaced)
+            {
+                Debug.LogWarning("[CoreGenerator] Nessuna Normal Room sul percorso Start-Boss usa una dimensione supportata dal pool Parkour: Parkour Room non piazzata.");
+                return;
+            }
+        }
+    }
+
+    private List<VirtualRoom> FindMainPathNormalRooms(List<VirtualRoom> layout, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    {
+        VirtualRoom startRoom = layout.FirstOrDefault(room => room.roomType == RoomType.Start);
+        VirtualRoom bossRoom = layout.FirstOrDefault(room => room.roomType == RoomType.Boss);
+        if (startRoom == null || bossRoom == null)
+            return new List<VirtualRoom>();
+
+        var previous = new Dictionary<VirtualRoom, VirtualRoom>();
+        var visited = new HashSet<VirtualRoom> { startRoom };
+        var queue = new Queue<VirtualRoom>();
+        queue.Enqueue(startRoom);
+
+        while (queue.Count > 0 && !visited.Contains(bossRoom))
+        {
+            VirtualRoom current = queue.Dequeue();
+            foreach (VirtualRoom neighbor in GetAdjacentRooms(current, cellToRoomMap))
+            {
+                if (neighbor.roomType != RoomType.Normal && neighbor != bossRoom && neighbor != startRoom)
+                    continue;
+                if (!visited.Add(neighbor))
+                    continue;
+
+                previous[neighbor] = current;
+                queue.Enqueue(neighbor);
+            }
+        }
+
+        if (!visited.Contains(bossRoom))
+            return new List<VirtualRoom>();
+
+        var candidates = new List<VirtualRoom>();
+        VirtualRoom current = bossRoom;
+        while (current != null)
+        {
+            if (current.roomType == RoomType.Normal)
+                candidates.Add(current);
+            previous.TryGetValue(current, out current);
+        }
+        return candidates;
+    }
+
+    private IEnumerable<VirtualRoom> GetAdjacentRooms(VirtualRoom room, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    {
+        var neighbors = new HashSet<VirtualRoom>();
+        for (int x = 0; x < room.size.x; x++)
+        {
+            for (int y = 0; y < room.size.y; y++)
+            {
+                Vector2Int cell = room.anchorPos + new Vector2Int(x, y);
+                foreach (Vector2Int direction in directions)
+                {
+                    if (cellToRoomMap.TryGetValue(cell + direction, out VirtualRoom neighbor) && neighbor != room)
+                        neighbors.Add(neighbor);
+                }
+            }
+        }
+        return neighbors
+            .OrderBy(candidate => candidate.anchorPos.x)
+            .ThenBy(candidate => candidate.anchorPos.y)
+            .ThenBy(candidate => candidate.size.x)
+            .ThenBy(candidate => candidate.size.y);
+    }
+
+    private static bool IsSpecialRoomType(RoomType roomType)
+    {
+        return roomType != RoomType.Start && roomType != RoomType.Normal;
     }
 
     bool IsTouchingAnySpecialRoom(Vector2Int anchor, Vector2Int size, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap, VirtualRoom roomToIgnore)
     {
-        var specialRoomTypes = new HashSet<string> { "Boss", "Shop", "Treasure", "Curch", "EvilCurch" };
         for (int x = 0; x < size.x; x++)
         {
             for (int y = 0; y < size.y; y++)
@@ -471,7 +708,7 @@ public class CoreGenerator : MonoBehaviour
                 Vector2Int cell = anchor + new Vector2Int(x, y);
                 foreach (var dir in directions)
                 {
-                    if (cellToRoomMap.TryGetValue(cell + dir, out var neighborRoom) && neighborRoom != roomToIgnore && specialRoomTypes.Contains(neighborRoom.type))
+                    if (cellToRoomMap.TryGetValue(cell + dir, out var neighborRoom) && neighborRoom != roomToIgnore && IsSpecialRoomType(neighborRoom.roomType))
                     {
                         return true;
                     }
@@ -490,7 +727,7 @@ public class CoreGenerator : MonoBehaviour
                 Vector2Int cell = anchor + new Vector2Int(x, y);
                 foreach (var dir in directions)
                 {
-                    if (cellToRoomMap.TryGetValue(cell + dir, out var neighborRoom) && neighborRoom != roomToIgnore && (neighborRoom.type == "Shop" || neighborRoom.type == "Treasure"))
+                    if (cellToRoomMap.TryGetValue(cell + dir, out var neighborRoom) && neighborRoom != roomToIgnore && (neighborRoom.roomType == RoomType.Shop || neighborRoom.roomType == RoomType.Treasure))
                     {
                         return true;
                     }
@@ -500,7 +737,7 @@ public class CoreGenerator : MonoBehaviour
         return false;
     }
     
-    List<Vector2Int> GetSizesToTry(int chancePercent, string roomType)
+    List<Vector2Int> GetSizesToTry(int chancePercent, RoomPoolKey poolKey)
     {
         var sizes = new List<Vector2Int>();
         bool forceBigOnly = chancePercent >= 100;
@@ -512,12 +749,23 @@ public class CoreGenerator : MonoBehaviour
         }
 
         if (!forceBigOnly)
-            sizes.Add(new Vector2Int(1, 1)); // Fallback solo se non sto forzando big al 100%
+            sizes.Add(new Vector2Int(1, 1));
+
+        // The probability orders compatible authored sizes; it must not cause a
+        // requested category to fail when another populated size is available.
+        if (_prefabLookup != null && _prefabLookup.TryGetValue(poolKey, out var sizeMap))
+        {
+            foreach (Vector2Int size in new[] { new Vector2Int(1, 1), new Vector2Int(2, 1), new Vector2Int(1, 2), new Vector2Int(2, 2) })
+            {
+                if (!sizes.Contains(size) && sizeMap.TryGetValue(size, out var variants) && HasAnyVariant(variants))
+                    sizes.Add(size);
+            }
+        }
 
         return sizes;
     }
 
-    private void LogRoomPlacement(string roomType, Vector2Int size, Vector2Int anchor)
+    private void LogRoomPlacement(RoomType roomType, Vector2Int size, Vector2Int anchor)
     {
         if (!showRngLogs)
             return;
@@ -574,9 +822,9 @@ public class CoreGenerator : MonoBehaviour
         return !strictOneDoor || connectionsCount == 1;
     }
 
-    VirtualRoom AddRoomToLayout(List<VirtualRoom> layout, HashSet<Vector2Int> occupied, Vector2Int anchor, Vector2Int size, string type, Room prefab, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap = null)
+    VirtualRoom AddRoomToLayout(List<VirtualRoom> layout, HashSet<Vector2Int> occupied, Vector2Int anchor, Vector2Int size, RoomType roomType, Room prefab, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap = null)
     {
-        var vr = new VirtualRoom { anchorPos = anchor, size = size, type = type, prefabReference = prefab };
+        var vr = new VirtualRoom { anchorPos = anchor, size = size, roomType = roomType, prefabReference = prefab };
         layout.Add(vr);
         for (int x = 0; x < size.x; x++)
         {
@@ -590,13 +838,24 @@ public class CoreGenerator : MonoBehaviour
         return vr;
     }
     
-    Room GetRandomPrefab(string type, Vector2Int size)
+    Room GetRandomPrefab(RoomPoolKey poolKey, Vector2Int size)
     {
-        if (_prefabLookup.TryGetValue(type, out var sizeMap) && sizeMap.TryGetValue(size, out var variants))
+        if (_prefabLookup.TryGetValue(poolKey, out var sizeMap) && sizeMap.TryGetValue(size, out var variants))
         {
             if (variants != null && variants.Length > 0)
             {
-                return variants[prng.Next(variants.Length)];
+                int totalWeight = 0;
+                for (int i = 0; i < variants.Length; i++)
+                    if (variants[i] != null) totalWeight += Mathf.Max(1, variants[i].roomData != null ? variants[i].roomData.generationWeight : 1);
+                if (totalWeight <= 0) return null;
+                int roll = prng.Next(totalWeight);
+                for (int i = 0; i < variants.Length; i++)
+                {
+                    Room candidate = variants[i];
+                    if (candidate == null) continue;
+                    roll -= Mathf.Max(1, candidate.roomData != null ? candidate.roomData.generationWeight : 1);
+                    if (roll < 0) return candidate;
+                }
             }
         }
         return null;
@@ -610,11 +869,18 @@ public class CoreGenerator : MonoBehaviour
     {
         activeThemeDefinition = SelectThemeForFloor(currentFloor, currentMasterSeed);
         activeRoomSet = activeThemeDefinition != null ? activeThemeDefinition.roomSet : null;
+        DungeonFloorThemeTable.FloorThemeEntry entry = floorThemeTable != null ? floorThemeTable.GetEntryForFloor(currentFloor) : null;
+        activeFloorDefinition = activeThemeDefinition != null && activeThemeDefinition.roomComposition != null
+            ? activeThemeDefinition.roomComposition
+            : entry != null ? entry.floorDefinition : null;
+        DungeonRoomSet overrideSet = PickFloorRoomSet(activeFloorDefinition);
+        if (overrideSet != null) activeRoomSet = overrideSet;
         string themeLabel = ActiveThemeDisplayName;
 
         if (activeThemeDefinition != null && activeRoomSet != null)
         {
-            Debug.Log($"[CoreGenerator] Piano {currentFloor}: tema selezionato '{themeLabel}' | RoomSet: '{activeRoomSet.name}'");
+            string compositionLabel = activeFloorDefinition != null ? activeFloorDefinition.name : "Legacy";
+            Debug.Log($"[CoreGenerator] Piano {currentFloor}: tema selezionato '{themeLabel}' | RoomSet: '{activeRoomSet.name}' | Composition: '{compositionLabel}'");
         }
         else
         {
@@ -666,22 +932,43 @@ public class CoreGenerator : MonoBehaviour
             return false;
         }
 
-        if (!HasAnyVariant(activeRoomSet.boss1x1Variants, activeRoomSet.boss2x1Variants, activeRoomSet.boss1x2Variants, activeRoomSet.boss2x2Variants))
+        if (ResolveSpecialRoomCount(RoomType.Boss) > 0 && !HasAnyVariant(activeRoomSet.boss1x1Variants, activeRoomSet.boss2x1Variants, activeRoomSet.boss1x2Variants, activeRoomSet.boss2x2Variants))
         {
             error = $"il room set '{activeRoomSet.name}' non ha varianti Boss.";
             return false;
         }
 
-        if (!HasAnyVariant(activeRoomSet.shop1x1Variants, activeRoomSet.shop2x1Variants, activeRoomSet.shop1x2Variants, activeRoomSet.shop2x2Variants))
+        if (ResolveSpecialRoomCount(RoomType.Shop) > 0 && !HasAnyVariant(activeRoomSet.shop1x1Variants, activeRoomSet.shop2x1Variants, activeRoomSet.shop1x2Variants, activeRoomSet.shop2x2Variants))
         {
             error = $"il room set '{activeRoomSet.name}' non ha varianti Shop.";
             return false;
         }
 
-        if (!HasAnyVariant(activeRoomSet.treasure1x1Variants, activeRoomSet.treasure2x1Variants, activeRoomSet.treasure1x2Variants, activeRoomSet.treasure2x2Variants))
+        if (ResolveSpecialRoomCount(RoomType.Treasure) > 0 && !HasAnyVariant(activeRoomSet.treasure1x1Variants, activeRoomSet.treasure2x1Variants, activeRoomSet.treasure1x2Variants, activeRoomSet.treasure2x2Variants))
         {
             error = $"il room set '{activeRoomSet.name}' non ha varianti Treasure.";
             return false;
+        }
+
+        if (ResolveSecretAccessRoomCount(false) > 0 && !HasAnyVariant(activeRoomSet.secretAccessSecret1x1Variants, activeRoomSet.secretAccessSecret2x1Variants, activeRoomSet.secretAccessSecret1x2Variants, activeRoomSet.secretAccessSecret2x2Variants))
+        {
+            error = $"il room set '{activeRoomSet.name}' non ha varianti SecretAccess/Secret.";
+            return false;
+        }
+
+        if (ResolveSecretAccessRoomCount(true) > 0 && !HasAnyVariant(activeRoomSet.secretAccessSuperSecret1x1Variants, activeRoomSet.secretAccessSuperSecret2x1Variants, activeRoomSet.secretAccessSuperSecret1x2Variants, activeRoomSet.secretAccessSuperSecret2x2Variants))
+        {
+            error = $"il room set '{activeRoomSet.name}' non ha varianti SecretAccess/SuperSecret.";
+            return false;
+        }
+
+        if (ResolveSpecialRoomCount(RoomType.Miniboss) > 0 && !HasAnyVariant(activeRoomSet.miniboss1x1Variants, activeRoomSet.miniboss2x1Variants, activeRoomSet.miniboss1x2Variants, activeRoomSet.miniboss2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Miniboss."; return false; }
+        if (ResolveSpecialRoomCount(RoomType.Parkour) > 0 && !HasAnyVariant(activeRoomSet.parkour1x1Variants, activeRoomSet.parkour2x1Variants, activeRoomSet.parkour1x2Variants, activeRoomSet.parkour2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Parkour."; return false; }
+        if (ResolveSpecialRoomCount(RoomType.NpcEncounter) > 0 && !HasAnyVariant(activeRoomSet.npcEncounter1x1Variants, activeRoomSet.npcEncounter2x1Variants, activeRoomSet.npcEncounter1x2Variants, activeRoomSet.npcEncounter2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti NpcEncounter."; return false; }
+        if (ResolveChurchRoomCount() > 0)
+        {
+            if (!HasAnyVariant(activeRoomSet.curch1x1Variants, activeRoomSet.curch2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Curch richieste da Church Rooms."; return false; }
+            if (!HasAnyVariant(activeRoomSet.evilCurch1x1Variants, activeRoomSet.evilCurch2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti EvilCurch richieste da Church Rooms."; return false; }
         }
 
         error = null;
@@ -696,6 +983,16 @@ public class CoreGenerator : MonoBehaviour
         DungeonFloorThemeTable.FloorThemeEntry entry = floorThemeTable.GetEntryForFloor(floor);
         if (entry == null || entry.themes == null || entry.themes.Count == 0)
             return null;
+
+        if (!string.IsNullOrWhiteSpace(pendingThemeOverrideId))
+        {
+            string requested = pendingThemeOverrideId;
+            pendingThemeOverrideId = null; // explicitly one-floor only
+            foreach (DungeonFloorThemeTable.ThemeChoice choice in entry.themes)
+                if (choice != null && choice.theme != null && choice.theme.roomSet != null && string.Equals(choice.theme.themeId, requested, StringComparison.Ordinal))
+                    return choice.theme;
+            Debug.LogWarning($"[CoreGenerator] Theme override '{requested}' is not valid for floor {floor}; using weighted floor selection.");
+        }
 
         int totalWeight = 0;
         for (int i = 0; i < entry.themes.Count; i++)
@@ -724,6 +1021,67 @@ public class CoreGenerator : MonoBehaviour
                 return choice.theme;
         }
 
+        return null;
+    }
+
+    private int ResolveNormalRoomCount()
+    {
+        if (activeFloorDefinition == null || activeFloorDefinition.normalRooms == null)
+            return Mathf.Max(0, totalNormalRooms);
+        return activeFloorDefinition.normalRooms.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "normal-count"));
+    }
+
+    private int ResolveSpecialRoomCount(RoomType roomType)
+    {
+        if (activeFloorDefinition == null)
+            return roomType == RoomType.Curch || roomType == RoomType.EvilCurch || roomType == RoomType.Wave || roomType == RoomType.Challenge || roomType == RoomType.Miniboss || roomType == RoomType.Parkour || roomType == RoomType.NpcEncounter ? 0 : 1;
+        DungeonFloorDefinition.RoomCount count = activeFloorDefinition.GetCount(roomType);
+        return count == null ? 0 : count.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", roomType + "-count"));
+    }
+
+    private int ResolveChallengeRoomCount()
+    {
+        if (activeFloorDefinition == null)
+            return 0;
+
+        DungeonFloorDefinition.RoomCount count = activeFloorDefinition.GetCount(RoomType.Challenge);
+        return count == null ? 0 : count.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "challenge-count"));
+    }
+
+    private int ResolveChurchRoomCount()
+    {
+        if (activeFloorDefinition == null)
+            return 0;
+
+        DungeonFloorDefinition.RoomCount count = activeFloorDefinition.GetChurchCount();
+        return count == null ? 0 : count.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "church-count"));
+    }
+
+    private int ResolveSecretAccessRoomCount(bool superSecret)
+    {
+        if (activeFloorDefinition == null)
+            return 0;
+
+        DungeonFloorDefinition.RoomCount count = activeFloorDefinition.GetSecretAccessCount(superSecret);
+        string seedLabel = superSecret ? "super-secret-access-count" : "secret-access-count";
+        return count == null ? 0 : count.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", seedLabel));
+    }
+
+    private DungeonRoomSet PickFloorRoomSet(DungeonFloorDefinition definition)
+    {
+        if (definition == null || definition.allowedRoomSets == null) return null;
+        int total = 0;
+        foreach (DungeonFloorDefinition.RoomSetChoice choice in definition.allowedRoomSets)
+            if (choice != null && choice.roomSet != null) total += Mathf.Max(1, choice.weight);
+        if (total <= 0) return null;
+        System.Random random = DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "room-set");
+        int roll = random.Next(total);
+        foreach (DungeonFloorDefinition.RoomSetChoice choice in definition.allowedRoomSets)
+        {
+            if (choice == null || choice.roomSet == null) continue;
+            roll -= Mathf.Max(1, choice.weight);
+            if (roll < 0) return choice.roomSet;
+        }
         return null;
     }
 
@@ -764,40 +1122,59 @@ public class CoreGenerator : MonoBehaviour
         return false;
     }
 
+    private bool HasWaveRoomVariants() => activeRoomSet != null && HasAnyVariant(activeRoomSet.wave1x1Variants, activeRoomSet.wave2x1Variants, activeRoomSet.wave1x2Variants, activeRoomSet.wave2x2Variants);
+
+    private bool HasChallengeRoomVariants() => activeRoomSet != null && HasAnyVariant(activeRoomSet.challenge1x1Variants, activeRoomSet.challenge2x1Variants, activeRoomSet.challenge1x2Variants, activeRoomSet.challenge2x2Variants);
+
     private void InitializePrefabLookup()
     {
-        _prefabLookup = new Dictionary<string, Dictionary<Vector2Int, Room[]>>
+        _prefabLookup = new Dictionary<RoomPoolKey, Dictionary<Vector2Int, Room[]>>
         {
-            ["Normal"] = BuildSizeMap(
+            [RoomPoolKey.Normal] = BuildSizeMap(
                 activeRoomSet.normal1x1Variants,
                 activeRoomSet.normal2x1Variants,
                 activeRoomSet.normal1x2Variants,
                 activeRoomSet.normal2x2Variants),
-            ["Boss"] = BuildSizeMap(
+            [RoomPoolKey.Boss] = BuildSizeMap(
                 activeRoomSet.boss1x1Variants,
                 activeRoomSet.boss2x1Variants,
                 activeRoomSet.boss1x2Variants,
                 activeRoomSet.boss2x2Variants),
-            ["Shop"] = BuildSizeMap(
+            [RoomPoolKey.Shop] = BuildSizeMap(
                 activeRoomSet.shop1x1Variants,
                 activeRoomSet.shop2x1Variants,
                 activeRoomSet.shop1x2Variants,
                 activeRoomSet.shop2x2Variants),
-            ["Treasure"] = BuildSizeMap(
+            [RoomPoolKey.Treasure] = BuildSizeMap(
                 activeRoomSet.treasure1x1Variants,
                 activeRoomSet.treasure2x1Variants,
                 activeRoomSet.treasure1x2Variants,
                 activeRoomSet.treasure2x2Variants),
-            ["Curch"] = new Dictionary<Vector2Int, Room[]>
+            [RoomPoolKey.Curch] = new Dictionary<Vector2Int, Room[]>
             {
                 [new Vector2Int(1, 1)] = activeRoomSet.curch1x1Variants,
                 [new Vector2Int(2, 2)] = activeRoomSet.curch2x2Variants
             },
-            ["EvilCurch"] = new Dictionary<Vector2Int, Room[]>
+            [RoomPoolKey.EvilCurch] = new Dictionary<Vector2Int, Room[]>
             {
                 [new Vector2Int(1, 1)] = activeRoomSet.evilCurch1x1Variants,
                 [new Vector2Int(2, 2)] = activeRoomSet.evilCurch2x2Variants
-            }
+            },
+            [RoomPoolKey.SecretAccessSecret] = BuildSizeMap(
+                activeRoomSet.secretAccessSecret1x1Variants,
+                activeRoomSet.secretAccessSecret2x1Variants,
+                activeRoomSet.secretAccessSecret1x2Variants,
+                activeRoomSet.secretAccessSecret2x2Variants),
+            [RoomPoolKey.SecretAccessSuperSecret] = BuildSizeMap(
+                activeRoomSet.secretAccessSuperSecret1x1Variants,
+                activeRoomSet.secretAccessSuperSecret2x1Variants,
+                activeRoomSet.secretAccessSuperSecret1x2Variants,
+                activeRoomSet.secretAccessSuperSecret2x2Variants),
+            [RoomPoolKey.Wave] = BuildSizeMap(activeRoomSet.wave1x1Variants,activeRoomSet.wave2x1Variants,activeRoomSet.wave1x2Variants,activeRoomSet.wave2x2Variants),
+            [RoomPoolKey.Challenge] = BuildSizeMap(activeRoomSet.challenge1x1Variants,activeRoomSet.challenge2x1Variants,activeRoomSet.challenge1x2Variants,activeRoomSet.challenge2x2Variants),
+            [RoomPoolKey.Miniboss] = BuildSizeMap(activeRoomSet.miniboss1x1Variants,activeRoomSet.miniboss2x1Variants,activeRoomSet.miniboss1x2Variants,activeRoomSet.miniboss2x2Variants),
+            [RoomPoolKey.Parkour] = BuildSizeMap(activeRoomSet.parkour1x1Variants,activeRoomSet.parkour2x1Variants,activeRoomSet.parkour1x2Variants,activeRoomSet.parkour2x2Variants),
+            [RoomPoolKey.NpcEncounter] = BuildSizeMap(activeRoomSet.npcEncounter1x1Variants,activeRoomSet.npcEncounter2x1Variants,activeRoomSet.npcEncounter1x2Variants,activeRoomSet.npcEncounter2x2Variants)
         };
     }
 
@@ -808,10 +1185,14 @@ public class CoreGenerator : MonoBehaviour
             Vector3 worldPos = new Vector3(vr.anchorPos.x * xOffset, 0, vr.anchorPos.y * zOffset);
             Room instance = Instantiate(vr.prefabReference, worldPos, Quaternion.identity);
             instance.transform.parent = transform;
-            instance.name = $"{vr.type}_{vr.anchorPos}";
-
-            instance.roomData.size = vr.size;
-            if (vr.type == "Start") startRoomInstance = instance;
+            instance.name = $"{vr.roomType}_{vr.anchorPos}";
+            string definitionId = instance.roomData != null && !string.IsNullOrWhiteSpace(instance.roomData.stableId)
+                ? instance.roomData.stableId : vr.prefabReference.name;
+            instance.ConfigureGeneratedInstance(
+                DungeonDeterminism.RoomId(gameSeedString, currentFloor, vr.anchorPos, vr.roomType.ToString(), definitionId),
+                vr.anchorPos, vr.size, currentFloor, vr.roomType);
+            instance.InitializeGeneratedRuntime();
+            if (vr.roomType == RoomType.Start) startRoomInstance = instance;
 
             activeRoomObjects.Add(instance);
         }
@@ -822,8 +1203,8 @@ public class CoreGenerator : MonoBehaviour
         var gridLookup = new Dictionary<Vector2Int, Room>();
         foreach (Room r in activeRoomObjects)
         {
-            Vector2Int anchor = GetGridPos(r.transform.position);
-            Vector2Int size = (r.roomData.size == Vector2Int.zero) ? Vector2Int.one : r.roomData.size;
+            Vector2Int anchor = r.GridAnchor;
+            Vector2Int size = r.GridSize;
             for (int x = 0; x < size.x; x++)
                 for (int y = 0; y < size.y; y++)
                     gridLookup[anchor + new Vector2Int(x, y)] = r;
@@ -831,8 +1212,8 @@ public class CoreGenerator : MonoBehaviour
 
         foreach (Room r in activeRoomObjects)
         {
-            Vector2Int anchor = GetGridPos(r.transform.position);
-            Vector2Int size = (r.roomData.size == Vector2Int.zero) ? Vector2Int.one : r.roomData.size;
+            Vector2Int anchor = r.GridAnchor;
+            Vector2Int size = r.GridSize;
             for (int x = 0; x < size.x; x++)
             {
                 for (int y = 0; y < size.y; y++)
@@ -862,7 +1243,12 @@ public class CoreGenerator : MonoBehaviour
     void InitializeMinimap()
     {
         if (!MinimapManager.instance) return;
-        foreach (Room r in activeRoomObjects) MinimapManager.instance.RegisterRoom(GetGridPos(r.transform.position), r.roomData);
+        foreach (Room r in activeRoomObjects)
+        {
+            MinimapManager.instance.RegisterRoom(r.GridAnchor, r.roomData);
+            if (runStateController != null && runStateController.TryGetRoom(r.RuntimeId, out SavedDungeonRoomState state) && state != null)
+                MinimapManager.instance.RestoreRoomVisibility(r.GridAnchor, state.visited, state.revealed);
+        }
     }
 
     int GetManhattanDist(Vector2Int a, Vector2Int b) => Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
@@ -873,7 +1259,7 @@ public class CoreGenerator : MonoBehaviour
         ResolvePlayerTransform();
         if (playerTransform == null) return;
         
-        Room startRoom = startRoomInstance ?? activeRoomObjects.FirstOrDefault(r => r != null && r.roomData != null && r.roomData.isStartRoom);
+        Room startRoom = startRoomInstance ?? activeRoomObjects.FirstOrDefault(r => r != null && r.PlacementRole == RoomType.Start);
         if (startRoom == null) startRoom = activeRoomObjects.FirstOrDefault(r => r != null);
         
         if (startRoom == null)

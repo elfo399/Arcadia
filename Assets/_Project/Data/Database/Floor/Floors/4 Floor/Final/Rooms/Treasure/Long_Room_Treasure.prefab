@@ -538,6 +538,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 83021117a2912d3428b58c9ee278d50e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  doorId: entry-South SX-0-0-0--1
+  requirements: []
+  costs:
+  - kind: 3
+    amount: 1
+    item: {fileID: 11400000, guid: 676f9c25d86a4b60b85da77541e76ac2, type: 2}
+    allowLethal: 0
+  closedVisual: {fileID: 0}
+  openedVisual: {fileID: 0}
+  blockingCollider: {fileID: 1176026204898827753}
+  prompt: Open
 --- !u!1 &931440061204141445
 GameObject:
   m_ObjectHideFlags: 0
@@ -1755,7 +1766,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   roomData: {fileID: 11400000, guid: 049b6d2714f157846ac4dd5824c5a7b0, type: 2}
-  internalRoomType: Normal
+  questTargetId: 
+  questTargetTag: 
   doors:
   - label: North SX
     gridOffset: {x: 0, y: 0}
@@ -1763,6 +1775,7 @@ MonoBehaviour:
     doorObject: {fileID: 7166205522964631405}
     wallObject: {fileID: 4514277170246237565}
     lockObject: {fileID: 8819289847696371682}
+    authoredGate: {fileID: 1443470646621854526}
     isConnected: 0
   - label: North DX
     gridOffset: {x: 1, y: 0}
@@ -1770,6 +1783,7 @@ MonoBehaviour:
     doorObject: {fileID: 4468019011060315025}
     wallObject: {fileID: 4907858621689939227}
     lockObject: {fileID: 9188695214389405477}
+    authoredGate: {fileID: 4516336899738526766}
     isConnected: 0
   - label: South SX
     gridOffset: {x: 0, y: 0}
@@ -1777,6 +1791,7 @@ MonoBehaviour:
     doorObject: {fileID: 3935008918324900738}
     wallObject: {fileID: 8251875609231077050}
     lockObject: {fileID: 796595336241428686}
+    authoredGate: {fileID: 3295315915071547612}
     isConnected: 0
   - label: South DX
     gridOffset: {x: 1, y: 0}
@@ -1784,6 +1799,7 @@ MonoBehaviour:
     doorObject: {fileID: 992268561662703808}
     wallObject: {fileID: 3060343329876996752}
     lockObject: {fileID: 7956961753491566547}
+    authoredGate: {fileID: 6760466249516082267}
     isConnected: 0
   - label: West
     gridOffset: {x: 0, y: 0}
@@ -1791,6 +1807,7 @@ MonoBehaviour:
     doorObject: {fileID: 5692850843076534909}
     wallObject: {fileID: 4384561209117864248}
     lockObject: {fileID: 6296335948659669508}
+    authoredGate: {fileID: 987950327001681086}
     isConnected: 0
   - label: East
     gridOffset: {x: 1, y: 0}
@@ -1798,13 +1815,15 @@ MonoBehaviour:
     doorObject: {fileID: 5254987993790537219}
     wallObject: {fileID: 3596602838662624233}
     lockObject: {fileID: 9099550353440184782}
+    authoredGate: {fileID: 5925961964242263064}
     isConnected: 0
-  isLocked: 0
   roomCleared: 0
   activeEnemies: []
-  coinPrefab: {fileID: 0}
-  minCoins: 2
-  maxCoins: 5
+  floorPortalPrefab: {fileID: 0}
+  preplacedFloorPortal: {fileID: 0}
+  portalSpawnOffset: {x: 0, y: 0, z: 0}
+  portalDistanceFromCenter: 10
+  playerSpawnPoint: {fileID: 0}
 --- !u!65 &8020430283198389810
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1838,6 +1857,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 83021117a2912d3428b58c9ee278d50e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  doorId: door-68dc5b97b9be49a2835059131fbf3f52
+  requirements: []
+  costs: []
+  closedVisual: {fileID: 0}
+  openedVisual: {fileID: 0}
+  blockingCollider: {fileID: 0}
+  prompt: Open
 --- !u!1 &4514277170246237565
 GameObject:
   m_ObjectHideFlags: 0
@@ -2552,6 +2578,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 83021117a2912d3428b58c9ee278d50e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  doorId: entry-West-0-0--1-0
+  requirements: []
+  costs:
+  - kind: 3
+    amount: 1
+    item: {fileID: 11400000, guid: 676f9c25d86a4b60b85da77541e76ac2, type: 2}
+    allowLethal: 0
+  closedVisual: {fileID: 0}
+  openedVisual: {fileID: 0}
+  blockingCollider: {fileID: 216075383050586024}
+  prompt: Open
 --- !u!1 &6399472824268567350
 GameObject:
   m_ObjectHideFlags: 0
@@ -3125,6 +3162,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 83021117a2912d3428b58c9ee278d50e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  doorId: entry-South DX-1-0-0--1
+  requirements: []
+  costs:
+  - kind: 3
+    amount: 1
+    item: {fileID: 11400000, guid: 676f9c25d86a4b60b85da77541e76ac2, type: 2}
+    allowLethal: 0
+  closedVisual: {fileID: 0}
+  openedVisual: {fileID: 0}
+  blockingCollider: {fileID: 4439168206907247403}
+  prompt: Open
 --- !u!1 &8138925100794731251
 GameObject:
   m_ObjectHideFlags: 0
@@ -3558,6 +3606,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 83021117a2912d3428b58c9ee278d50e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  doorId: entry-North SX-0-0-0-1
+  requirements: []
+  costs:
+  - kind: 3
+    amount: 1
+    item: {fileID: 11400000, guid: 676f9c25d86a4b60b85da77541e76ac2, type: 2}
+    allowLethal: 0
+  closedVisual: {fileID: 0}
+  openedVisual: {fileID: 0}
+  blockingCollider: {fileID: 581738876223457642}
+  prompt: Open
 --- !u!1 &9099550353440184782
 GameObject:
   m_ObjectHideFlags: 0
@@ -3676,6 +3735,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 83021117a2912d3428b58c9ee278d50e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  doorId: entry-East-1-0-1-0
+  requirements: []
+  costs:
+  - kind: 3
+    amount: 1
+    item: {fileID: 11400000, guid: 676f9c25d86a4b60b85da77541e76ac2, type: 2}
+    allowLethal: 0
+  closedVisual: {fileID: 0}
+  openedVisual: {fileID: 0}
+  blockingCollider: {fileID: 6432124470200669221}
+  prompt: Open
 --- !u!1 &9188695214389405477
 GameObject:
   m_ObjectHideFlags: 0
@@ -3794,3 +3864,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 83021117a2912d3428b58c9ee278d50e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  doorId: entry-North DX-1-0-0-1
+  requirements: []
+  costs:
+  - kind: 3
+    amount: 1
+    item: {fileID: 11400000, guid: 676f9c25d86a4b60b85da77541e76ac2, type: 2}
+    allowLethal: 0
+  closedVisual: {fileID: 0}
+  openedVisual: {fileID: 0}
+  blockingCollider: {fileID: 1248402760942587299}
+  prompt: Open

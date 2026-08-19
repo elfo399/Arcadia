@@ -3,7 +3,7 @@ using System.IO;
 
 public static class SaveSystem
 {
-    public const int CurrentSaveVersion = 6;
+    public const int CurrentSaveVersion = 10;
     public const string SinglePlayerId = "player";
     public const string DefaultPlayerName = "Player";
 
@@ -373,6 +373,53 @@ public static class SaveSystem
                     // resolved by PlayerInventory once ItemDatabase is available.
                     // assetName remains populated as a legacy fallback.
                     data.saveVersion = 6;
+                    break;
+
+                case 6:
+                    // Older checkpoints restart the current floor once. New saves
+                    // receive deterministic per-room/rule state on their next save.
+                    data.dungeonRun = null;
+                    data.saveVersion = 7;
+                    break;
+
+                case 7:
+                    // v7 coupled a floor snapshot to global run data. Preserve
+                    // modifiers/events and move room records into floor state.
+                    if (data.dungeonRun != null && data.dungeonRun.currentFloorState == null)
+                    {
+                        data.dungeonRun.currentFloor = Mathf.Max(1, data.dungeonRun.floor);
+                        data.dungeonRun.currentFloorState = new SavedDungeonFloorState
+                        {
+                            floorNumber = data.dungeonRun.currentFloor,
+                            rooms = data.dungeonRun.rooms
+                        };
+                        data.dungeonRun.floor = 0;
+                        data.dungeonRun.rooms = null;
+                    }
+                    data.saveVersion = 8;
+                    break;
+
+                case 8:
+                    // v8 stored one effect per modifier. v9 stores an effect list
+                    // so a pact restores every effect without relying on assets.
+                    if (data.dungeonRun != null && data.dungeonRun.modifiers != null)
+                    {
+                        foreach (SavedRunModifierState modifier in data.dungeonRun.modifiers)
+                            if (modifier != null && (modifier.effects == null || modifier.effects.Length == 0))
+                                modifier.effects = new[] { new SavedRunModifierEffect { effect = modifier.effect, multiplierPerStack = Mathf.Max(.01f, modifier.multiplierPerStack) } };
+                    }
+                    data.saveVersion = 9;
+                    break;
+
+                case 9:
+                    // v9 could retain a checkpoint after an intentional Hub return.
+                    // It cannot prove that the snapshot came from an interrupted run,
+                    // so discard only the old run-resume data and retain progression.
+                    data.dungeonCheckpointActive = false;
+                    data.dungeonFloor = 1;
+                    data.dungeonSeed = string.Empty;
+                    data.dungeonRun = null;
+                    data.saveVersion = 10;
                     break;
 
                 default:
