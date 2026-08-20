@@ -1150,7 +1150,14 @@ public class CoreGenerator : MonoBehaviour
 
     void CleanupScene()
     {
-        foreach (var r in activeRoomObjects) if (r != null) Destroy(r.gameObject);
+        foreach (var r in activeRoomObjects)
+        {
+            if (r == null)
+                continue;
+
+            r.RoomCompleted -= HandleRoomCompleted;
+            Destroy(r.gameObject);
+        }
         activeRoomObjects.Clear();
         if (MinimapManager.instance) MinimapManager.instance.ClearMap();
     }
@@ -1161,9 +1168,19 @@ public class CoreGenerator : MonoBehaviour
         foreach (Room r in activeRoomObjects)
         {
             MinimapManager.instance.RegisterRoom(r.GridAnchor, r.roomData);
+            MinimapManager.instance.SetRoomCompleted(r.GridAnchor, r.roomCleared);
+            r.RoomCompleted -= HandleRoomCompleted;
+            r.RoomCompleted += HandleRoomCompleted;
+
             if (runStateController != null && runStateController.TryGetRoom(r.RuntimeId, out SavedDungeonRoomState state) && state != null)
                 MinimapManager.instance.RestoreRoomVisibility(r.GridAnchor, state.visited, state.revealed);
         }
+    }
+
+    private void HandleRoomCompleted(Room room)
+    {
+        if (room != null && MinimapManager.instance != null)
+            MinimapManager.instance.SetRoomCompleted(room.GridAnchor, true);
     }
 
     int GetManhattanDist(Vector2Int a, Vector2Int b) => Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);

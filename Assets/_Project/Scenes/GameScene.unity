@@ -10515,12 +10515,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mapContainer: {fileID: 404315157}
   roomIconPrefab: {fileID: 1018800666023050230, guid: 9285e9127ce2862419e20358961a0f73, type: 3}
-  skullIcon: {fileID: 21300000, guid: c6be7888e3165f340b4a0f93e59222e4, type: 3}
-  crownIcon: {fileID: 21300000, guid: cd3b020d43e5ba24d9f7b44480c19617, type: 3}
-  startIcon: {fileID: 21300000, guid: 2fe0ace2aec664c4cae85d718a12742c, type: 3}
-  shopIcon: {fileID: 21300000, guid: 79f6d1f25c66c304b8d82f24b8113f23, type: 3}
-  blessedIcon: {fileID: 21300000, guid: 94b17d7ee0c181241827673c4a6ac5de, type: 3}
-  evilIcon: {fileID: 21300000, guid: 774ea01ce256b264fbba7093d1b9934e, type: 3}
+  bossIcon: {fileID: 21300000, guid: 00673145d46e3f7499675249d66e52c4, type: 3}
+  crownIcon: {fileID: 21300000, guid: b8582ebf36402cb4085d3a6f092f5695, type: 3}
+  startIcon: {fileID: 21300000, guid: bead2f252312a294d9267010a3b044ef, type: 3}
+  shopIcon: {fileID: 21300000, guid: 3257e7075ddb1d947bdece2bc081683d, type: 3}
+  blessedIcon: {fileID: 21300000, guid: 92d438fef3809554b860ce93d4daeceb, type: 3}
+  evilIcon: {fileID: 21300000, guid: 900223196106fb441bfc51fcb7cb7979, type: 3}
+  challengeIcon: {fileID: 21300000, guid: 16ce427918efae1468f454714f7e44eb, type: 3}
+  minibossIcon: {fileID: 21300000, guid: 5f0b58cb81ca74940af89c51a2c1bddb, type: 3}
+  npcEncounterIcon: {fileID: 21300000, guid: eb8fbfa77496f704ea59001914bc5b69, type: 3}
   currentRoomColor: {r: 1, g: 1, b: 1, a: 1}
   visitedRoomColor: {r: 0.3, g: 0.3, b: 0.3, a: 1}
   adjacentRoomColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
@@ -18880,12 +18883,12 @@ MonoBehaviour:
   treasureBigRoomChance: 0
   curchBigRoomChance: 48
   evilCurchBigRoomChance: 48
-  waveBigRoomChance: 0
   challengeBigRoomChance: 0
   minibossBigRoomChance: 0
-  parkourBigRoomChance: 0
   npcEncounterBigRoomChance: 0
   secretAccessBigRoomChance: 0
+  legacyWaveBigRoomChance: 0
+  legacyParkourBigRoomChance: 0
   minBossDistance: 3
   avoidBossTouchingSpecials: 1
   bossMustBeDeadEnd: 1
@@ -25133,12 +25136,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mapContainer: {fileID: 0}
   roomIconPrefab: {fileID: 1018800666023050230, guid: 9285e9127ce2862419e20358961a0f73, type: 3}
-  skullIcon: {fileID: 21300000, guid: c6be7888e3165f340b4a0f93e59222e4, type: 3}
-  crownIcon: {fileID: 21300000, guid: cd3b020d43e5ba24d9f7b44480c19617, type: 3}
-  startIcon: {fileID: 21300000, guid: 2fe0ace2aec664c4cae85d718a12742c, type: 3}
-  shopIcon: {fileID: 21300000, guid: 79f6d1f25c66c304b8d82f24b8113f23, type: 3}
-  blessedIcon: {fileID: 21300000, guid: 94b17d7ee0c181241827673c4a6ac5de, type: 3}
-  evilIcon: {fileID: 21300000, guid: 774ea01ce256b264fbba7093d1b9934e, type: 3}
+  bossIcon: {fileID: 21300000, guid: 00673145d46e3f7499675249d66e52c4, type: 3}
+  crownIcon: {fileID: 21300000, guid: b8582ebf36402cb4085d3a6f092f5695, type: 3}
+  startIcon: {fileID: 21300000, guid: bead2f252312a294d9267010a3b044ef, type: 3}
+  shopIcon: {fileID: 21300000, guid: 3257e7075ddb1d947bdece2bc081683d, type: 3}
+  blessedIcon: {fileID: 21300000, guid: 92d438fef3809554b860ce93d4daeceb, type: 3}
+  evilIcon: {fileID: 21300000, guid: 900223196106fb441bfc51fcb7cb7979, type: 3}
+  challengeIcon: {fileID: 21300000, guid: 16ce427918efae1468f454714f7e44eb, type: 3}
+  minibossIcon: {fileID: 21300000, guid: 5f0b58cb81ca74940af89c51a2c1bddb, type: 3}
+  npcEncounterIcon: {fileID: 21300000, guid: eb8fbfa77496f704ea59001914bc5b69, type: 3}
   currentRoomColor: {r: 1, g: 1, b: 1, a: 1}
   visitedRoomColor: {r: 0.3, g: 0.3, b: 0.3, a: 1}
   adjacentRoomColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}

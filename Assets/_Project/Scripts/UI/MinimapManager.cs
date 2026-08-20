@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 using System.Linq;
 
 public class MinimapManager : MonoBehaviour
@@ -20,12 +21,15 @@ public class MinimapManager : MonoBehaviour
     public GameObject roomIconPrefab;
 
     [Header("Icone Speciali")]
-    public Sprite skullIcon;   
+    [FormerlySerializedAs("skullIcon")] public Sprite bossIcon;
     public Sprite crownIcon;   
     public Sprite startIcon;   
     public Sprite shopIcon;
     public Sprite blessedIcon;
     public Sprite evilIcon;
+    public Sprite challengeIcon;
+    public Sprite minibossIcon;
+    public Sprite npcEncounterIcon;
 
     [Header("Colori")]
     public Color currentRoomColor = Color.white;
@@ -56,6 +60,7 @@ public class MinimapManager : MonoBehaviour
     private Dictionary<Vector2Int, RoomData> _roomData = new Dictionary<Vector2Int, RoomData>();
     private HashSet<Vector2Int> _visitedRoomAnchors = new HashSet<Vector2Int>();
     private HashSet<Vector2Int> _revealedRoomAnchors = new HashSet<Vector2Int>(); // Stanze da mostrare permanentemente
+    private HashSet<Vector2Int> _completedRoomAnchors = new HashSet<Vector2Int>();
     private readonly Dictionary<string, RectTransform> runtimeRectChildren = new Dictionary<string, RectTransform>();
     private readonly Dictionary<int, List<GameObject>> renderedMenuObjects = new Dictionary<int, List<GameObject>>();
     private Vector2Int _lastPlayerRoomAnchor = new Vector2Int(-999, -999);
@@ -403,6 +408,7 @@ public class MinimapManager : MonoBehaviour
         _roomIconObjects.Clear();
         _visitedRoomAnchors.Clear();
         _revealedRoomAnchors.Clear();
+        _completedRoomAnchors.Clear();
         _roomData.Clear();
         _lastPlayerRoomAnchor = new Vector2Int(-999,-999);
         MapStateChanged?.Invoke();
@@ -444,6 +450,24 @@ public class MinimapManager : MonoBehaviour
         return _roomData.ContainsKey(gridPos);
     }
 
+    /// <summary>Updates overlays that are intentionally revealed only after a room is completed.</summary>
+    public void SetRoomCompleted(Vector2Int gridPos, bool completed)
+    {
+        if (completed)
+            _completedRoomAnchors.Add(gridPos);
+        else
+            _completedRoomAnchors.Remove(gridPos);
+
+        if (_roomIconObjects.TryGetValue(gridPos, out GameObject iconObj) && iconObj != null &&
+            _roomData.TryGetValue(gridPos, out RoomData data))
+        {
+            MinimapRoomIconView iconView = iconObj.GetComponent<MinimapRoomIconView>();
+            ApplySpecialRoomOverlay(iconView != null ? iconView.OverlayImage : null, gridPos, data);
+        }
+
+        MapStateChanged?.Invoke();
+    }
+
     private void SetupIconVisuals(GameObject iconObj, Vector2Int gridPos, RoomData data)
     {
         RectTransform rt = iconObj.GetComponent<RectTransform>();
@@ -464,16 +488,38 @@ public class MinimapManager : MonoBehaviour
             fillImage.color = visitedRoomColor;
 
         Image overlayImg = iconView != null ? iconView.OverlayImage : null;
-        if (overlayImg != null)
+        ApplySpecialRoomOverlay(overlayImg, gridPos, data);
+    }
+
+    private void ApplySpecialRoomOverlay(Image overlayImg, Vector2Int gridPos, RoomData data)
+    {
+        if (overlayImg == null || data == null)
+            return;
+
+        overlayImg.type = Image.Type.Simple;
+        overlayImg.preserveAspect = true;
+        overlayImg.raycastTarget = false;
+
+        Sprite overlaySprite = null;
+        switch (data.roomType)
         {
-            overlayImg.gameObject.SetActive(false);
-            if      (data.roomType == RoomType.Boss && skullIcon != null)   { overlayImg.sprite = skullIcon;   overlayImg.gameObject.SetActive(true); }
-            else if (data.roomType == RoomType.Treasure && crownIcon != null) { overlayImg.sprite = crownIcon;   overlayImg.gameObject.SetActive(true); }
-            else if (data.roomType == RoomType.Start && startIcon != null)  { overlayImg.sprite = startIcon;   overlayImg.gameObject.SetActive(true); }
-            else if (data.roomType == RoomType.Shop && shopIcon != null)    { overlayImg.sprite = shopIcon;    overlayImg.gameObject.SetActive(true); }
-            else if (data.roomType == RoomType.Curch && blessedIcon != null){ overlayImg.sprite = blessedIcon; overlayImg.gameObject.SetActive(true); }
-            else if (data.roomType == RoomType.EvilCurch && evilIcon != null)    { overlayImg.sprite = evilIcon;    overlayImg.gameObject.SetActive(true); }
+            case RoomType.Boss: overlaySprite = bossIcon; break;
+            case RoomType.Treasure: overlaySprite = crownIcon; break;
+            case RoomType.Start: overlaySprite = startIcon; break;
+            case RoomType.Shop: overlaySprite = shopIcon; break;
+            case RoomType.Curch: overlaySprite = blessedIcon; break;
+            case RoomType.EvilCurch: overlaySprite = evilIcon; break;
+            case RoomType.Challenge: overlaySprite = challengeIcon; break;
+            case RoomType.Miniboss:
+                if (_completedRoomAnchors.Contains(gridPos)) overlaySprite = minibossIcon;
+                break;
+            case RoomType.NpcEncounter:
+                if (_completedRoomAnchors.Contains(gridPos)) overlaySprite = npcEncounterIcon;
+                break;
         }
+
+        overlayImg.sprite = overlaySprite;
+        overlayImg.gameObject.SetActive(overlaySprite != null);
     }
     
     public void RevealStartingArea(Vector2Int startPosAnchor)
