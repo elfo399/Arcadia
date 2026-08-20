@@ -425,6 +425,12 @@ public class CoreGenerator : MonoBehaviour
             PlaceSpecialRoom(churchType, churchPool, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, bigRoomChance, cellToRoomMap);
         }
 
+        if (!RestoreReplacedNormalRooms(layout, occupiedCells, cellToRoomMap))
+            return null;
+
+        if (!HasExpectedFinalRoomCounts(layout))
+            return null;
+
         return layout;
     }
     
@@ -508,26 +514,7 @@ public class CoreGenerator : MonoBehaviour
     {
         var sizesToTry = GetSizesToTry(bigRoomChance, poolKey);
 
-        // --- Strategia 1: Sostituzione di una stanza interna (vicolo cieco) ---
-        foreach (var roomToReplace in replacementCandidates.ToList()) 
-        {
-            if (minDistance > 0 && GetManhattanDist(Vector2Int.zero, roomToReplace.anchorPos) < minDistance) continue;
-            if (avoidBossTouchingSpecials && roomType == RoomType.Boss && IsTouchingRestrictedRoom(roomToReplace.anchorPos, roomToReplace.size, cellToRoomMap, roomToReplace)) continue;
-            if (IsTouchingAnySpecialRoom(roomToReplace.anchorPos, roomToReplace.size, cellToRoomMap, roomToReplace)) continue;
-            if (!sizesToTry.Contains(roomToReplace.size)) continue;
-            
-            Room prefab = GetRandomPrefab(poolKey, roomToReplace.size);
-            if (prefab != null)
-            {
-                TemporarilyRemoveRoom(roomToReplace, layout, occupied, cellToRoomMap);
-                LogRoomPlacement(roomType, roomToReplace.size, roomToReplace.anchorPos);
-                AddRoomToLayout(layout, occupied, roomToReplace.anchorPos, roomToReplace.size, roomType, prefab, cellToRoomMap);
-                replacementCandidates.Remove(roomToReplace);
-                return true; 
-            }
-        }
-
-        // --- Strategia 2: Aggiunta su un bordo esterno (fallback) ---
+        // Prefer adding a room so the configured Normal count remains untouched.
         bool isStrictDeadEnd = roomType == RoomType.Boss && bossMustBeDeadEnd;
         foreach (var spot in freeSockets.ToList())
         {
@@ -551,6 +538,26 @@ public class CoreGenerator : MonoBehaviour
                 }
             }
         }
+
+        // Fallback for authored sizes or constraints that only fit an existing dead end.
+        // RestoreReplacedNormalRooms compensates this replacement before accepting the layout.
+        foreach (var roomToReplace in replacementCandidates.ToList())
+        {
+            if (minDistance > 0 && GetManhattanDist(Vector2Int.zero, roomToReplace.anchorPos) < minDistance) continue;
+            if (avoidBossTouchingSpecials && roomType == RoomType.Boss && IsTouchingRestrictedRoom(roomToReplace.anchorPos, roomToReplace.size, cellToRoomMap, roomToReplace)) continue;
+            if (IsTouchingAnySpecialRoom(roomToReplace.anchorPos, roomToReplace.size, cellToRoomMap, roomToReplace)) continue;
+            if (!sizesToTry.Contains(roomToReplace.size)) continue;
+
+            Room prefab = GetRandomPrefab(poolKey, roomToReplace.size);
+            if (prefab != null)
+            {
+                TemporarilyRemoveRoom(roomToReplace, layout, occupied, cellToRoomMap);
+                LogRoomPlacement(roomType, roomToReplace.size, roomToReplace.anchorPos);
+                AddRoomToLayout(layout, occupied, roomToReplace.anchorPos, roomToReplace.size, roomType, prefab, cellToRoomMap);
+                replacementCandidates.Remove(roomToReplace);
+                return true;
+            }
+        }
         
         // Callers that intentionally treat a shrine as optional simply ignore this
         // result. A floor definition with a positive minimum must instead fail the
@@ -571,6 +578,69 @@ public class CoreGenerator : MonoBehaviour
         int effectiveBigRoomChance = Mathf.Max(challengeBigRoomChance, legacyWaveBigRoomChance);
         return PlaceSpecialRooms(RoomType.Challenge, RoomPoolKey.Challenge, count, layout, occupied,
             replacementCandidates, freeSockets, 0, effectiveBigRoomChance, cellToRoomMap);
+    }
+
+    private bool RestoreReplacedNormalRooms(List<VirtualRoom> layout, HashSet<Vector2Int> occupied, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    {
+        int missingNormalRooms = activeNormalRoomCount - layout.Count(room => room.roomType == RoomType.Normal);
+        if (missingNormalRooms < 0)
+            return false;
+
+        while (missingNormalRooms > 0)
+        {
+            List<Vector2Int> normalSockets = FindFreeSockets(occupied).OrderBy(x => prng.Next()).ToList();
+            List<Vector2Int> sizesToTry = GetSizesToTry(normalBigRoomChance, RoomPoolKey.Normal);
+            bool placed = false;
+
+            foreach (Vector2Int socket in normalSockets)
+            {
+                foreach (Vector2Int size in sizesToTry)
+                {
+                    if (!CanFit(socket, size, occupied, false))
+                        continue;
+                    if (WouldBreakBossDeadEnd(socket, size, cellToRoomMap))
+                        continue;
+
+                    Room prefab = GetRandomPrefab(RoomPoolKey.Normal, size);
+                    if (prefab == null)
+                        continue;
+
+                    LogRoomPlacement(RoomType.Normal, size, socket);
+                    AddRoomToLayout(layout, occupied, socket, size, RoomType.Normal, prefab, cellToRoomMap);
+                    missingNormalRooms--;
+                    placed = true;
+                    break;
+                }
+
+                if (placed)
+                    break;
+            }
+
+            if (!placed)
+                return false;
+        }
+
+        return true;
+    }
+
+    private bool HasExpectedFinalRoomCounts(List<VirtualRoom> layout)
+    {
+        if (layout.Count(room => room.roomType == RoomType.Normal) != activeNormalRoomCount)
+            return false;
+
+        if (activeFloorDefinition == null)
+            return true;
+
+        if (layout.Count(room => room.roomType == RoomType.Shop) != ResolveSpecialRoomCount(RoomType.Shop)) return false;
+        if (layout.Count(room => room.roomType == RoomType.Treasure) != ResolveSpecialRoomCount(RoomType.Treasure)) return false;
+        if (layout.Count(room => room.roomType == RoomType.Boss) != ResolveSpecialRoomCount(RoomType.Boss)) return false;
+        if (layout.Count(room => room.roomType == RoomType.Challenge) != ResolveChallengeRoomCount()) return false;
+        if (layout.Count(room => room.roomType == RoomType.Miniboss) != ResolveSpecialRoomCount(RoomType.Miniboss)) return false;
+        if (layout.Count(room => room.roomType == RoomType.NpcEncounter) != ResolveSpecialRoomCount(RoomType.NpcEncounter)) return false;
+        if (layout.Count(room => room.roomType == RoomType.SecretAccess) != ResolveSecretAccessRoomCount(false) + ResolveSecretAccessRoomCount(true)) return false;
+
+        int churchCount = layout.Count(room => room.roomType == RoomType.Curch || room.roomType == RoomType.EvilCurch);
+        return churchCount == ResolveChurchRoomCount();
     }
 
     private IEnumerable<VirtualRoom> GetAdjacentRooms(VirtualRoom room, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
@@ -635,6 +705,27 @@ public class CoreGenerator : MonoBehaviour
                 }
             }
         }
+        return false;
+    }
+
+    private bool WouldBreakBossDeadEnd(Vector2Int anchor, Vector2Int size, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
+    {
+        if (!bossMustBeDeadEnd)
+            return false;
+
+        for (int x = 0; x < size.x; x++)
+        {
+            for (int y = 0; y < size.y; y++)
+            {
+                Vector2Int cell = anchor + new Vector2Int(x, y);
+                foreach (Vector2Int direction in directions)
+                {
+                    if (cellToRoomMap.TryGetValue(cell + direction, out VirtualRoom neighborRoom) && neighborRoom.roomType == RoomType.Boss)
+                        return true;
+                }
+            }
+        }
+
         return false;
     }
     
