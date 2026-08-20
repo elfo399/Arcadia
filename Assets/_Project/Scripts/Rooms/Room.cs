@@ -16,7 +16,7 @@ public class Room : MonoBehaviour
     public int ActiveEnemyCount{get{PruneEnemies();return activeEnemies.Count;}} public bool PlayerHasEntered{get;private set;} public bool BattleActive=>doorLocks.Count>0;
     private readonly List<RoomRule> rules=new List<RoomRule>(); private readonly Dictionary<string,List<GameObject>> encounterEnemies=new Dictionary<string,List<GameObject>>(StringComparer.Ordinal); private readonly HashSet<string> doorLocks=new HashSet<string>(StringComparer.Ordinal);
     private SavedDungeonRoomState state; private RoomRuleContext context; private GameObject spawnedPortal; private bool initialized; private string legacyEncounterOwner="legacy";
-    public void ConfigureGeneratedInstance(string id,Vector2Int anchor,Vector2Int size,int floor,RoomType role){RuntimeId=id;GridAnchor=anchor;GridSize=size==Vector2Int.zero?Vector2Int.one:size;Floor=floor;PlacementRole=role;}
+    public void ConfigureGeneratedInstance(string id,Vector2Int anchor,Vector2Int size,int floor,RoomType role){RuntimeId=id;GridAnchor=anchor;GridSize=size==Vector2Int.zero?Vector2Int.one:size;Floor=floor;PlacementRole=RoomTypeMigration.Normalize(role);}
     public void InitializeGeneratedRuntime(){InitializeRuntime();}
     private void Start()=>InitializeRuntime();
     private void InitializeRuntime()
@@ -24,7 +24,7 @@ public class Room : MonoBehaviour
         if(initialized)return;initialized=true;if(string.IsNullOrWhiteSpace(RuntimeId))ConfigureGeneratedInstance(gameObject.name,Vector2Int.zero,roomData!=null?roomData.size:Vector2Int.one,0,roomData!=null?roomData.roomType:RoomType.Normal);
         state=DungeonRunStateController.Active!=null?DungeonRunStateController.Active.GetRoom(RuntimeId):new SavedDungeonRoomState{roomId=RuntimeId,rules=Array.Empty<SavedDungeonRuleState>()};context=new RoomRuleContext(this,state);
         rules.AddRange(GetComponents<RoomRule>());
-        bool hasEncounter=false;foreach(var rule in rules)if(rule is CombatRoomRule||rule is WaveRoomRule)hasEncounter=true;
+        bool hasEncounter=false;foreach(var rule in rules)if(rule is CombatRoomRule||rule is IChallengeRoomVariant)hasEncounter=true;
         // Legacy spawners still get combat even when a reward/event rule is added.
         if(!hasEncounter&&GetComponentsInChildren<EnemySpawner>(true).Length>0)rules.Add(gameObject.AddComponent<CombatRoomRule>());
         bool hasModernReward=false;foreach(var rule in rules)if(rule is RoomRewardRule)hasModernReward=true;

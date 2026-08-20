@@ -1,0 +1,115 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a544078287434a34b9eda1b7e6dec126, type: 3}
+  m_Name: Sword4_Epic
+  m_EditorClassIdentifier: 
+  definitionId: weapon.sword.sword4_epic
+  weaponName: Sword Epic
+  baseValue: 284
+  rarity: 2
+  canUpgrade: 1
+  canCraft: 0
+  upgradeCoinCost: 100
+  upgradeMaterialRequirements: []
+  upgradeCostStages:
+  - minimumTargetLevel: 1
+    coinCost: 100
+    materialRequirements: []
+  - minimumTargetLevel: 4
+    coinCost: 165
+    materialRequirements: []
+  - minimumTargetLevel: 7
+    coinCost: 235
+    materialRequirements: []
+  physicalDamageGrowth: 0.1
+  magicDamageGrowth: 0
+  criticalHitGrowth: 0.01
+  criticalChanceGrowth: 0.005
+  strengthScalingRankGrowth: 0
+  dexterityScalingRankGrowth: 0
+  intelligenceScalingRankGrowth: 0
+  faithScalingRankGrowth: 0
+  physicalBlockGrowth: 0
+  magicBlockGrowth: 0
+  stabilityGrowth: 0
+  icon: {fileID: 21300000, guid: 11cdc85aacc7d78448f83a6c59b6b5ad, type: 3}
+  modelPrefab: {fileID: 3213851043470871558, guid: c7f94f6bbd8660c468077cc8f017cb52, type: 3}
+  description: Un'arma d'eccellenza con requisiti e scaling calibrati per StraightSword.
+  category: 1
+  rangeType: 0
+  damageType: 0
+  physicalDamage: 46
+  magicDamage: 0
+  criticalHit: 1.1
+  criticalChance: 0.09
+  lightDamageMultiplier: 1
+  heavyDamageMultiplier: 1.35
+  weight: 3.5
+  scaling: STR A / DEX B
+  strengthScalingRank: 5
+  dexterityScalingRank: 4
+  intelligenceScalingRank: 0
+  faithScalingRank: 0
+  strengthRequirement: 22
+  dexterityRequirement: 16
+  intelligenceRequirement: 0
+  faithRequirement: 0
+  requirements: STR 22 / DEX 16
+  animationProfile: {fileID: 11400000, guid: 83aa8dbcfcce8614f95a879fa83d9545, type: 2}
+  lightAttackStaminaCost: 9
+  heavyAttackStaminaCost: 17
+  canBlock: 0
+  canParry: 0
+  physicalBlockPercent: 0.1
+  magicBlockPercent: 0.05
+  stability: 5
+  parryWindowStart: 0.05
+  parryWindowDuration: 0.18
+  hasRightSkill: 0
+  hasLeftSkill: 0
+  isSpecialWeapon: 0
+  wandLightProjectilePrefab: {fileID: 0}
+  wandLightManaCost: 6
+  wandLightCooldown: 0.2
+  wandLightProjectileSpeed: 22
+  wandLightProjectileLifetime: 2.5
+  wandLightSpawnOffset: {x: 0, y: 1.2, z: 0.75}
+  wandHitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  bowProjectilePrefab: {fileID: 0}
+  bowAmmoItem: {fileID: 0}
+  bowShotCooldown: 0.2
+  bowProjectileSpeed: 26
+  bowProjectileLifetime: 3.5
+  bowSpawnOffset: {x: 0, y: 1.2, z: 0.9}
+  bowHitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  canBeThrown: 0
+  throwStrengthRequirement: 0
+  throwProjectilePrefab: {fileID: 0}
+  throwSpeed: 20
+  throwLifetime: 2.5
+  throwStaminaCost: 18
+  throwBladeHitChance: 0.65
+  throwHandleDamageMultiplier: 0.5
+  throwBreakChance: 0.1
+  droppedPickupColliderCenter: {x: 0, y: 0.05, z: 0}
+  droppedPickupColliderSize: {x: 0.7, y: 0.12, z: 0.22}
+  droppedPickupMass: 1.7
+  droppedPickupLinearDrag: 0.12
+  droppedPickupAngularDrag: 0.3
+  droppedForwardImpulse: 1.2
+  droppedUpImpulse: 0.35
+  droppedInitialTorque: {x: 3, y: 0.7, z: 1.5}
+  droppedModelLocalEuler: {x: 90, y: 0, z: 0}

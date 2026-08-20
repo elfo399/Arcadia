@@ -12,4 +12,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d5fd944f5a2a5145bf58fdff4f4b0f5, type: 3}
   m_Name: FlailRegistry
   m_EditorClassIdentifier: 
-  entries: []
+  entries:
+  - category: Flail
+    key: mace1h_basic
+    itemName: Flail Basic
+    icon: {fileID: 21300000, guid: 1607ced5cec633e42a563cbd2366bff7, type: 3}
+    weaponData: {fileID: 11400000, guid: 4bafaa20f6fbbd94b91b3ced3b78cf28, type: 2}
+    usableData: {fileID: 0}
+    itemData: {fileID: 0}
+    armorData: {fileID: 0}
+    magicData: {fileID: 0}
+  - category: Flail
+    key: mace1h_epic
+    itemName: Flail Epic
+    icon: {fileID: 21300000, guid: 52523ca14280f5e4dbdb6185e1af7f0a, type: 3}
+    weaponData: {fileID: 11400000, guid: 1376c0f1a92c16d42bef4939ffd9c68e, type: 2}
+    usableData: {fileID: 0}
+    itemData: {fileID: 0}
+    armorData: {fileID: 0}
+    magicData: {fileID: 0}
+  - category: Flail
+    key: mace1h_medium
+    itemName: Flail Medium
+    icon: {fileID: 21300000, guid: adef18068606da04cbb1513fd206fe70, type: 3}
+    weaponData: {fileID: 11400000, guid: 0820ec1b89f1e574f9bd555c1292d675, type: 2}
+    usableData: {fileID: 0}
+    itemData: {fileID: 0}
+    armorData: {fileID: 0}
+    magicData: {fileID: 0}

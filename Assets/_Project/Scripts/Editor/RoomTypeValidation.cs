@@ -21,11 +21,8 @@ public static class RoomTypeValidation
 
                 switch (room.roomData.roomType)
                 {
-                    case RoomType.Wave:
-                        warnings += WarnIfMissing<WaveRoomRule>(room, path, "Wave");
-                        break;
                     case RoomType.Challenge:
-                        warnings += WarnIfMissing<ChallengeRoomRule>(room, path, "Challenge");
+                        warnings += WarnIfMissingChallengeVariant(room, path);
                         break;
                     case RoomType.Miniboss:
                         warnings += WarnIfMissing<MinibossRoomRule>(room, path, "Miniboss");
@@ -50,6 +47,16 @@ public static class RoomTypeValidation
             return 0;
 
         Debug.LogWarning($"[RoomTypeValidation] {label} RoomData has no {typeof(T).Name}: {path}", room);
+        return 1;
+    }
+
+    private static int WarnIfMissingChallengeVariant(Room room, string path)
+    {
+        foreach (RoomRule rule in room.GetComponentsInChildren<RoomRule>(true))
+            if (rule is IChallengeRoomVariant)
+                return 0;
+
+        Debug.LogWarning($"[RoomTypeValidation] Challenge RoomData has no IChallengeRoomVariant: {path}", room);
         return 1;
     }
 }

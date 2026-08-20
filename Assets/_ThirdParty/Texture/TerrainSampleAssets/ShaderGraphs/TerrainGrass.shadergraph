@@ -11643,7 +11643,7 @@
 
 {
     "m_SGVersion": 1,
-    "m_Type": "UnityEditor.Rendering.HighDefinition.DiffusionProfileShaderProperty",
+    "m_Type": "UnityEditor.ShaderGraph.Internal.Vector1ShaderProperty",
     "m_ObjectId": "d8683f16afdb4b4aa6f3e2e1a367bb86",
     "m_Guid": {
         "m_GuidSerialized": "2fc80210-eb6f-49d2-8071-941e76314c43"
@@ -11660,8 +11660,11 @@
     "overrideHLSLDeclaration": false,
     "hlslDeclarationOverride": 0,
     "m_Hidden": false,
-    "m_Value": {
-        "instanceID": 0
+    "m_Value": 0.0,
+    "m_FloatType": 0,
+    "m_RangeValues": {
+        "x": 0.0,
+        "y": 1.0
     }
 }
 
@@ -13161,4 +13164,3 @@
     "m_Modifiable": true,
     "m_DefaultType": 0
 }
-

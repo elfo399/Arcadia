@@ -1,0 +1,115 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a544078287434a34b9eda1b7e6dec126, type: 3}
+  m_Name: Sword_Medium
+  m_EditorClassIdentifier: 
+  definitionId: weapon.sword.sword_medium
+  weaponName: Sword Medium
+  baseValue: 159
+  rarity: 1
+  canUpgrade: 1
+  canCraft: 0
+  upgradeCoinCost: 65
+  upgradeMaterialRequirements: []
+  upgradeCostStages:
+  - minimumTargetLevel: 1
+    coinCost: 65
+    materialRequirements: []
+  - minimumTargetLevel: 4
+    coinCost: 107
+    materialRequirements: []
+  - minimumTargetLevel: 7
+    coinCost: 153
+    materialRequirements: []
+  physicalDamageGrowth: 0.085
+  magicDamageGrowth: 0
+  criticalHitGrowth: 0.01
+  criticalChanceGrowth: 0.005
+  strengthScalingRankGrowth: 0
+  dexterityScalingRankGrowth: 0
+  intelligenceScalingRankGrowth: 0
+  faithScalingRankGrowth: 0
+  physicalBlockGrowth: 0
+  magicBlockGrowth: 0
+  stabilityGrowth: 0
+  icon: {fileID: 21300000, guid: d72b662a7c73d29418f8b6d28e5f60a1, type: 3}
+  modelPrefab: {fileID: 3213851043470871558, guid: 3cc49648719f14f478b227f311810350, type: 3}
+  description: Un'arma bilanciata con requisiti e scaling calibrati per StraightSword.
+  category: 1
+  rangeType: 0
+  damageType: 0
+  physicalDamage: 34
+  magicDamage: 0
+  criticalHit: 1.1
+  criticalChance: 0.09
+  lightDamageMultiplier: 1
+  heavyDamageMultiplier: 1.35
+  weight: 3.3
+  scaling: STR B / DEX C
+  strengthScalingRank: 4
+  dexterityScalingRank: 3
+  intelligenceScalingRank: 0
+  faithScalingRank: 0
+  strengthRequirement: 16
+  dexterityRequirement: 12
+  intelligenceRequirement: 0
+  faithRequirement: 0
+  requirements: STR 16 / DEX 12
+  animationProfile: {fileID: 11400000, guid: 83aa8dbcfcce8614f95a879fa83d9545, type: 2}
+  lightAttackStaminaCost: 9
+  heavyAttackStaminaCost: 17
+  canBlock: 0
+  canParry: 0
+  physicalBlockPercent: 0.1
+  magicBlockPercent: 0.05
+  stability: 5
+  parryWindowStart: 0.05
+  parryWindowDuration: 0.18
+  hasRightSkill: 0
+  hasLeftSkill: 0
+  isSpecialWeapon: 0
+  wandLightProjectilePrefab: {fileID: 0}
+  wandLightManaCost: 6
+  wandLightCooldown: 0.2
+  wandLightProjectileSpeed: 22
+  wandLightProjectileLifetime: 2.5
+  wandLightSpawnOffset: {x: 0, y: 1.2, z: 0.75}
+  wandHitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  bowProjectilePrefab: {fileID: 0}
+  bowAmmoItem: {fileID: 0}
+  bowShotCooldown: 0.2
+  bowProjectileSpeed: 26
+  bowProjectileLifetime: 3.5
+  bowSpawnOffset: {x: 0, y: 1.2, z: 0.9}
+  bowHitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  canBeThrown: 0
+  throwStrengthRequirement: 0
+  throwProjectilePrefab: {fileID: 0}
+  throwSpeed: 20
+  throwLifetime: 2.5
+  throwStaminaCost: 18
+  throwBladeHitChance: 0.65
+  throwHandleDamageMultiplier: 0.5
+  throwBreakChance: 0.1
+  droppedPickupColliderCenter: {x: 0, y: 0.05, z: 0}
+  droppedPickupColliderSize: {x: 0.7, y: 0.12, z: 0.22}
+  droppedPickupMass: 1.45
+  droppedPickupLinearDrag: 0.12
+  droppedPickupAngularDrag: 0.3
+  droppedForwardImpulse: 1.2
+  droppedUpImpulse: 0.35
+  droppedInitialTorque: {x: 3, y: 0.7, z: 1.5}
+  droppedModelLocalEuler: {x: 90, y: 0, z: 0}

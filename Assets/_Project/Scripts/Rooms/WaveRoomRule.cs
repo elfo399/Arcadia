@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable] public sealed class DungeonWaveDefinition { public List<SpawnTable> enemyPools = new List<SpawnTable>(); }
 
 /// <summary>Ordered authored-spawn-point encounter. Each interrupted wave restarts from wave zero after loading.</summary>
-public sealed class WaveRoomRule : RoomRule
+public sealed class WaveRoomRule : RoomRule, IChallengeRoomVariant
 {
     public override bool BlocksRoomCompletion => true;
     [SerializeField] private List<DungeonWaveDefinition> waves = new List<DungeonWaveDefinition>();

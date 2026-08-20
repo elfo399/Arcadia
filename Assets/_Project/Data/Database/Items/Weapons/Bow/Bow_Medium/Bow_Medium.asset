@@ -1,0 +1,115 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a544078287434a34b9eda1b7e6dec126, type: 3}
+  m_Name: Bow_Medium
+  m_EditorClassIdentifier: 
+  definitionId: weapon.bow.bow_medium
+  weaponName: Bow Medium
+  baseValue: 136
+  rarity: 1
+  canUpgrade: 1
+  canCraft: 0
+  upgradeCoinCost: 65
+  upgradeMaterialRequirements: []
+  upgradeCostStages:
+  - minimumTargetLevel: 1
+    coinCost: 65
+    materialRequirements: []
+  - minimumTargetLevel: 4
+    coinCost: 107
+    materialRequirements: []
+  - minimumTargetLevel: 7
+    coinCost: 153
+    materialRequirements: []
+  physicalDamageGrowth: 0.085
+  magicDamageGrowth: 0
+  criticalHitGrowth: 0.01
+  criticalChanceGrowth: 0.005
+  strengthScalingRankGrowth: 0
+  dexterityScalingRankGrowth: 0
+  intelligenceScalingRankGrowth: 0
+  faithScalingRankGrowth: 0
+  physicalBlockGrowth: 0
+  magicBlockGrowth: 0
+  stabilityGrowth: 0
+  icon: {fileID: 21300000, guid: 7af8c9f2f9be2774b8507d6b00283375, type: 3}
+  modelPrefab: {fileID: 4651264813699394226, guid: 4bd6dfd950c6ee44ba7f75f9c94595c9, type: 3}
+  description: Un arco bilanciata pensato per attacchi a distanza basati su Destrezza.
+  category: 7
+  rangeType: 1
+  damageType: 0
+  physicalDamage: 29
+  magicDamage: 0
+  criticalHit: 1.1
+  criticalChance: 0.12
+  lightDamageMultiplier: 1
+  heavyDamageMultiplier: 1.35
+  weight: 2.5500002
+  scaling: STR D / DEX A
+  strengthScalingRank: 2
+  dexterityScalingRank: 5
+  intelligenceScalingRank: 0
+  faithScalingRank: 0
+  strengthRequirement: 8
+  dexterityRequirement: 18
+  intelligenceRequirement: 0
+  faithRequirement: 0
+  requirements: STR 8 / DEX 18
+  animationProfile: {fileID: 11400000, guid: ec30b1160936fd04a953ace192e6f517, type: 2}
+  lightAttackStaminaCost: 8
+  heavyAttackStaminaCost: 15
+  canBlock: 0
+  canParry: 0
+  physicalBlockPercent: 0.1
+  magicBlockPercent: 0.05
+  stability: 5
+  parryWindowStart: 0.05
+  parryWindowDuration: 0.18
+  hasRightSkill: 0
+  hasLeftSkill: 0
+  isSpecialWeapon: 0
+  wandLightProjectilePrefab: {fileID: 0}
+  wandLightManaCost: 6
+  wandLightCooldown: 0.2
+  wandLightProjectileSpeed: 22
+  wandLightProjectileLifetime: 2.5
+  wandLightSpawnOffset: {x: 0, y: 1.2, z: 0.75}
+  wandHitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  bowProjectilePrefab: {fileID: 1171546011100446755, guid: 914b60f537db37c49b37262c9ef89d9a, type: 3}
+  bowAmmoItem: {fileID: 11400000, guid: 8dcc8513464141c40a0a38dc44690d46, type: 2}
+  bowShotCooldown: 0.2
+  bowProjectileSpeed: 26
+  bowProjectileLifetime: 3.5
+  bowSpawnOffset: {x: 0, y: 1.2, z: 0.9}
+  bowHitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  canBeThrown: 0
+  throwStrengthRequirement: 0
+  throwProjectilePrefab: {fileID: 0}
+  throwSpeed: 20
+  throwLifetime: 2.5
+  throwStaminaCost: 18
+  throwBladeHitChance: 0.65
+  throwHandleDamageMultiplier: 0.5
+  throwBreakChance: 0.1
+  droppedPickupColliderCenter: {x: 0, y: 0.05, z: 0}
+  droppedPickupColliderSize: {x: 0.7, y: 0.12, z: 0.22}
+  droppedPickupMass: 1.45
+  droppedPickupLinearDrag: 0.12
+  droppedPickupAngularDrag: 0.3
+  droppedForwardImpulse: 1.2
+  droppedUpImpulse: 0.35
+  droppedInitialTorque: {x: 3, y: 0.7, z: 1.5}
+  droppedModelLocalEuler: {x: 90, y: 0, z: 0}

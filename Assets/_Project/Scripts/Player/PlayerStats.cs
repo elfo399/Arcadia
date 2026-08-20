@@ -138,6 +138,9 @@ public class PlayerStats : MonoBehaviour, IDamageable
     private int temporaryIntelligenceBonus;
     private int temporaryFaithBonus;
     private readonly HashSet<string> storyFlags = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> healingBlocks = new(StringComparer.Ordinal);
+
+    public bool IsHealingBlocked => healingBlocks.Count > 0;
     private readonly DialogueHistory dialogueHistory = new();
 
     public int TotalArmorPhysicalDefense => totalArmorPhysicalDefense;
@@ -416,9 +419,26 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public void RestoreHealth(float amount)
     {
-        if (amount <= 0f) return;
+        if (amount <= 0f || IsHealingBlocked) return;
         currentHealth += amount;
         currentHealth = Mathf.Min(currentHealth, maxHealth);
+    }
+
+    /// <summary>
+    /// Adds a scoped positive-healing block. Multiple systems can overlap safely;
+    /// healing resumes only after every source releases its own identifier.
+    /// Damage and explicit health sacrifices are unaffected.
+    /// </summary>
+    public void AcquireHealingBlock(string sourceId)
+    {
+        if (!string.IsNullOrWhiteSpace(sourceId))
+            healingBlocks.Add(sourceId.Trim());
+    }
+
+    public void ReleaseHealingBlock(string sourceId)
+    {
+        if (!string.IsNullOrWhiteSpace(sourceId))
+            healingBlocks.Remove(sourceId.Trim());
     }
 
     /// <summary>
@@ -469,6 +489,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         switch (usable.effectType)
         {
             case UsableItemData.UsableEffectType.Heal:
+                if (IsHealingBlocked) return false;
                 float heal = usable.healAmount > 0 ? usable.healAmount : flaskHealAmount;
                 if (RunModifierController.Active != null) heal *= RunModifierController.Active.GetMultiplier(RunModifierEffect.FlaskHealingMultiplier);
                 RestoreHealth(heal);
@@ -580,6 +601,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         {
             case MagicItemData.MagicEffectType.HealHealth:
             {
+                if (IsHealingBlocked) return false;
                 float amount = Mathf.Max(0f, magic.healAmount);
                 if (amount <= 0f) return false;
                 RestoreHealth(amount);

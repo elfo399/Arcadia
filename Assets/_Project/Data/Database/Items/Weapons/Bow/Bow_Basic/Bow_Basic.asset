@@ -13,41 +13,67 @@ MonoBehaviour:
   m_Name: Bow_Basic
   m_EditorClassIdentifier: 
   definitionId: e9bbdbd574ffe864d92aa518329e0d5c
-  weaponName: Bow_Basic
+  weaponName: Bow Basic
+  baseValue: 58
+  rarity: 0
   canUpgrade: 1
-  icon: {fileID: 21300000, guid: f662ea7b3189fe044922a4bcfb036b2c, type: 3}
+  canCraft: 0
+  upgradeCoinCost: 30
+  upgradeMaterialRequirements: []
+  upgradeCostStages:
+  - minimumTargetLevel: 1
+    coinCost: 30
+    materialRequirements: []
+  - minimumTargetLevel: 4
+    coinCost: 50
+    materialRequirements: []
+  - minimumTargetLevel: 7
+    coinCost: 70
+    materialRequirements: []
+  physicalDamageGrowth: 0.07
+  magicDamageGrowth: 0
+  criticalHitGrowth: 0.01
+  criticalChanceGrowth: 0.005
+  strengthScalingRankGrowth: 0
+  dexterityScalingRankGrowth: 0
+  intelligenceScalingRankGrowth: 0
+  faithScalingRankGrowth: 0
+  physicalBlockGrowth: 0
+  magicBlockGrowth: 0
+  stabilityGrowth: 0
+  icon: {fileID: 21300000, guid: 336042c8f73317049b76ed714cd5f7b8, type: 3}
   modelPrefab: {fileID: 3548874538517711366, guid: b3821827a4e26fc419b781f2fa7fce09, type: 3}
-  description: 
+  description: Un arco affidabile pensato per attacchi a distanza basati su Destrezza.
   category: 7
-  rangeType: 0
+  rangeType: 1
   damageType: 0
-  physicalDamage: 10
+  physicalDamage: 18
   magicDamage: 0
   criticalHit: 1.1
-  criticalChance: 0
+  criticalChance: 0.12
   lightDamageMultiplier: 1
-  heavyDamageMultiplier: 1.25
-  weight: 3
-  scaling: DEX D
-  strengthScalingRank: 0
-  dexterityScalingRank: 2
+  heavyDamageMultiplier: 1.35
+  weight: 2.4
+  scaling: STR E / DEX B
+  strengthScalingRank: 1
+  dexterityScalingRank: 4
   intelligenceScalingRank: 0
   faithScalingRank: 0
-  strengthRequirement: 0
-  dexterityRequirement: 10
+  strengthRequirement: 5
+  dexterityRequirement: 12
   intelligenceRequirement: 0
   faithRequirement: 0
-  requirements: DEX 10
+  requirements: STR 5 / DEX 12
   animationProfile: {fileID: 11400000, guid: ec30b1160936fd04a953ace192e6f517, type: 2}
-  lightAttackStaminaCost: 10
-  heavyAttackStaminaCost: 20
-  canBlock: 1
+  lightAttackStaminaCost: 8
+  heavyAttackStaminaCost: 15
+  canBlock: 0
   canParry: 0
-  physicalBlockPercent: 0.75
-  magicBlockPercent: 0.4
-  stability: 25
+  physicalBlockPercent: 0.1
+  magicBlockPercent: 0.05
+  stability: 5
   parryWindowStart: 0.05
-  parryWindowDuration: 0.2
+  parryWindowDuration: 0.18
   hasRightSkill: 0
   hasLeftSkill: 0
   isSpecialWeapon: 0
@@ -80,10 +106,10 @@ MonoBehaviour:
   throwBreakChance: 0.1
   droppedPickupColliderCenter: {x: 0, y: 0.05, z: 0}
   droppedPickupColliderSize: {x: 0.7, y: 0.12, z: 0.22}
-  droppedPickupMass: 2.2
-  droppedPickupLinearDrag: 0.06
-  droppedPickupAngularDrag: 0.45
-  droppedForwardImpulse: 0.9
-  droppedUpImpulse: 0.18
-  droppedInitialTorque: {x: 2.5, y: 0.3, z: 1.2}
+  droppedPickupMass: 1.2
+  droppedPickupLinearDrag: 0.12
+  droppedPickupAngularDrag: 0.3
+  droppedForwardImpulse: 1.2
+  droppedUpImpulse: 0.35
+  droppedInitialTorque: {x: 3, y: 0.7, z: 1.5}
   droppedModelLocalEuler: {x: 90, y: 0, z: 0}

@@ -1049,6 +1049,7 @@ public class PlayerCombat : MonoBehaviour
             case MagicItemData.MagicEffectType.Damage:
                 return magic.projectilePrefab != null;
             case MagicItemData.MagicEffectType.HealHealth:
+                return magic.healAmount > 0 && (stats == null || !stats.IsHealingBlocked);
             case MagicItemData.MagicEffectType.RestoreMana:
                 return magic.healAmount > 0;
             case MagicItemData.MagicEffectType.BoostAttribute:

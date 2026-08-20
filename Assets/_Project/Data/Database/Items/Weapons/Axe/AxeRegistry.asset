@@ -12,4 +12,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d5fd944f5a2a5145bf58fdff4f4b0f5, type: 3}
   m_Name: AxeRegistry
   m_EditorClassIdentifier: 
-  entries: []
+  entries:
+  - category: Axe
+    key: axe1h_basic
+    itemName: Axe Basic
+    icon: {fileID: 21300000, guid: 39a98a46acbfc184abad49ebc0c77096, type: 3}
+    weaponData: {fileID: 11400000, guid: ae926ac64e9f75f44a645a87f8c1c0d6, type: 2}
+    usableData: {fileID: 0}
+    itemData: {fileID: 0}
+    armorData: {fileID: 0}
+    magicData: {fileID: 0}
+  - category: Axe
+    key: axe1h_epic
+    itemName: Axe Epic
+    icon: {fileID: 21300000, guid: 2f28ac173d9989543ab55cba496e2039, type: 3}
+    weaponData: {fileID: 11400000, guid: 2e80cd3252bd297489d64878ae28db56, type: 2}
+    usableData: {fileID: 0}
+    itemData: {fileID: 0}
+    armorData: {fileID: 0}
+    magicData: {fileID: 0}
+  - category: Axe
+    key: axe1h_medium
+    itemName: Axe Medium
+    icon: {fileID: 21300000, guid: bae6c9fcdb9dbe64484d0086b400d264, type: 3}
+    weaponData: {fileID: 11400000, guid: 2f828a40e3ff4d24b9e937996d83b116, type: 2}
+    usableData: {fileID: 0}
+    itemData: {fileID: 0}
+    armorData: {fileID: 0}
+    magicData: {fileID: 0}

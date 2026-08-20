@@ -20,7 +20,7 @@ public class LootItem
 }
 
 [CreateAssetMenu(fileName = "NewRoom", menuName = "Dungeon/Room Data")]
-public class RoomData : ScriptableObject
+public class RoomData : ScriptableObject, ISerializationCallbackReceiver
 {
     [Header("Identità")]
     [Tooltip("Immutable authoring ID used by deterministic generated-room identities.")]
@@ -39,9 +39,20 @@ public class RoomData : ScriptableObject
     [Header("Rewards / Loot Table")]
     public List<LootItem> rewards = new List<LootItem>();
 
+    public void OnBeforeSerialize()
+    {
+        roomType = RoomTypeMigration.Normalize(roomType);
+    }
+
+    public void OnAfterDeserialize()
+    {
+        roomType = RoomTypeMigration.Normalize(roomType);
+    }
+
 #if UNITY_EDITOR
     private void OnValidate()
     {
+        roomType = RoomTypeMigration.Normalize(roomType);
         if (string.IsNullOrWhiteSpace(stableId))
         {
             stableId = "roomdef-" + System.Guid.NewGuid().ToString("N");

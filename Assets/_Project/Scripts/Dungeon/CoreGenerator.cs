@@ -4,6 +4,7 @@ using UnityEngine;
 using Unity.AI.Navigation;
 using System.Linq;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 
 public class CoreGenerator : MonoBehaviour
 {
@@ -48,12 +49,14 @@ public class CoreGenerator : MonoBehaviour
     [Range(0, 100)] public int treasureBigRoomChance = 50;
     [Range(0, 100)] public int curchBigRoomChance = 50;
     [Range(0, 100)] public int evilCurchBigRoomChance = 50;
-    [Range(0, 100)] public int waveBigRoomChance = 0;
     [Range(0, 100)] public int challengeBigRoomChance = 0;
     [Range(0, 100)] public int minibossBigRoomChance = 0;
-    [Range(0, 100)] public int parkourBigRoomChance = 0;
     [Range(0, 100)] public int npcEncounterBigRoomChance = 0;
     [Range(0, 100)] public int secretAccessBigRoomChance = 0;
+    [SerializeField, HideInInspector, FormerlySerializedAs("waveBigRoomChance")]
+    private int legacyWaveBigRoomChance;
+    [SerializeField, HideInInspector, FormerlySerializedAs("parkourBigRoomChance")]
+    private int legacyParkourBigRoomChance;
 
     [Header("Regole Distanza & Adiacenza")]
     [Tooltip("Distanza minima (celle) dallo Start per il Boss.")]
@@ -92,7 +95,7 @@ public class CoreGenerator : MonoBehaviour
     // SecretAccess pools deliberately share RoomType.SecretAccess.
     private enum RoomPoolKey
     {
-        Normal, Shop, Treasure, Wave, Challenge, Miniboss, Parkour,
+        Normal, Shop, Treasure, Challenge, Miniboss,
         NpcEncounter, SecretAccessSecret, SecretAccessSuperSecret,
         Curch, EvilCurch, Boss
     }
@@ -422,8 +425,6 @@ public class CoreGenerator : MonoBehaviour
             PlaceSpecialRoom(churchType, churchPool, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, bigRoomChance, cellToRoomMap);
         }
 
-        PlaceParkourRooms(ResolveSpecialRoomCount(RoomType.Parkour), layout, occupiedCells, cellToRoomMap);
-
         return layout;
     }
     
@@ -567,109 +568,9 @@ public class CoreGenerator : MonoBehaviour
 
     private bool PlaceChallengeRooms(int count, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, List<VirtualRoom> replacementCandidates, List<Vector2Int> freeSockets, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
     {
-        if (count <= 0)
-            return true;
-
-        bool hasWavePool = HasWaveRoomVariants();
-        bool hasChallengePool = HasChallengeRoomVariants();
-        if (!hasWavePool && !hasChallengePool)
-        {
-            Debug.LogWarning($"[CoreGenerator] Il room set '{activeRoomSet.name}' non ha varianti Wave o Challenge: Challenge Rooms viene saltato.");
-            return true;
-        }
-
-        System.Random choiceRandom = DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "challenge-room-types");
-        for (int i = 0; i < count; i++)
-        {
-            bool useWave = hasWavePool && (!hasChallengePool || choiceRandom.Next(0, 2) == 0);
-            RoomType roomType = useWave ? RoomType.Wave : RoomType.Challenge;
-            RoomPoolKey poolKey = useWave ? RoomPoolKey.Wave : RoomPoolKey.Challenge;
-            int bigRoomChance = useWave ? waveBigRoomChance : challengeBigRoomChance;
-            if (!PlaceSpecialRoom(roomType, poolKey, layout, occupied, replacementCandidates, freeSockets, 0, bigRoomChance, cellToRoomMap))
-                return false;
-        }
-
-        return true;
-    }
-
-    private void PlaceParkourRooms(int count, List<VirtualRoom> layout, HashSet<Vector2Int> occupied, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
-    {
-        for (int i = 0; i < count; i++)
-        {
-            List<VirtualRoom> pathCandidates = FindMainPathNormalRooms(layout, cellToRoomMap);
-            if (pathCandidates.Count == 0)
-            {
-                Debug.LogWarning("[CoreGenerator] Nessuna Normal Room valida sul percorso Start-Boss: Parkour Room non piazzata.");
-                return;
-            }
-
-            bool replaced = false;
-            foreach (Vector2Int size in GetSizesToTry(parkourBigRoomChance, RoomPoolKey.Parkour))
-            {
-                foreach (VirtualRoom candidate in pathCandidates.Where(room => room.size == size).OrderBy(_ => prng.Next()).ToList())
-                {
-                    Room prefab = GetRandomPrefab(RoomPoolKey.Parkour, candidate.size);
-                    if (prefab == null)
-                        continue;
-
-                    TemporarilyRemoveRoom(candidate, layout, occupied, cellToRoomMap);
-                    LogRoomPlacement(RoomType.Parkour, candidate.size, candidate.anchorPos);
-                    AddRoomToLayout(layout, occupied, candidate.anchorPos, candidate.size, RoomType.Parkour, prefab, cellToRoomMap);
-                    replaced = true;
-                    break;
-                }
-
-                if (replaced)
-                    break;
-            }
-
-            if (!replaced)
-            {
-                Debug.LogWarning("[CoreGenerator] Nessuna Normal Room sul percorso Start-Boss usa una dimensione supportata dal pool Parkour: Parkour Room non piazzata.");
-                return;
-            }
-        }
-    }
-
-    private List<VirtualRoom> FindMainPathNormalRooms(List<VirtualRoom> layout, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
-    {
-        VirtualRoom startRoom = layout.FirstOrDefault(room => room.roomType == RoomType.Start);
-        VirtualRoom bossRoom = layout.FirstOrDefault(room => room.roomType == RoomType.Boss);
-        if (startRoom == null || bossRoom == null)
-            return new List<VirtualRoom>();
-
-        var previous = new Dictionary<VirtualRoom, VirtualRoom>();
-        var visited = new HashSet<VirtualRoom> { startRoom };
-        var queue = new Queue<VirtualRoom>();
-        queue.Enqueue(startRoom);
-
-        while (queue.Count > 0 && !visited.Contains(bossRoom))
-        {
-            VirtualRoom current = queue.Dequeue();
-            foreach (VirtualRoom neighbor in GetAdjacentRooms(current, cellToRoomMap))
-            {
-                if (neighbor.roomType != RoomType.Normal && neighbor != bossRoom && neighbor != startRoom)
-                    continue;
-                if (!visited.Add(neighbor))
-                    continue;
-
-                previous[neighbor] = current;
-                queue.Enqueue(neighbor);
-            }
-        }
-
-        if (!visited.Contains(bossRoom))
-            return new List<VirtualRoom>();
-
-        var candidates = new List<VirtualRoom>();
-        VirtualRoom current = bossRoom;
-        while (current != null)
-        {
-            if (current.roomType == RoomType.Normal)
-                candidates.Add(current);
-            previous.TryGetValue(current, out current);
-        }
-        return candidates;
+        int effectiveBigRoomChance = Mathf.Max(challengeBigRoomChance, legacyWaveBigRoomChance);
+        return PlaceSpecialRooms(RoomType.Challenge, RoomPoolKey.Challenge, count, layout, occupied,
+            replacementCandidates, freeSockets, 0, effectiveBigRoomChance, cellToRoomMap);
     }
 
     private IEnumerable<VirtualRoom> GetAdjacentRooms(VirtualRoom room, Dictionary<Vector2Int, VirtualRoom> cellToRoomMap)
@@ -963,7 +864,6 @@ public class CoreGenerator : MonoBehaviour
         }
 
         if (ResolveSpecialRoomCount(RoomType.Miniboss) > 0 && !HasAnyVariant(activeRoomSet.miniboss1x1Variants, activeRoomSet.miniboss2x1Variants, activeRoomSet.miniboss1x2Variants, activeRoomSet.miniboss2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Miniboss."; return false; }
-        if (ResolveSpecialRoomCount(RoomType.Parkour) > 0 && !HasAnyVariant(activeRoomSet.parkour1x1Variants, activeRoomSet.parkour2x1Variants, activeRoomSet.parkour1x2Variants, activeRoomSet.parkour2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Parkour."; return false; }
         if (ResolveSpecialRoomCount(RoomType.NpcEncounter) > 0 && !HasAnyVariant(activeRoomSet.npcEncounter1x1Variants, activeRoomSet.npcEncounter2x1Variants, activeRoomSet.npcEncounter1x2Variants, activeRoomSet.npcEncounter2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti NpcEncounter."; return false; }
         if (ResolveChurchRoomCount() > 0)
         {
@@ -1034,7 +934,7 @@ public class CoreGenerator : MonoBehaviour
     private int ResolveSpecialRoomCount(RoomType roomType)
     {
         if (activeFloorDefinition == null)
-            return roomType == RoomType.Curch || roomType == RoomType.EvilCurch || roomType == RoomType.Wave || roomType == RoomType.Challenge || roomType == RoomType.Miniboss || roomType == RoomType.Parkour || roomType == RoomType.NpcEncounter ? 0 : 1;
+            return roomType == RoomType.Curch || roomType == RoomType.EvilCurch || roomType == RoomType.Challenge || roomType == RoomType.Miniboss || roomType == RoomType.NpcEncounter ? 0 : 1;
         DungeonFloorDefinition.RoomCount count = activeFloorDefinition.GetCount(roomType);
         return count == null ? 0 : count.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", roomType + "-count"));
     }
@@ -1044,8 +944,9 @@ public class CoreGenerator : MonoBehaviour
         if (activeFloorDefinition == null)
             return 0;
 
-        DungeonFloorDefinition.RoomCount count = activeFloorDefinition.GetCount(RoomType.Challenge);
-        return count == null ? 0 : count.Resolve(DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "challenge-count"));
+        return activeFloorDefinition.ResolveChallengeCount(
+            DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "challenge-count"),
+            DungeonDeterminism.Create(gameSeedString, currentFloor, "floor", "legacy-wave-count"));
     }
 
     private int ResolveChurchRoomCount()
@@ -1122,19 +1023,15 @@ public class CoreGenerator : MonoBehaviour
         return false;
     }
 
-    private bool HasWaveRoomVariants() => activeRoomSet != null && HasAnyVariant(activeRoomSet.wave1x1Variants, activeRoomSet.wave2x1Variants, activeRoomSet.wave1x2Variants, activeRoomSet.wave2x2Variants);
-
-    private bool HasChallengeRoomVariants() => activeRoomSet != null && HasAnyVariant(activeRoomSet.challenge1x1Variants, activeRoomSet.challenge2x1Variants, activeRoomSet.challenge1x2Variants, activeRoomSet.challenge2x2Variants);
-
     private void InitializePrefabLookup()
     {
         _prefabLookup = new Dictionary<RoomPoolKey, Dictionary<Vector2Int, Room[]>>
         {
             [RoomPoolKey.Normal] = BuildSizeMap(
-                activeRoomSet.normal1x1Variants,
-                activeRoomSet.normal2x1Variants,
-                activeRoomSet.normal1x2Variants,
-                activeRoomSet.normal2x2Variants),
+                activeRoomSet.GetNormal1x1Variants(),
+                activeRoomSet.GetNormal2x1Variants(),
+                activeRoomSet.GetNormal1x2Variants(),
+                activeRoomSet.GetNormal2x2Variants()),
             [RoomPoolKey.Boss] = BuildSizeMap(
                 activeRoomSet.boss1x1Variants,
                 activeRoomSet.boss2x1Variants,
@@ -1170,10 +1067,8 @@ public class CoreGenerator : MonoBehaviour
                 activeRoomSet.secretAccessSuperSecret2x1Variants,
                 activeRoomSet.secretAccessSuperSecret1x2Variants,
                 activeRoomSet.secretAccessSuperSecret2x2Variants),
-            [RoomPoolKey.Wave] = BuildSizeMap(activeRoomSet.wave1x1Variants,activeRoomSet.wave2x1Variants,activeRoomSet.wave1x2Variants,activeRoomSet.wave2x2Variants),
-            [RoomPoolKey.Challenge] = BuildSizeMap(activeRoomSet.challenge1x1Variants,activeRoomSet.challenge2x1Variants,activeRoomSet.challenge1x2Variants,activeRoomSet.challenge2x2Variants),
+            [RoomPoolKey.Challenge] = BuildSizeMap(activeRoomSet.GetChallenge1x1Variants(),activeRoomSet.GetChallenge2x1Variants(),activeRoomSet.GetChallenge1x2Variants(),activeRoomSet.GetChallenge2x2Variants()),
             [RoomPoolKey.Miniboss] = BuildSizeMap(activeRoomSet.miniboss1x1Variants,activeRoomSet.miniboss2x1Variants,activeRoomSet.miniboss1x2Variants,activeRoomSet.miniboss2x2Variants),
-            [RoomPoolKey.Parkour] = BuildSizeMap(activeRoomSet.parkour1x1Variants,activeRoomSet.parkour2x1Variants,activeRoomSet.parkour1x2Variants,activeRoomSet.parkour2x2Variants),
             [RoomPoolKey.NpcEncounter] = BuildSizeMap(activeRoomSet.npcEncounter1x1Variants,activeRoomSet.npcEncounter2x1Variants,activeRoomSet.npcEncounter1x2Variants,activeRoomSet.npcEncounter2x2Variants)
         };
     }
@@ -1218,10 +1113,10 @@ public class CoreGenerator : MonoBehaviour
             {
                 for (int y = 0; y < size.y; y++)
                 {
-                    Vector2Int current = anchor + new Vector2Int(x, y);
+                    Vector2Int cellPosition = anchor + new Vector2Int(x, y);
                     foreach (Vector2Int dir in directions)
                     {
-                        if (gridLookup.TryGetValue(current + dir, out Room neighbor) && neighbor != r)
+                        if (gridLookup.TryGetValue(cellPosition + dir, out Room neighbor) && neighbor != r)
                             r.OpenDoor(new Vector2Int(x, y), dir);
                     }
                 }

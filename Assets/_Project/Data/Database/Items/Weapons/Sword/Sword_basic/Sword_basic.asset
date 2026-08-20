@@ -13,22 +13,27 @@ MonoBehaviour:
   m_Name: Sword_basic
   m_EditorClassIdentifier: 
   definitionId: d4c94f42b047e794c939b2f303ff63eb
-  weaponName: Sword_basic
-  baseValue: 1
+  weaponName: Sword Basic
+  baseValue: 70
   rarity: 0
   canUpgrade: 1
-  canCraft: 1
-  upgradeCoinCost: 0
-  upgradeMaterialRequirements:
-  - item: {fileID: 11400000, guid: a1f6c9b4d7e8458aa5e9f0c2b6d31f70, type: 2}
-    amount: 2
-  - item: {fileID: 11400000, guid: b2e7d0c5a8f9569bb6f0a1d3c7e42a81, type: 2}
-    amount: 1
-  upgradeCostStages: []
-  physicalDamageGrowth: 0.05
-  magicDamageGrowth: 0.05
-  criticalHitGrowth: 0
-  criticalChanceGrowth: 0
+  canCraft: 0
+  upgradeCoinCost: 30
+  upgradeMaterialRequirements: []
+  upgradeCostStages:
+  - minimumTargetLevel: 1
+    coinCost: 30
+    materialRequirements: []
+  - minimumTargetLevel: 4
+    coinCost: 50
+    materialRequirements: []
+  - minimumTargetLevel: 7
+    coinCost: 70
+    materialRequirements: []
+  physicalDamageGrowth: 0.07
+  magicDamageGrowth: 0
+  criticalHitGrowth: 0.01
+  criticalChanceGrowth: 0.005
   strengthScalingRankGrowth: 0
   dexterityScalingRankGrowth: 0
   intelligenceScalingRankGrowth: 0
@@ -36,39 +41,39 @@ MonoBehaviour:
   physicalBlockGrowth: 0
   magicBlockGrowth: 0
   stabilityGrowth: 0
-  icon: {fileID: 21300000, guid: fc3a7ced92e4f9242b44c592418cae09, type: 3}
+  icon: {fileID: 21300000, guid: 088e811b41a43a8418f3a05e5c808dca, type: 3}
   modelPrefab: {fileID: 3213851043470871558, guid: 30b6b019014098045849a8e6e4ca0ac2, type: 3}
-  description: 
+  description: Un'arma affidabile con requisiti e scaling calibrati per StraightSword.
   category: 1
   rangeType: 0
   damageType: 0
-  physicalDamage: 25
+  physicalDamage: 22
   magicDamage: 0
   criticalHit: 1.1
-  criticalChance: 0
+  criticalChance: 0.09
   lightDamageMultiplier: 1
-  heavyDamageMultiplier: 1.25
-  weight: 3
+  heavyDamageMultiplier: 1.35
+  weight: 3.1
   scaling: STR C / DEX D
-  strengthScalingRank: 0
-  dexterityScalingRank: 0
+  strengthScalingRank: 3
+  dexterityScalingRank: 2
   intelligenceScalingRank: 0
   faithScalingRank: 0
-  strengthRequirement: 0
-  dexterityRequirement: 0
+  strengthRequirement: 10
+  dexterityRequirement: 8
   intelligenceRequirement: 0
   faithRequirement: 0
   requirements: STR 10 / DEX 8
   animationProfile: {fileID: 11400000, guid: 83aa8dbcfcce8614f95a879fa83d9545, type: 2}
-  lightAttackStaminaCost: 10
-  heavyAttackStaminaCost: 20
+  lightAttackStaminaCost: 9
+  heavyAttackStaminaCost: 17
   canBlock: 0
   canParry: 0
-  physicalBlockPercent: 0.75
-  magicBlockPercent: 0.4
-  stability: 25
+  physicalBlockPercent: 0.1
+  magicBlockPercent: 0.05
+  stability: 5
   parryWindowStart: 0.05
-  parryWindowDuration: 0.2
+  parryWindowDuration: 0.18
   hasRightSkill: 0
   hasLeftSkill: 0
   isSpecialWeapon: 0
@@ -82,7 +87,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   bowProjectilePrefab: {fileID: 0}
-  bowAmmoItem: {fileID: 11400000, guid: 8dcc8513464141c40a0a38dc44690d46, type: 2}
+  bowAmmoItem: {fileID: 0}
   bowShotCooldown: 0.2
   bowProjectileSpeed: 26
   bowProjectileLifetime: 3.5
@@ -90,9 +95,9 @@ MonoBehaviour:
   bowHitMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  canBeThrown: 1
+  canBeThrown: 0
   throwStrengthRequirement: 0
-  throwProjectilePrefab: {fileID: 8947079371753237599, guid: a0b671feb5f43264d8662b6c052d3a17, type: 3}
+  throwProjectilePrefab: {fileID: 0}
   throwSpeed: 40.4
   throwLifetime: 2.5
   throwStaminaCost: 18
@@ -101,10 +106,10 @@ MonoBehaviour:
   throwBreakChance: 0.01
   droppedPickupColliderCenter: {x: 0, y: 0.05, z: 0}
   droppedPickupColliderSize: {x: 0.7, y: 0.12, z: 0.22}
-  droppedPickupMass: 1
-  droppedPickupLinearDrag: 0.2
-  droppedPickupAngularDrag: 0.25
-  droppedForwardImpulse: 1.8
-  droppedUpImpulse: 0.6
-  droppedInitialTorque: {x: 6, y: 0, z: 2}
+  droppedPickupMass: 1.2
+  droppedPickupLinearDrag: 0.12
+  droppedPickupAngularDrag: 0.3
+  droppedForwardImpulse: 1.2
+  droppedUpImpulse: 0.35
+  droppedInitialTorque: {x: 3, y: 0.7, z: 1.5}
   droppedModelLocalEuler: {x: 90, y: 0, z: 0}

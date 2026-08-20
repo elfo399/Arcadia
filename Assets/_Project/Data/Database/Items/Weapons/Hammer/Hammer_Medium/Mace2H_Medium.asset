@@ -10,44 +10,70 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a544078287434a34b9eda1b7e6dec126, type: 3}
-  m_Name: Shield_Basic
+  m_Name: Mace2H_Medium
   m_EditorClassIdentifier: 
-  definitionId: 5d4e35d4268bfdf4db37db31881e24f9
-  weaponName: Shield_Basic
+  definitionId: weapon.hammer.mace2h_medium
+  weaponName: Hammer Medium
+  baseValue: 231
+  rarity: 1
   canUpgrade: 1
-  icon: {fileID: 21300000, guid: b94c1563eec74f949bef803ca9fc8480, type: 3}
-  modelPrefab: {fileID: 0}
-  description: 
-  category: 6
+  canCraft: 0
+  upgradeCoinCost: 65
+  upgradeMaterialRequirements: []
+  upgradeCostStages:
+  - minimumTargetLevel: 1
+    coinCost: 65
+    materialRequirements: []
+  - minimumTargetLevel: 4
+    coinCost: 107
+    materialRequirements: []
+  - minimumTargetLevel: 7
+    coinCost: 153
+    materialRequirements: []
+  physicalDamageGrowth: 0.085
+  magicDamageGrowth: 0
+  criticalHitGrowth: 0.01
+  criticalChanceGrowth: 0.005
+  strengthScalingRankGrowth: 0
+  dexterityScalingRankGrowth: 0
+  intelligenceScalingRankGrowth: 0
+  faithScalingRankGrowth: 0
+  physicalBlockGrowth: 0
+  magicBlockGrowth: 0
+  stabilityGrowth: 0
+  icon: {fileID: 21300000, guid: ae7e34665e6546a43a20ee9f6989110b, type: 3}
+  modelPrefab: {fileID: 4184770148864136449, guid: 66d4ef2df080e714892271cd9e1a9ae2, type: 3}
+  description: Un'arma bilanciata con requisiti e scaling calibrati per Hammer.
+  category: 11
   rangeType: 0
   damageType: 0
-  physicalDamage: 10
+  physicalDamage: 50
   magicDamage: 0
   criticalHit: 1.1
-  criticalChance: 0
+  criticalChance: 0.04
   lightDamageMultiplier: 1
-  heavyDamageMultiplier: 1.25
-  weight: 3
-  scaling: STR E
-  strengthScalingRank: 1
-  dexterityScalingRank: 0
+  heavyDamageMultiplier: 1.5
+  weight: 6.6499996
+  scaling: STR A / DEX D
+  strengthScalingRank: 5
+  dexterityScalingRank: 2
   intelligenceScalingRank: 0
   faithScalingRank: 0
-  strengthRequirement: 10
-  dexterityRequirement: 0
+  strengthRequirement: 26
+  dexterityRequirement: 5
   intelligenceRequirement: 0
   faithRequirement: 0
-  requirements: STR 10
+  requirements: STR 26 / DEX 5
   animationProfile: {fileID: 11400000, guid: 83aa8dbcfcce8614f95a879fa83d9545, type: 2}
-  lightAttackStaminaCost: 10
-  heavyAttackStaminaCost: 20
-  canBlock: 1
-  canParry: 1
-  physicalBlockPercent: 0.75
-  magicBlockPercent: 0.4
-  stability: 25
+  lightAttackStaminaCost: 15
+  heavyAttackStaminaCost: 28
+  canBlock: 0
+  canParry: 0
+  physicalBlockPercent: 0.1
+  magicBlockPercent: 0.05
+  stability: 5
   parryWindowStart: 0.05
-  parryWindowDuration: 0.2
+  parryWindowDuration: 0.18
   hasRightSkill: 0
   hasLeftSkill: 0
   isSpecialWeapon: 0
@@ -80,10 +106,10 @@ MonoBehaviour:
   throwBreakChance: 0.1
   droppedPickupColliderCenter: {x: 0, y: 0.05, z: 0}
   droppedPickupColliderSize: {x: 0.7, y: 0.12, z: 0.22}
-  droppedPickupMass: 2.2
-  droppedPickupLinearDrag: 0.06
-  droppedPickupAngularDrag: 0.45
-  droppedForwardImpulse: 0.9
-  droppedUpImpulse: 0.18
-  droppedInitialTorque: {x: 2.5, y: 0.3, z: 1.2}
+  droppedPickupMass: 1.45
+  droppedPickupLinearDrag: 0.12
+  droppedPickupAngularDrag: 0.3
+  droppedForwardImpulse: 1.2
+  droppedUpImpulse: 0.35
+  droppedInitialTorque: {x: 3, y: 0.7, z: 1.5}
   droppedModelLocalEuler: {x: 90, y: 0, z: 0}

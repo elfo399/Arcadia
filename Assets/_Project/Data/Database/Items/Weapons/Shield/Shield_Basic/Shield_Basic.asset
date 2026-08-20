@@ -13,41 +13,67 @@ MonoBehaviour:
   m_Name: Shield_Basic
   m_EditorClassIdentifier: 
   definitionId: 42feb8f52f3ce9542b98698eb7978862
-  weaponName: Shield_Basic
+  weaponName: Shield Basic
+  baseValue: 45
+  rarity: 0
   canUpgrade: 1
+  canCraft: 0
+  upgradeCoinCost: 30
+  upgradeMaterialRequirements: []
+  upgradeCostStages:
+  - minimumTargetLevel: 1
+    coinCost: 30
+    materialRequirements: []
+  - minimumTargetLevel: 4
+    coinCost: 50
+    materialRequirements: []
+  - minimumTargetLevel: 7
+    coinCost: 70
+    materialRequirements: []
+  physicalDamageGrowth: 0.07
+  magicDamageGrowth: 0
+  criticalHitGrowth: 0.01
+  criticalChanceGrowth: 0.005
+  strengthScalingRankGrowth: 0
+  dexterityScalingRankGrowth: 0
+  intelligenceScalingRankGrowth: 0
+  faithScalingRankGrowth: 0
+  physicalBlockGrowth: 0.01
+  magicBlockGrowth: 0.01
+  stabilityGrowth: 1
   icon: {fileID: 21300000, guid: b94c1563eec74f949bef803ca9fc8480, type: 3}
   modelPrefab: {fileID: 5996680578629692151, guid: 78a5c937ad4012d4dbff0c759b2a9049, type: 3}
-  description: 
+  description: Uno scudo affidabile progettato per parare e assorbire i colpi.
   category: 6
   rangeType: 0
   damageType: 0
-  physicalDamage: 9999
+  physicalDamage: 8
   magicDamage: 0
   criticalHit: 1.1
-  criticalChance: 0
+  criticalChance: 0.06
   lightDamageMultiplier: 1
-  heavyDamageMultiplier: 1.25
-  weight: 3
-  scaling: STR E
-  strengthScalingRank: 1
+  heavyDamageMultiplier: 1.35
+  weight: 4.8
+  scaling: STR C
+  strengthScalingRank: 3
   dexterityScalingRank: 0
   intelligenceScalingRank: 0
   faithScalingRank: 0
-  strengthRequirement: 10
+  strengthRequirement: 12
   dexterityRequirement: 0
   intelligenceRequirement: 0
   faithRequirement: 0
-  requirements: STR 10
+  requirements: STR 12
   animationProfile: {fileID: 11400000, guid: 83aa8dbcfcce8614f95a879fa83d9545, type: 2}
-  lightAttackStaminaCost: 10
+  lightAttackStaminaCost: 12
   heavyAttackStaminaCost: 20
   canBlock: 1
   canParry: 1
-  physicalBlockPercent: 0.75
-  magicBlockPercent: 0.4
-  stability: 25
+  physicalBlockPercent: 0.7
+  magicBlockPercent: 0.3
+  stability: 28
   parryWindowStart: 0.05
-  parryWindowDuration: 0.2
+  parryWindowDuration: 0.22
   hasRightSkill: 0
   hasLeftSkill: 0
   isSpecialWeapon: 0
@@ -80,10 +106,10 @@ MonoBehaviour:
   throwBreakChance: 0.1
   droppedPickupColliderCenter: {x: 0, y: 0.05, z: 0}
   droppedPickupColliderSize: {x: 0.7, y: 0.12, z: 0.22}
-  droppedPickupMass: 2.2
-  droppedPickupLinearDrag: 0.06
-  droppedPickupAngularDrag: 0.45
-  droppedForwardImpulse: 0.9
-  droppedUpImpulse: 0.18
-  droppedInitialTorque: {x: 2.5, y: 0.3, z: 1.2}
+  droppedPickupMass: 1.2
+  droppedPickupLinearDrag: 0.12
+  droppedPickupAngularDrag: 0.3
+  droppedForwardImpulse: 1.2
+  droppedUpImpulse: 0.35
+  droppedInitialTorque: {x: 3, y: 0.7, z: 1.5}
   droppedModelLocalEuler: {x: 90, y: 0, z: 0}
