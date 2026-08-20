@@ -123,7 +123,7 @@ public class CoreGenerator : MonoBehaviour
     public IReadOnlyList<Room> ActiveRooms => activeRoomObjects;
 
     // Lookup ricostruito in base al tema attivo del piano.
-    private Dictionary<RoomPoolKey, Dictionary<Vector2Int, Room[]>> _prefabLookup;
+    private Dictionary<RoomPoolKey, Dictionary<Vector2Int, WeightedRoomVariant[]>> _prefabLookup;
 
     private readonly Vector2Int[] directions = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
     
@@ -743,21 +743,33 @@ public class CoreGenerator : MonoBehaviour
     {
         if (_prefabLookup.TryGetValue(poolKey, out var sizeMap) && sizeMap.TryGetValue(size, out var variants))
         {
-            if (variants != null && variants.Length > 0)
+            if (variants == null || variants.Length == 0)
+                return null;
+
+            double totalWeight = 0d;
+            for (int i = 0; i < variants.Length; i++)
             {
-                int totalWeight = 0;
-                for (int i = 0; i < variants.Length; i++)
-                    if (variants[i] != null) totalWeight += Mathf.Max(1, variants[i].roomData != null ? variants[i].roomData.generationWeight : 1);
-                if (totalWeight <= 0) return null;
-                int roll = prng.Next(totalWeight);
-                for (int i = 0; i < variants.Length; i++)
-                {
-                    Room candidate = variants[i];
-                    if (candidate == null) continue;
-                    roll -= Mathf.Max(1, candidate.roomData != null ? candidate.roomData.generationWeight : 1);
-                    if (roll < 0) return candidate;
-                }
+                WeightedRoomVariant variant = variants[i];
+                if (!IsSelectableVariant(variant)) continue;
+                totalWeight += variant.spawnWeight;
             }
+
+            if (totalWeight <= 0d)
+                return null;
+
+            double roll = prng.NextDouble() * totalWeight;
+            Room lastValid = null;
+            for (int i = 0; i < variants.Length; i++)
+            {
+                WeightedRoomVariant variant = variants[i];
+                if (!IsSelectableVariant(variant)) continue;
+                lastValid = variant.room;
+                if (roll < variant.spawnWeight)
+                    return variant.room;
+                roll -= variant.spawnWeight;
+            }
+
+            return lastValid;
         }
         return null;
     }
@@ -827,48 +839,48 @@ public class CoreGenerator : MonoBehaviour
             return false;
         }
 
-        if (!HasAnyVariant(activeRoomSet.normal1x1Variants, activeRoomSet.normal2x1Variants, activeRoomSet.normal1x2Variants, activeRoomSet.normal2x2Variants))
+        if (!HasAnyVariant(activeRoomSet.GetNormal1x1Variants(), activeRoomSet.GetNormal2x1Variants(), activeRoomSet.GetNormal1x2Variants(), activeRoomSet.GetNormal2x2Variants()))
         {
             error = $"il room set '{activeRoomSet.name}' non ha varianti Normal.";
             return false;
         }
 
-        if (ResolveSpecialRoomCount(RoomType.Boss) > 0 && !HasAnyVariant(activeRoomSet.boss1x1Variants, activeRoomSet.boss2x1Variants, activeRoomSet.boss1x2Variants, activeRoomSet.boss2x2Variants))
+        if (ResolveSpecialRoomCount(RoomType.Boss) > 0 && !HasAnyVariant(activeRoomSet.GetBoss1x1Variants(), activeRoomSet.GetBoss2x1Variants(), activeRoomSet.GetBoss1x2Variants(), activeRoomSet.GetBoss2x2Variants()))
         {
             error = $"il room set '{activeRoomSet.name}' non ha varianti Boss.";
             return false;
         }
 
-        if (ResolveSpecialRoomCount(RoomType.Shop) > 0 && !HasAnyVariant(activeRoomSet.shop1x1Variants, activeRoomSet.shop2x1Variants, activeRoomSet.shop1x2Variants, activeRoomSet.shop2x2Variants))
+        if (ResolveSpecialRoomCount(RoomType.Shop) > 0 && !HasAnyVariant(activeRoomSet.GetShop1x1Variants(), activeRoomSet.GetShop2x1Variants(), activeRoomSet.GetShop1x2Variants(), activeRoomSet.GetShop2x2Variants()))
         {
             error = $"il room set '{activeRoomSet.name}' non ha varianti Shop.";
             return false;
         }
 
-        if (ResolveSpecialRoomCount(RoomType.Treasure) > 0 && !HasAnyVariant(activeRoomSet.treasure1x1Variants, activeRoomSet.treasure2x1Variants, activeRoomSet.treasure1x2Variants, activeRoomSet.treasure2x2Variants))
+        if (ResolveSpecialRoomCount(RoomType.Treasure) > 0 && !HasAnyVariant(activeRoomSet.GetTreasure1x1Variants(), activeRoomSet.GetTreasure2x1Variants(), activeRoomSet.GetTreasure1x2Variants(), activeRoomSet.GetTreasure2x2Variants()))
         {
             error = $"il room set '{activeRoomSet.name}' non ha varianti Treasure.";
             return false;
         }
 
-        if (ResolveSecretAccessRoomCount(false) > 0 && !HasAnyVariant(activeRoomSet.secretAccessSecret1x1Variants, activeRoomSet.secretAccessSecret2x1Variants, activeRoomSet.secretAccessSecret1x2Variants, activeRoomSet.secretAccessSecret2x2Variants))
+        if (ResolveSecretAccessRoomCount(false) > 0 && !HasAnyVariant(activeRoomSet.GetSecretAccessSecret1x1Variants(), activeRoomSet.GetSecretAccessSecret2x1Variants(), activeRoomSet.GetSecretAccessSecret1x2Variants(), activeRoomSet.GetSecretAccessSecret2x2Variants()))
         {
             error = $"il room set '{activeRoomSet.name}' non ha varianti SecretAccess/Secret.";
             return false;
         }
 
-        if (ResolveSecretAccessRoomCount(true) > 0 && !HasAnyVariant(activeRoomSet.secretAccessSuperSecret1x1Variants, activeRoomSet.secretAccessSuperSecret2x1Variants, activeRoomSet.secretAccessSuperSecret1x2Variants, activeRoomSet.secretAccessSuperSecret2x2Variants))
+        if (ResolveSecretAccessRoomCount(true) > 0 && !HasAnyVariant(activeRoomSet.GetSecretAccessSuperSecret1x1Variants(), activeRoomSet.GetSecretAccessSuperSecret2x1Variants(), activeRoomSet.GetSecretAccessSuperSecret1x2Variants(), activeRoomSet.GetSecretAccessSuperSecret2x2Variants()))
         {
             error = $"il room set '{activeRoomSet.name}' non ha varianti SecretAccess/SuperSecret.";
             return false;
         }
 
-        if (ResolveSpecialRoomCount(RoomType.Miniboss) > 0 && !HasAnyVariant(activeRoomSet.miniboss1x1Variants, activeRoomSet.miniboss2x1Variants, activeRoomSet.miniboss1x2Variants, activeRoomSet.miniboss2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Miniboss."; return false; }
-        if (ResolveSpecialRoomCount(RoomType.NpcEncounter) > 0 && !HasAnyVariant(activeRoomSet.npcEncounter1x1Variants, activeRoomSet.npcEncounter2x1Variants, activeRoomSet.npcEncounter1x2Variants, activeRoomSet.npcEncounter2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti NpcEncounter."; return false; }
+        if (ResolveSpecialRoomCount(RoomType.Miniboss) > 0 && !HasAnyVariant(activeRoomSet.GetMiniboss1x1Variants(), activeRoomSet.GetMiniboss2x1Variants(), activeRoomSet.GetMiniboss1x2Variants(), activeRoomSet.GetMiniboss2x2Variants())) { error=$"il room set '{activeRoomSet.name}' non ha varianti Miniboss."; return false; }
+        if (ResolveSpecialRoomCount(RoomType.NpcEncounter) > 0 && !HasAnyVariant(activeRoomSet.GetNpcEncounter1x1Variants(), activeRoomSet.GetNpcEncounter2x1Variants(), activeRoomSet.GetNpcEncounter1x2Variants(), activeRoomSet.GetNpcEncounter2x2Variants())) { error=$"il room set '{activeRoomSet.name}' non ha varianti NpcEncounter."; return false; }
         if (ResolveChurchRoomCount() > 0)
         {
-            if (!HasAnyVariant(activeRoomSet.curch1x1Variants, activeRoomSet.curch2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti Curch richieste da Church Rooms."; return false; }
-            if (!HasAnyVariant(activeRoomSet.evilCurch1x1Variants, activeRoomSet.evilCurch2x2Variants)) { error=$"il room set '{activeRoomSet.name}' non ha varianti EvilCurch richieste da Church Rooms."; return false; }
+            if (!HasAnyVariant(activeRoomSet.GetCurch1x1Variants(), activeRoomSet.GetCurch2x2Variants())) { error=$"il room set '{activeRoomSet.name}' non ha varianti Curch richieste da Church Rooms."; return false; }
+            if (!HasAnyVariant(activeRoomSet.GetEvilCurch1x1Variants(), activeRoomSet.GetEvilCurch2x2Variants())) { error=$"il room set '{activeRoomSet.name}' non ha varianti EvilCurch richieste da Church Rooms."; return false; }
         }
 
         error = null;
@@ -991,9 +1003,9 @@ public class CoreGenerator : MonoBehaviour
         return activeRoomSet != null ? activeRoomSet.startRoomPrefab : null;
     }
 
-    private Dictionary<Vector2Int, Room[]> BuildSizeMap(Room[] oneByOne, Room[] twoByOne, Room[] oneByTwo, Room[] twoByTwo)
+    private Dictionary<Vector2Int, WeightedRoomVariant[]> BuildSizeMap(WeightedRoomVariant[] oneByOne, WeightedRoomVariant[] twoByOne, WeightedRoomVariant[] oneByTwo, WeightedRoomVariant[] twoByTwo)
     {
-        return new Dictionary<Vector2Int, Room[]>
+        return new Dictionary<Vector2Int, WeightedRoomVariant[]>
         {
             [new Vector2Int(1, 1)] = oneByOne,
             [new Vector2Int(2, 1)] = twoByOne,
@@ -1002,20 +1014,20 @@ public class CoreGenerator : MonoBehaviour
         };
     }
 
-    private bool HasAnyVariant(params Room[][] groups)
+    private bool HasAnyVariant(params WeightedRoomVariant[][] groups)
     {
         if (groups == null)
             return false;
 
         for (int i = 0; i < groups.Length; i++)
         {
-            Room[] variants = groups[i];
+            WeightedRoomVariant[] variants = groups[i];
             if (variants == null || variants.Length == 0)
                 continue;
 
             for (int j = 0; j < variants.Length; j++)
             {
-                if (variants[j] != null)
+                if (IsSelectableVariant(variants[j]))
                     return true;
             }
         }
@@ -1025,7 +1037,7 @@ public class CoreGenerator : MonoBehaviour
 
     private void InitializePrefabLookup()
     {
-        _prefabLookup = new Dictionary<RoomPoolKey, Dictionary<Vector2Int, Room[]>>
+        _prefabLookup = new Dictionary<RoomPoolKey, Dictionary<Vector2Int, WeightedRoomVariant[]>>
         {
             [RoomPoolKey.Normal] = BuildSizeMap(
                 activeRoomSet.GetNormal1x1Variants(),
@@ -1033,44 +1045,52 @@ public class CoreGenerator : MonoBehaviour
                 activeRoomSet.GetNormal1x2Variants(),
                 activeRoomSet.GetNormal2x2Variants()),
             [RoomPoolKey.Boss] = BuildSizeMap(
-                activeRoomSet.boss1x1Variants,
-                activeRoomSet.boss2x1Variants,
-                activeRoomSet.boss1x2Variants,
-                activeRoomSet.boss2x2Variants),
+                activeRoomSet.GetBoss1x1Variants(),
+                activeRoomSet.GetBoss2x1Variants(),
+                activeRoomSet.GetBoss1x2Variants(),
+                activeRoomSet.GetBoss2x2Variants()),
             [RoomPoolKey.Shop] = BuildSizeMap(
-                activeRoomSet.shop1x1Variants,
-                activeRoomSet.shop2x1Variants,
-                activeRoomSet.shop1x2Variants,
-                activeRoomSet.shop2x2Variants),
+                activeRoomSet.GetShop1x1Variants(),
+                activeRoomSet.GetShop2x1Variants(),
+                activeRoomSet.GetShop1x2Variants(),
+                activeRoomSet.GetShop2x2Variants()),
             [RoomPoolKey.Treasure] = BuildSizeMap(
-                activeRoomSet.treasure1x1Variants,
-                activeRoomSet.treasure2x1Variants,
-                activeRoomSet.treasure1x2Variants,
-                activeRoomSet.treasure2x2Variants),
-            [RoomPoolKey.Curch] = new Dictionary<Vector2Int, Room[]>
+                activeRoomSet.GetTreasure1x1Variants(),
+                activeRoomSet.GetTreasure2x1Variants(),
+                activeRoomSet.GetTreasure1x2Variants(),
+                activeRoomSet.GetTreasure2x2Variants()),
+            [RoomPoolKey.Curch] = new Dictionary<Vector2Int, WeightedRoomVariant[]>
             {
-                [new Vector2Int(1, 1)] = activeRoomSet.curch1x1Variants,
-                [new Vector2Int(2, 2)] = activeRoomSet.curch2x2Variants
+                [new Vector2Int(1, 1)] = activeRoomSet.GetCurch1x1Variants(),
+                [new Vector2Int(2, 2)] = activeRoomSet.GetCurch2x2Variants()
             },
-            [RoomPoolKey.EvilCurch] = new Dictionary<Vector2Int, Room[]>
+            [RoomPoolKey.EvilCurch] = new Dictionary<Vector2Int, WeightedRoomVariant[]>
             {
-                [new Vector2Int(1, 1)] = activeRoomSet.evilCurch1x1Variants,
-                [new Vector2Int(2, 2)] = activeRoomSet.evilCurch2x2Variants
+                [new Vector2Int(1, 1)] = activeRoomSet.GetEvilCurch1x1Variants(),
+                [new Vector2Int(2, 2)] = activeRoomSet.GetEvilCurch2x2Variants()
             },
             [RoomPoolKey.SecretAccessSecret] = BuildSizeMap(
-                activeRoomSet.secretAccessSecret1x1Variants,
-                activeRoomSet.secretAccessSecret2x1Variants,
-                activeRoomSet.secretAccessSecret1x2Variants,
-                activeRoomSet.secretAccessSecret2x2Variants),
+                activeRoomSet.GetSecretAccessSecret1x1Variants(),
+                activeRoomSet.GetSecretAccessSecret2x1Variants(),
+                activeRoomSet.GetSecretAccessSecret1x2Variants(),
+                activeRoomSet.GetSecretAccessSecret2x2Variants()),
             [RoomPoolKey.SecretAccessSuperSecret] = BuildSizeMap(
-                activeRoomSet.secretAccessSuperSecret1x1Variants,
-                activeRoomSet.secretAccessSuperSecret2x1Variants,
-                activeRoomSet.secretAccessSuperSecret1x2Variants,
-                activeRoomSet.secretAccessSuperSecret2x2Variants),
+                activeRoomSet.GetSecretAccessSuperSecret1x1Variants(),
+                activeRoomSet.GetSecretAccessSuperSecret2x1Variants(),
+                activeRoomSet.GetSecretAccessSuperSecret1x2Variants(),
+                activeRoomSet.GetSecretAccessSuperSecret2x2Variants()),
             [RoomPoolKey.Challenge] = BuildSizeMap(activeRoomSet.GetChallenge1x1Variants(),activeRoomSet.GetChallenge2x1Variants(),activeRoomSet.GetChallenge1x2Variants(),activeRoomSet.GetChallenge2x2Variants()),
-            [RoomPoolKey.Miniboss] = BuildSizeMap(activeRoomSet.miniboss1x1Variants,activeRoomSet.miniboss2x1Variants,activeRoomSet.miniboss1x2Variants,activeRoomSet.miniboss2x2Variants),
-            [RoomPoolKey.NpcEncounter] = BuildSizeMap(activeRoomSet.npcEncounter1x1Variants,activeRoomSet.npcEncounter2x1Variants,activeRoomSet.npcEncounter1x2Variants,activeRoomSet.npcEncounter2x2Variants)
+            [RoomPoolKey.Miniboss] = BuildSizeMap(activeRoomSet.GetMiniboss1x1Variants(),activeRoomSet.GetMiniboss2x1Variants(),activeRoomSet.GetMiniboss1x2Variants(),activeRoomSet.GetMiniboss2x2Variants()),
+            [RoomPoolKey.NpcEncounter] = BuildSizeMap(activeRoomSet.GetNpcEncounter1x1Variants(),activeRoomSet.GetNpcEncounter2x1Variants(),activeRoomSet.GetNpcEncounter1x2Variants(),activeRoomSet.GetNpcEncounter2x2Variants())
         };
+    }
+
+    private static bool IsSelectableVariant(WeightedRoomVariant variant)
+    {
+        return variant != null
+            && variant.room != null
+            && variant.spawnWeight > 0f
+            && !float.IsInfinity(variant.spawnWeight);
     }
 
     void SpawnDungeon(List<VirtualRoom> layout)
