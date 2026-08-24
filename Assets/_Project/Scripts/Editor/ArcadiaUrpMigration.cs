@@ -19,12 +19,22 @@ public static class ArcadiaUrpMigration
     private const string RepairMarkerPath = "Library/ArcadiaRepairPinkMaterials.request";
     private const string BackupRoot = "Library/ArcadiaMaterialBackupBeforeUrpRepair";
     private const string ReportPath = "Logs/ArcadiaUrpMaterialRepair.txt";
+    private static double nextRepairRequestCheck;
 
     [InitializeOnLoadMethod]
     private static void RunRequestedRepair()
     {
+        EditorApplication.update -= WatchForRepairRequest;
+        EditorApplication.update += WatchForRepairRequest;
+    }
+
+    private static void WatchForRepairRequest()
+    {
+        if (EditorApplication.timeSinceStartup < nextRepairRequestCheck)
+            return;
+        nextRepairRequestCheck = EditorApplication.timeSinceStartup + 1.0;
         if (File.Exists(RepairMarkerPath))
-            EditorApplication.delayCall += TryRunRequestedRepair;
+            TryRunRequestedRepair();
     }
 
     private static void TryRunRequestedRepair()
@@ -39,6 +49,8 @@ public static class ArcadiaUrpMigration
         File.Delete(RepairMarkerPath);
         if (string.Equals(request, "restore-shadergraphs", StringComparison.OrdinalIgnoreCase))
             RestoreShaderGraphMaterials();
+        else if (string.Equals(request, "repair-holotna", StringComparison.OrdinalIgnoreCase))
+            RepairHolotnaMountainMaterials();
         else
             RepairPinkMaterials();
     }
@@ -210,6 +222,72 @@ public static class ArcadiaUrpMigration
         Debug.Log($"Arcadia specialized Shader Graph restore completed. Restored assets: {restored}.");
     }
 
+    [MenuItem("Arcadia/Rendering/Repair Holotna Mountain Materials")]
+    public static void RepairHolotnaMountainMaterials()
+    {
+        const string root = "Assets/_ThirdParty/Holotna/Mountain";
+        string[] materialPaths = AssetDatabase.FindAssets("t:Material", new[] { root })
+            .Select(AssetDatabase.GUIDToAssetPath)
+            .Where(path => path.EndsWith(".mat", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        BackupMaterials(materialPaths);
+        const string skyboxPath = root + "/Misc/Skybox.mat";
+        string skyboxBackupPath = Path.Combine(BackupRoot, skyboxPath).Replace('/', Path.DirectorySeparatorChar);
+        if (File.Exists(skyboxBackupPath))
+        {
+            File.Copy(skyboxBackupPath, skyboxPath, true);
+            AssetDatabase.ImportAsset(skyboxPath, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
+        }
+
+        int converted = 0;
+        var changes = new List<string>();
+        AssetDatabase.StartAssetEditing();
+        try
+        {
+            foreach (string path in materialPaths)
+            {
+                Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (material == null || ShaderName(material).StartsWith("Universal Render Pipeline/", StringComparison.OrdinalIgnoreCase) ||
+                    ShaderName(material).StartsWith("Skybox/", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string before = ShaderName(material);
+                if (!ConvertToUrpLit(material, before))
+                    continue;
+                EditorUtility.SetDirty(material);
+                converted++;
+                changes.Add($"{before} -> {ShaderName(material)} | {path}");
+            }
+        }
+        finally
+        {
+            AssetDatabase.StopAssetEditing();
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+        int remaining = materialPaths.Count(path =>
+        {
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            return material == null || NeedsFallback(material);
+        });
+
+        const string reportPath = "Logs/ArcadiaHolotnaMaterialRepair.txt";
+        var report = new List<string>
+        {
+            $"Holotna materials scanned: {materialPaths.Length}",
+            $"Converted to URP: {converted}",
+            $"Remaining incompatible: {remaining}",
+            string.Empty
+        };
+        report.AddRange(changes);
+        File.WriteAllLines(reportPath, report);
+        Debug.Log($"Arcadia Holotna repair completed. Converted: {converted}; remaining: {remaining}. Report: {reportPath}");
+    }
+
     private static List<MaterialUpgrader> GetOfficialMaterialUpgraders()
     {
         var upgraders = new List<MaterialUpgrader>();
@@ -231,6 +309,7 @@ public static class ArcadiaUrpMigration
         string shaderName = material.shader.name;
         if (shaderName.StartsWith("Universal Render Pipeline/", StringComparison.OrdinalIgnoreCase) ||
             shaderName.StartsWith("TextMeshPro/", StringComparison.OrdinalIgnoreCase) ||
+            shaderName.StartsWith("GUI/", StringComparison.OrdinalIgnoreCase) ||
             shaderName.StartsWith("UI/", StringComparison.OrdinalIgnoreCase) ||
             shaderName.StartsWith("Sprites/", StringComparison.OrdinalIgnoreCase) ||
             shaderName.StartsWith("Skybox/", StringComparison.OrdinalIgnoreCase) ||
@@ -263,7 +342,8 @@ public static class ArcadiaUrpMigration
 
         string key = (originalShaderName + " " + material.name).ToLowerInvariant();
         bool transparent = key.Contains("transparent") || key.Contains("fade") || key.Contains("water") || color.a < 0.999f;
-        bool cutout = key.Contains("cutout") || key.Contains("alpha test") || key.Contains("leaf") || key.Contains("foliage") || key.Contains("grass") || key.Contains("plant");
+        bool cutout = key.Contains("cutout") || key.Contains("alpha test") || key.Contains("leaf") || key.Contains("foliage") ||
+                      key.Contains("grass") || key.Contains("plant") || key.Contains("flower") || key.Contains("bush");
         bool doubleSided = cutout || key.Contains("vegetation") || key.Contains("double sided") || key.Contains("doublesided");
 
         var serializedMaterial = new SerializedObject(material);
