@@ -47,7 +47,9 @@ public static class ArcadiaUrpMigration
 
         string request = File.ReadAllText(RepairMarkerPath).Trim();
         File.Delete(RepairMarkerPath);
-        if (string.Equals(request, "restore-shadergraphs", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(request, "restore-tmp", StringComparison.OrdinalIgnoreCase))
+            RestoreTextMeshProMaterials();
+        else if (string.Equals(request, "restore-shadergraphs", StringComparison.OrdinalIgnoreCase))
             RestoreShaderGraphMaterials();
         else if (string.Equals(request, "repair-holotna", StringComparison.OrdinalIgnoreCase))
             RepairHolotnaMountainMaterials();
@@ -220,6 +222,50 @@ public static class ArcadiaUrpMigration
         AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
         AssetDatabase.SaveAssets();
         Debug.Log($"Arcadia specialized Shader Graph restore completed. Restored assets: {restored}.");
+    }
+
+    [MenuItem("Arcadia/Rendering/Restore TextMesh Pro Materials")]
+    public static void RestoreTextMeshProMaterials()
+    {
+        string[] materialPaths =
+        {
+            "Assets/_Project/Art/Fonts/BoldPixels SDF.asset",
+            "Assets/_Project/Art/Fonts/alagard SDF.asset",
+            "Assets/Nicrom/3D_PolyArt/Medieval_Village_Demo/Assets/Materials/Misc/MVD_Material_TMP_GroundText.mat"
+        };
+
+        int restored = 0;
+        foreach (string assetPath in materialPaths)
+        {
+            string backupPath = Path.Combine(BackupRoot, assetPath).Replace('/', Path.DirectorySeparatorChar);
+            if (!File.Exists(backupPath))
+                throw new FileNotFoundException($"The original TextMesh Pro material backup is missing for '{assetPath}'.", backupPath);
+
+            File.Copy(backupPath, assetPath, true);
+            restored++;
+        }
+
+        AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
+        AssetDatabase.SaveAssets();
+
+        var invalid = new List<string>();
+        foreach (string assetPath in materialPaths)
+        {
+            Material material = AssetDatabase.LoadAllAssetsAtPath(assetPath)
+                .OfType<Material>()
+                .FirstOrDefault();
+            if (material == null || material.shader == null ||
+                !material.shader.name.StartsWith("TextMeshPro/", StringComparison.OrdinalIgnoreCase) ||
+                !material.shader.isSupported)
+            {
+                invalid.Add($"{assetPath} | {ShaderName(material)}");
+            }
+        }
+
+        if (invalid.Count > 0)
+            throw new InvalidOperationException("TextMesh Pro material restore validation failed:\n" + string.Join("\n", invalid));
+
+        Debug.Log($"Arcadia TextMesh Pro material restore completed. Restored and validated: {restored}.");
     }
 
     [MenuItem("Arcadia/Rendering/Repair Holotna Mountain Materials")]
