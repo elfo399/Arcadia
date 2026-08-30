@@ -168,7 +168,6 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 382720306513167504}
   - {fileID: 4071497228326024138}
   - {fileID: 3080162491272494820}
   - {fileID: 2033433490515560989}
@@ -1099,7 +1098,7 @@ GameObject:
   - component: {fileID: 2275314461642173434}
   - component: {fileID: 6308808802036477624}
   m_Layer: 0
-  m_Name: Standard_Room
+  m_Name: Miniboss_Standard_Room
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1119,6 +1118,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5469367549916586497}
+  - {fileID: 382720306513167504}
   - {fileID: 1587992594092919328}
   - {fileID: 6279915863722807912}
   m_Father: {fileID: 0}
@@ -1136,6 +1136,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   roomData: {fileID: 11400000, guid: fd5a0d95701c4d20a34074fdf4c408d6, type: 2}
+  questTargetId: 
+  questTargetTag: 
   doors:
   - label: North
     gridOffset: {x: 0, y: 0}
@@ -1143,6 +1145,7 @@ MonoBehaviour:
     doorObject: {fileID: 75610467913206445}
     wallObject: {fileID: 6690670704869111997}
     lockObject: {fileID: 0}
+    authoredGate: {fileID: 0}
     isConnected: 0
   - label: South
     gridOffset: {x: 0, y: 0}
@@ -1150,6 +1153,7 @@ MonoBehaviour:
     doorObject: {fileID: 8050985167038856448}
     wallObject: {fileID: 5190223399547746128}
     lockObject: {fileID: 0}
+    authoredGate: {fileID: 0}
     isConnected: 0
   - label: West
     gridOffset: {x: 0, y: 0}
@@ -1157,6 +1161,7 @@ MonoBehaviour:
     doorObject: {fileID: 3278329207975274429}
     wallObject: {fileID: 6820404311904105720}
     lockObject: {fileID: 0}
+    authoredGate: {fileID: 0}
     isConnected: 0
   - label: East
     gridOffset: {x: 0, y: 0}
@@ -1164,8 +1169,8 @@ MonoBehaviour:
     doorObject: {fileID: 3067673834399767491}
     wallObject: {fileID: 6023095682210919977}
     lockObject: {fileID: 0}
+    authoredGate: {fileID: 0}
     isConnected: 0
-  isLocked: 0
   roomCleared: 0
   activeEnemies: []
   floorPortalPrefab: {fileID: 0}
@@ -1783,7 +1788,7 @@ Transform:
   m_LocalScale: {x: 5, y: 1, z: 5}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1587992594092919328}
+  m_Father: {fileID: 4632564547433871007}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &6276273389163007253
 MeshFilter:
