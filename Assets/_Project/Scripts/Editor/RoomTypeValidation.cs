@@ -19,13 +19,18 @@ public static class RoomTypeValidation
                 if (room == null || room.roomData == null)
                     continue;
 
+                if (path.Contains("/Rooms/Normal/Combat/"))
+                    warnings += WarnIfMissing<CombatRoomRule>(room, path, "Normal Combat");
+                if (path.Contains("/Rooms/Normal/Parkour/"))
+                    warnings += WarnIfMissing<ParkourRoomRule>(room, path, "Normal Parkour");
+
                 switch (room.roomData.roomType)
                 {
                     case RoomType.Challenge:
-                        warnings += WarnIfMissingChallengeVariant(room, path);
+                        warnings += WarnIfMissing<ChallengeRoomRule>(room, path, "Challenge");
                         break;
                     case RoomType.Miniboss:
-                        warnings += WarnIfMissing<MinibossRoomRule>(room, path, "Miniboss");
+                        warnings += WarnIfMissing<CombatRoomRule>(room, path, "Miniboss");
                         break;
                     case RoomType.Boss:
                         warnings += WarnIfMissing<CombatRoomRule>(room, path, "Boss");
@@ -43,20 +48,11 @@ public static class RoomTypeValidation
 
     private static int WarnIfMissing<T>(Room room, string path, string label) where T : Component
     {
-        if (room.GetComponentInChildren<T>(true) != null)
+        if (room.GetComponent<T>() != null)
             return 0;
 
         Debug.LogWarning($"[RoomTypeValidation] {label} RoomData has no {typeof(T).Name}: {path}", room);
         return 1;
     }
 
-    private static int WarnIfMissingChallengeVariant(Room room, string path)
-    {
-        foreach (RoomRule rule in room.GetComponentsInChildren<RoomRule>(true))
-            if (rule is IChallengeRoomVariant)
-                return 0;
-
-        Debug.LogWarning($"[RoomTypeValidation] Challenge RoomData has no IChallengeRoomVariant: {path}", room);
-        return 1;
-    }
 }

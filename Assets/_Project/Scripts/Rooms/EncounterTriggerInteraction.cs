@@ -4,8 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// Authored prop bridge for optional combat and ambush/mimic compositions. It
-/// starts an existing encounter rule; combat ownership and reward gating remain
-/// entirely in that rule and RoomRewardRule.
+/// starts an existing encounter rule; combat ownership remains in that rule.
 /// </summary>
 public sealed class EncounterTriggerInteraction : MonoBehaviour, IInteractable
 {

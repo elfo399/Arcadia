@@ -1478,6 +1478,7 @@ GameObject:
   - component: {fileID: 2465098802145948511}
   - component: {fileID: 9073747019927318074}
   - component: {fileID: 8020430283198389810}
+  - component: {fileID: -1526923823964783655}
   m_Layer: 0
   m_Name: Long_Standard_Room
   m_TagString: Untagged
@@ -1607,6 +1608,22 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 95, y: 1, z: 45}
   m_Center: {x: 25, y: 1, z: 0}
+--- !u!114 &-1526923823964783655
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4485767998833019594}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 892097554238dd246ab18a818be01d2c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ruleId: rule-combat
+  blocksRoomCompletion: 0
+  locksConnectedDoors: 0
+  startOnPlayerEntry: 1
 --- !u!1 &4514277170246237565
 GameObject:
   m_ObjectHideFlags: 0

@@ -9,16 +9,14 @@ public enum DungeonChallengeMode
     NoHealing = 3
 }
 
-/// <summary>
-/// Voluntary wave-based Challenge variant. The mode adds the authored constraint;
-/// future Challenge implementations can use a different IChallengeRoomVariant rule.
-/// </summary>
-public sealed class ChallengeRoomRule : RoomRule, IInteractable, ITriggeredRoomEncounter, IChallengeRoomVariant
+/// <summary>Wave encounter with an optional challenge constraint.</summary>
+public sealed class ChallengeRoomRule : RoomRule, IInteractable, ITriggeredRoomEncounter
 {
     public override bool BlocksRoomCompletion => floorAllowsChallenge;
 
     [SerializeField] private DungeonChallengeMode mode;
-    [SerializeField] private List<DungeonWaveDefinition> waves = new List<DungeonWaveDefinition>();
+    [SerializeField] private List<ChallengeWaveDefinition> waves = new List<ChallengeWaveDefinition>();
+    [SerializeField] private bool startOnPlayerEntry;
     [SerializeField, Min(1f)] private float timeLimitSeconds = 30f;
     [SerializeField] private bool failureCompletesRoom = true;
     [SerializeField] private bool allowRetry = true;
@@ -39,6 +37,12 @@ public sealed class ChallengeRoomRule : RoomRule, IInteractable, ITriggeredRoomE
         floorAllowsChallenge = CoreGenerator.Instance == null
             || CoreGenerator.Instance.ActiveFloorDefinition == null
             || CoreGenerator.Instance.ActiveFloorDefinition.challengesAvailable;
+    }
+
+    public override void OnPlayerEntered(bool firstVisit)
+    {
+        if (startOnPlayerEntry)
+            StartChallenge();
     }
 
     private void OnEnable()
@@ -84,10 +88,10 @@ public sealed class ChallengeRoomRule : RoomRule, IInteractable, ITriggeredRoomE
     public bool CanStartFromTrigger()
     {
         if (!floorAllowsChallenge || active || IsResolved || waves.Count == 0
-            || GetComponentsInChildren<DungeonWaveSpawnPoint>(true).Length == 0)
+            || GetComponentsInChildren<ChallengeWaveSpawnPoint>(true).Length == 0)
             return false;
 
-        foreach (DungeonWaveDefinition wave in waves)
+        foreach (ChallengeWaveDefinition wave in waves)
         {
             List<SpawnTable> pools = wave != null ? wave.enemyPools : null;
             if (pools == null || pools.Count == 0)
@@ -112,8 +116,8 @@ public sealed class ChallengeRoomRule : RoomRule, IInteractable, ITriggeredRoomE
             return;
         }
 
-        DungeonWaveSpawnPoint[] points = GetComponentsInChildren<DungeonWaveSpawnPoint>(true);
-        DungeonWaveDefinition wave = waves[waveIndex];
+        ChallengeWaveSpawnPoint[] points = GetComponentsInChildren<ChallengeWaveSpawnPoint>(true);
+        ChallengeWaveDefinition wave = waves[waveIndex];
         List<SpawnTable> pools = wave != null ? wave.enemyPools : null;
         if (pools == null || pools.Count == 0)
             pools = CoreGenerator.Instance != null && CoreGenerator.Instance.ActiveFloorDefinition != null
@@ -133,7 +137,7 @@ public sealed class ChallengeRoomRule : RoomRule, IInteractable, ITriggeredRoomE
         }
 
         System.Random random = Context.CreateRandom(RuleId + ":challenge:" + waveIndex);
-        foreach (DungeonWaveSpawnPoint point in points)
+        foreach (ChallengeWaveSpawnPoint point in points)
             point.Spawn(validPools[random.Next(validPools.Count)], random, Context.Room, RuleId);
         Context.Room.WakeUpEnemies(RuleId);
 

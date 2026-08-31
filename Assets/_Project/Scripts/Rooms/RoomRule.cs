@@ -52,9 +52,3 @@ public abstract class RoomRule : MonoBehaviour
 
 /// <summary>Implemented by authored rules that can be started by a separate prop interaction.</summary>
 public interface ITriggeredRoomEncounter { bool CanStartFromTrigger(); bool TryStartFromTrigger(); }
-
-/// <summary>
-/// Marker for gameplay rules that author a Challenge room variant. New challenge
-/// implementations can join the shared Challenge prefab pool by implementing it.
-/// </summary>
-public interface IChallengeRoomVariant { }

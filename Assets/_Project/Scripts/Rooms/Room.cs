@@ -24,12 +24,8 @@ public class Room : MonoBehaviour
     {
         if(initialized)return;initialized=true;if(string.IsNullOrWhiteSpace(RuntimeId))ConfigureGeneratedInstance(gameObject.name,Vector2Int.zero,roomData!=null?roomData.size:Vector2Int.one,0,roomData!=null?roomData.roomType:RoomType.Normal);
         state=DungeonRunStateController.Active!=null?DungeonRunStateController.Active.GetRoom(RuntimeId):new SavedDungeonRoomState{roomId=RuntimeId,rules=Array.Empty<SavedDungeonRuleState>()};context=new RoomRuleContext(this,state);
+        // Room gameplay is authored explicitly on the prefab; runtime initialization never adds rules.
         rules.AddRange(GetComponents<RoomRule>());
-        bool hasEncounter=false;foreach(var rule in rules)if(rule is CombatRoomRule||rule is IChallengeRoomVariant)hasEncounter=true;
-        // Legacy spawners still get combat even when a reward/event rule is added.
-        if(!hasEncounter&&GetComponentsInChildren<EnemySpawner>(true).Length>0)rules.Add(gameObject.AddComponent<CombatRoomRule>());
-        bool hasModernReward=false;foreach(var rule in rules)if(rule is RoomRewardRule)hasModernReward=true;
-        if(!hasModernReward&&roomData!=null&&roomData.rewards!=null&&roomData.rewards.Count>0)rules.Add(gameObject.AddComponent<LegacyRoomRewardRule>());
         var saved=new Dictionary<string,SavedDungeonRuleState>(StringComparer.Ordinal);if(state.rules!=null)foreach(var item in state.rules)if(item!=null&&!string.IsNullOrWhiteSpace(item.ruleId))saved[item.ruleId]=item;
         var ids=new HashSet<string>(StringComparer.Ordinal);foreach(var rule in rules)if(rule!=null){if(!ids.Add(rule.RuleId))Debug.LogError($"[Room] duplicate Rule ID '{rule.RuleId}' in {name}.",this);saved.TryGetValue(rule.RuleId,out var previous);rule.InitializeRule(context,previous);}
         roomCleared=state.completed;if(roomCleared){RefreshDoors();TrySpawnFloorPortal();}else RefreshDoors();

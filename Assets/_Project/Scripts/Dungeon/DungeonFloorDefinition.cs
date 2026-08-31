@@ -48,12 +48,10 @@ public sealed class DungeonFloorDefinition : ScriptableObject
     [Header("Content pools")]
     [Tooltip("Optional weighted room-set override. Empty means the selected theme room set remains authoritative.")]
     public List<RoomSetChoice> allowedRoomSets = new List<RoomSetChoice>();
-    public List<LootPoolDefinition> lootPools = new List<LootPoolDefinition>();
     public List<SpawnTable> enemyPools = new List<SpawnTable>();
     [Tooltip("Authoring switches consumed by room rules/encounters on this floor.")]
     public bool challengesAvailable = true;
     public bool shrinesAvailable = true;
-    public bool minibossesAvailable = true;
 
     public RoomCount GetCount(RoomType roomType)
     {

@@ -1523,8 +1523,9 @@ GameObject:
   - component: {fileID: 2465098802145948511}
   - component: {fileID: 9073747019927318074}
   - component: {fileID: -8682136029178512985}
+  - component: {fileID: 6383102715177086465}
   m_Layer: 0
-  m_Name: Tall_Standard_Room
+  m_Name: Wave_Tall_Standard_Room
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1653,6 +1654,28 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 45, y: 1, z: 95}
   m_Center: {x: 0, y: 1, z: 25}
+--- !u!114 &6383102715177086465
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4485767998833019594}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 55d1d0b26fc4a744ab6c66f938efe930, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ruleId: rule-287ace3acdda4aa08892f2f2455c2daa
+  blocksRoomCompletion: 0
+  locksConnectedDoors: 0
+  mode: 0
+  waves: []
+  startOnPlayerEntry: 0
+  timeLimitSeconds: 30
+  failureCompletesRoom: 1
+  allowRetry: 1
+  prompt: Accept challenge
 --- !u!1 &4523402569780469222
 GameObject:
   m_ObjectHideFlags: 0
