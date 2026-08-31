@@ -970,8 +970,8 @@ public class CoreGenerator : MonoBehaviour
         if (ResolveSpecialRoomCount(RoomType.NpcEncounter) > 0 && !HasAnyVariant(activeRoomSet.GetNpcEncounter1x1Variants(), activeRoomSet.GetNpcEncounter2x1Variants(), activeRoomSet.GetNpcEncounter1x2Variants(), activeRoomSet.GetNpcEncounter2x2Variants())) { error=$"il room set '{activeRoomSet.name}' non ha varianti NpcEncounter."; return false; }
         if (ResolveChurchRoomCount() > 0)
         {
-            if (!HasAnyVariant(activeRoomSet.GetCurch1x1Variants(), activeRoomSet.GetCurch2x2Variants())) { error=$"il room set '{activeRoomSet.name}' non ha varianti Curch richieste da Church Rooms."; return false; }
-            if (!HasAnyVariant(activeRoomSet.GetEvilCurch1x1Variants(), activeRoomSet.GetEvilCurch2x2Variants())) { error=$"il room set '{activeRoomSet.name}' non ha varianti EvilCurch richieste da Church Rooms."; return false; }
+            if (!HasAnyVariant(activeRoomSet.GetCurch1x1Variants(), activeRoomSet.GetCurch2x1Variants(), activeRoomSet.GetCurch1x2Variants(), activeRoomSet.GetCurch2x2Variants())) { error=$"il room set '{activeRoomSet.name}' non ha varianti Curch richieste da Church Rooms."; return false; }
+            if (!HasAnyVariant(activeRoomSet.GetEvilCurch1x1Variants(), activeRoomSet.GetEvilCurch2x1Variants(), activeRoomSet.GetEvilCurch1x2Variants(), activeRoomSet.GetEvilCurch2x2Variants())) { error=$"il room set '{activeRoomSet.name}' non ha varianti EvilCurch richieste da Church Rooms."; return false; }
         }
 
         error = null;
@@ -1150,16 +1150,16 @@ public class CoreGenerator : MonoBehaviour
                 activeRoomSet.GetTreasure2x1Variants(),
                 activeRoomSet.GetTreasure1x2Variants(),
                 activeRoomSet.GetTreasure2x2Variants()),
-            [RoomPoolKey.Curch] = new Dictionary<Vector2Int, WeightedRoomVariant[]>
-            {
-                [new Vector2Int(1, 1)] = activeRoomSet.GetCurch1x1Variants(),
-                [new Vector2Int(2, 2)] = activeRoomSet.GetCurch2x2Variants()
-            },
-            [RoomPoolKey.EvilCurch] = new Dictionary<Vector2Int, WeightedRoomVariant[]>
-            {
-                [new Vector2Int(1, 1)] = activeRoomSet.GetEvilCurch1x1Variants(),
-                [new Vector2Int(2, 2)] = activeRoomSet.GetEvilCurch2x2Variants()
-            },
+            [RoomPoolKey.Curch] = BuildSizeMap(
+                activeRoomSet.GetCurch1x1Variants(),
+                activeRoomSet.GetCurch2x1Variants(),
+                activeRoomSet.GetCurch1x2Variants(),
+                activeRoomSet.GetCurch2x2Variants()),
+            [RoomPoolKey.EvilCurch] = BuildSizeMap(
+                activeRoomSet.GetEvilCurch1x1Variants(),
+                activeRoomSet.GetEvilCurch2x1Variants(),
+                activeRoomSet.GetEvilCurch1x2Variants(),
+                activeRoomSet.GetEvilCurch2x2Variants()),
             [RoomPoolKey.SecretAccessSecret] = BuildSizeMap(
                 activeRoomSet.GetSecretAccessSecret1x1Variants(),
                 activeRoomSet.GetSecretAccessSecret2x1Variants(),

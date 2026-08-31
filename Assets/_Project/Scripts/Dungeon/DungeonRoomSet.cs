@@ -42,10 +42,14 @@ public class DungeonRoomSet : ScriptableObject
 
     [Header("Curch")]
     public WeightedRoomVariant[] curch1x1WeightedVariants;
+    public WeightedRoomVariant[] curch2x1WeightedVariants;
+    public WeightedRoomVariant[] curch1x2WeightedVariants;
     public WeightedRoomVariant[] curch2x2WeightedVariants;
 
     [Header("Evil Curch")]
     public WeightedRoomVariant[] evilCurch1x1WeightedVariants;
+    public WeightedRoomVariant[] evilCurch2x1WeightedVariants;
+    public WeightedRoomVariant[] evilCurch1x2WeightedVariants;
     public WeightedRoomVariant[] evilCurch2x2WeightedVariants;
 
     [Header("Secret Access / Secret")]
@@ -98,8 +102,12 @@ public class DungeonRoomSet : ScriptableObject
     [HideInInspector] public Room[] shop1x2Variants;
     [HideInInspector] public Room[] shop2x2Variants;
     [HideInInspector] public Room[] curch1x1Variants;
+    [HideInInspector] public Room[] curch2x1Variants;
+    [HideInInspector] public Room[] curch1x2Variants;
     [HideInInspector] public Room[] curch2x2Variants;
     [HideInInspector] public Room[] evilCurch1x1Variants;
+    [HideInInspector] public Room[] evilCurch2x1Variants;
+    [HideInInspector] public Room[] evilCurch1x2Variants;
     [HideInInspector] public Room[] evilCurch2x2Variants;
     [HideInInspector] public Room[] secretAccessSecret1x1Variants;
     [HideInInspector] public Room[] secretAccessSecret2x1Variants;
@@ -149,8 +157,12 @@ public class DungeonRoomSet : ScriptableObject
     public WeightedRoomVariant[] GetShop1x2Variants() => MergeVariants(shop1x2WeightedVariants, shop1x2Variants);
     public WeightedRoomVariant[] GetShop2x2Variants() => MergeVariants(shop2x2WeightedVariants, shop2x2Variants);
     public WeightedRoomVariant[] GetCurch1x1Variants() => MergeVariants(curch1x1WeightedVariants, curch1x1Variants);
+    public WeightedRoomVariant[] GetCurch2x1Variants() => MergeVariants(curch2x1WeightedVariants, curch2x1Variants);
+    public WeightedRoomVariant[] GetCurch1x2Variants() => MergeVariants(curch1x2WeightedVariants, curch1x2Variants);
     public WeightedRoomVariant[] GetCurch2x2Variants() => MergeVariants(curch2x2WeightedVariants, curch2x2Variants);
     public WeightedRoomVariant[] GetEvilCurch1x1Variants() => MergeVariants(evilCurch1x1WeightedVariants, evilCurch1x1Variants);
+    public WeightedRoomVariant[] GetEvilCurch2x1Variants() => MergeVariants(evilCurch2x1WeightedVariants, evilCurch2x1Variants);
+    public WeightedRoomVariant[] GetEvilCurch1x2Variants() => MergeVariants(evilCurch1x2WeightedVariants, evilCurch1x2Variants);
     public WeightedRoomVariant[] GetEvilCurch2x2Variants() => MergeVariants(evilCurch2x2WeightedVariants, evilCurch2x2Variants);
     public WeightedRoomVariant[] GetSecretAccessSecret1x1Variants() => MergeVariants(secretAccessSecret1x1WeightedVariants, secretAccessSecret1x1Variants);
     public WeightedRoomVariant[] GetSecretAccessSecret2x1Variants() => MergeVariants(secretAccessSecret2x1WeightedVariants, secretAccessSecret2x1Variants);
@@ -215,8 +227,12 @@ public class DungeonRoomSet : ScriptableObject
         migrated |= MigrateLegacy(ref shop1x2WeightedVariants, ref shop1x2Variants);
         migrated |= MigrateLegacy(ref shop2x2WeightedVariants, ref shop2x2Variants);
         migrated |= MigrateLegacy(ref curch1x1WeightedVariants, ref curch1x1Variants);
+        migrated |= MigrateLegacy(ref curch2x1WeightedVariants, ref curch2x1Variants);
+        migrated |= MigrateLegacy(ref curch1x2WeightedVariants, ref curch1x2Variants);
         migrated |= MigrateLegacy(ref curch2x2WeightedVariants, ref curch2x2Variants);
         migrated |= MigrateLegacy(ref evilCurch1x1WeightedVariants, ref evilCurch1x1Variants);
+        migrated |= MigrateLegacy(ref evilCurch2x1WeightedVariants, ref evilCurch2x1Variants);
+        migrated |= MigrateLegacy(ref evilCurch1x2WeightedVariants, ref evilCurch1x2Variants);
         migrated |= MigrateLegacy(ref evilCurch2x2WeightedVariants, ref evilCurch2x2Variants);
         migrated |= MigrateLegacy(ref secretAccessSecret1x1WeightedVariants, ref secretAccessSecret1x1Variants);
         migrated |= MigrateLegacy(ref secretAccessSecret2x1WeightedVariants, ref secretAccessSecret2x1Variants);

@@ -72,11 +72,23 @@ MonoBehaviour:
   curch1x1WeightedVariants:
   - room: {fileID: 2275314461642173434, guid: 679c2098fafe89f4da74e67484bba649, type: 3}
     spawnWeight: 1
+  curch2x1WeightedVariants:
+  - room: {fileID: 9073747019927318074, guid: 0d6d8f1532abc89479622f2167abf6cb, type: 3}
+    spawnWeight: 1
+  curch1x2WeightedVariants:
+  - room: {fileID: 9073747019927318074, guid: a1651679995d8ef4aac2a7aa5de125d0, type: 3}
+    spawnWeight: 1
   curch2x2WeightedVariants:
   - room: {fileID: 9073747019927318074, guid: c962f5524d6a39d41857290dbc80b89c, type: 3}
     spawnWeight: 1
   evilCurch1x1WeightedVariants:
   - room: {fileID: 2275314461642173434, guid: ebaa0cb9ffb48d24d8c9ddc9da71869d, type: 3}
+    spawnWeight: 1
+  evilCurch2x1WeightedVariants:
+  - room: {fileID: 9073747019927318074, guid: 0d8898c603337004e8d2d402cad4c9ae, type: 3}
+    spawnWeight: 1
+  evilCurch1x2WeightedVariants:
+  - room: {fileID: 9073747019927318074, guid: ddb88963f50ddcb498f282c5bf3b8a81, type: 3}
     spawnWeight: 1
   evilCurch2x2WeightedVariants:
   - room: {fileID: 9073747019927318074, guid: ef40bf62af5539e408083b6a41adc6de, type: 3}
@@ -166,8 +178,12 @@ MonoBehaviour:
   shop1x2Variants: []
   shop2x2Variants: []
   curch1x1Variants: []
+  curch2x1Variants: []
+  curch1x2Variants: []
   curch2x2Variants: []
   evilCurch1x1Variants: []
+  evilCurch2x1Variants: []
+  evilCurch1x2Variants: []
   evilCurch2x2Variants: []
   secretAccessSecret1x1Variants: []
   secretAccessSecret2x1Variants: []
