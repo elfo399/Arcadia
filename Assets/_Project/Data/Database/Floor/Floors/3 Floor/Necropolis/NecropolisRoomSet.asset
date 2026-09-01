@@ -12,142 +12,154 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a6cff3c97bf28f4cb0f2874d6370220, type: 3}
   m_Name: NecropolisRoomSet
   m_EditorClassIdentifier: 
-  startRoomPrefab: {fileID: 2275314461642173434, guid: a70d06bcb14e6054785cd76bc125ebd7, type: 3}
+  startRoomPrefab: {fileID: 2275314461642173434, guid: 05cbc5396d78442493c4061df7699f94, type: 3}
   normal1x1WeightedVariants:
-  - room: {fileID: 2275314461642173434, guid: 98912f0f50d4aa14c93d38110d6c8436, type: 3}
-    spawnWeight: 1
-  - room: {fileID: 2275314461642173434, guid: 9e5a357c66cc4e408c310a37efd4fe06, type: 3}
-    spawnWeight: 1
+  - room: {fileID: 2275314461642173434, guid: f1a3aeda39804c7cbac446f8140bca9c, type: 3}
+    spawnWeight: 80
+  - room: {fileID: 2275314461642173434, guid: 879666fc167e4a03b5dea10eeb621909, type: 3}
+    spawnWeight: 20
   normal2x1WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 78287c33858d6764fb1e53a6eb8cd770, type: 3}
-    spawnWeight: 1
-  - room: {fileID: 9073747019927318074, guid: 89792985b42a4ffabb223ad39407718b, type: 3}
-    spawnWeight: 1
+  - room: {fileID: 9073747019927318074, guid: 98aac512bd5f4f9cb0cb7d69314d28b4, type: 3}
+    spawnWeight: 80
+  - room: {fileID: 9073747019927318074, guid: 964b086c351d4ae1bcb5fbb98483ac3b, type: 3}
+    spawnWeight: 20
   normal1x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 2b808543915f74e4c9780605a09aee10, type: 3}
-    spawnWeight: 1
-  - room: {fileID: 9073747019927318074, guid: 4a4abd34841b4d22b359d74f1a27d861, type: 3}
-    spawnWeight: 1
+  - room: {fileID: 9073747019927318074, guid: 6152e381ff5b42e88afb8c94196f9f54, type: 3}
+    spawnWeight: 80
+  - room: {fileID: 9073747019927318074, guid: d947aeca530d49f48a2ab67bd386a299, type: 3}
+    spawnWeight: 20
   normal2x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: ad915e94aed9982488cc072b1a6f25b0, type: 3}
-    spawnWeight: 1
-  - room: {fileID: 9073747019927318074, guid: 14aa138ae2494edcac757cc55ca83cb8, type: 3}
-    spawnWeight: 1
+  - room: {fileID: 9073747019927318074, guid: 1f05c3ba7fc5412287a141e255301ebe, type: 3}
+    spawnWeight: 80
+  - room: {fileID: 9073747019927318074, guid: 2b55d42c42fc4e9ab548e05e400e04a4, type: 3}
+    spawnWeight: 20
   boss1x1WeightedVariants:
-  - room: {fileID: 2275314461642173434, guid: 929b1e4448f492e418bd4f6ffe2d62d5, type: 3}
+  - room: {fileID: 2275314461642173434, guid: c195f710707b48e5b71a567a26956782, type: 3}
     spawnWeight: 1
   boss2x1WeightedVariants:
-  - room: {fileID: 7698762379488882794, guid: 9e919e7f33cb31647b61bc2e74ff8429, type: 3}
+  - room: {fileID: 7698762379488882794, guid: 857ff6bb5283469797e3d3d905306560, type: 3}
     spawnWeight: 1
   boss1x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 212121388fa89ff4d81bc4b02b90181a, type: 3}
+  - room: {fileID: 9073747019927318074, guid: bcbd05fef30a400fb23359bac179a2e7, type: 3}
     spawnWeight: 1
   boss2x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: da7b3b6b18c2ed646929e3612bde3543, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 3b249696a85b45c68a3ccc06fc74c849, type: 3}
     spawnWeight: 1
   treasure1x1WeightedVariants:
-  - room: {fileID: 2275314461642173434, guid: 06f62a7a47eb04a4195bb60cbcdbc03c, type: 3}
+  - room: {fileID: 2275314461642173434, guid: c8bf7e3f79584c788a5bdb40a57abef8, type: 3}
     spawnWeight: 1
   treasure2x1WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 827e829bd1df83341a5f0666bd936401, type: 3}
+  - room: {fileID: 9073747019927318074, guid: ed37d30c265d485aacc9f5f3af53aaab, type: 3}
     spawnWeight: 1
   treasure1x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: acedf93c94ae8e54f8d2a48933529d42, type: 3}
+  - room: {fileID: 9073747019927318074, guid: a8f900ff549f45698c51da6942df1f0c, type: 3}
     spawnWeight: 1
   treasure2x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: ac37b28e355ae954a9f28abb8b50635f, type: 3}
+  - room: {fileID: 9073747019927318074, guid: a47079d2927e44a6968913899ea45f96, type: 3}
     spawnWeight: 1
   shop1x1WeightedVariants:
-  - room: {fileID: 2275314461642173434, guid: 32b3c59e8e7a77046ae2a1e49fc2ca20, type: 3}
+  - room: {fileID: 2275314461642173434, guid: 47e3dd6606b0427bafec19ceee7ab95c, type: 3}
     spawnWeight: 1
   shop2x1WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 338508340f5011b459474a3f77fe887e, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 73ce5dcc739245c1818442a941504a0a, type: 3}
     spawnWeight: 1
   shop1x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 31fa755c7e73b9d48a5cb212815a09dd, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 0be8a821e7e74767820ac49a5a15573d, type: 3}
     spawnWeight: 1
   shop2x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: da613c62b2e66da4da55269d0a3920cf, type: 3}
+  - room: {fileID: 9073747019927318074, guid: f0bddaf8813e43a9bb97bb205192e6cd, type: 3}
     spawnWeight: 1
   curch1x1WeightedVariants:
-  - room: {fileID: 2275314461642173434, guid: 7d76f792abad9e54e85d8ad734ba4a10, type: 3}
+  - room: {fileID: 2275314461642173434, guid: 2980999d69b044b0937bf5830d45a7a4, type: 3}
+    spawnWeight: 1
+  curch2x1WeightedVariants:
+  - room: {fileID: 9073747019927318074, guid: 88621aaff6064a14a20c29adff99f939, type: 3}
+    spawnWeight: 1
+  curch1x2WeightedVariants:
+  - room: {fileID: 9073747019927318074, guid: ddbeb8b5d4a245109698e8e87f4e9924, type: 3}
     spawnWeight: 1
   curch2x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 6a22ee13a61a8d24cab735c86c2fc9e4, type: 3}
+  - room: {fileID: 9073747019927318074, guid: fccdc4b51c3c415da60cd2d3f35a5fd2, type: 3}
     spawnWeight: 1
   evilCurch1x1WeightedVariants:
-  - room: {fileID: 2275314461642173434, guid: e9d4f84376d51f74890d712e4130719a, type: 3}
+  - room: {fileID: 2275314461642173434, guid: 07e619126ef14eb0b4515c54ab2ab31c, type: 3}
+    spawnWeight: 1
+  evilCurch2x1WeightedVariants:
+  - room: {fileID: 9073747019927318074, guid: 0cefd113fe644de684e8ec735e72d3c6, type: 3}
+    spawnWeight: 1
+  evilCurch1x2WeightedVariants:
+  - room: {fileID: 9073747019927318074, guid: b049380c95f8460295f8426644fce0c3, type: 3}
     spawnWeight: 1
   evilCurch2x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 8867149c134ef654697ecfb3fa1871f4, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 258a65fe0d0a4ca39c19e2b67632a622, type: 3}
     spawnWeight: 1
   secretAccessSecret1x1WeightedVariants:
-  - room: {fileID: 2275314461642173434, guid: 7d581b0641a1453dacba69518e76fb2e, type: 3}
+  - room: {fileID: 2275314461642173434, guid: 1bcdf804a4724cd2b4c96dd15f247731, type: 3}
     spawnWeight: 1
   secretAccessSecret2x1WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 3e0b05570bc74515b295fca026c28217, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 9cea24582d53468d89b34ad6da8b0422, type: 3}
     spawnWeight: 1
   secretAccessSecret1x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 76d843d159f04a65ab7ff7b0dcd60e7f, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 226e59b485bd4b57b1b450b7eccbbf11, type: 3}
     spawnWeight: 1
   secretAccessSecret2x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 9f07dad8f28b4ce4bfa9dff2daa17ff0, type: 3}
+  - room: {fileID: 9073747019927318074, guid: cc15605c9d154d9cb8fd1b29516d58b5, type: 3}
     spawnWeight: 1
   secretAccessSuperSecret1x1WeightedVariants:
-  - room: {fileID: 2275314461642173434, guid: d73661b749cf450f9acd33a64ce2d45c, type: 3}
+  - room: {fileID: 2275314461642173434, guid: c6320951f129400ca83ce95bcf433059, type: 3}
     spawnWeight: 1
   secretAccessSuperSecret2x1WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 9617fdaab6294aeda5e4e3e99897f730, type: 3}
+  - room: {fileID: 9073747019927318074, guid: bd1d554f6ac842cb96b0d622d524ca62, type: 3}
     spawnWeight: 1
   secretAccessSuperSecret1x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 5bbaf10bccaa46809f4c7b6251572aeb, type: 3}
+  - room: {fileID: 9073747019927318074, guid: cb63278029204b9fb83d301efe19f920, type: 3}
     spawnWeight: 1
   secretAccessSuperSecret2x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: a997962ddcb845f398e5fa4f340f25f0, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 2dec809dcd0e4430b4151adccb9c1ae9, type: 3}
     spawnWeight: 1
   challenge1x1WeightedVariants:
-  - room: {fileID: 2275314461642173434, guid: b318e5525e204d5caf968bd9657ffd39, type: 3}
+  - room: {fileID: 2275314461642173434, guid: 1a581e2db6f94f6ca00b41e515f51ac8, type: 3}
     spawnWeight: 1
-  - room: {fileID: 2275314461642173434, guid: 1e9bcf2a0faa428285517bde41e5320f, type: 3}
+  - room: {fileID: 2275314461642173434, guid: ff89d2f70fa0459597f7e7d665968a61, type: 3}
     spawnWeight: 1
   challenge2x1WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: a6673855f42d490c91543431634931dd, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 5239b9e74ef24d209ab0e3d78581f5ba, type: 3}
     spawnWeight: 1
-  - room: {fileID: 9073747019927318074, guid: e4c6cffa2b10423081cd7374cb74d0a8, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 21a535122eeb4258a25d21ccb2aaa16f, type: 3}
     spawnWeight: 1
   challenge1x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: f4db974d19b54a6c81e25626073979d5, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 2cf61832e6bd45ff9009af88651217fd, type: 3}
     spawnWeight: 1
-  - room: {fileID: 9073747019927318074, guid: b4bd8b5fb71348f4898b9f2da3dc1588, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 95cea2bd6f79447eb96df2b736d9a81a, type: 3}
     spawnWeight: 1
   challenge2x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: feeb97e3d5b849948f288fd4ed0ea02b, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 998d5edb59874e7cbb39fd5be3c9f7e4, type: 3}
     spawnWeight: 1
-  - room: {fileID: 9073747019927318074, guid: 9dfc9ce20706462b9f525f3b9fd844f4, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 08f8afa69a13489a990ea85b323b10fd, type: 3}
     spawnWeight: 1
   miniboss1x1WeightedVariants:
-  - room: {fileID: 2275314461642173434, guid: 89657b488fe949b99e15ee557af93120, type: 3}
+  - room: {fileID: 2275314461642173434, guid: 81762ca7107649acaaf2450775e4c2cd, type: 3}
     spawnWeight: 1
   miniboss2x1WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: a83b4d14dd464cb2bd48865baba23c06, type: 3}
+  - room: {fileID: 9073747019927318074, guid: a4c9c758fb4a4c4581d93f792180d404, type: 3}
     spawnWeight: 1
   miniboss1x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 47070b26b04a4f77bdda7c1f790e6a8f, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 76c3c6560b7b4b61be8321a6788d2189, type: 3}
     spawnWeight: 1
   miniboss2x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 59d3878f708544b1be24f23ccf80863f, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 5028ef77932247f49268b63db5df5fa5, type: 3}
     spawnWeight: 1
   npcEncounter1x1WeightedVariants:
-  - room: {fileID: 2275314461642173434, guid: b7fd6c982483457999f1e95b6f47d34e, type: 3}
+  - room: {fileID: 2275314461642173434, guid: 654b3d3f58564efca1c50d51534c1c1c, type: 3}
     spawnWeight: 1
   npcEncounter2x1WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: c63a2ec237cb46f59418ade42d8233f0, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 785dc78bb81b482889c129f79a49b65c, type: 3}
     spawnWeight: 1
   npcEncounter1x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: 90ca1f70665f4c9790ffa9183e585b64, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 12aea85301b34de1bec82f6aa05e7109, type: 3}
     spawnWeight: 1
   npcEncounter2x2WeightedVariants:
-  - room: {fileID: 9073747019927318074, guid: cb2b2259c32a4f68b7f5856d86c0ed2a, type: 3}
+  - room: {fileID: 9073747019927318074, guid: 09f806e2cf3f40c9848d6038df716364, type: 3}
     spawnWeight: 1
   normal1x1Variants: []
   normal2x1Variants: []
@@ -166,8 +178,12 @@ MonoBehaviour:
   shop1x2Variants: []
   shop2x2Variants: []
   curch1x1Variants: []
+  curch2x1Variants: []
+  curch1x2Variants: []
   curch2x2Variants: []
   evilCurch1x1Variants: []
+  evilCurch2x1Variants: []
+  evilCurch1x2Variants: []
   evilCurch2x2Variants: []
   secretAccessSecret1x1Variants: []
   secretAccessSecret2x1Variants: []

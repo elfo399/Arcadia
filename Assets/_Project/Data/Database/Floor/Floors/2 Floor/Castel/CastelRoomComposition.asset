@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   normalRooms:
     enabled: 1
-    min: 10
-    max: 10
+    min: 8
+    max: 8
   shopRooms:
     enabled: 1
     min: 1
@@ -29,33 +29,37 @@ MonoBehaviour:
     min: 1
     max: 1
   challengeRooms:
+    enabled: 1
+    min: 1
+    max: 1
+  legacyWaveRooms:
     enabled: 0
     min: 0
     max: 0
   minibossRooms:
-    enabled: 0
-    min: 0
-    max: 0
-  parkourRooms:
-    enabled: 0
-    min: 0
-    max: 0
-  npcEncounterRooms:
-    enabled: 0
-    min: 0
-    max: 0
-  churchRooms:
     enabled: 1
     min: 1
     max: 1
+  legacyParkourRooms:
+    enabled: 1
+    min: 1
+    max: 1
+  npcEncounterRooms:
+    enabled: 1
+    min: 1
+    max: 1
+  churchRooms:
+    enabled: 0
+    min: 1
+    max: 1
   secretAccessSecretRooms:
-    enabled: 0
-    min: 0
-    max: 0
+    enabled: 1
+    min: 1
+    max: 1
   secretAccessSuperSecretRooms:
-    enabled: 0
-    min: 0
-    max: 0
+    enabled: 1
+    min: 1
+    max: 1
   allowedRoomSets: []
   enemyPools: []
   challengesAvailable: 1
