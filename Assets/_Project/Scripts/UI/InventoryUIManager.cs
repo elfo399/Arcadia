@@ -140,9 +140,6 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
 
     private void UpdateInventoryEmptyState()
     {
-        if (noItemsBanner == null)
-            return;
-
         bool hasNormalItem = false;
         for (int i = 0; i < sourceItems.Count; i++)
         {
@@ -154,7 +151,10 @@ public class InventoryUIManager : MonoBehaviour, IInventorySlotHandler
             }
         }
 
-        if (noItemsBanner.activeSelf == hasNormalItem)
+        if (slotParent != null && slotParent != transform && slotParent.gameObject.activeSelf != hasNormalItem)
+            slotParent.gameObject.SetActive(hasNormalItem);
+
+        if (noItemsBanner != null && noItemsBanner.activeSelf == hasNormalItem)
             noItemsBanner.SetActive(!hasNormalItem);
     }
 
