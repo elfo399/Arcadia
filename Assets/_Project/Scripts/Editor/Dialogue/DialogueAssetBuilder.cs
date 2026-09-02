@@ -800,8 +800,7 @@ public static class DialogueAssetBuilder
                         showReadIndicator = false,
                         actions = new List<DialogueAction>
                         {
-                            AmountAction(DialogueActionType.ModifyMalefico, 5),
-                            AmountAction(DialogueActionType.ModifyKarma, -2),
+                            AmountAction(DialogueActionType.ModifyKarma, -7),
                             StoryFlagAction(DialogueActionType.SetStoryFlag, "accepted_dark_power")
                         }
                     },

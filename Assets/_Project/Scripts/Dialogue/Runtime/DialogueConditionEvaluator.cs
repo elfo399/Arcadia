@@ -83,14 +83,6 @@ public sealed class DialogueConditionEvaluator
                 result = stats != null && Compare(stats.karma, condition.value, condition.comparison);
                 break;
 
-            case DialogueConditionType.Benedetto:
-                result = stats != null && Compare(stats.benedetto, condition.value, condition.comparison);
-                break;
-
-            case DialogueConditionType.Malefico:
-                result = stats != null && Compare(stats.malefico, condition.value, condition.comparison);
-                break;
-
             case DialogueConditionType.QuestState:
                 result = EvaluateQuestState(condition.id, condition.questState);
                 break;

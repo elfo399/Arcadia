@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f5a1f49b3f94f0b96ef73b1d0a2b1c2, type: 3}
+  m_Name: Recipe_Wand_Medium
+  m_EditorClassIdentifier:
+  recipeId: craft_wand_medium
+  resultWeapon: {fileID: 11400000, guid: b909d472a907aca4d898b37be78b7c6c, type: 2}
+  startingUpgradeLevel: 0
+  coinCost: 360
+  materialRequirements:
+  - item: {fileID: 11400000, guid: 7a3fbc8ca77f494b8319c4c16b11fc69, type: 2}
+    amount: 3
+  - item: {fileID: 11400000, guid: a36fbf135c8a4eb7a0b5b22402081757, type: 2}
+    amount: 2
+  - item: {fileID: 11400000, guid: 121325dec9bf4fb1ad4a67ce37aefdce, type: 2}
+    amount: 1
+  blueprintFragmentsRequired: 3
+  unlockType: 1
+  storyFlagId:

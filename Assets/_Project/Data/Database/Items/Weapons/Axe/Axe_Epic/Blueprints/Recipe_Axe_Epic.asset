@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f5a1f49b3f94f0b96ef73b1d0a2b1c2, type: 3}
+  m_Name: Recipe_Axe_Epic
+  m_EditorClassIdentifier:
+  recipeId: craft_axe_epic
+  resultWeapon: {fileID: 11400000, guid: 2e80cd3252bd297489d64878ae28db56, type: 2}
+  startingUpgradeLevel: 0
+  coinCost: 700
+  materialRequirements:
+  - item: {fileID: 11400000, guid: e1582d118a97462da87d426944e68a5d, type: 2}
+    amount: 5
+  - item: {fileID: 11400000, guid: 4ffd84ef0f3e411ca80c4364fe1c8e09, type: 2}
+    amount: 2
+  - item: {fileID: 11400000, guid: b7a08209f3534b17ba0f3380833a51de, type: 2}
+    amount: 1
+  blueprintFragmentsRequired: 5
+  unlockType: 1
+  storyFlagId:

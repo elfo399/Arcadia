@@ -44,9 +44,7 @@ public class PlayerClassData : ScriptableObject
     [Min(0f)] public float flaskHealAmount = 40f;
 
     [Header("Alignment")]
-    public int karma = 0;
-    public int benedetto = 0;
-    public int malefico = 0;
+    [Range(PlayerStats.MinKarma, PlayerStats.MaxKarma)] public int karma = 0;
 
     [Header("Starting Loadout")]
     public WeaponItem[] rightLoadout = new WeaponItem[3];

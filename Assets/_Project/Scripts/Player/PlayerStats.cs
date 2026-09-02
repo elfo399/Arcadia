@@ -7,6 +7,15 @@ using System.Collections.Generic;
 
 public enum DungeonRunEndReason { Completed, Death, VoluntaryExit }
 
+public enum KarmaState
+{
+    EvilProfondo,
+    Evil,
+    Neutral,
+    Faith,
+    FaithProfonda
+}
+
 public class PlayerStats : MonoBehaviour, IDamageable
 {
     public static event System.Action<float> DamageTaken;
@@ -14,6 +23,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public const int SilverCoinValue = 5;
     public const int GoldCoinValue = 10;
     public const int MaxAllocatableAttributeLevel = 99;
+    public const int MinKarma = -100;
+    public const int MaxKarma = 100;
     private const int FirstAttributeSoftCap = 40;
     private const int SecondAttributeSoftCap = 60;
     private const float MidAttributeGrowthMultiplier = 0.5f;
@@ -80,9 +91,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public int dexterity = 10;
     public int intelligence = 10;
     public int faith = 10;
-    public int karma = 0;
-    public int benedetto = 0;
-    public int malefico = 0;
+    [Range(MinKarma, MaxKarma)] public int karma = 0;
 
     [Header("Combat Flags")]
     [SerializeField] private bool invulnerable;
@@ -323,17 +332,17 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public bool ModifyKarma(int amount, bool save = true)
     {
-        return TryModifyPersistentValue(ref karma, amount, save);
-    }
+        if (amount == 0)
+            return false;
 
-    public bool ModifyBenedetto(int amount, bool save = true)
-    {
-        return TryModifyPersistentValue(ref benedetto, amount, save);
-    }
+        int updated = ClampKarma(SaturatingAdd(karma, amount));
+        if (updated == karma)
+            return false;
 
-    public bool ModifyMalefico(int amount, bool save = true)
-    {
-        return TryModifyPersistentValue(ref malefico, amount, save);
+        karma = updated;
+        if (save)
+            SaveStats();
+        return true;
     }
 
     public bool AddAttributePoints(int amount, bool save = true)
@@ -1089,8 +1098,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
             intelligence = this.intelligence,
             faith = this.faith,
             karma = this.karma,
-            benedetto = this.benedetto,
-            malefico = this.malefico,
             usesUnifiedCoins = true,
             bankCoins = this.bankCoins,
             runCoins = this.runCoins,
@@ -1202,9 +1209,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
             this.dexterity = data.dexterity > 0 ? data.dexterity : this.dexterity;
             this.intelligence = data.intelligence > 0 ? data.intelligence : this.intelligence;
             this.faith = data.faith > 0 ? data.faith : this.faith;
-            this.karma = data.karma;
-            this.benedetto = data.benedetto;
-            this.malefico = data.malefico;
+            this.karma = ClampKarma(data.karma);
             this.runCoins = Mathf.Max(0, data.runCoins);
             this.bankCoins = ResolveSavedBankCoins(data);
             ApplyLoadedDungeonCheckpoint(data);
@@ -1260,9 +1265,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         this.dexterity = data.dexterity > 0 ? data.dexterity : this.dexterity;
         this.intelligence = data.intelligence > 0 ? data.intelligence : this.intelligence;
         this.faith = data.faith > 0 ? data.faith : this.faith;
-        this.karma = data.karma;
-        this.benedetto = data.benedetto;
-        this.malefico = data.malefico;
+        this.karma = ClampKarma(data.karma);
         this.runCoins = Mathf.Max(0, data.runCoins);
         this.bankCoins = ResolveSavedBankCoins(data);
         ApplyLoadedDungeonCheckpoint(data);
@@ -1389,9 +1392,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         intelligence = Mathf.Max(1, playerClass.intelligence);
         faith = Mathf.Max(1, playerClass.faith);
 
-        karma = playerClass.karma;
-        benedetto = playerClass.benedetto;
-        malefico = playerClass.malefico;
+        karma = ClampKarma(playerClass.karma);
         runCoins = 0;
         bankCoins = 0;
         SyncLegacyWalletFields();
@@ -1628,10 +1629,43 @@ public class PlayerStats : MonoBehaviour, IDamageable
             case "intelligence": return intelligence;
             case "faith": return faith;
             case "karma": return karma;
-            case "evil":
-            case "malefico": return malefico;
-            case "benedetto": return benedetto;
             default: return 0;
+        }
+    }
+
+    public KarmaState GetKarmaState()
+    {
+        return ResolveKarmaState(karma);
+    }
+
+    public string GetKarmaStateDisplayName()
+    {
+        return GetKarmaStateDisplayName(GetKarmaState());
+    }
+
+    public static KarmaState ResolveKarmaState(int karmaValue)
+    {
+        int clamped = ClampKarma(karmaValue);
+        if (clamped <= -60)
+            return KarmaState.EvilProfondo;
+        if (clamped <= -6)
+            return KarmaState.Evil;
+        if (clamped <= 5)
+            return KarmaState.Neutral;
+        if (clamped <= 59)
+            return KarmaState.Faith;
+        return KarmaState.FaithProfonda;
+    }
+
+    public static string GetKarmaStateDisplayName(KarmaState state)
+    {
+        switch (state)
+        {
+            case KarmaState.EvilProfondo: return "Evil profondo";
+            case KarmaState.Evil: return "Evil";
+            case KarmaState.Faith: return "Faith";
+            case KarmaState.FaithProfonda: return "Faith profonda";
+            default: return "Neutral";
         }
     }
 
@@ -2310,21 +2344,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
             savedMagic != null ? savedMagic.blueprintFragments : null);
     }
 
-    private bool TryModifyPersistentValue(ref int currentValue, int amount, bool save)
-    {
-        if (amount == 0)
-            return false;
-
-        int updated = SaturatingAdd(currentValue, amount);
-        if (updated == currentValue)
-            return false;
-
-        currentValue = updated;
-        if (save)
-            SaveStats();
-        return true;
-    }
-
     private static int SaturatingAdd(int currentValue, int amount)
     {
         long result = (long)currentValue + amount;
@@ -2333,6 +2352,11 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (result < int.MinValue)
             return int.MinValue;
         return (int)result;
+    }
+
+    public static int ClampKarma(int value)
+    {
+        return Mathf.Clamp(value, MinKarma, MaxKarma);
     }
 
     private static string NormalizeStoryFlagId(string flagId)

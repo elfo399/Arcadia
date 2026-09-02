@@ -4,19 +4,17 @@ using UnityEngine;
 
 public enum DialogueConditionType
 {
-    PlayerAttribute,
-    PlayerLevel,
-    Karma,
-    Benedetto,
-    Malefico,
-    QuestState,
-    StoryFlag,
-    HasItem,
-    ItemAmount,
-    HasCoins,
-    DungeonFloor,
-    DialogueNodeRead,
-    DialogueChoiceSeen
+    PlayerAttribute = 0,
+    PlayerLevel = 1,
+    Karma = 2,
+    QuestState = 5,
+    StoryFlag = 6,
+    HasItem = 7,
+    ItemAmount = 8,
+    HasCoins = 9,
+    DungeonFloor = 10,
+    DialogueNodeRead = 11,
+    DialogueChoiceSeen = 12
 }
 
 public enum DialogueComparisonOperator

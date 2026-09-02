@@ -3,7 +3,7 @@ using System.IO;
 
 public static class SaveSystem
 {
-    public const int CurrentSaveVersion = 10;
+    public const int CurrentSaveVersion = 11;
     public const string SinglePlayerId = "player";
     public const string DefaultPlayerName = "Player";
 
@@ -169,6 +169,7 @@ public static class SaveSystem
             GameData data = JsonUtility.FromJson<GameData>(json);
             MigrateLegacyPlayerIdentityFields(data, json);
             MigrateLegacyCurrencyFields(data, json);
+            MigrateLegacyAlignmentFields(data, json);
             MigrateSaveVersion(data);
             EnsureNarrativeCollections(data);
             Debug.Log($"Dati caricati con successo da: {path}");
@@ -320,6 +321,27 @@ public static class SaveSystem
                                         || ReadJsonBool(json, "startingClassApplied");
     }
 
+    private static void MigrateLegacyAlignmentFields(GameData data, string json)
+    {
+        if (data == null || string.IsNullOrWhiteSpace(json) || data.saveVersion >= 11)
+            return;
+
+        int benedetto = ReadJsonInt(json, "benedetto");
+        int malefico = ReadJsonInt(json, "malefico");
+        if (benedetto == 0 && malefico == 0)
+        {
+            data.karma = PlayerStats.ClampKarma(data.karma);
+            return;
+        }
+
+        long migratedKarma = (long)data.karma + benedetto - malefico;
+        data.karma = migratedKarma > PlayerStats.MaxKarma
+            ? PlayerStats.MaxKarma
+            : migratedKarma < PlayerStats.MinKarma
+                ? PlayerStats.MinKarma
+                : (int)migratedKarma;
+    }
+
     private static void MigrateSaveVersion(GameData data)
     {
         if (data == null)
@@ -420,6 +442,12 @@ public static class SaveSystem
                     data.dungeonSeed = string.Empty;
                     data.dungeonRun = null;
                     data.saveVersion = 10;
+                    break;
+
+                case 10:
+                    // Benedetto and Malefico were consolidated into the bounded Karma value.
+                    data.karma = PlayerStats.ClampKarma(data.karma);
+                    data.saveVersion = 11;
                     break;
 
                 default:

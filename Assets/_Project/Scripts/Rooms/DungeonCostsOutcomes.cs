@@ -76,7 +76,7 @@ public static class DungeonCostTransaction
     {for(int i=removed.Count-1;i>=0;i--)if(inventory==null||!inventory.TryAddItem(removed[i].Key,removed[i].Value,false))Debug.LogError("[DungeonCostTransaction] Inventory rollback failed.");if(healthPaid)stats.RestoreHealth(totals.health);if(flasksPaid)stats.RestoreFlasks(totals.flasks);if(coinsPaid)stats.AddCoins(totals.coins,false);}
 }
 
-public enum DungeonOutcomeKind { RunModifier, Item, LootPool, Karma, Benedetto, Malefico, StoryFlag, Heal, RestoreFlasks, MagicRecipe }
+public enum DungeonOutcomeKind { RunModifier = 0, Item = 1, LootPool = 2, Karma = 3, StoryFlag = 6, Heal = 7, RestoreFlasks = 8, MagicRecipe = 9 }
 [Serializable] public sealed class DungeonResolvedOutcome
 {
     [NonSerialized] internal DungeonOutcome source;
@@ -90,8 +90,6 @@ public enum DungeonOutcomeKind { RunModifier, Item, LootPool, Karma, Benedetto, 
             case DungeonOutcomeKind.Item:return inventory!=null&&inventory.TryAddItem(source.item,Mathf.Max(1,source.amount));
             case DungeonOutcomeKind.LootPool:return resolvedLoot!=null&&inventory!=null&&inventory.TryAddItem(resolvedLoot.item,resolvedLoot.amount);
             case DungeonOutcomeKind.Karma:return stats.ModifyKarma(source.amount,false);
-            case DungeonOutcomeKind.Benedetto:return stats.ModifyBenedetto(source.amount,false);
-            case DungeonOutcomeKind.Malefico:return stats.ModifyMalefico(source.amount,false);
             case DungeonOutcomeKind.StoryFlag:return stats.HasStoryFlag(source.id)||stats.SetStoryFlag(source.id,false);
             case DungeonOutcomeKind.Heal:stats.RestoreHealth(source.amount);return true;
             case DungeonOutcomeKind.RestoreFlasks:stats.RestoreFlasks(source.amount);return true;

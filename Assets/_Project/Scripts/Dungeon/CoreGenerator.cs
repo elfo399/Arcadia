@@ -410,15 +410,17 @@ public class CoreGenerator : MonoBehaviour
         if (activeFloorDefinition != null)
         {
             int churchCount = ResolveChurchRoomCount();
-            bool useEvilChurch = playerStats != null && playerStats.malefico > playerStats.benedetto;
+            KarmaState karmaState = playerStats != null ? playerStats.GetKarmaState() : KarmaState.Neutral;
+            bool useEvilChurch = karmaState == KarmaState.Evil || karmaState == KarmaState.EvilProfondo;
             RoomType churchType = useEvilChurch ? RoomType.EvilCurch : RoomType.Curch;
             RoomPoolKey churchPool = useEvilChurch ? RoomPoolKey.EvilCurch : RoomPoolKey.Curch;
             int bigRoomChance = useEvilChurch ? evilCurchBigRoomChance : curchBigRoomChance;
             if (!PlaceSpecialRooms(churchType, churchPool, churchCount, layout, occupiedCells, deadEndNormalRooms, freeSockets, 0, bigRoomChance, cellToRoomMap)) return null;
         }
-        else if (playerStats != null && playerStats.benedetto != playerStats.malefico && prng.Next(0, 100) <= curchsRoomsChance)
+        else if (playerStats != null && playerStats.GetKarmaState() != KarmaState.Neutral && prng.Next(0, 100) <= curchsRoomsChance)
         {
-            bool useEvilChurch = playerStats.malefico > playerStats.benedetto;
+            KarmaState karmaState = playerStats.GetKarmaState();
+            bool useEvilChurch = karmaState == KarmaState.Evil || karmaState == KarmaState.EvilProfondo;
             RoomType churchType = useEvilChurch ? RoomType.EvilCurch : RoomType.Curch;
             RoomPoolKey churchPool = useEvilChurch ? RoomPoolKey.EvilCurch : RoomPoolKey.Curch;
             int bigRoomChance = useEvilChurch ? evilCurchBigRoomChance : curchBigRoomChance;

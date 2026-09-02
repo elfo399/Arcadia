@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f5a1f49b3f94f0b96ef73b1d0a2b1c2, type: 3}
+  m_Name: Recipe_Bow_Medium
+  m_EditorClassIdentifier:
+  recipeId: craft_bow_medium
+  resultWeapon: {fileID: 11400000, guid: 3c0748b81993ab4448b4b0c7027e39a7, type: 2}
+  startingUpgradeLevel: 0
+  coinCost: 300
+  materialRequirements:
+  - item: {fileID: 11400000, guid: 7a3fbc8ca77f494b8319c4c16b11fc69, type: 2}
+    amount: 3
+  - item: {fileID: 11400000, guid: 65b812e6e91c4ff399afce333ef06be5, type: 2}
+    amount: 2
+  - item: {fileID: 11400000, guid: c8728f37aec54605ae6ae2a6ebcd88bc, type: 2}
+    amount: 1
+  blueprintFragmentsRequired: 3
+  unlockType: 1
+  storyFlagId:

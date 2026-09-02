@@ -96,8 +96,6 @@ public sealed class DialogueActionRunner
         switch (action.type)
         {
             case DialogueActionType.ModifyKarma:
-            case DialogueActionType.ModifyBenedetto:
-            case DialogueActionType.ModifyMalefico:
                 return stats != null;
 
             case DialogueActionType.GiveAttributePoint:
@@ -173,16 +171,6 @@ public sealed class DialogueActionRunner
             case DialogueActionType.ModifyKarma:
                 if (stats == null) return false;
                 persistentStateChanged = stats.ModifyKarma(action.amount, save: false);
-                return true;
-
-            case DialogueActionType.ModifyBenedetto:
-                if (stats == null) return false;
-                persistentStateChanged = stats.ModifyBenedetto(action.amount, save: false);
-                return true;
-
-            case DialogueActionType.ModifyMalefico:
-                if (stats == null) return false;
-                persistentStateChanged = stats.ModifyMalefico(action.amount, save: false);
                 return true;
 
             case DialogueActionType.GiveAttributePoint:

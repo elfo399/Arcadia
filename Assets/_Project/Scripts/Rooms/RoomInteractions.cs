@@ -1,12 +1,12 @@
 using System;
 using UnityEngine;
 
-public enum DungeonRequirementKind { None, Coins, Strength, Dexterity, Intelligence, Faith, Karma, Benedetto, Malefico, StoryFlag, InventoryItem }
+public enum DungeonRequirementKind { None = 0, Coins = 1, Strength = 2, Dexterity = 3, Intelligence = 4, Faith = 5, Karma = 6, StoryFlag = 9, InventoryItem = 10 }
 [Serializable] public sealed class DungeonRequirement
 {
     public DungeonRequirementKind kind; public int amount; public string id; public ItemData item; public bool consumeItem;
     public bool IsMet(PlayerStats stats)
-    { if(kind==DungeonRequirementKind.None)return true; if(stats==null)return false; switch(kind) { case DungeonRequirementKind.Coins:return stats.HasCoins(amount); case DungeonRequirementKind.Strength:return stats.EffectiveStrength>=amount; case DungeonRequirementKind.Dexterity:return stats.EffectiveDexterity>=amount; case DungeonRequirementKind.Intelligence:return stats.EffectiveIntelligence>=amount; case DungeonRequirementKind.Faith:return stats.EffectiveFaith>=amount; case DungeonRequirementKind.Karma:return stats.karma>=amount; case DungeonRequirementKind.Benedetto:return stats.benedetto>=amount; case DungeonRequirementKind.Malefico:return stats.malefico>=amount; case DungeonRequirementKind.StoryFlag:return stats.HasStoryFlag(id); case DungeonRequirementKind.InventoryItem:return item!=null&&PlayerInventoryHas(stats,item,amount); default:return false; } }
+    { if(kind==DungeonRequirementKind.None)return true; if(stats==null)return false; switch(kind) { case DungeonRequirementKind.Coins:return stats.HasCoins(amount); case DungeonRequirementKind.Strength:return stats.EffectiveStrength>=amount; case DungeonRequirementKind.Dexterity:return stats.EffectiveDexterity>=amount; case DungeonRequirementKind.Intelligence:return stats.EffectiveIntelligence>=amount; case DungeonRequirementKind.Faith:return stats.EffectiveFaith>=amount; case DungeonRequirementKind.Karma:return stats.karma>=amount; case DungeonRequirementKind.StoryFlag:return stats.HasStoryFlag(id); case DungeonRequirementKind.InventoryItem:return item!=null&&PlayerInventoryHas(stats,item,amount); default:return false; } }
     public bool TryConsume(PlayerStats stats){return DungeonCostTransaction.TryConsumeRequirements(new[]{this},stats);}
     private static bool PlayerInventoryHas(PlayerStats stats,ItemData item,int amount){PlayerInventory inventory=stats.GetComponent<PlayerInventory>();return inventory!=null&&inventory.GetTotalItemAmount(item)>=Mathf.Max(1,amount);}
 }

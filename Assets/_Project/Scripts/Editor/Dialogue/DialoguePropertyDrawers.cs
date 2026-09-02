@@ -262,8 +262,6 @@ public sealed class DialogueConditionDrawer : PropertyDrawer
 
             case DialogueConditionType.PlayerLevel:
             case DialogueConditionType.Karma:
-            case DialogueConditionType.Benedetto:
-            case DialogueConditionType.Malefico:
             case DialogueConditionType.HasCoins:
             case DialogueConditionType.DungeonFloor:
                 DrawPropertyLine(position, ref y, property, "comparison", "Operator");
@@ -407,8 +405,6 @@ public sealed class DialogueActionDrawer : PropertyDrawer
         switch (type)
         {
             case DialogueActionType.ModifyKarma:
-            case DialogueActionType.ModifyBenedetto:
-            case DialogueActionType.ModifyMalefico:
                 DrawPropertyLine(position, ref y, property, "amount", "Delta");
                 break;
 

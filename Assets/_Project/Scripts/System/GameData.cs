@@ -178,8 +178,6 @@ public class GameData
     public int faith;
 
     public int karma;
-    public int benedetto;
-    public int malefico;
 
     // Banked currency (persistent across runs)
     public bool usesUnifiedCoins;

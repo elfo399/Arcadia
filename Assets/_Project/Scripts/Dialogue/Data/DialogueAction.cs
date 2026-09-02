@@ -3,25 +3,23 @@ using UnityEngine;
 
 public enum DialogueActionType
 {
-    ModifyKarma,
-    ModifyBenedetto,
-    ModifyMalefico,
-    GiveAttributePoint,
-    AddCoins,
-    RemoveCoins,
-    AddItem,
-    RemoveItem,
-    StartQuest,
-    CompleteQuest,
-    FailQuest,
-    SetStoryFlag,
-    ClearStoryFlag,
-    RestoreHealth,
-    RestoreMana,
-    RestoreStamina,
-    RestoreFlasks,
-    OpenService,
-    Teleport
+    ModifyKarma = 0,
+    GiveAttributePoint = 3,
+    AddCoins = 4,
+    RemoveCoins = 5,
+    AddItem = 6,
+    RemoveItem = 7,
+    StartQuest = 8,
+    CompleteQuest = 9,
+    FailQuest = 10,
+    SetStoryFlag = 11,
+    ClearStoryFlag = 12,
+    RestoreHealth = 13,
+    RestoreMana = 14,
+    RestoreStamina = 15,
+    RestoreFlasks = 16,
+    OpenService = 17,
+    Teleport = 18
 }
 
 [Serializable]
@@ -52,8 +50,6 @@ public sealed class DialogueAction
         switch (type)
         {
             case DialogueActionType.ModifyKarma:
-            case DialogueActionType.ModifyBenedetto:
-            case DialogueActionType.ModifyMalefico:
             case DialogueActionType.GiveAttributePoint:
             case DialogueActionType.AddCoins:
             case DialogueActionType.RemoveCoins:

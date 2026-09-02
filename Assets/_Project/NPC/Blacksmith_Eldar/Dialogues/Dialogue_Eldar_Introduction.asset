@@ -220,24 +220,8 @@ MonoBehaviour:
         conditions: []
         groups: []
       actions:
-      - type: 2
-        amount: 5
-        stopOnFailure: 0
-        id:
-        item:
-          itemType: 0
-          item: {fileID: 0}
-          weapon: {fileID: 0}
-          armor: {fileID: 0}
-          magic: {fileID: 0}
-          usable: {fileID: 0}
-        questDefinition: {fileID: 0}
-        serviceId:
-        teleportTargetId:
-        teleportSceneName:
-        useTeleportTargetRotation: 1
       - type: 0
-        amount: -2
+        amount: -7
         stopOnFailure: 0
         id:
         item:

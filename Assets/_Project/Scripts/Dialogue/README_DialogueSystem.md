@@ -103,7 +103,7 @@ AND
     Faith >= 25
 ```
 
-I tipi iniziali coprono attributi, livello, Karma/Benedetto/Malefico, quest state, story flag, item/quantita, coins della run, dungeon floor, node letto e choice selezionata. Le condizioni sugli attributi leggono i valori base persistenti (non bonus temporanei); `Has Coins` usa `runCoins`, coerentemente con il wallet gameplay attuale. Gli operatori numerici sono tipizzati (`Equal`, `NotEqual`, `Greater`, `GreaterOrEqual`, `Less`, `LessOrEqual`).
+I tipi iniziali coprono attributi, livello, Karma, quest state, story flag, item/quantita, coins della run, dungeon floor, node letto e choice selezionata. Le condizioni sugli attributi leggono i valori base persistenti (non bonus temporanei); `Has Coins` usa `runCoins`, coerentemente con il wallet gameplay attuale. Gli operatori numerici sono tipizzati (`Equal`, `NotEqual`, `Greater`, `GreaterOrEqual`, `Less`, `LessOrEqual`).
 
 La mappatura quest segue lo stato esistente: `NotStarted` = ID assente, `Active` = presente/non completata, `ReadyToComplete` = completata con reward non riscossa, `Completed` = flag completed, `RewardClaimed` = reward riscossa.
 
@@ -111,7 +111,7 @@ La mappatura quest segue lo stato esistente: `NotStarted` = ID assente, `Active`
 
 Le actions disponibili sono:
 
-- Modify Karma/Benedetto/Malefico;
+- Modify Karma;
 - Give Attribute Point;
 - Add/Remove Coins (wallet `runCoins`);
 - Add/Remove Item per generic, weapon, armor, magic e usable;
@@ -208,7 +208,7 @@ Per usarlo:
 5. assegnare lo speaker Player nel `DialogueManager`;
 6. verificare che il Fabbro abbia un collider sul layer interagibile.
 
-L'esempio dimostra flag `met_blacksmith`, menu, choice Intelligence 20 disabilitata, ramo lore con ritorno al menu e choice oscura con Malefico +5, Karma -2 e `accepted_dark_power`.
+L'esempio dimostra flag `met_blacksmith`, menu, choice Intelligence 20 disabilitata, ramo lore con ritorno al menu e choice oscura con Karma -7 e `accepted_dark_power`.
 
 `Dialogue_Blacksmith_Lore.asset` e anche un template standalone di authoring. Il ramo lore effettivamente raggiunto dal profile e incorporato in Introduction/Default, perche la prima versione naviga node della conversazione corrente e non effettua salti impliciti tra asset diversi.
 
@@ -280,7 +280,7 @@ Runtime usa HashSet case-insensitive. Le chiavi sono composte da ID stabili e no
 
 Un node viene marcato letto quando la linea e stata completamente rivelata, non al semplice ingresso: annullare durante il typewriter non abilita il fast-forward su testo non ancora letto.
 
-`SaveSystem.CurrentSaveVersion` e 3. La migrazione 2 -> 3 inizializza collezioni vuote; save precedenti senza i nuovi campi restano validi. `PlayerStats.BuildGameDataSnapshot` include sempre flag e history, quindi gli autosave di inventory/quest non li sovrascrivono.
+`SaveSystem.CurrentSaveVersion` e 11. La migrazione 2 -> 3 inizializza collezioni vuote; la migrazione 10 -> 11 consolida Benedetto/Malefico in Karma. I save precedenti restano validi. `PlayerStats.BuildGameDataSnapshot` include sempre flag e history, quindi gli autosave di inventory/quest non li sovrascrivono.
 
 ## 17. Teleport
 

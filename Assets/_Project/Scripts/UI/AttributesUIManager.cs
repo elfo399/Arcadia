@@ -40,6 +40,9 @@ public class AttributesUIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI attributesMagicDefValueText;
     [SerializeField] private TextMeshProUGUI attributesLoadValueText;
     [SerializeField] private TextMeshProUGUI attributesLoadTierValueText;
+    [Header("Karma")]
+    [Tooltip("Testo che mostra lo stato derivato dal Karma: Evil profondo, Evil, Neutral, Faith o Faith profonda.")]
+    [SerializeField] private TextMeshProUGUI karmaStateText;
     [Header("Unspent Attribute Points")]
     [Tooltip("Parent che contiene la scritta Point e il relativo valore. Viene nascosto quando non restano punti da assegnare.")]
     [SerializeField] private GameObject txtPointParent;
@@ -150,6 +153,7 @@ public class AttributesUIManager : MonoBehaviour
         if (playerStats == null) return;
 
         RefreshUnspentAttributePoints();
+        RefreshKarmaState();
         RefreshAttributeRowsValues();
         RefreshAttributeDerivedPanel();
         RefreshPlayerPortrait();
@@ -441,7 +445,9 @@ public class AttributesUIManager : MonoBehaviour
             if (row.valueText != null) row.valueText.text = value.ToString();
             if (row.descText != null)
             {
-                string description = GetDefaultAttributeDescription(row.key);
+                string description = statName == "karma"
+                    ? $"Moral balance. Current state: {playerStats.GetKarmaStateDisplayName()}."
+                    : GetDefaultAttributeDescription(row.key);
                 if (!string.IsNullOrWhiteSpace(description))
                     row.descText.text = description;
             }
@@ -468,6 +474,14 @@ public class AttributesUIManager : MonoBehaviour
             confirmButton.gameObject.SetActive(hasPendingAllocation);
             confirmButton.interactable = hasPendingAllocation;
         }
+    }
+
+    private void RefreshKarmaState()
+    {
+        if (karmaStateText == null || playerStats == null)
+            return;
+
+        karmaStateText.text = playerStats.GetKarmaStateDisplayName();
     }
 
     private void RefreshUnspentAttributePoints()
@@ -740,7 +754,6 @@ public class AttributesUIManager : MonoBehaviour
     {
         if (string.IsNullOrWhiteSpace(key)) return string.Empty;
         string k = key.Trim().ToLowerInvariant();
-        if (k == "evil") return "malefico";
         return k;
     }
 
@@ -816,7 +829,6 @@ public class AttributesUIManager : MonoBehaviour
             case "dexterity": return "Increases Ranged & DEX Damage.";
             case "intelligence": return "Increases Magic & INT Damage.";
             case "faith": return "Increases Magic Resistance.";
-            case "evil": return "Represents your dark alignment.";
             case "karma": return "Represents your moral balance.";
             default: return string.Empty;
         }

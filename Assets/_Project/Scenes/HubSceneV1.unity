@@ -2705,8 +2705,30 @@ MonoBehaviour:
   bookCloseStateName: CloseBook
   bookCloseDuration: 0.6666666
   recipes:
-  - {fileID: 11400000, guid: e9b91714b0e545b4baabf9e100128002, type: 2}
-  - {fileID: 11400000, guid: c1a2d388aa584c68ad4f6ba7eaa5d209, type: 2}
+  - {fileID: 11400000, guid: 01c019519a6a4a9f8b8cb65853f54add, type: 2}
+  - {fileID: 11400000, guid: 48f637f7fad14a3cac0236819d7c8589, type: 2}
+  - {fileID: 11400000, guid: b109be9d125b42279935c73c8e9de2c6, type: 2}
+  - {fileID: 11400000, guid: 6f24d1de74bd498dbdb37e89ed20acb8, type: 2}
+  - {fileID: 11400000, guid: ce58b406c1134f2586c2601c6ad99fb0, type: 2}
+  - {fileID: 11400000, guid: c64c28fc27604365b7791be0bb3386b8, type: 2}
+  - {fileID: 11400000, guid: 61c796b2704e4cc59cb2b77f8aee8369, type: 2}
+  - {fileID: 11400000, guid: 6c9faed6911f42f0976cac3e92eee01c, type: 2}
+  - {fileID: 11400000, guid: f9ce2ded7d0f434d8d9c09bdd1104c92, type: 2}
+  - {fileID: 11400000, guid: f77bb4f7237e47ccab53a7934a21a5eb, type: 2}
+  - {fileID: 11400000, guid: ada9aecc068f47e5bf0a9e423a614e5a, type: 2}
+  - {fileID: 11400000, guid: 2c98f23d36364138aa4206b3acbd3b04, type: 2}
+  - {fileID: 11400000, guid: a51c471fc11642b4957e809526dc1050, type: 2}
+  - {fileID: 11400000, guid: 08a242471fe94ef282a11cd06b8afb61, type: 2}
+  - {fileID: 11400000, guid: 06c4df0b590e4381b2cce5b5194faba8, type: 2}
+  - {fileID: 11400000, guid: c66e22f2b72840a4b5f122ba28de11fb, type: 2}
+  - {fileID: 11400000, guid: aeb7a16f371f4e7485acce6ecff4cfc7, type: 2}
+  - {fileID: 11400000, guid: 6be7cf6ebefc4899b0d8cefdf3648189, type: 2}
+  - {fileID: 11400000, guid: 041278dffcb44d19b73f94441ebff3f9, type: 2}
+  - {fileID: 11400000, guid: d11121f0c22942e395c3850801be9baa, type: 2}
+  - {fileID: 11400000, guid: 63507c77893848d2847e4e132e8dd10f, type: 2}
+  - {fileID: 11400000, guid: e9e6d16b17474dd1b6ae383e4b814634, type: 2}
+  - {fileID: 11400000, guid: bc1a70e1f55f4992b350e94842b29372, type: 2}
+  - {fileID: 11400000, guid: d0673301f1794f0ba936a21062fcaa75, type: 2}
 --- !u!114 &49554512
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -18585,8 +18607,8 @@ MonoBehaviour:
   m_ChildAlignment: 1
   m_StartCorner: 0
   m_StartAxis: 0
-  m_CellSize: {x: 245, y: 48}
-  m_Spacing: {x: 0, y: 6}
+  m_CellSize: {x: 230, y: 48}
+  m_Spacing: {x: 0, y: -10}
   m_Constraint: 1
   m_ConstraintCount: 1
 --- !u!1 &392722400
@@ -42587,8 +42609,8 @@ MonoBehaviour:
   m_ChildAlignment: 1
   m_StartCorner: 0
   m_StartAxis: 0
-  m_CellSize: {x: 245, y: 48}
-  m_Spacing: {x: 0, y: 6}
+  m_CellSize: {x: 230, y: 48}
+  m_Spacing: {x: 0, y: -10}
   m_Constraint: 1
   m_ConstraintCount: 1
 --- !u!1 &1060271469
@@ -42648,6 +42670,7 @@ MonoBehaviour:
   attributesMagicDefValueText: {fileID: 48598488}
   attributesLoadValueText: {fileID: 22483337}
   attributesLoadTierValueText: {fileID: 1077141921}
+  karmaStateText: {fileID: 0}
   txtPointParent: {fileID: 95793539}
   txtPointValue: {fileID: 284778425}
   playerPortraitImage: {fileID: 183070892}
@@ -47301,9 +47324,7 @@ MonoBehaviour:
   dexterity: 10
   intelligence: 10
   faith: 10
-  karma: 0
-  benedetto: 10
-  malefico: 0
+  karma: 10
   invulnerable: 0
   totalArmorPhysicalDefense: 0
   totalArmorMagicDefense: 0
