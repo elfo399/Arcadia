@@ -715,7 +715,9 @@ public class WeatherManager : MonoBehaviour
             case WeatherCondition.Lightning2:
                 return "THUNDER";
             default:
-                return "SUN";
+                // "Clear" describes the weather, not the light source. During the
+                // night the same clear condition must be represented by the moon.
+                return CurrentPhase == DayPhase.Night ? "MOON" : "SUN";
         }
     }
 
