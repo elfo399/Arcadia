@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 2796751989926474975}
   - component: {fileID: 6667051510066170585}
   - component: {fileID: 9085782522639564932}
+  - component: {fileID: 5254547783095269784}
   m_Layer: 0
   m_Name: BasciSword
   m_TagString: Untagged
@@ -150,8 +151,33 @@ MonoBehaviour:
   lifetime: 2.5
   hitEnableDelay: 0.08
   minArmingDistance: 0.9
+  useBallisticArc: 1
+  gravityMultiplier: 1
+  spinSpeed: 720
   hitMask:
     serializedVersion: 2
     m_Bits: 4294967295
   forceIgnoreRaycastLayer: 1
   logHits: 1
+--- !u!64 &5254547783095269784
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8947079371753237599}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 6060968266713717718, guid: ca3efc9aae68e2c4b82574617a4bf176, type: 3}

@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 7325296867923003085}
   - component: {fileID: 5910821841762126184}
   - component: {fileID: 8494776722968477090}
+  - component: {fileID: 8494776722968477091}
   m_Layer: 0
   m_Name: Plant.005
   m_TagString: Untagged
@@ -40,6 +41,28 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7990368823354416247}
+  m_Mesh: {fileID: -8585468956973780949, guid: 997633ad9d58bb7498c1a461ea28605c, type: 3}
+--- !u!64 &8494776722968477091
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7990368823354416247}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
   m_Mesh: {fileID: -8585468956973780949, guid: 997633ad9d58bb7498c1a461ea28605c, type: 3}
 --- !u!23 &8494776722968477090
 MeshRenderer:

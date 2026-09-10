@@ -235,6 +235,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3587716953621560387}
   - component: {fileID: 5379640143609346020}
+  - component: {fileID: 6317832920844593204}
   m_Layer: 0
   m_Name: Bird
   m_TagString: Untagged
@@ -274,9 +275,6 @@ SkinnedMeshRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 3
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -320,6 +318,29 @@ SkinnedMeshRenderer:
     m_Center: {x: 0.029634545, y: 0.05048281, z: 0.000031121075}
     m_Extent: {x: 0.047890544, y: 0.07143225, z: 0.0822888}
   m_DirtyAABB: 0
+--- !u!136 &6317832920844593204
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2173937409864884493}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.07143225
+  m_Height: 0.1428645
+  m_Direction: 1
+  m_Center: {x: 0.029634545, y: 0.05048281, z: 0.000031121075}
 --- !u!1 &2257996027750863069
 GameObject:
   m_ObjectHideFlags: 0
@@ -362,6 +383,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4030638334827449915}
   - component: {fileID: 7178954133585686178}
+  - component: {fileID: 7389181325661218466}
   m_Layer: 0
   m_Name: Bird.001
   m_TagString: Untagged
@@ -401,9 +423,6 @@ SkinnedMeshRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 3
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -447,6 +466,29 @@ SkinnedMeshRenderer:
     m_Center: {x: -0.0028393734, y: 0.050482854, z: 0.000075962394}
     m_Extent: {x: 0.015416626, y: 0.07143225, z: 0.11474177}
   m_DirtyAABB: 0
+--- !u!136 &7389181325661218466
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2585805447690608641}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.07143225
+  m_Height: 0.1428645
+  m_Direction: 1
+  m_Center: {x: -0.0028393734, y: 0.050482854, z: 0.000075962394}
 --- !u!1 &2683835193214820529
 GameObject:
   m_ObjectHideFlags: 0
@@ -995,7 +1037,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!95 &1803931052638921131
 Animator:
-  serializedVersion: 7
+  serializedVersion: 5
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -1009,7 +1051,6 @@ Animator:
   m_ApplyRootMotion: 0
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
-  m_AnimatePhysics: 0
   m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
@@ -1247,6 +1288,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4614623767457889886}
   - component: {fileID: 3701787659456844344}
+  - component: {fileID: 3452549582657120058}
   m_Layer: 0
   m_Name: Bird.004
   m_TagString: Untagged
@@ -1286,9 +1328,6 @@ SkinnedMeshRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 3
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -1332,6 +1371,29 @@ SkinnedMeshRenderer:
     m_Center: {x: -0.03761661, y: 0.05048275, z: 0.00008011982}
     m_Extent: {x: 0.05106452, y: 0.07143225, z: 0.046264946}
   m_DirtyAABB: 0
+--- !u!136 &3452549582657120058
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7184921465969168046}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.05106452
+  m_Height: 0.1428645
+  m_Direction: 1
+  m_Center: {x: -0.03761661, y: 0.05048275, z: 0.00008011982}
 --- !u!1 &7329090991767860342
 GameObject:
   m_ObjectHideFlags: 0
@@ -1342,6 +1404,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7473175680626010245}
   - component: {fileID: 1145198331864481630}
+  - component: {fileID: 2049534579246581541}
   m_Layer: 0
   m_Name: Bird.002
   m_TagString: Untagged
@@ -1381,9 +1444,6 @@ SkinnedMeshRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 3
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -1427,6 +1487,29 @@ SkinnedMeshRenderer:
     m_Center: {x: -0.00041384622, y: 0.050482824, z: 0.000079441816}
     m_Extent: {x: 0.017842147, y: 0.07143225, z: 0.11532934}
   m_DirtyAABB: 0
+--- !u!136 &2049534579246581541
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7329090991767860342}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.07143225
+  m_Height: 0.1428645
+  m_Direction: 1
+  m_Center: {x: -0.00041384622, y: 0.050482824, z: 0.000079441816}
 --- !u!1 &7796186167942125640
 GameObject:
   m_ObjectHideFlags: 0
@@ -1501,6 +1584,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8511887537108914440}
   - component: {fileID: 4922529915330693832}
+  - component: {fileID: 9062767744432802707}
   m_Layer: 0
   m_Name: Bird.003
   m_TagString: Untagged
@@ -1540,9 +1624,6 @@ SkinnedMeshRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 3
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -1586,6 +1667,29 @@ SkinnedMeshRenderer:
     m_Center: {x: -0.0028393818, y: 0.05048287, z: 0.00007598102}
     m_Extent: {x: 0.0154166175, y: 0.07143225, z: 0.11474179}
   m_DirtyAABB: 0
+--- !u!136 &9062767744432802707
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8046321201390408432}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.07143225
+  m_Height: 0.1428645
+  m_Direction: 1
+  m_Center: {x: -0.0028393818, y: 0.05048287, z: 0.00007598102}
 --- !u!1 &8178002907741033509
 GameObject:
   m_ObjectHideFlags: 0

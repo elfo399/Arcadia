@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 9186548325627078473}
   - component: {fileID: 5247527626439469292}
   - component: {fileID: 8013594627882474534}
+  - component: {fileID: 7826444036665431012}
   m_Layer: 0
   m_Name: Pistol 1
   m_TagString: Untagged
@@ -25,6 +26,7 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8374159468128534003}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1.5, y: 1.5, z: 1.5}
@@ -33,7 +35,6 @@ Transform:
   - {fileID: 5647349399766264406}
   - {fileID: 5330076846809342680}
   m_Father: {fileID: 0}
-  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &5247527626439469292
 MeshFilter:
@@ -86,11 +87,34 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &7826444036665431012
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8374159468128534003}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 1220828769319070387, guid: e7f1b4bf636aa9647a3a0b696c12d53f, type: 3}
 --- !u!1001 &5320390698479390141
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
+    serializedVersion: 3
     m_TransformParent: {fileID: 9186548325627078473}
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 7f5966777b29c474fa44e7d233c2181d, type: 3}
@@ -142,6 +166,9 @@ PrefabInstance:
       value: Pistol_Trigger_1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 7f5966777b29c474fa44e7d233c2181d, type: 3}
 --- !u!4 &5647349399766264406 stripped
 Transform:
@@ -153,6 +180,7 @@ PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
+    serializedVersion: 3
     m_TransformParent: {fileID: 9186548325627078473}
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: aacc880c9573a5146bdbe7112007fd58, type: 3}
@@ -204,6 +232,9 @@ PrefabInstance:
       value: Pistol_Trigger_2
       objectReference: {fileID: 0}
     m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: aacc880c9573a5146bdbe7112007fd58, type: 3}
 --- !u!4 &5330076846809342680 stripped
 Transform:
